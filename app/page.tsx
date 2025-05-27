@@ -42,10 +42,10 @@ const RadicoDashboard = () => {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState(new Date());
 
-  // Your actual Google Sheets configuration
+  // Your actual Google Sheets configuration - UPDATED WITH CORRECT IDs
   const SHEETS_CONFIG = {
-    masterSheetId: process.env.NEXT_PUBLIC_MASTER_SHEET_ID || '1pRz9CgOoamTrfpnmF-XuBCg9IZON9br5avgRlKYtxM',
-    visitSheetId: process.env.NEXT_PUBLIC_VISIT_SHEET_ID || '1XG4c_Lrpk-YglTq3G3ZY9Qjt7wSnUq0UZWDSYT61eWt',
+    masterSheetId: process.env.NEXT_PUBLIC_MASTER_SHEET_ID || '1pRz9CgOoamTrFipnmF-XuBCg9IZON9br5avgRlKYtxM',
+    visitSheetId: process.env.NEXT_PUBLIC_VISIT_SHEET_ID || '1XG4c_Lrpk-YglTq3G3ZY9Qjt7wSnUq0UZWDSYT61eWE',
     apiKey: process.env.NEXT_PUBLIC_GOOGLE_API_KEY
   };
 
@@ -101,11 +101,11 @@ const RadicoDashboard = () => {
     return data;
   };
 
-  // Fetch from your Radico Visit Final spreadsheet
+  // Fetch from your Radico Visit Final spreadsheet - UPDATED SHEET NAME
   const fetchVisitSheetData = async () => {
     try {
       const response = await fetch(
-        `https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_CONFIG.visitSheetId}/values/Sheet1?key=${SHEETS_CONFIG.apiKey}`
+        `https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_CONFIG.visitSheetId}/values/Radico%20Visit%20Final?key=${SHEETS_CONFIG.apiKey}`
       );
       
       if (!response.ok) {
