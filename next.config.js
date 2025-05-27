@@ -2,9 +2,12 @@
 const nextConfig = {
   output: 'export',
   trailingSlash: true,
+  basePath: '/radico-dashboard',
+  assetPrefix: '/radico-dashboard',
   images: {
     unoptimized: true
   },
+  distDir: 'out',
   env: {
     NEXT_PUBLIC_GOOGLE_API_KEY: process.env.NEXT_PUBLIC_GOOGLE_API_KEY,
     NEXT_PUBLIC_MASTER_SHEET_ID: '1pRz9CgOoamTrFipnmF-XuBCg9IZON9br5avgRlKYtxM',
