@@ -21,6 +21,25 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         
+      - name: Debug - List repository contents
+        run: |
+          echo "=== Repository root contents ==="
+          ls -la
+          echo "=== Check for app directory ==="
+          if [ -d "app" ]; then
+            echo "✅ app directory found!"
+            ls -la app/
+          else
+            echo "❌ app directory NOT found!"
+          fi
+          echo "=== Check for pages directory ==="
+          if [ -d "pages" ]; then
+            echo "✅ pages directory found!"
+            ls -la pages/
+          else
+            echo "❌ pages directory NOT found!"
+          fi
+        
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
