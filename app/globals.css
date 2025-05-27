@@ -1,1 +1,305 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+:root {
+  --foreground-rgb: 0, 0, 0;
+  --background-start-rgb: 214, 219, 220;
+  --background-end-rgb: 255, 255, 255;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --foreground-rgb: 255, 255, 255;
+    --background-start-rgb: 0, 0, 0;
+    --background-end-rgb: 0, 0, 0;
+  }
+}
+
+body {
+  color: rgb(var(--foreground-rgb));
+  background: linear-gradient(
+      to bottom,
+      transparent,
+      rgb(var(--background-end-rgb))
+    )
+    rgb(var(--background-start-rgb));
+  font-family: 'Inter', sans-serif;
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}
+
+/* Loading animation */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: .5;
+  }
+}
+
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Print styles for PDF generation */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+  
+  .print-break {
+    page-break-before: always;
+  }
+  
+  .print-avoid-break {
+    page-break-inside: avoid;
+  }
+}
+
+/* Enhanced table styles */
+.enhanced-table {
+  @apply min-w-full divide-y divide-gray-200;
+}
+
+.enhanced-table thead {
+  @apply bg-gray-50;
+}
+
+.enhanced-table th {
+  @apply px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider;
+}
+
+.enhanced-table td {
+  @apply px-6 py-4 whitespace-nowrap text-sm text-gray-900;
+}
+
+.enhanced-table tbody tr:nth-child(even) {
+  @apply bg-gray-50;
+}
+
+.enhanced-table tbody tr:hover {
+  @apply bg-gray-100;
+}
+
+/* Custom button styles */
+.btn-primary {
+  @apply bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+}
+
+.btn-secondary {
+  @apply bg-gray-200 hover:bg-gray-300 text-gray-800 font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+}
+
+.btn-success {
+  @apply bg-green-600 hover:bg-green-700 text-white font-medium py-2 px-4 rounded-lg transition-colors duration-200;
+}
+
+/* Card hover effects */
+.card-hover {
+  @apply transition-all duration-200 hover:shadow-lg hover:-translate-y-1;
+}
+
+/* Status badges */
+.badge-success {
+  @apply inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800;
+}
+
+.badge-warning {
+  @apply inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-yellow-100 text-yellow-800;
+}
+
+.badge-danger {
+  @apply inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800;
+}
+
+.badge-info {
+  @apply inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800;
+}
+
+/* Radico brand specific styles */
+.radico-gradient {
+  background: linear-gradient(135deg, #1e40af 0%, #7c3aed 50%, #ea580c 100%);
+}
+
+.radico-text-gradient {
+  background: linear-gradient(135deg, #1e40af, #7c3aed, #ea580c);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Enhanced animations for dashboard */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeInLeft {
+  from {
+    opacity: 0;
+    transform: translateX(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes fadeInRight {
+  from {
+    opacity: 0;
+    transform: translateX(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.6s ease-out;
+}
+
+.animate-fade-in-left {
+  animation: fadeInLeft 0.6s ease-out;
+}
+
+.animate-fade-in-right {
+  animation: fadeInRight 0.6s ease-out;
+}
+
+/* Metric card specific styling */
+.metric-card {
+  @apply bg-white overflow-hidden shadow-sm rounded-lg transition-all duration-200 hover:shadow-md;
+}
+
+.metric-card:hover {
+  transform: translateY(-2px);
+}
+
+/* Progress bar enhancements */
+.progress-bar {
+  @apply w-full bg-gray-200 rounded-full h-2 overflow-hidden;
+}
+
+.progress-fill {
+  @apply h-full rounded-full transition-all duration-1000 ease-out;
+}
+
+/* Table row animations */
+.table-row-hover {
+  @apply transition-colors duration-150 hover:bg-gray-50;
+}
+
+/* Loading skeleton */
+.skeleton {
+  @apply animate-pulse bg-gray-200 rounded;
+}
+
+.skeleton-text {
+  @apply h-4 bg-gray-200 rounded animate-pulse;
+}
+
+.skeleton-circle {
+  @apply w-12 h-12 bg-gray-200 rounded-full animate-pulse;
+}
+
+/* Custom shadows for depth */
+.shadow-radico {
+  box-shadow: 0 4px 6px -1px rgba(30, 64, 175, 0.1), 0 2px 4px -1px rgba(30, 64, 175, 0.06);
+}
+
+.shadow-radico-lg {
+  box-shadow: 0 10px 15px -3px rgba(30, 64, 175, 0.1), 0 4px 6px -2px rgba(30, 64, 175, 0.05);
+}
+
+/* Achievement indicator styles */
+.achievement-excellent {
+  @apply bg-green-100 text-green-800 border border-green-200;
+}
+
+.achievement-good {
+  @apply bg-yellow-100 text-yellow-800 border border-yellow-200;
+}
+
+.achievement-needs-improvement {
+  @apply bg-red-100 text-red-800 border border-red-200;
+}
+
+/* Responsive table improvements */
+@media (max-width: 768px) {
+  .mobile-table {
+    @apply block overflow-x-auto whitespace-nowrap;
+  }
+  
+  .mobile-table table {
+    @apply min-w-full;
+  }
+}
+
+/* Dashboard specific responsive improvements */
+@media (max-width: 640px) {
+  .dashboard-header {
+    @apply flex-col space-y-4;
+  }
+  
+  .dashboard-tabs {
+    @apply flex-col space-y-2;
+  }
+  
+  .metric-grid {
+    @apply grid-cols-1 gap-4;
+  }
+}
+
+/* Print optimizations for reports */
+@media print {
+  .dashboard-header,
+  .dashboard-tabs,
+  .no-print {
+    display: none !important;
+  }
+  
+  .print-section {
+    page-break-inside: avoid;
+    margin-bottom: 20px;
+  }
+  
+  .print-page-break {
+    page-break-before: always;
+  }
+}
