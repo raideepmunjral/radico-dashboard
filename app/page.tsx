@@ -119,11 +119,12 @@ const RadicoDashboard = () => {
   // ENHANCED BRAND FAMILY MAPPING - Updated to handle historical data variations
   const brandFamily: Record<string, string> = {
     // Historical Data Brand Short Variations (with typos!)
-    "VERVE FAIMLY": "VERVE", // Note: typo in historical data
+    "VERVE FAIMLY": "VERVE", // Note: typo in historical data - "FAIMLY" instead of "FAMILY"
     "VERVE FAMILY": "VERVE",
-    "8PM B": "8PM",
+    "8PM B": "8PM", // Short form in historical data
     "8PM": "8PM",
     "8 PM": "8PM",
+    "8PM PREMIUM": "8PM",
     
     // Current Data Variations
     "8 PM PREMIUM BLACK BLENDED WHISKY": "8PM",
@@ -137,7 +138,7 @@ const RadicoDashboard = () => {
     "8PM PREMIUM BLACK BLENDED WHISKY": "8PM",
     "8PM PREMIUM BLACK SUPERIOR WHISKY": "8PM",
     
-    // VERVE Variations
+    // VERVE Variations (current data)
     "M2M VERVE CRANBERRY TEASE SP FL VODKA": "VERVE",
     "M2M VERVE GREEN APPLE SUPERIOR FL. VODKA": "VERVE",
     "M2M VERVE LEMON LUSH SUP FL VODKA": "VERVE",
@@ -159,30 +160,41 @@ const RadicoDashboard = () => {
   
   // Helper function to determine brand family with fallback logic
   const getBrandFamily = (brandShort?: string, brand?: string): string | null => {
-    // Try exact match first with brand short (priority)
-    if (brandShort && brandFamily[brandShort.trim()]) {
-      return brandFamily[brandShort.trim()];
+    // Clean and trim inputs
+    const cleanBrandShort = brandShort?.toString().trim();
+    const cleanBrand = brand?.toString().trim();
+    
+    // Try exact match first with brand short (priority for historical data)
+    if (cleanBrandShort && brandFamily[cleanBrandShort]) {
+      return brandFamily[cleanBrandShort];
     }
     
     // Try exact match with full brand name
-    if (brand && brandFamily[brand.trim()]) {
-      return brandFamily[brand.trim()];
+    if (cleanBrand && brandFamily[cleanBrand]) {
+      return brandFamily[cleanBrand];
     }
     
-    // Try partial matching for historical data
-    const textToCheck = ((brandShort || '') + ' ' + (brand || '')).toUpperCase();
+    // Try partial matching for historical data patterns
+    const combinedText = ((cleanBrandShort || '') + ' ' + (cleanBrand || '')).toUpperCase();
     
-    // Historical data patterns
-    if (textToCheck.includes('VERVE FAIMLY') || textToCheck.includes('VERVE FAMILY')) return 'VERVE';
-    if (textToCheck.includes('8PM B') || textToCheck.includes('8PM')) return '8PM';
+    // Historical data specific patterns (priority)
+    if (combinedText.includes('VERVE FAIMLY') || combinedText.includes('VERVE FAMILY')) return 'VERVE';
+    if (combinedText.includes('8PM B')) return '8PM';
     
     // Long brand name patterns from historical data
-    if (textToCheck.includes('M2 MAGIC MOMENTS VERVE') || textToCheck.includes('MAGIC MOMENTS VERVE')) return 'VERVE';
-    if (textToCheck.includes('8PM PREMIUM BLACK') || textToCheck.includes('PREMIUM BLACK')) return '8PM';
+    if (combinedText.includes('M2 MAGIC MOMENTS VERVE') || combinedText.includes('MAGIC MOMENTS VERVE')) return 'VERVE';
+    if (combinedText.includes('8PM PREMIUM BLACK') || combinedText.includes('PREMIUM BLACK SUPERIOR WHISKY')) return '8PM';
+    if (combinedText.includes('8PM PREMIUM BLACK BLENDED WHISKY')) return '8PM';
     
-    // General patterns
-    if (textToCheck.includes('VERVE')) return 'VERVE';
-    if (textToCheck.includes('8PM') || textToCheck.includes('8 PM')) return '8PM';
+    // General patterns (fallback)
+    if (combinedText.includes('VERVE')) return 'VERVE';
+    if (combinedText.includes('8PM') || combinedText.includes('8 PM')) return '8PM';
+    
+    // Last resort - check individual components
+    if (cleanBrandShort) {
+      if (cleanBrandShort.toUpperCase().includes('VERVE')) return 'VERVE';
+      if (cleanBrandShort.toUpperCase().includes('8PM')) return '8PM';
+    }
     
     return null;
   };
@@ -1636,9 +1648,14 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
         // Check for March 2025 data patterns
         marchDataCheck: {
           totalRows: data.historicalData?.length || 0,
-          sampleMonthValues: data.historicalData?.slice(1, 11).map((row: any) => row[10]).filter(Boolean) || [],
-          sampleBrandShort: data.historicalData?.slice(1, 11).map((row: any) => row[3]).filter(Boolean) || [],
-          expectedMarchPattern: "MAR'25"
+          sampleMonthValues: data.historicalData?.slice(1, 21).map((row: any) => row[10]).filter(Boolean) || [],
+          sampleBrandShort: data.historicalData?.slice(1, 21).map((row: any) => row[3]).filter(Boolean) || [],
+          expectedMarchPattern: "MAR'25",
+          // Count actual March entries
+          marchDataCount: data.historicalData?.slice(1).filter((row: any) => {
+            const monthValue = row[10]?.toString().trim();
+            return monthValue && (monthValue.includes("MAR'25") || monthValue.includes("Mar'25") || monthValue.includes("MARCH'25"));
+          }).length || 0
         }
       });
     }
@@ -1683,12 +1700,17 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
               <h4 className="font-medium text-gray-700 mb-2">March 2025 Data Analysis:</h4>
               <div className="bg-white p-3 rounded border text-xs">
                 <p><strong>Expected Pattern:</strong> {debugInfo.marchDataCheck.expectedMarchPattern}</p>
-                <p><strong>Sample Month Values:</strong> {debugInfo.marchDataCheck.sampleMonthValues.join(', ')}</p>
+                <p><strong>Total Historical Rows:</strong> {debugInfo.marchDataCheck.totalRows.toLocaleString()}</p>
+                <p><strong>March Data Entries Found:</strong> {debugInfo.marchDataCheck.marchDataCount.toLocaleString()}</p>
+                <p><strong>Sample Month Values (first 20):</strong> {debugInfo.marchDataCheck.sampleMonthValues.slice(0, 10).join(', ')}</p>
                 <p><strong>Sample Brand Short:</strong> {debugInfo.marchDataCheck.sampleBrandShort.slice(0, 5).join(', ')}</p>
                 <p><strong>Contains March Data:</strong> {
-                  debugInfo.marchDataCheck.sampleMonthValues.some((val: string) => 
-                    val && (val.includes("MAR'25") || val.includes("Mar'25") || val.includes("MARCH'25"))
-                  ) ? '✅ Yes' : '❌ No'
+                  debugInfo.marchDataCheck.marchDataCount > 0 ? '✅ Yes' : '❌ No'
+                } {debugInfo.marchDataCheck.marchDataCount > 0 ? `(${debugInfo.marchDataCheck.marchDataCount} entries)` : ''}</p>
+                <p><strong>Processing Status:</strong> {
+                  debugInfo.marchTotals.total8PM > 0 || debugInfo.marchTotals.totalVERVE > 0 
+                    ? '✅ March data processed successfully' 
+                    : '❌ March data found but not processed - check brand/month filtering'
                 }</p>
               </div>
             </div>
