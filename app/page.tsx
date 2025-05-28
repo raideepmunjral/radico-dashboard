@@ -665,7 +665,7 @@ const RadicoDashboard = () => {
   // Get unique values for filter dropdowns
   const getFilterOptions = (shops: ShopData[], field: keyof ShopData): string[] => {
     const values = shops.map(shop => shop[field] as string).filter(Boolean);
-    return [...new Set(values)].sort();
+    return Array.from(new Set(values)).sort();
   };
 
   // ==========================================
