@@ -1645,17 +1645,58 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
           total8PM: Object.values(data.salesData).reduce((sum: number, shop: any) => sum + (shop.marchEightPM || 0), 0),
           totalVERVE: Object.values(data.salesData).reduce((sum: number, shop: any) => sum + (shop.marchVerve || 0), 0)
         },
-        // Check for March 2025 data patterns
+        // Check for March 2025 data patterns - COMPREHENSIVE SCAN
         marchDataCheck: {
           totalRows: data.historicalData?.length || 0,
-          sampleMonthValues: data.historicalData?.slice(1, 21).map((row: any) => row[10]).filter(Boolean) || [],
-          sampleBrandShort: data.historicalData?.slice(1, 21).map((row: any) => row[3]).filter(Boolean) || [],
-          expectedMarchPattern: "MAR'25",
-          // Count actual March entries
-          marchDataCount: data.historicalData?.slice(1).filter((row: any) => {
-            const monthValue = row[10]?.toString().trim();
-            return monthValue && (monthValue.includes("MAR'25") || monthValue.includes("Mar'25") || monthValue.includes("MARCH'25"));
-          }).length || 0
+          // Scan ALL data for March entries, not just first few rows
+          marchDataAnalysis: (() => {
+            if (!data.historicalData || data.historicalData.length < 2) return { found: 0, samples: [], monthSamples: [] };
+            
+            let marchCount = 0;
+            let marchSamples: any[] = [];
+            let allMonthValues: string[] = [];
+            let allBrandShort: string[] = [];
+            
+            // Scan through ALL rows to find March data
+            data.historicalData.slice(1).forEach((row: any, index: number) => {
+              if (row && row.length > 10) {
+                const monthValue = row[10]?.toString().trim();
+                const brandShort = row[3]?.toString().trim();
+                
+                // Collect diverse month samples (every 1000th row for better representation)
+                if (index % 1000 === 0 && monthValue) {
+                  allMonthValues.push(monthValue);
+                }
+                
+                // Collect brand samples
+                if (index % 2000 === 0 && brandShort) {
+                  allBrandShort.push(brandShort);
+                }
+                
+                // Count and collect March samples
+                if (monthValue && (monthValue.includes("MAR'25") || monthValue.includes("Mar'25") || monthValue.includes("MARCH'25"))) {
+                  marchCount++;
+                  if (marchSamples.length < 5) {
+                    marchSamples.push({
+                      shop_name: row[0],
+                      brandShort: row[3],
+                      cases: row[5],
+                      monthValue: monthValue,
+                      brand: row[12]
+                    });
+                  }
+                }
+              }
+            });
+            
+            return {
+              found: marchCount,
+              samples: marchSamples,
+              monthSamples: allMonthValues.slice(0, 20),
+              brandSamples: allBrandShort.slice(0, 10)
+            };
+          })(),
+          expectedMarchPattern: "MAR'25"
         }
       });
     }
@@ -1697,21 +1738,37 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
           {/* Enhanced March Data Check */}
           {debugInfo.marchDataCheck && (
             <div className="mt-4">
-              <h4 className="font-medium text-gray-700 mb-2">March 2025 Data Analysis:</h4>
+              <h4 className="font-medium text-gray-700 mb-2">March 2025 Data Analysis (COMPREHENSIVE SCAN):</h4>
               <div className="bg-white p-3 rounded border text-xs">
                 <p><strong>Expected Pattern:</strong> {debugInfo.marchDataCheck.expectedMarchPattern}</p>
                 <p><strong>Total Historical Rows:</strong> {debugInfo.marchDataCheck.totalRows.toLocaleString()}</p>
-                <p><strong>March Data Entries Found:</strong> {debugInfo.marchDataCheck.marchDataCount.toLocaleString()}</p>
-                <p><strong>Sample Month Values (first 20):</strong> {debugInfo.marchDataCheck.sampleMonthValues.slice(0, 10).join(', ')}</p>
-                <p><strong>Sample Brand Short:</strong> {debugInfo.marchDataCheck.sampleBrandShort.slice(0, 5).join(', ')}</p>
+                <p><strong>March Data Entries Found:</strong> <span className={debugInfo.marchDataCheck.marchDataAnalysis.found > 0 ? 'text-green-600 font-bold' : 'text-red-600 font-bold'}>
+                  {debugInfo.marchDataCheck.marchDataAnalysis.found.toLocaleString()}
+                </span></p>
+                <p><strong>Month Values Sample (every 1000th row):</strong> {debugInfo.marchDataCheck.marchDataAnalysis.monthSamples.join(', ')}</p>
+                <p><strong>Brand Short Sample:</strong> {debugInfo.marchDataCheck.marchDataAnalysis.brandSamples.join(', ')}</p>
                 <p><strong>Contains March Data:</strong> {
-                  debugInfo.marchDataCheck.marchDataCount > 0 ? '✅ Yes' : '❌ No'
-                } {debugInfo.marchDataCheck.marchDataCount > 0 ? `(${debugInfo.marchDataCheck.marchDataCount} entries)` : ''}</p>
+                  debugInfo.marchDataCheck.marchDataAnalysis.found > 0 ? '✅ Yes' : '❌ No'
+                } {debugInfo.marchDataCheck.marchDataAnalysis.found > 0 ? `(${debugInfo.marchDataCheck.marchDataAnalysis.found} entries)` : ''}</p>
                 <p><strong>Processing Status:</strong> {
                   debugInfo.marchTotals.total8PM > 0 || debugInfo.marchTotals.totalVERVE > 0 
                     ? '✅ March data processed successfully' 
-                    : '❌ March data found but not processed - check brand/month filtering'
+                    : debugInfo.marchDataCheck.marchDataAnalysis.found > 0
+                    ? '⚠️ March data found but not processed - check brand/month filtering'
+                    : '❌ No March data found in dataset'
                 }</p>
+                
+                {/* Show March data samples if found */}
+                {debugInfo.marchDataCheck.marchDataAnalysis.found > 0 && debugInfo.marchDataCheck.marchDataAnalysis.samples.length > 0 && (
+                  <div className="mt-2 p-2 bg-green-50 rounded">
+                    <p><strong>March Data Samples:</strong></p>
+                    {debugInfo.marchDataCheck.marchDataAnalysis.samples.map((sample: any, idx: number) => (
+                      <div key={idx} className="text-xs mt-1">
+                        • {sample.shop_name} - {sample.brandShort} - {sample.cases} cases ({sample.monthValue})
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
           )}
