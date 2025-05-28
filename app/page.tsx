@@ -402,6 +402,13 @@ const RadicoDashboard = () => {
     const mayData = processMonthlyData('05', '2025', false);
     const aprilData = processMonthlyData('04', '2025', false);
     const marchData = processMonthlyData('03', '2025', true); // Use historical data for March
+    
+    // DEBUG: Log the results of each month processing
+    console.log('=== MONTH PROCESSING RESULTS ===');
+    console.log('May Data:', { total8PM: mayData.total8PM, totalVERVE: mayData.totalVERVE, uniqueShops: mayData.uniqueShops.size });
+    console.log('April Data:', { total8PM: aprilData.total8PM, totalVERVE: aprilData.totalVERVE, uniqueShops: aprilData.uniqueShops.size });
+    console.log('March Data:', { total8PM: marchData.total8PM, totalVERVE: marchData.totalVERVE, uniqueShops: marchData.uniqueShops.size });
+    console.log('=== END MONTH PROCESSING RESULTS ===');
 
     // Current month primary data
     const total8PM = mayData.total8PM;
