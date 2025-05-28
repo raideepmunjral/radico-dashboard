@@ -405,10 +405,32 @@ const RadicoDashboard = () => {
     
     // DEBUG: Log the results of each month processing
     console.log('=== MONTH PROCESSING RESULTS ===');
-    console.log('May Data:', { total8PM: mayData.total8PM, totalVERVE: mayData.totalVERVE, uniqueShops: mayData.uniqueShops.size });
-    console.log('April Data:', { total8PM: aprilData.total8PM, totalVERVE: aprilData.totalVERVE, uniqueShops: aprilData.uniqueShops.size });
-    console.log('March Data:', { total8PM: marchData.total8PM, totalVERVE: marchData.totalVERVE, uniqueShops: marchData.uniqueShops.size });
+    console.log('May Data:', { 
+      total8PM: mayData.total8PM, 
+      totalVERVE: mayData.totalVERVE, 
+      uniqueShops: mayData.uniqueShops.size,
+      shopSalesCount: Object.keys(mayData.shopSales).length 
+    });
+    console.log('April Data:', { 
+      total8PM: aprilData.total8PM, 
+      totalVERVE: aprilData.totalVERVE, 
+      uniqueShops: aprilData.uniqueShops.size,
+      shopSalesCount: Object.keys(aprilData.shopSales).length 
+    });
+    console.log('March Data:', { 
+      total8PM: marchData.total8PM, 
+      totalVERVE: marchData.totalVERVE, 
+      uniqueShops: marchData.uniqueShops.size,
+      shopSalesCount: Object.keys(marchData.shopSales).length 
+    });
     console.log('=== END MONTH PROCESSING RESULTS ===');
+    
+    // CRITICAL: If March data is 0, something went wrong in processMonthlyData
+    if (marchData.total8PM === 0 && marchData.totalVERVE === 0) {
+      console.error('🚨 MARCH PROCESSING FAILED - No totals despite 3160 entries found');
+      console.log('March processing inputs:', { monthFilter: '03', year: '2025', useHistorical: true });
+      console.log('Historical data length:', historicalData?.length || 'undefined');
+    }
 
     // Current month primary data
     const total8PM = mayData.total8PM;
