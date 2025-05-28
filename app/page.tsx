@@ -479,16 +479,19 @@ const RadicoDashboard = () => {
     mayData.challans.forEach(row => {
       if (row.length >= 15) {
         const shopId = row[8]?.toString().trim();
-        const shopName = row[9]?.toString().trim() || shopNameMap[shopId] || 'Unknown';
+        const shopNameFromChallan = row[9]?.toString().trim();
         const brand = row[11]?.toString().trim();
         const cases = parseFloat(row[14]) || 0;
         
         if (shopId && brand && cases > 0) {
+          // Get actual shop name from Shop Details, not from challan
+          const actualShopName = shopNameMap[shopId] || shopNameFromChallan || 'Unknown Shop';
+          
           if (!shopSales[shopId]) {
             const shopDetails = shopDetailsMap[shopId] || {};
             shopSales[shopId] = { 
               shopId,
-              shopName: shopDetails.shopName || shopName,
+              shopName: actualShopName, // Use actual shop name
               department: shopDetails.dept || 'Unknown',
               salesman: shopDetails.salesman || 'Unknown',
               total: 0,
@@ -538,24 +541,29 @@ const RadicoDashboard = () => {
       Object.keys(monthData.shopSales).forEach(shopIdentifier => {
         const monthShopData = monthData.shopSales[shopIdentifier];
         
-        // FIXED: Handle both shop ID and shop name based identification
+        // ENHANCED: Handle both shop ID and shop name based identification
         let actualShopId = shopIdentifier;
         let actualShopName = monthShopData.shopName || shopIdentifier;
         
-        // Try to find the correct shop ID and details
+        // First, try direct shop ID lookup
         if (shopDetailsMap[shopIdentifier]) {
-          // Direct match found
           const details = shopDetailsMap[shopIdentifier];
           actualShopId = details.shopId || shopIdentifier;
           actualShopName = details.shopName || actualShopName;
         } else {
-          // Try to find by shop name
-          const matchingEntry = Object.entries(shopDetailsMap).find(([key, details]) => 
-            details.shopName === shopIdentifier
+          // Try to find by shop name in Shop Details
+          const matchingShop = shopDetails.slice(1).find(row => 
+            row[1]?.toString().trim() === shopIdentifier
           );
-          if (matchingEntry) {
-            actualShopId = matchingEntry[1].shopId || matchingEntry[0];
-            actualShopName = matchingEntry[1].shopName;
+          
+          if (matchingShop) {
+            actualShopId = matchingShop[0]?.toString().trim();
+            actualShopName = matchingShop[1]?.toString().trim();
+          } else {
+            // If no match found, use the identifier as shop name if it looks like a name
+            if (!shopIdentifier.includes('@') && !shopIdentifier.includes('.com')) {
+              actualShopName = shopIdentifier;
+            }
           }
         }
         
@@ -564,7 +572,7 @@ const RadicoDashboard = () => {
           const shopDetails = shopDetailsMap[actualShopId] || shopDetailsMap[actualShopName] || {};
           shopSales[actualShopId] = {
             shopId: actualShopId,
-            shopName: actualShopName, // FIXED: Use actual shop name, not identifier
+            shopName: actualShopName, // Use resolved shop name
             department: shopDetails.dept || 'Unknown',
             salesman: shopDetails.salesman || 'Unknown',
             total: 0,
@@ -584,7 +592,7 @@ const RadicoDashboard = () => {
           };
         }
         
-        // Add historical data - FIXED
+        // Add historical data
         if (monthKey === 'april') {
           shopSales[actualShopId].aprilTotal = monthShopData.total;
           shopSales[actualShopId].aprilEightPM = monthShopData.eightPM;
@@ -1030,9 +1038,9 @@ const RadicoDashboard = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row justify-between items-center h-auto sm:h-16 py-4 sm:py-0">
             <div className="flex items-center mb-4 sm:mb-0">
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Radico Khaitan FIXED Dashboard</h1>
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Radico Khaitan Analytics Dashboard</h1>
               <span className="ml-3 px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
-                ✅ Historical Fixed
+                Live Data
               </span>
             </div>
             <div className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4">
@@ -1075,7 +1083,7 @@ const RadicoDashboard = () => {
               { id: 'shops', label: 'Top Shops', icon: Trophy },
               { id: 'department', label: 'Department Analysis', icon: Building },
               { id: 'analytics', label: 'Advanced Analytics', icon: Activity },
-              { id: 'historical', label: 'Historical Debug', icon: History }
+              { id: 'historical', label: 'Historical Analysis', icon: History }
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -1263,10 +1271,10 @@ const AdvancedAnalyticsTab = ({
 
       <div className="bg-white rounded-lg shadow">
         <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">Complete Shop Analysis - FIXED 3-Month Comparison (Mar-Apr-May 2025)</h3>
+          <h3 className="text-lg font-medium text-gray-900">Complete Shop Analysis - 3-Month Comparison (Mar-Apr-May 2025)</h3>
           <p className="text-sm text-gray-500">
             {filteredShops.length} shops {filters.department || filters.salesman || filters.searchText ? '(filtered)' : ''} 
-            ranked by current month performance - Historical data now working correctly
+            ranked by current month performance with historical data integration
           </p>
         </div>
         
@@ -1408,7 +1416,7 @@ const AdvancedAnalyticsTab = ({
         <div className="bg-white rounded-lg shadow">
           <div className="px-6 py-4 border-b border-gray-200 flex items-center">
             <AlertTriangle className="w-5 h-5 text-red-600 mr-2" />
-            <h3 className="text-lg font-medium text-gray-900">Lost Customers - FIXED ({data.customerInsights.lostCustomers})</h3>
+            <h3 className="text-lg font-medium text-gray-900">Lost Customers ({data.customerInsights.lostCustomers})</h3>
           </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
@@ -1457,69 +1465,212 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
     }
   }, [data]);
 
+  // Calculate month-over-month comparisons
+  const mayTotal = data.summary.total8PM + data.summary.totalVERVE;
+  const aprilTotal = Object.values(data.salesData).reduce((sum: number, shop: any) => sum + (shop.aprilTotal || 0), 0);
+  const marchTotal = Object.values(data.salesData).reduce((sum: number, shop: any) => sum + (shop.marchTotal || 0), 0);
+
+  const mayToAprilGrowth = aprilTotal > 0 ? ((mayTotal - aprilTotal) / aprilTotal * 100) : 0;
+  const aprilToMarchGrowth = marchTotal > 0 ? ((aprilTotal - marchTotal) / marchTotal * 100) : 0;
+
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">FIXED Historical Analysis & Debug</h2>
-        <p className="text-gray-600">Complete Historical Data Integration Status</p>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Historical Analysis & Trends</h2>
+        <p className="text-gray-600">3-Month Business Performance Analysis (March - April - May 2025)</p>
       </div>
 
-      {debugInfo && (
-        <div className="bg-gray-50 p-6 rounded-lg">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">🔧 DEBUG INFORMATION</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-            <div>
-              <h4 className="font-medium text-gray-700">📊 Historical Data Status:</h4>
-              <ul className="mt-2 space-y-1">
-                <li>Has Historical Data: {debugInfo.hasHistoricalData ? '✅ Yes' : '❌ No'}</li>
-                <li>Data Length: <span className="font-bold text-blue-600">{debugInfo.dataLength.toLocaleString()}</span> rows</li>
-                <li>March Active Shops: <span className="font-bold text-green-600">{debugInfo.marchTotals.shops}</span></li>
-                <li>March 8PM Cases: <span className="font-bold text-purple-600">{debugInfo.marchTotals.total8PM.toLocaleString()}</span></li>
-                <li>March VERVE Cases: <span className="font-bold text-orange-600">{debugInfo.marchTotals.totalVERVE.toLocaleString()}</span></li>
-              </ul>
+      {/* Monthly Comparison Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">March 2025</h3>
+          <div className="space-y-3">
+            <div className="flex justify-between">
+              <span className="text-sm text-gray-500">Total Sales:</span>
+              <span className="font-medium">{marchTotal.toLocaleString()} cases</span>
             </div>
-            <div>
-              <h4 className="font-medium text-gray-700">👥 Customer Insights (FIXED):</h4>
-              <ul className="mt-2 space-y-1">
-                <li>New Customers: <span className="font-bold text-green-600">{debugInfo.customerInsights.firstTimeCustomers}</span></li>
-                <li>Lost Customers: <span className="font-bold text-red-600">{debugInfo.customerInsights.lostCustomers}</span></li>
-                <li>Consistent: <span className="font-bold text-yellow-600">{debugInfo.customerInsights.consistentPerformers}</span></li>
-                <li>Declining: <span className="font-bold text-orange-600">{debugInfo.customerInsights.decliningPerformers}</span></li>
-              </ul>
+            <div className="flex justify-between">
+              <span className="text-sm text-gray-500">8PM:</span>
+              <span className="font-medium text-purple-600">{debugInfo?.marchTotals.total8PM.toLocaleString() || 0} cases</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm text-gray-500">VERVE:</span>
+              <span className="font-medium text-orange-600">{debugInfo?.marchTotals.totalVERVE.toLocaleString() || 0} cases</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm text-gray-500">Active Shops:</span>
+              <span className="font-medium">{debugInfo?.marchTotals.shops || 0}</span>
             </div>
           </div>
         </div>
-      )}
 
-      <div className={`p-6 rounded-lg text-center ${
-        debugInfo?.marchTotals.total8PM > 0 || debugInfo?.marchTotals.totalVERVE > 0
-          ? 'bg-green-50'
-          : 'bg-yellow-50'
-      }`}>
-        {debugInfo?.marchTotals.total8PM > 0 || debugInfo?.marchTotals.totalVERVE > 0 ? (
-          <>
-            <div className="text-4xl mb-4">🎉</div>
-            <h3 className="text-lg font-medium text-green-900 mb-2">Historical Data Integration: SUCCESS!</h3>
-            <p className="text-green-700 mb-4">
-              March 2025 historical data is now properly integrated with {debugInfo.marchTotals.shops} active shops processed.
-            </p>
-          </>
-        ) : (
-          <>
-            <div className="text-4xl mb-4">⚠️</div>
-            <h3 className="text-lg font-medium text-yellow-900 mb-2">Historical Data Status: In Progress</h3>
-            <p className="text-yellow-700 mb-4">
-              Historical data connection established but processing needs verification.
-            </p>
-          </>
-        )}
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">April 2025</h3>
+          <div className="space-y-3">
+            <div className="flex justify-between">
+              <span className="text-sm text-gray-500">Total Sales:</span>
+              <span className="font-medium">{aprilTotal.toLocaleString()} cases</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm text-gray-500">8PM:</span>
+              <span className="font-medium text-purple-600">{Object.values(data.salesData).reduce((sum: number, shop: any) => sum + (shop.aprilEightPM || 0), 0).toLocaleString()} cases</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm text-gray-500">VERVE:</span>
+              <span className="font-medium text-orange-600">{Object.values(data.salesData).reduce((sum: number, shop: any) => sum + (shop.aprilVerve || 0), 0).toLocaleString()} cases</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm text-gray-500">Growth vs March:</span>
+              <span className={`font-medium ${aprilToMarchGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {aprilToMarchGrowth >= 0 ? '+' : ''}{aprilToMarchGrowth.toFixed(1)}%
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">May 2025 (Current)</h3>
+          <div className="space-y-3">
+            <div className="flex justify-between">
+              <span className="text-sm text-gray-500">Total Sales:</span>
+              <span className="font-medium">{mayTotal.toLocaleString()} cases</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm text-gray-500">8PM:</span>
+              <span className="font-medium text-purple-600">{data.summary.total8PM.toLocaleString()} cases</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm text-gray-500">VERVE:</span>
+              <span className="font-medium text-orange-600">{data.summary.totalVERVE.toLocaleString()} cases</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-sm text-gray-500">Growth vs April:</span>
+              <span className={`font-medium ${mayToAprilGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {mayToAprilGrowth >= 0 ? '+' : ''}{mayToAprilGrowth.toFixed(1)}%
+              </span>
+            </div>
+          </div>
+        </div>
       </div>
+
+      {/* Historical Trends Chart */}
+      <div className="bg-white p-6 rounded-lg shadow">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">3-Month Sales Trend</h3>
+        <div className="space-y-6">
+          {/* 8PM Trend */}
+          <div>
+            <h4 className="font-medium text-purple-600 mb-2">8PM Family Performance</h4>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="text-center">
+                <div className="text-lg font-bold text-purple-600">{debugInfo?.marchTotals.total8PM.toLocaleString() || 0}</div>
+                <div className="text-xs text-gray-500">March</div>
+              </div>
+              <div className="text-center">
+                <div className="text-lg font-bold text-purple-600">{Object.values(data.salesData).reduce((sum: number, shop: any) => sum + (shop.aprilEightPM || 0), 0).toLocaleString()}</div>
+                <div className="text-xs text-gray-500">April</div>
+              </div>
+              <div className="text-center">
+                <div className="text-lg font-bold text-purple-600">{data.summary.total8PM.toLocaleString()}</div>
+                <div className="text-xs text-gray-500">May</div>
+              </div>
+            </div>
+          </div>
+
+          {/* VERVE Trend */}
+          <div>
+            <h4 className="font-medium text-orange-600 mb-2">VERVE Family Performance</h4>
+            <div className="grid grid-cols-3 gap-4">
+              <div className="text-center">
+                <div className="text-lg font-bold text-orange-600">{debugInfo?.marchTotals.totalVERVE.toLocaleString() || 0}</div>
+                <div className="text-xs text-gray-500">March</div>
+              </div>
+              <div className="text-center">
+                <div className="text-lg font-bold text-orange-600">{Object.values(data.salesData).reduce((sum: number, shop: any) => sum + (shop.aprilVerve || 0), 0).toLocaleString()}</div>
+                <div className="text-xs text-gray-500">April</div>
+              </div>
+              <div className="text-center">
+                <div className="text-lg font-bold text-orange-600">{data.summary.totalVERVE.toLocaleString()}</div>
+                <div className="text-xs text-gray-500">May</div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Customer Journey Analysis */}
+      <div className="bg-white p-6 rounded-lg shadow">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Customer Journey Analysis</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="text-center">
+            <div className="text-2xl font-bold text-green-600">{data.customerInsights.firstTimeCustomers}</div>
+            <div className="text-sm text-gray-500">New Customers</div>
+            <div className="text-xs text-gray-400">Started in May</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-red-600">{data.customerInsights.lostCustomers}</div>
+            <div className="text-sm text-gray-500">Lost Customers</div>
+            <div className="text-xs text-gray-400">Active in April, not in May</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-blue-600">{data.customerInsights.consistentPerformers}</div>
+            <div className="text-sm text-gray-500">Consistent Performers</div>
+            <div className="text-xs text-gray-400">Growing or stable</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-yellow-600">{data.customerInsights.decliningPerformers}</div>
+            <div className="text-sm text-gray-500">Declining Performers</div>
+            <div className="text-xs text-gray-400">Negative growth trend</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Data Integration Status */}
+      {debugInfo && (
+        <div className={`p-6 rounded-lg text-center ${
+          debugInfo?.marchTotals.total8PM > 0 || debugInfo?.marchTotals.totalVERVE > 0
+            ? 'bg-green-50'
+            : 'bg-yellow-50'
+        }`}>
+          {debugInfo?.marchTotals.total8PM > 0 || debugInfo?.marchTotals.totalVERVE > 0 ? (
+            <>
+              <div className="text-4xl mb-4">📈</div>
+              <h3 className="text-lg font-medium text-green-900 mb-2">Historical Data Integration: Complete</h3>
+              <p className="text-green-700 mb-4">
+                Successfully integrated {debugInfo.dataLength.toLocaleString()} historical records with {debugInfo.marchTotals.shops} active shops in March 2025.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
+                <div className="bg-white p-4 rounded shadow">
+                  <div className="text-2xl font-bold text-blue-600">{debugInfo.dataLength.toLocaleString()}</div>
+                  <div className="text-sm text-gray-600">Historical Records</div>
+                </div>
+                <div className="bg-white p-4 rounded shadow">
+                  <div className="text-2xl font-bold text-purple-600">{debugInfo.marchTotals.total8PM.toLocaleString()}</div>
+                  <div className="text-sm text-gray-600">March 8PM Cases</div>
+                </div>
+                <div className="bg-white p-4 rounded shadow">
+                  <div className="text-2xl font-bold text-orange-600">{debugInfo.marchTotals.totalVERVE.toLocaleString()}</div>
+                  <div className="text-sm text-gray-600">March VERVE Cases</div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="text-4xl mb-4">⚠️</div>
+              <h3 className="text-lg font-medium text-yellow-900 mb-2">Historical Data: Processing</h3>
+              <p className="text-yellow-700 mb-4">
+                Historical data connection established. Verification in progress.
+              </p>
+            </>
+          )}
+        </div>
+      )}
     </div>
   );
 };
 
 const DepartmentTab = ({ data }: { data: DashboardData }) => (
   <div className="space-y-6">
+    {/* Department Performance Overview */}
     <div className="bg-white p-6 rounded-lg shadow">
       <h3 className="text-lg font-medium text-gray-900 mb-4">Department Performance Overview - May 2025</h3>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1545,6 +1696,132 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => (
             </div>
           );
         })}
+      </div>
+    </div>
+
+    {/* Department Performance Table */}
+    <div className="bg-white rounded-lg shadow">
+      <div className="px-6 py-4 border-b border-gray-200">
+        <h3 className="text-lg font-medium text-gray-900">Department Performance Analysis</h3>
+        <p className="text-sm text-gray-500">Coverage and sales performance by territory</p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Shops</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Active Shops</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Coverage</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Sales</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Avg per Shop</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">8PM Share</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">VERVE Share</th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {Object.entries(data.deptPerformance).map(([dept, performance]) => {
+              const coveragePercent = (performance.billedShops / performance.totalShops) * 100;
+              const avgPerShop = performance.billedShops > 0 ? (performance.sales / performance.billedShops).toFixed(1) : 0;
+              
+              // Calculate brand share for this department
+              const deptShops = Object.values(data.salesData).filter((shop: any) => shop.department === dept && shop.total > 0);
+              const dept8PM = deptShops.reduce((sum: number, shop: any) => sum + shop.eightPM, 0);
+              const deptVERVE = deptShops.reduce((sum: number, shop: any) => sum + shop.verve, 0);
+              const deptTotal = dept8PM + deptVERVE;
+              const eightPMShare = deptTotal > 0 ? ((dept8PM / deptTotal) * 100).toFixed(1) : '0';
+              const verveShare = deptTotal > 0 ? ((deptVERVE / deptTotal) * 100).toFixed(1) : '0';
+              
+              return (
+                <tr key={dept}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{dept}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{performance.totalShops}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{performance.billedShops}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <div className="flex items-center">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        coveragePercent > 80 
+                          ? 'bg-green-100 text-green-800' 
+                          : coveragePercent > 60
+                          ? 'bg-yellow-100 text-yellow-800'
+                          : 'bg-red-100 text-red-800'
+                      }`}>
+                        {coveragePercent.toFixed(1)}%
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">{performance.sales.toLocaleString()}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{avgPerShop}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-purple-600">{eightPMShare}%</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600">{verveShare}%</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    {/* Department Brand Performance Comparison */}
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="bg-white rounded-lg shadow">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-medium text-gray-900">8PM Performance by Department</h3>
+        </div>
+        <div className="p-6">
+          <div className="space-y-4">
+            {Object.entries(data.deptPerformance).map(([dept, performance]) => {
+              const deptShops = Object.values(data.salesData).filter((shop: any) => shop.department === dept && shop.total > 0);
+              const dept8PM = deptShops.reduce((sum: number, shop: any) => sum + shop.eightPM, 0);
+              const sharePercent = data.summary.total8PM > 0 ? (dept8PM / data.summary.total8PM) * 100 : 0;
+              
+              return (
+                <div key={dept}>
+                  <div className="flex justify-between text-sm">
+                    <span>{dept}</span>
+                    <span>{dept8PM.toLocaleString()} cases ({sharePercent.toFixed(1)}%)</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-purple-600 h-2 rounded-full" 
+                      style={{ width: `${sharePercent}%` }}
+                    ></div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-lg shadow">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-medium text-gray-900">VERVE Performance by Department</h3>
+        </div>
+        <div className="p-6">
+          <div className="space-y-4">
+            {Object.entries(data.deptPerformance).map(([dept, performance]) => {
+              const deptShops = Object.values(data.salesData).filter((shop: any) => shop.department === dept && shop.total > 0);
+              const deptVERVE = deptShops.reduce((sum: number, shop: any) => sum + shop.verve, 0);
+              const sharePercent = data.summary.totalVERVE > 0 ? (deptVERVE / data.summary.totalVERVE) * 100 : 0;
+              
+              return (
+                <div key={dept}>
+                  <div className="flex justify-between text-sm">
+                    <span>{dept}</span>
+                    <span>{deptVERVE.toLocaleString()} cases ({sharePercent.toFixed(1)}%)</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-orange-600 h-2 rounded-full" 
+                      style={{ width: `${sharePercent}%` }}
+                    ></div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -1582,24 +1859,178 @@ const OverviewTab = ({ data }: { data: DashboardData }) => (
       />
     </div>
 
+    {/* Enhanced Sales vs Target Cards */}
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="bg-white p-6 rounded-lg shadow">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">8PM Performance - May 2025</h3>
+        <div className="space-y-4">
+          <div>
+            <div className="flex justify-between text-sm">
+              <span>Sales vs Target</span>
+              <span>{data.summary.eightPmAchievement}%</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div 
+                className="bg-purple-600 h-2 rounded-full" 
+                style={{ width: `${Math.min(parseFloat(data.summary.eightPmAchievement), 100)}%` }}
+              ></div>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4 text-center">
+            <div>
+              <div className="text-2xl font-bold text-purple-600">{data.summary.total8PM.toLocaleString()}</div>
+              <div className="text-sm text-gray-500">Achieved</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-gray-400">{data.summary.total8PMTarget.toLocaleString()}</div>
+              <div className="text-sm text-gray-500">Target</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white p-6 rounded-lg shadow">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">VERVE Performance - May 2025</h3>
+        <div className="space-y-4">
+          <div>
+            <div className="flex justify-between text-sm">
+              <span>Sales vs Target</span>
+              <span>{data.summary.verveAchievement}%</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-2">
+              <div 
+                className="bg-orange-600 h-2 rounded-full" 
+                style={{ width: `${Math.min(parseFloat(data.summary.verveAchievement), 100)}%` }}
+              ></div>
+            </div>
+          </div>
+          <div className="grid grid-cols-2 gap-4 text-center">
+            <div>
+              <div className="text-2xl font-bold text-orange-600">{data.summary.totalVERVE.toLocaleString()}</div>
+              <div className="text-sm text-gray-500">Achieved</div>
+            </div>
+            <div>
+              <div className="text-2xl font-bold text-gray-400">{data.summary.totalVerveTarget.toLocaleString()}</div>
+              <div className="text-sm text-gray-500">Target</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {/* Enhanced Brand Distribution and Achievement Summary */}
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="bg-white p-6 rounded-lg shadow">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Brand Distribution - May 2025</h3>
+        <div className="space-y-4">
+          <div>
+            <div className="flex justify-between text-sm">
+              <span>8PM Family</span>
+              <span>{((data.summary.total8PM / data.summary.totalSales) * 100).toFixed(1)}%</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-3">
+              <div 
+                className="bg-purple-600 h-3 rounded-full" 
+                style={{ width: `${(data.summary.total8PM / data.summary.totalSales) * 100}%` }}
+              ></div>
+            </div>
+            <div className="text-sm text-gray-500 mt-1">{data.summary.total8PM.toLocaleString()} cases</div>
+          </div>
+          <div>
+            <div className="flex justify-between text-sm">
+              <span>VERVE Family</span>
+              <span>{((data.summary.totalVERVE / data.summary.totalSales) * 100).toFixed(1)}%</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-3">
+              <div 
+                className="bg-orange-600 h-3 rounded-full" 
+                style={{ width: `${(data.summary.totalVERVE / data.summary.totalSales) * 100}%` }}
+              ></div>
+            </div>
+            <div className="text-sm text-gray-500 mt-1">{data.summary.totalVERVE.toLocaleString()} cases</div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white p-6 rounded-lg shadow">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Achievement Summary - May 2025</h3>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">8PM Achievement:</span>
+            <span className={`text-lg font-bold ${
+              parseFloat(data.summary.eightPmAchievement) >= 100 ? 'text-green-600' : 
+              parseFloat(data.summary.eightPmAchievement) >= 80 ? 'text-yellow-600' : 'text-red-600'
+            }`}>
+              {data.summary.eightPmAchievement}%
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">VERVE Achievement:</span>
+            <span className={`text-lg font-bold ${
+              parseFloat(data.summary.verveAchievement) >= 100 ? 'text-green-600' : 
+              parseFloat(data.summary.verveAchievement) >= 80 ? 'text-yellow-600' : 'text-red-600'
+            }`}>
+              {data.summary.verveAchievement}%
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">Market Coverage:</span>
+            <span className={`text-lg font-bold ${
+              parseFloat(data.summary.coverage) >= 80 ? 'text-green-600' : 
+              parseFloat(data.summary.coverage) >= 60 ? 'text-yellow-600' : 'text-red-600'
+            }`}>
+              {data.summary.coverage}%
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div className="bg-white p-6 rounded-lg shadow">
+      <h3 className="text-lg font-medium text-gray-900 mb-4">Performance Statistics - May 2025</h3>
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="text-center">
+          <div className="text-3xl font-bold text-blue-600">{data.summary.totalSales.toLocaleString()}</div>
+          <div className="text-sm text-gray-500">Total Cases Sold</div>
+        </div>
+        <div className="text-center">
+          <div className="text-3xl font-bold text-green-600">{data.summary.coverage}%</div>
+          <div className="text-sm text-gray-500">Market Coverage</div>
+        </div>
+        <div className="text-center">
+          <div className="text-3xl font-bold text-purple-600">{data.topShops.length}</div>
+          <div className="text-sm text-gray-500">Active Shops</div>
+        </div>
+        <div className="text-center">
+          <div className="text-3xl font-bold text-orange-600">{data.customerInsights.firstTimeCustomers}</div>
+          <div className="text-sm text-gray-500">New Customers</div>
+        </div>
+      </div>
+    </div>
+
+    {/* Enhanced Customer Insights Summary */}
     <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-lg">
-      <h3 className="text-lg font-medium text-gray-900 mb-4">FIXED 3-Month Customer Insights Summary</h3>
+      <h3 className="text-lg font-medium text-gray-900 mb-4">3-Month Customer Journey Analysis</h3>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="text-center">
           <div className="text-xl font-bold text-green-600">{data.customerInsights.firstTimeCustomers}</div>
           <div className="text-xs text-gray-600">New Customers</div>
+          <div className="text-xs text-gray-400">Started billing in May</div>
         </div>
         <div className="text-center">
           <div className="text-xl font-bold text-red-600">{data.customerInsights.lostCustomers}</div>
           <div className="text-xs text-gray-600">Lost Customers</div>
+          <div className="text-xs text-gray-400">Active in April, not in May</div>
         </div>
         <div className="text-center">
           <div className="text-xl font-bold text-yellow-600">{data.customerInsights.consistentPerformers}</div>
           <div className="text-xs text-gray-600">Consistent</div>
+          <div className="text-xs text-gray-400">Stable or growing</div>
         </div>
         <div className="text-center">
           <div className="text-xl font-bold text-orange-600">{data.customerInsights.decliningPerformers}</div>
           <div className="text-xs text-gray-600">Declining</div>
+          <div className="text-xs text-gray-400">Negative trend</div>
         </div>
       </div>
     </div>
@@ -1609,8 +2040,8 @@ const OverviewTab = ({ data }: { data: DashboardData }) => (
 const TopShopsTab = ({ data }: { data: DashboardData }) => (
   <div className="bg-white rounded-lg shadow">
     <div className="px-6 py-4 border-b border-gray-200">
-      <h3 className="text-lg font-medium text-gray-900">Top 20 Performing Shops - May 2025 (FIXED with Historical Data)</h3>
-      <p className="text-sm text-gray-500">Ranked by total cases sold with FIXED 3-month comparison</p>
+      <h3 className="text-lg font-medium text-gray-900">Top 20 Performing Shops - May 2025</h3>
+      <p className="text-sm text-gray-500">Ranked by total cases sold with complete 3-month comparison (Mar-Apr-May)</p>
     </div>
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
@@ -1622,6 +2053,7 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => (
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salesman</th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">May Cases</th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Apr Cases</th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mar Cases</th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Growth %</th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">8PM Cases</th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">VERVE Cases</th>
@@ -1647,6 +2079,7 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => (
               <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{shop.salesman}</td>
               <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{shop.total.toLocaleString()}</td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{shop.aprilTotal?.toLocaleString() || 0}</td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">{shop.marchTotal?.toLocaleString() || 0}</td>
               <td className="px-6 py-4 whitespace-nowrap text-sm">
                 <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                   (shop.growthPercent || 0) > 0 
