@@ -194,7 +194,7 @@ const RadicoDashboard = () => {
 
   // ==========================================
   // PART 3: DATA FETCHING FUNCTIONS
-// ==========================================
+  // ==========================================
 
   // ENHANCED MAIN DATA FETCHING FUNCTION
   const fetchDashboardData = async () => {
@@ -775,10 +775,6 @@ const RadicoDashboard = () => {
     };
   };
 
-  // ==========================================
-  // PART 5: FILTER AND SEARCH FUNCTIONALITY  
-  // ==========================================
-
   // Filter shops based on current filter state
   const getFilteredShops = (shops: ShopData[]): ShopData[] => {
     return shops.filter(shop => {
@@ -800,21 +796,14 @@ const RadicoDashboard = () => {
     return Array.from(new Set(values)).sort();
   };
 
-  // ==========================================
-  // PART 6: ENHANCED SKU MODAL WITH 3-MONTH VIEW
-  // ==========================================
-
+  // Enhanced SKU Modal Component
   const EnhancedSKUModal = ({ shop, onClose }: { shop: ShopData, onClose: () => void }) => {
     const [activeMonth, setActiveMonth] = useState('May');
     
-    // Create 3-month SKU data
     const getSKUDataForMonth = (month: string) => {
-      // This would need to be enhanced based on your data structure
-      // For now, showing current month data
       if (month === 'May') {
         return shop.skuBreakdown || [];
       }
-      // Add logic for April and March SKU breakdowns
       return [];
     };
 
@@ -828,7 +817,6 @@ const RadicoDashboard = () => {
             </button>
           </div>
 
-          {/* Month Tabs */}
           <div className="flex border-b">
             {['March', 'April', 'May'].map((month) => (
               <button
@@ -846,7 +834,6 @@ const RadicoDashboard = () => {
           </div>
 
           <div className="p-6 overflow-y-auto">
-            {/* Month Summary */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <div className="text-center bg-blue-50 p-4 rounded-lg">
                 <div className="text-2xl font-bold text-blue-600">
@@ -874,7 +861,6 @@ const RadicoDashboard = () => {
               </div>
             </div>
 
-            {/* SKU Breakdown Table */}
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
@@ -901,65 +887,6 @@ const RadicoDashboard = () => {
     );
   };
 
-  // ==========================================
-  // PART 7: FILTER COMPONENTS
-  // ==========================================
-
-  const FilterBar = ({ shops }: { shops: ShopData[] }) => {
-    const departments = getFilterOptions(shops, 'department');
-    const salesmen = getFilterOptions(shops, 'salesman');
-
-    return (
-      <div className="bg-white p-4 rounded-lg shadow mb-6">
-        <div className="flex flex-wrap gap-4 items-center">
-          <div className="flex items-center space-x-2">
-            <Search className="w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search shops, departments, salesmen..."
-              value={filters.searchText}
-              onChange={(e) => setFilters({ ...filters, searchText: e.target.value })}
-              className="border border-gray-300 rounded-lg px-3 py-2 w-64"
-            />
-          </div>
-          
-          <select
-            value={filters.department}
-            onChange={(e) => setFilters({ ...filters, department: e.target.value })}
-            className="border border-gray-300 rounded-lg px-3 py-2"
-          >
-            <option value="">All Departments</option>
-            {departments.map(dept => (
-              <option key={dept} value={dept}>{dept}</option>
-            ))}
-          </select>
-
-          <select
-            value={filters.salesman}
-            onChange={(e) => setFilters({ ...filters, salesman: e.target.value })}
-            className="border border-gray-300 rounded-lg px-3 py-2"
-          >
-            <option value="">All Salesmen</option>
-            {salesmen.map(salesman => (
-              <option key={salesman} value={salesman}>{salesman}</option>
-            ))}
-          </select>
-
-          <button
-            onClick={() => setFilters({ department: '', salesman: '', shop: '', searchText: '' })}
-            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200"
-          >
-            Clear Filters
-          </button>
-        </div>
-      </div>
-    );
-  };
-
-  // ==========================================
-  // PART 8: EXPORT FUNCTIONS (ENHANCED)
-  // ==========================================
-
   const generatePDFReport = async () => {
     if (!dashboardData) return;
 
@@ -969,13 +896,11 @@ const RadicoDashboard = () => {
 
       const doc = new jsPDF();
       
-      // Header
       doc.setFontSize(20);
       doc.text('Radico Khaitan Advanced Analytics Report', 20, 20);
       doc.setFontSize(12);
       doc.text(`Generated: ${new Date().toLocaleString()}`, 20, 30);
       
-      // Executive Summary
       doc.setFontSize(16);
       doc.text('Executive Summary', 20, 50);
       
@@ -997,52 +922,6 @@ const RadicoDashboard = () => {
         theme: 'grid'
       });
 
-      // Customer Insights with Current Filters Applied
-      doc.addPage();
-      doc.setFontSize(16);
-      doc.text('Customer Insights - 3-Month Analysis (Mar-Apr-May 2025)', 20, 20);
-
-      const insightsData = [
-        ['First-time Customers', dashboardData.customerInsights.firstTimeCustomers.toString()],
-        ['Lost Customers', dashboardData.customerInsights.lostCustomers.toString()],
-        ['Consistent Performers', dashboardData.customerInsights.consistentPerformers.toString()],
-        ['Declining Performers', dashboardData.customerInsights.decliningPerformers.toString()]
-      ];
-
-      (doc as any).autoTable({
-        head: [['Category', 'Count']],
-        body: insightsData,
-        startY: 30,
-        theme: 'striped'
-      });
-
-      // Apply current filters to export data
-      const filteredShops = getFilteredShops(dashboardData.topShops.slice(0, 12));
-      
-      // Top Performing Shops with Current Filters
-      doc.addPage();
-      doc.setFontSize(16);
-      doc.text('Filtered Top Performing Shops - 3-Month Comparison', 20, 20);
-
-      const topShopsData = filteredShops.map((shop, index) => [
-        (index + 1).toString(),
-        shop.shopName,
-        shop.department,
-        (shop.marchTotal || 0).toString(),
-        (shop.aprilTotal || 0).toString(),
-        (shop.mayTotal || shop.total).toString(),
-        `${shop.growthPercent?.toFixed(1) || '0'}%`,
-        shop.monthlyTrend || 'stable'
-      ]);
-
-      (doc as any).autoTable({
-        head: [['Rank', 'Shop Name', 'Department', 'Mar', 'Apr', 'May', 'Growth %', 'Trend']],
-        body: topShopsData,
-        startY: 30,
-        theme: 'grid',
-        styles: { fontSize: 8 }
-      });
-
       doc.save(`Radico_Fixed_Analytics_${new Date().toISOString().split('T')[0]}.pdf`);
     } catch (error) {
       console.error('Error generating PDF:', error);
@@ -1054,13 +933,11 @@ const RadicoDashboard = () => {
     if (!dashboardData) return;
 
     try {
-      // Apply current filters to export data
       const filteredShops = getFilteredShops(dashboardData.allShopsComparison);
       
       let csvContent = "data:text/csv;charset=utf-8,";
-      
-      // Add header with filter information
       csvContent += "Radico Fixed Shop Analysis Report - 3-Month Comparison - " + new Date().toLocaleDateString() + "\n";
+      
       if (filters.department || filters.salesman || filters.searchText) {
         csvContent += "APPLIED FILTERS: ";
         if (filters.department) csvContent += `Department: ${filters.department}, `;
@@ -1070,7 +947,6 @@ const RadicoDashboard = () => {
       }
       csvContent += "\n";
       
-      // Add summary
       csvContent += "EXECUTIVE SUMMARY\n";
       csvContent += "Total Shops," + dashboardData.summary.totalShops + "\n";
       csvContent += "Billed Shops," + dashboardData.summary.billedShops + "\n";
@@ -1078,14 +954,12 @@ const RadicoDashboard = () => {
       csvContent += "8PM Sales," + dashboardData.summary.total8PM + " cases\n";
       csvContent += "VERVE Sales," + dashboardData.summary.totalVERVE + " cases\n\n";
       
-      // Add customer insights
       csvContent += "CUSTOMER INSIGHTS\n";
       csvContent += "First-time Customers," + dashboardData.customerInsights.firstTimeCustomers + "\n";
       csvContent += "Lost Customers," + dashboardData.customerInsights.lostCustomers + "\n";
       csvContent += "Consistent Performers," + dashboardData.customerInsights.consistentPerformers + "\n";
       csvContent += "Declining Performers," + dashboardData.customerInsights.decliningPerformers + "\n\n";
       
-      // Add filtered shop comparison data
       csvContent += "FILTERED SHOP COMPARISON (MAR-APR-MAY 2025)\n";
       csvContent += "Shop Name,Department,Salesman,Mar Cases,Apr Cases,May Cases,8PM Cases,VERVE Cases,Growth %,Monthly Trend\n";
       
@@ -1093,7 +967,6 @@ const RadicoDashboard = () => {
         csvContent += `"${shop.shopName}","${shop.department}","${shop.salesman}",${shop.marchTotal || 0},${shop.aprilTotal || 0},${shop.mayTotal || shop.total},${shop.eightPM},${shop.verve},${shop.growthPercent?.toFixed(1) || 0}%,"${shop.monthlyTrend || 'stable'}"\n`;
       });
 
-      // Download
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement("a");
       link.setAttribute("href", encodedUri);
@@ -1106,10 +979,6 @@ const RadicoDashboard = () => {
       alert('Error exporting data. Please try again.');
     }
   };
-
-  // ==========================================
-  // PART 9: MAIN COMPONENT STRUCTURE & TABS
-  // ==========================================
 
   React.useEffect(() => {
     fetchDashboardData();
@@ -1158,7 +1027,6 @@ const RadicoDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row justify-between items-center h-auto sm:h-16 py-4 sm:py-0">
@@ -1200,7 +1068,6 @@ const RadicoDashboard = () => {
         </div>
       </header>
 
-      {/* Enhanced Navigation Tabs */}
       <nav className="bg-white border-b overflow-x-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex space-x-4 sm:space-x-8 min-w-max">
@@ -1228,7 +1095,6 @@ const RadicoDashboard = () => {
         </div>
       </nav>
 
-      {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         {dashboardData && (
           <>
@@ -1253,7 +1119,6 @@ const RadicoDashboard = () => {
         )}
       </main>
 
-      {/* Enhanced SKU Modal */}
       {showSKUModal && selectedShopSKU && (
         <EnhancedSKUModal 
           shop={selectedShopSKU} 
@@ -1267,11 +1132,7 @@ const RadicoDashboard = () => {
   );
 };
 
-// ==========================================
-// PART 10: ENHANCED TAB COMPONENTS
-// ==========================================
-
-// Enhanced Advanced Analytics Tab with Filters
+// Tab Components
 const AdvancedAnalyticsTab = ({ 
   data, 
   onShowSKU, 
@@ -1297,13 +1158,11 @@ const AdvancedAnalyticsTab = ({
   const endIndex = startIndex + itemsPerPage;
   const currentShops = filteredShops.slice(startIndex, endIndex);
 
-  // Get unique values for filter dropdowns
   const departments = [...new Set(data.allShopsComparison.map(shop => shop.department))].sort();
   const salesmen = [...new Set(data.allShopsComparison.map(shop => shop.salesman))].sort();
 
   return (
     <div className="space-y-6">
-      {/* Customer Insights Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
         <div className="bg-white p-4 sm:p-6 rounded-lg shadow">
           <div className="flex items-center">
@@ -1354,7 +1213,6 @@ const AdvancedAnalyticsTab = ({
         </div>
       </div>
 
-      {/* Enhanced Filter Bar */}
       <div className="bg-white p-4 rounded-lg shadow">
         <div className="flex flex-wrap gap-4 items-center">
           <div className="flex items-center space-x-2">
@@ -1404,7 +1262,6 @@ const AdvancedAnalyticsTab = ({
         </div>
       </div>
 
-      {/* Complete Shop Analysis with Filters */}
       <div className="bg-white rounded-lg shadow">
         <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900">Complete Shop Analysis - FIXED 3-Month Comparison (Mar-Apr-May 2025)</h3>
@@ -1493,7 +1350,6 @@ const AdvancedAnalyticsTab = ({
           </table>
         </div>
 
-        {/* Enhanced Pagination */}
         <div className="px-4 sm:px-6 py-3 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center">
           <div className="text-sm text-gray-700 mb-2 sm:mb-0">
             Showing {startIndex + 1} to {Math.min(endIndex, filteredShops.length)} of {filteredShops.length} filtered shops
@@ -1520,9 +1376,7 @@ const AdvancedAnalyticsTab = ({
         </div>
       </div>
 
-      {/* Enhanced Category Breakdown Sections */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* New Customers */}
         <div className="bg-white rounded-lg shadow">
           <div className="px-6 py-4 border-b border-gray-200 flex items-center">
             <UserPlus className="w-5 h-5 text-green-600 mr-2" />
@@ -1552,7 +1406,6 @@ const AdvancedAnalyticsTab = ({
           </div>
         </div>
 
-        {/* FIXED Lost Customers */}
         <div className="bg-white rounded-lg shadow">
           <div className="px-6 py-4 border-b border-gray-200 flex items-center">
             <AlertTriangle className="w-5 h-5 text-red-600 mr-2" />
@@ -1582,51 +1435,14 @@ const AdvancedAnalyticsTab = ({
           </div>
         </div>
       </div>
-
-      {/* Consistent Performers */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center">
-          <Star className="w-5 h-5 text-yellow-600 mr-2" />
-          <h3 className="text-lg font-medium text-gray-900">Consistent Performers ({data.customerInsights.consistentPerformers})</h3>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shop Name</th>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Salesman</th>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mar Cases</th>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Apr Cases</th>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">May Cases</th>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Growth %</th>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Trend</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {data.customerInsights.consistentShops.slice(0, 15).map((shop) => (
-                <tr key={shop.shopId}>
-                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
-                    <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
-                      Declining 📉
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
     </div>
   );
 };
 
-// FIXED Historical Analysis Tab with Complete Debug Info
 const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
   const [debugInfo, setDebugInfo] = React.useState<any>(null);
 
   useEffect(() => {
-    // Show comprehensive debug information about historical data processing
     if (data.historicalData) {
       setDebugInfo({
         hasHistoricalData: !!data.historicalData,
@@ -1637,68 +1453,6 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
           shops: Object.values(data.salesData).filter((shop: any) => shop.marchTotal > 0).length,
           total8PM: Object.values(data.salesData).reduce((sum: number, shop: any) => sum + (shop.marchEightPM || 0), 0),
           totalVERVE: Object.values(data.salesData).reduce((sum: number, shop: any) => sum + (shop.marchVerve || 0), 0)
-        },
-        // COMPREHENSIVE March 2025 data check with FIXED parsing
-        marchDataCheck: {
-          totalRows: data.historicalData?.length || 0,
-          marchDataAnalysis: (() => {
-            if (!data.historicalData || data.historicalData.length < 2) return { found: 0, samples: [], monthSamples: [], datePatterns: [] };
-            
-            let marchCount = 0;
-            let marchSamples: any[] = [];
-            let datePatterns: string[] = [];
-            let brandPatterns: string[] = [];
-            
-            // Comprehensive scan through ALL rows
-            data.historicalData.slice(1).forEach((row: any, index: number) => {
-              if (row && row.length >= 8) {
-                const dateStr = row[7]?.toString().trim(); // Date column
-                const brandShort = row[3]?.toString().trim(); // Brand short column
-                const shopName = row[0]?.toString().trim(); // Shop name
-                const cases = parseFloat(row[5]) || 0; // Cases
-                
-                // Collect date pattern samples (every 5000th row for diversity)
-                if (index % 5000 === 0 && dateStr) {
-                  datePatterns.push(dateStr);
-                }
-                
-                // Collect brand pattern samples
-                if (index % 7000 === 0 && brandShort) {
-                  brandPatterns.push(brandShort);
-                }
-                
-                // FIXED: Check for March 2025 with DD-MM-YYYY format
-                if (dateStr && cases > 0) {
-                  const dateParts = dateStr.split('-');
-                  if (dateParts.length === 3) {
-                    const month = dateParts[1]; 
-                    const year = dateParts[2];
-                    
-                    if (month === '03' && year === '2025') {
-                      marchCount++;
-                      if (marchSamples.length < 10) {
-                        marchSamples.push({
-                          shop_name: shopName,
-                          brandShort: brandShort,
-                          cases: cases,
-                          dateStr: dateStr,
-                          fullRow: row.slice(0, 6) // First 6 columns for context
-                        });
-                      }
-                    }
-                  }
-                }
-              }
-            });
-            
-            return {
-              found: marchCount,
-              samples: marchSamples,
-              datePatterns: datePatterns.slice(0, 15),
-              brandPatterns: brandPatterns.slice(0, 10)
-            };
-          })(),
-          expectedPattern: "DD-03-2025 (March 2025 in DD-MM-YYYY format)"
         }
       });
     }
@@ -1708,13 +1462,12 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
     <div className="space-y-6">
       <div className="text-center">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">FIXED Historical Analysis & Debug</h2>
-        <p className="text-gray-600">Complete Historical Data Integration Status & Comprehensive Debugging</p>
+        <p className="text-gray-600">Complete Historical Data Integration Status</p>
       </div>
 
-      {/* Enhanced Debug Information */}
       {debugInfo && (
         <div className="bg-gray-50 p-6 rounded-lg">
-          <h3 className="text-lg font-medium text-gray-900 mb-4">🔧 COMPREHENSIVE DEBUG INFORMATION</h3>
+          <h3 className="text-lg font-medium text-gray-900 mb-4">🔧 DEBUG INFORMATION</h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
             <div>
               <h4 className="font-medium text-gray-700">📊 Historical Data Status:</h4>
@@ -1736,88 +1489,9 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
               </ul>
             </div>
           </div>
-
-          {/* ENHANCED March Data Analysis */}
-          {debugInfo.marchDataCheck && (
-            <div className="mt-6">
-              <h4 className="font-medium text-gray-700 mb-3">🎯 FIXED March 2025 Data Analysis (COMPREHENSIVE SCAN):</h4>
-              <div className="bg-white p-4 rounded border text-xs space-y-2">
-                <p><strong>📅 Expected Date Pattern:</strong> <span className="text-blue-600">{debugInfo.marchDataCheck.expectedPattern}</span></p>
-                <p><strong>📊 Total Historical Rows:</strong> <span className="font-bold">{debugInfo.marchDataCheck.totalRows.toLocaleString()}</span></p>
-                <p><strong>🎯 March 2025 Entries Found:</strong> <span className={debugInfo.marchDataCheck.marchDataAnalysis.found > 0 ? 'text-green-600 font-bold text-lg' : 'text-red-600 font-bold'}>
-                  {debugInfo.marchDataCheck.marchDataAnalysis.found.toLocaleString()} entries
-                </span></p>
-                
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
-                  <div>
-                    <p><strong>📅 Date Pattern Samples:</strong></p>
-                    <div className="bg-gray-100 p-2 rounded mt-1 max-h-32 overflow-y-auto">
-                      {debugInfo.marchDataCheck.marchDataAnalysis.datePatterns.map((pattern: string, idx: number) => (
-                        <div key={idx} className="text-xs py-1">{pattern}</div>
-                      ))}
-                    </div>
-                  </div>
-                  
-                  <div>
-                    <p><strong>🏷️ Brand Pattern Samples:</strong></p>
-                    <div className="bg-gray-100 p-2 rounded mt-1 max-h-32 overflow-y-auto">
-                      {debugInfo.marchDataCheck.marchDataAnalysis.brandPatterns.map((pattern: string, idx: number) => (
-                        <div key={idx} className="text-xs py-1">{pattern}</div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                
-                <p><strong>✅ Processing Status:</strong> <span className={
-                  debugInfo.marchTotals.total8PM > 0 || debugInfo.marchTotals.totalVERVE > 0 
-                    ? 'text-green-600 font-bold' 
-                    : debugInfo.marchDataCheck.marchDataAnalysis.found > 0
-                    ? 'text-yellow-600 font-bold'
-                    : 'text-red-600 font-bold'
-                }>
-                  {debugInfo.marchTotals.total8PM > 0 || debugInfo.marchTotals.totalVERVE > 0 
-                    ? '✅ March data processed successfully!' 
-                    : debugInfo.marchDataCheck.marchDataAnalysis.found > 0
-                    ? '⚠️ March data found but processing incomplete - check brand mapping'
-                    : '❌ No March data found in dataset'}
-                </span></p>
-                
-                {/* Show March data samples if found */}
-                {debugInfo.marchDataCheck.marchDataAnalysis.found > 0 && debugInfo.marchDataCheck.marchDataAnalysis.samples.length > 0 && (
-                  <div className="mt-4 p-3 bg-green-50 rounded">
-                    <p><strong>📋 March 2025 Data Samples (First 10):</strong></p>
-                    <div className="max-h-40 overflow-y-auto mt-2">
-                      {debugInfo.marchDataCheck.marchDataAnalysis.samples.map((sample: any, idx: number) => (
-                        <div key={idx} className="text-xs mt-1 p-2 bg-white rounded">
-                          <strong>{sample.shop_name}</strong> - {sample.brandShort} - <span className="text-green-600 font-bold">{sample.cases} cases</span> ({sample.dateStr})
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-          
-          {debugInfo.sampleData.length > 0 && (
-            <div className="mt-6">
-              <h4 className="font-medium text-gray-700 mb-2">📋 Sample Historical Data (Headers + 4 Rows):</h4>
-              <div className="bg-white p-3 rounded border text-xs overflow-x-auto">
-                <div className="space-y-2">
-                  {debugInfo.sampleData.map((row: any[], index: number) => (
-                    <div key={index} className={index === 0 ? 'font-bold bg-gray-100 p-2 rounded' : 'p-1'}>
-                      <span className="text-blue-600 mr-2">[Row {index}]</span>
-                      {row.slice(0, 8).join(' | ')} {/* Show first 8 columns */}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
-          )}
         </div>
       )}
 
-      {/* Success/Status Summary */}
       <div className={`p-6 rounded-lg text-center ${
         debugInfo?.marchTotals.total8PM > 0 || debugInfo?.marchTotals.totalVERVE > 0
           ? 'bg-green-50'
@@ -1830,64 +1504,23 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
             <p className="text-green-700 mb-4">
               March 2025 historical data is now properly integrated with {debugInfo.marchTotals.shops} active shops processed.
             </p>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
-              <div className="bg-white p-4 rounded shadow">
-                <div className="text-2xl font-bold text-purple-600">{debugInfo.marchTotals.total8PM.toLocaleString()}</div>
-                <div className="text-sm text-gray-600">March 8PM Cases</div>
-              </div>
-              <div className="bg-white p-4 rounded shadow">
-                <div className="text-2xl font-bold text-orange-600">{debugInfo.marchTotals.totalVERVE.toLocaleString()}</div>
-                <div className="text-sm text-gray-600">March VERVE Cases</div>
-              </div>
-              <div className="bg-white p-4 rounded shadow">
-                <div className="text-2xl font-bold text-blue-600">{debugInfo.marchTotals.shops}</div>
-                <div className="text-sm text-gray-600">Active Shops</div>
-              </div>
-            </div>
           </>
         ) : (
           <>
             <div className="text-4xl mb-4">⚠️</div>
             <h3 className="text-lg font-medium text-yellow-900 mb-2">Historical Data Status: In Progress</h3>
             <p className="text-yellow-700 mb-4">
-              Historical data connection established but processing needs verification. Check debug information above.
+              Historical data connection established but processing needs verification.
             </p>
           </>
         )}
-      </div>
-
-      {/* Planned Features */}
-      <div className="bg-blue-50 p-6 rounded-lg">
-        <div className="flex items-center mb-4">
-          <History className="w-8 h-8 text-blue-600 mr-3" />
-          <h3 className="text-lg font-medium text-blue-900">Advanced Historical Analysis Features</h3>
-        </div>
-        <div className="text-sm text-blue-700">
-          <p className="mb-3">With historical data now working, these features are ready for implementation:</p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <ul className="list-disc list-inside space-y-1">
-              <li>Year-over-year performance comparison</li>
-              <li>Seasonal trend analysis and forecasting</li>
-              <li>Long-term customer lifecycle tracking</li>
-              <li>Historical SKU performance trends</li>
-            </ul>
-            <ul className="list-disc list-inside space-y-1">
-              <li>Monthly growth pattern analysis</li>
-              <li>Market penetration historical tracking</li>
-              <li>Sales territory performance evolution</li>
-              <li>Brand mix evolution over time</li>
-            </ul>
-          </div>
-        </div>
       </div>
     </div>
   );
 };
 
-// Department Analysis Tab
 const DepartmentTab = ({ data }: { data: DashboardData }) => (
   <div className="space-y-6">
-    {/* Department Performance Overview */}
     <div className="bg-white p-6 rounded-lg shadow">
       <h3 className="text-lg font-medium text-gray-900 mb-4">Department Performance Overview - May 2025</h3>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -1915,64 +1548,11 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => (
         })}
       </div>
     </div>
-
-    {/* Detailed Department Analysis Table */}
-    <div className="bg-white rounded-lg shadow">
-      <div className="px-6 py-4 border-b border-gray-200">
-        <h3 className="text-lg font-medium text-gray-900">Department Performance Analysis</h3>
-        <p className="text-sm text-gray-500">Coverage and sales performance by territory</p>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Shops</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Billed Shops</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Coverage</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Sales</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Avg per Shop</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {Object.entries(data.deptPerformance).map(([dept, performance]) => {
-              const coveragePercent = (performance.billedShops / performance.totalShops) * 100;
-              const avgPerShop = performance.billedShops > 0 ? (performance.sales / performance.billedShops).toFixed(1) : 0;
-              
-              return (
-                <tr key={dept}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{dept}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{performance.totalShops}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{performance.billedShops}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <div className="flex items-center">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        coveragePercent > 80 
-                          ? 'bg-green-100 text-green-800' 
-                          : coveragePercent > 60
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}>
-                        {coveragePercent.toFixed(1)}%
-                      </span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">{performance.sales.toLocaleString()}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{avgPerShop}</td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </div>
   </div>
 );
 
-// Enhanced Overview Tab
 const OverviewTab = ({ data }: { data: DashboardData }) => (
   <div className="space-y-6">
-    {/* Key Metrics Cards */}
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
       <MetricCard
         title="Total Shops"
@@ -2003,158 +1583,6 @@ const OverviewTab = ({ data }: { data: DashboardData }) => (
       />
     </div>
 
-    {/* Enhanced Sales vs Target Cards */}
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div className="bg-white p-6 rounded-lg shadow">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">8PM Performance - May 2025</h3>
-        <div className="space-y-4">
-          <div>
-            <div className="flex justify-between text-sm">
-              <span>Sales vs Target</span>
-              <span>{data.summary.eightPmAchievement}%</span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div 
-                className="bg-purple-600 h-2 rounded-full" 
-                style={{ width: `${Math.min(parseFloat(data.summary.eightPmAchievement), 100)}%` }}
-              ></div>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4 text-center">
-            <div>
-              <div className="text-2xl font-bold text-purple-600">{data.summary.total8PM.toLocaleString()}</div>
-              <div className="text-sm text-gray-500">Achieved</div>
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-gray-400">{data.summary.total8PMTarget.toLocaleString()}</div>
-              <div className="text-sm text-gray-500">Target</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white p-6 rounded-lg shadow">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">VERVE Performance - May 2025</h3>
-        <div className="space-y-4">
-          <div>
-            <div className="flex justify-between text-sm">
-              <span>Sales vs Target</span>
-              <span>{data.summary.verveAchievement}%</span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div 
-                className="bg-orange-600 h-2 rounded-full" 
-                style={{ width: `${Math.min(parseFloat(data.summary.verveAchievement), 100)}%` }}
-              ></div>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4 text-center">
-            <div>
-              <div className="text-2xl font-bold text-orange-600">{data.summary.totalVERVE.toLocaleString()}</div>
-              <div className="text-sm text-gray-500">Achieved</div>
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-gray-400">{data.summary.totalVerveTarget.toLocaleString()}</div>
-              <div className="text-sm text-gray-500">Target</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    {/* Enhanced Brand Distribution and Achievement Summary */}
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {/* Brand Distribution */}
-      <div className="bg-white p-6 rounded-lg shadow">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Brand Distribution - May 2025</h3>
-        <div className="space-y-4">
-          <div>
-            <div className="flex justify-between text-sm">
-              <span>8PM Family</span>
-              <span>{((data.summary.total8PM / data.summary.totalSales) * 100).toFixed(1)}%</span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-3">
-              <div 
-                className="bg-purple-600 h-3 rounded-full" 
-                style={{ width: `${(data.summary.total8PM / data.summary.totalSales) * 100}%` }}
-              ></div>
-            </div>
-            <div className="text-sm text-gray-500 mt-1">{data.summary.total8PM.toLocaleString()} cases</div>
-          </div>
-          <div>
-            <div className="flex justify-between text-sm">
-              <span>VERVE Family</span>
-              <span>{((data.summary.totalVERVE / data.summary.totalSales) * 100).toFixed(1)}%</span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-3">
-              <div 
-                className="bg-orange-600 h-3 rounded-full" 
-                style={{ width: `${(data.summary.totalVERVE / data.summary.totalSales) * 100}%` }}
-              ></div>
-            </div>
-            <div className="text-sm text-gray-500 mt-1">{data.summary.totalVERVE.toLocaleString()} cases</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Achievement Summary */}
-      <div className="bg-white p-6 rounded-lg shadow">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Achievement Summary - May 2025</h3>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">8PM Achievement:</span>
-            <span className={`text-lg font-bold ${
-              parseFloat(data.summary.eightPmAchievement) >= 100 ? 'text-green-600' : 
-              parseFloat(data.summary.eightPmAchievement) >= 80 ? 'text-yellow-600' : 'text-red-600'
-            }`}>
-              {data.summary.eightPmAchievement}%
-            </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">VERVE Achievement:</span>
-            <span className={`text-lg font-bold ${
-              parseFloat(data.summary.verveAchievement) >= 100 ? 'text-green-600' : 
-              parseFloat(data.summary.verveAchievement) >= 80 ? 'text-yellow-600' : 'text-red-600'
-            }`}>
-              {data.summary.verveAchievement}%
-            </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Market Coverage:</span>
-            <span className={`text-lg font-bold ${
-              parseFloat(data.summary.coverage) >= 80 ? 'text-green-600' : 
-              parseFloat(data.summary.coverage) >= 60 ? 'text-yellow-600' : 'text-red-600'
-            }`}>
-              {data.summary.coverage}%
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div className="bg-white p-6 rounded-lg shadow">
-      <h3 className="text-lg font-medium text-gray-900 mb-4">Quick Statistics - May 2025 (FIXED Historical Integration)</h3>
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="text-center">
-          <div className="text-3xl font-bold text-blue-600">{data.summary.totalSales.toLocaleString()}</div>
-          <div className="text-sm text-gray-500">Total Cases Sold</div>
-        </div>
-        <div className="text-center">
-          <div className="text-3xl font-bold text-green-600">{data.summary.coverage}%</div>
-          <div className="text-sm text-gray-500">Market Coverage</div>
-        </div>
-        <div className="text-center">
-          <div className="text-3xl font-bold text-purple-600">{data.topShops.length}</div>
-          <div className="text-sm text-gray-500">Active Shops</div>
-        </div>
-        <div className="text-center">
-          <div className="text-3xl font-bold text-orange-600">{data.customerInsights.firstTimeCustomers}</div>
-          <div className="text-sm text-gray-500">New Customers</div>
-        </div>
-      </div>
-    </div>
-
-    {/* FIXED Customer Insights Summary */}
     <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-lg">
       <h3 className="text-lg font-medium text-gray-900 mb-4">FIXED 3-Month Customer Insights Summary</h3>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -2179,7 +1607,6 @@ const OverviewTab = ({ data }: { data: DashboardData }) => (
   </div>
 );
 
-// Top Shops Tab Component
 const TopShopsTab = ({ data }: { data: DashboardData }) => (
   <div className="bg-white rounded-lg shadow">
     <div className="px-6 py-4 border-b border-gray-200">
@@ -2242,7 +1669,6 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => (
   </div>
 );
 
-// Metric Card Component
 const MetricCard = ({ title, value, subtitle, icon: Icon, color }: {
   title: string;
   value: string;
@@ -2279,75 +1705,4 @@ const MetricCard = ({ title, value, subtitle, icon: Icon, color }: {
   );
 };
 
-export default RadicoDashboard;-4 text-sm text-gray-900">
-                    <div className="max-w-xs truncate">{shop.shopName}</div>
-                  </td>
-                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">{shop.department}</td>
-                  <td className="px-4 sm:px-6 py-4 text-sm text-gray-900">
-                    <div className="max-w-xs truncate">{shop.salesman}</div>
-                  </td>
-                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{shop.marchTotal || 0}</td>
-                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{shop.aprilTotal || 0}</td>
-                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{shop.mayTotal || shop.total}</td>
-                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
-                    <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                      {shop.growthPercent?.toFixed(1)}%
-                    </span>
-                  </td>
-                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      shop.monthlyTrend === 'improving' ? 'bg-green-100 text-green-800' :
-                      shop.monthlyTrend === 'stable' ? 'bg-blue-100 text-blue-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {shop.monthlyTrend === 'improving' ? 'Improving 📈' :
-                       shop.monthlyTrend === 'stable' ? 'Stable ➡️' : 
-                       'Consistent ✅'}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Declining Performers Section */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200 flex items-center">
-          <TrendingDown className="w-5 h-5 text-orange-600 mr-2" />
-          <h3 className="text-lg font-medium text-gray-900">Declining Performers ({data.customerInsights.decliningPerformers})</h3>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shop Name</th>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Salesman</th>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mar Cases</th>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Apr Cases</th>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">May Cases</th>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Decline %</th>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Trend</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {data.customerInsights.decliningShops.slice(0, 15).map((shop) => (
-                <tr key={shop.shopId}>
-                  <td className="px-4 sm:px-6 py-4 text-sm text-gray-900">
-                    <div className="max-w-xs truncate">{shop.shopName}</div>
-                  </td>
-                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">{shop.department}</td>
-                  <td className="px-4 sm:px-6 py-4 text-sm text-gray-900">
-                    <div className="max-w-xs truncate">{shop.salesman}</div>
-                  </td>
-                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{shop.marchTotal || 0}</td>
-                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">{shop.aprilTotal || 0}</td>
-                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{shop.mayTotal || shop.total}</td>
-                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">
-                    <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
-                      {shop.growthPercent?.toFixed(1)}%
-                    </span>
-                  </td>
-                  <td className="px-4 sm:px-6 py
+export default RadicoDashboard;
