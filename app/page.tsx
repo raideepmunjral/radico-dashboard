@@ -116,8 +116,9 @@ const RadicoDashboard = () => {
     apiKey: process.env.NEXT_PUBLIC_GOOGLE_API_KEY
   };
 
-  // BRAND FAMILY MAPPING
+  // ENHANCED BRAND FAMILY MAPPING - Updated to handle historical data variations
   const brandFamily: Record<string, string> = {
+    // 8PM Variations
     "8 PM PREMIUM BLACK BLENDED WHISKY": "8PM",
     "8 PM PREMIUM BLACK BLENDED WHISKY Pet": "8PM",
     "8 PM PREMIUM BLACK BLENDED WHISKY PET": "8PM",
@@ -126,6 +127,11 @@ const RadicoDashboard = () => {
     "8 PM BLACK 180 P": "8PM",
     "8 PM BLACK 90": "8PM",
     "8 PM BLACK 60 P": "8PM",
+    "8PM PREMIUM BLACK BLENDED WHISKY": "8PM",
+    "8PM": "8PM",
+    "8 PM": "8PM",
+    
+    // VERVE Variations
     "M2M VERVE CRANBERRY TEASE SP FL VODKA": "VERVE",
     "M2M VERVE GREEN APPLE SUPERIOR FL. VODKA": "VERVE",
     "M2M VERVE LEMON LUSH SUP FL VODKA": "VERVE",
@@ -141,7 +147,23 @@ const RadicoDashboard = () => {
     "VERVE LEMON LUSH 180": "VERVE",
     "VERVE GRAIN 750": "VERVE",
     "VERVE GRAIN 375": "VERVE",
-    "VERVE GRAIN 180": "VERVE"
+    "VERVE GRAIN 180": "VERVE",
+    "VERVE FAMILY": "VERVE",
+    "VERVE": "VERVE"
+  };
+  
+  // Helper function to determine brand family with fallback logic
+  const getBrandFamily = (brandShort?: string, brand?: string): string | null => {
+    // Try exact match first
+    if (brandShort && brandFamily[brandShort]) return brandFamily[brandShort];
+    if (brand && brandFamily[brand]) return brandFamily[brand];
+    
+    // Try partial matching
+    const textToCheck = (brandShort || brand || '').toUpperCase();
+    if (textToCheck.includes('8PM') || textToCheck.includes('8 PM')) return '8PM';
+    if (textToCheck.includes('VERVE')) return 'VERVE';
+    
+    return null;
   };
 
   // ==========================================
@@ -223,20 +245,31 @@ const RadicoDashboard = () => {
     }
   };
 
-  // NEW HISTORICAL DATA FETCH FUNCTION
+  // FIXED HISTORICAL DATA FETCH FUNCTION
   const fetchHistoricalSheetData = async () => {
     try {
-      const response = await fetch(
-        `https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_CONFIG.historicalSheetId}/values/MASTER?key=${SHEETS_CONFIG.apiKey}`
-      );
+      // Try multiple possible sheet names
+      const possibleSheetNames = ['MASTER', 'Sheet1', 'radico 24 25', 'Data'];
       
-      if (!response.ok) {
-        console.warn('Historical sheet not accessible, continuing without historical data');
-        return [];
+      for (const sheetName of possibleSheetNames) {
+        try {
+          const response = await fetch(
+            `https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_CONFIG.historicalSheetId}/values/${encodeURIComponent(sheetName)}?key=${SHEETS_CONFIG.apiKey}`
+          );
+          
+          if (response.ok) {
+            const result = await response.json();
+            console.log(`Historical data fetched from sheet: ${sheetName}`, result.values?.slice(0, 3));
+            return result.values || [];
+          }
+        } catch (err) {
+          console.log(`Failed to fetch from sheet: ${sheetName}`);
+          continue;
+        }
       }
       
-      const result = await response.json();
-      return result.values || [];
+      console.warn('No accessible historical sheet found');
+      return [];
     } catch (error) {
       console.warn('Error fetching historical data:', error);
       return [];
@@ -275,7 +308,7 @@ const RadicoDashboard = () => {
             
             if (shopName && brand && cases > 0) {
               monthlyUniqueShops.add(shopName);
-              const parentBrand = brandFamily[brand];
+              const parentBrand = getBrandFamily(brand, brand);
               
               if (parentBrand === "8PM") monthly8PM += cases;
               else if (parentBrand === "VERVE") monthlyVERVE += cases;
@@ -304,7 +337,7 @@ const RadicoDashboard = () => {
             
             if (shopId && brand && cases > 0) {
               monthlyUniqueShops.add(shopId);
-              const parentBrand = brandFamily[brand];
+              const parentBrand = getBrandFamily(brand, brand);
               
               if (parentBrand === "8PM") monthly8PM += cases;
               else if (parentBrand === "VERVE") monthlyVERVE += cases;
@@ -695,6 +728,8 @@ const RadicoDashboard = () => {
               <X className="w-6 h-6" />
             </button>
           </div>
+
+    {/* Enhanced Quick Stats with 3-Month Insights */}
           
           {/* Month Tabs */}
           <div className="flex border-b">
@@ -979,7 +1014,7 @@ const RadicoDashboard = () => {
   // PART 9: MAIN COMPONENT STRUCTURE & TABS
   // ==========================================
 
-  useEffect(() => {
+  React.useEffect(() => {
     fetchDashboardData();
   }, []);
 
@@ -1068,17 +1103,16 @@ const RadicoDashboard = () => {
         </div>
       </header>
 
-      {/* Enhanced Navigation Tabs */}
+      {/* Enhanced Navigation Tabs - REMOVED PERFORMANCE TAB */}
       <nav className="bg-white border-b overflow-x-auto">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex space-x-4 sm:space-x-8 min-w-max">
             {[
               { id: 'overview', label: 'Sales Overview', icon: BarChart3 },
               { id: 'shops', label: 'Top Shops', icon: Trophy },
-              { id: 'department', label: 'Department Analysis', icon: Building }, // Renamed from Territory
-              { id: 'performance', label: 'Performance', icon: Target },
+              { id: 'department', label: 'Department Analysis', icon: Building },
               { id: 'analytics', label: 'Advanced Analytics', icon: Activity },
-              { id: 'historical', label: 'Historical Analysis', icon: History } // NEW TAB
+              { id: 'historical', label: 'Historical Analysis', icon: History }
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -1097,14 +1131,13 @@ const RadicoDashboard = () => {
         </div>
       </nav>
 
-      {/* Main Content */}
+      {/* Main Content - REMOVED PERFORMANCE TAB */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
         {dashboardData && (
           <>
             {activeTab === 'overview' && <OverviewTab data={dashboardData} />}
             {activeTab === 'shops' && <TopShopsTab data={dashboardData} />}
-            {activeTab === 'department' && <DepartmentTab data={dashboardData} />} {/* Renamed */}
-            {activeTab === 'performance' && <EnhancedPerformanceTab data={dashboardData} />} {/* Enhanced */}
+            {activeTab === 'department' && <DepartmentTab data={dashboardData} />}
             {activeTab === 'analytics' && <AdvancedAnalyticsTab 
               data={dashboardData} 
               onShowSKU={(shop) => {
@@ -1118,7 +1151,7 @@ const RadicoDashboard = () => {
               setFilters={setFilters}
               getFilteredShops={getFilteredShops}
             />}
-            {activeTab === 'historical' && <HistoricalAnalysisTab data={dashboardData} />} {/* NEW TAB */}
+            {activeTab === 'historical' && <HistoricalAnalysisTab data={dashboardData} />}
           </>
         )}
       </main>
@@ -1562,22 +1595,81 @@ const AdvancedAnalyticsTab = ({
   );
 };
 
-// NEW: Historical Analysis Tab Component
-const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => (
-  <div className="space-y-6">
-    <div className="text-center">
-      <h2 className="text-2xl font-bold text-gray-900 mb-2">Historical Analysis</h2>
-      <p className="text-gray-600">Coming Soon - Full Financial Year Analysis (Apr 2024 - Mar 2025)</p>
-      <div className="mt-8 bg-blue-50 p-8 rounded-lg">
+// NEW: Enhanced Historical Analysis Tab with Debug Info
+const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
+  const [debugInfo, setDebugInfo] = React.useState<any>(null);
+
+  useEffect(() => {
+    // Show debug information about historical data processing
+    if (data.historicalData) {
+      setDebugInfo({
+        hasHistoricalData: !!data.historicalData,
+        dataLength: data.historicalData?.length || 0,
+        sampleData: data.historicalData?.slice(0, 3) || [],
+        customerInsights: data.customerInsights,
+        marchTotals: {
+          shops: Object.values(data.salesData).filter((shop: any) => shop.marchTotal > 0).length,
+          total8PM: Object.values(data.salesData).reduce((sum: number, shop: any) => sum + (shop.marchEightPM || 0), 0),
+          totalVERVE: Object.values(data.salesData).reduce((sum: number, shop: any) => sum + (shop.marchVerve || 0), 0)
+        }
+      });
+    }
+  }, [data]);
+
+  return (
+    <div className="space-y-6">
+      <div className="text-center">
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Historical Analysis & Debug</h2>
+        <p className="text-gray-600">Historical Data Integration Status & Debugging</p>
+      </div>
+
+      {/* Debug Information */}
+      {debugInfo && (
+        <div className="bg-gray-50 p-6 rounded-lg">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Debug Information</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+            <div>
+              <h4 className="font-medium text-gray-700">Historical Data Status:</h4>
+              <ul className="mt-2 space-y-1">
+                <li>Has Historical Data: {debugInfo.hasHistoricalData ? '✅ Yes' : '❌ No'}</li>
+                <li>Data Length: {debugInfo.dataLength} rows</li>
+                <li>March Active Shops: {debugInfo.marchTotals.shops}</li>
+                <li>March 8PM Cases: {debugInfo.marchTotals.total8PM}</li>
+                <li>March VERVE Cases: {debugInfo.marchTotals.totalVERVE}</li>
+              </ul>
+            </div>
+            <div>
+              <h4 className="font-medium text-gray-700">Customer Insights:</h4>
+              <ul className="mt-2 space-y-1">
+                <li>New Customers: {debugInfo.customerInsights.firstTimeCustomers}</li>
+                <li>Lost Customers: {debugInfo.customerInsights.lostCustomers}</li>
+                <li>Consistent: {debugInfo.customerInsights.consistentPerformers}</li>
+                <li>Declining: {debugInfo.customerInsights.decliningPerformers}</li>
+              </ul>
+            </div>
+          </div>
+          
+          {debugInfo.sampleData.length > 0 && (
+            <div className="mt-4">
+              <h4 className="font-medium text-gray-700 mb-2">Sample Historical Data:</h4>
+              <div className="bg-white p-3 rounded border text-xs overflow-x-auto">
+                <pre>{JSON.stringify(debugInfo.sampleData, null, 2)}</pre>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Coming Soon Section */}
+      <div className="bg-blue-50 p-8 rounded-lg text-center">
         <History className="w-16 h-16 text-blue-600 mx-auto mb-4" />
-        <h3 className="text-lg font-medium text-blue-900 mb-2">Historical Data Integration Complete</h3>
+        <h3 className="text-lg font-medium text-blue-900 mb-2">Historical Analysis Features</h3>
         <p className="text-blue-700 mb-4">
-          We have successfully connected to your historical data sheet. 
-          Advanced historical analysis features will be implemented in the next update.
+          Historical data connection is being debugged. Check the debug information above to see current status.
         </p>
         <div className="text-sm text-blue-600">
-          Features in development:
-          <ul className="list-disc list-inside mt-2 space-y-1">
+          <p className="mb-2">Planned Features:</p>
+          <ul className="list-disc list-inside space-y-1">
             <li>Year-over-year performance comparison</li>
             <li>Seasonal trend analysis</li>
             <li>Long-term customer lifecycle tracking</li>
@@ -1586,82 +1678,11 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => (
         </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
-// Enhanced Performance Tab (Simplified, no duplicates)
-const EnhancedPerformanceTab = ({ data }: { data: DashboardData }) => (
-  <div className="space-y-6">
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      {/* Brand Distribution */}
-      <div className="bg-white p-6 rounded-lg shadow">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Brand Distribution - May 2025</h3>
-        <div className="space-y-4">
-          <div>
-            <div className="flex justify-between text-sm">
-              <span>8PM Family</span>
-              <span>{((data.summary.total8PM / data.summary.totalSales) * 100).toFixed(1)}%</span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-3">
-              <div 
-                className="bg-purple-600 h-3 rounded-full" 
-                style={{ width: `${(data.summary.total8PM / data.summary.totalSales) * 100}%` }}
-              ></div>
-            </div>
-            <div className="text-sm text-gray-500 mt-1">{data.summary.total8PM.toLocaleString()} cases</div>
-          </div>
-          <div>
-            <div className="flex justify-between text-sm">
-              <span>VERVE Family</span>
-              <span>{((data.summary.totalVERVE / data.summary.totalSales) * 100).toFixed(1)}%</span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-3">
-              <div 
-                className="bg-orange-600 h-3 rounded-full" 
-                style={{ width: `${(data.summary.totalVERVE / data.summary.totalSales) * 100}%` }}
-              ></div>
-            </div>
-            <div className="text-sm text-gray-500 mt-1">{data.summary.totalVERVE.toLocaleString()} cases</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Achievement Summary */}
-      <div className="bg-white p-6 rounded-lg shadow">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Achievement Summary - May 2025</h3>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">8PM Achievement:</span>
-            <span className={`text-lg font-bold ${
-              parseFloat(data.summary.eightPmAchievement) >= 100 ? 'text-green-600' : 
-              parseFloat(data.summary.eightPmAchievement) >= 80 ? 'text-yellow-600' : 'text-red-600'
-            }`}>
-              {data.summary.eightPmAchievement}%
-            </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">VERVE Achievement:</span>
-            <span className={`text-lg font-bold ${
-              parseFloat(data.summary.verveAchievement) >= 100 ? 'text-green-600' : 
-              parseFloat(data.summary.verveAchievement) >= 80 ? 'text-yellow-600' : 'text-red-600'
-            }`}>
-              {data.summary.verveAchievement}%
-            </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Market Coverage:</span>
-            <span className={`text-lg font-bold ${
-              parseFloat(data.summary.coverage) >= 80 ? 'text-green-600' : 
-              parseFloat(data.summary.coverage) >= 60 ? 'text-yellow-600' : 'text-red-600'
-            }`}>
-              {data.summary.coverage}%
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-);
+// Enhanced Performance Tab (Simplified, no duplicates) - REMOVED AS REQUESTED
+// Performance data now integrated into Overview tab
 
 // Department Analysis Tab (Renamed from Territory, moved Department Performance here)
 const DepartmentTab = ({ data }: { data: DashboardData }) => (
@@ -1845,7 +1866,75 @@ const OverviewTab = ({ data }: { data: DashboardData }) => (
       </div>
     </div>
 
-    {/* Enhanced Quick Stats with 3-Month Insights */}
+    {/* Enhanced Brand Distribution and Achievement Summary - MOVED FROM PERFORMANCE TAB */}
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Brand Distribution */}
+      <div className="bg-white p-6 rounded-lg shadow">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Brand Distribution - May 2025</h3>
+        <div className="space-y-4">
+          <div>
+            <div className="flex justify-between text-sm">
+              <span>8PM Family</span>
+              <span>{((data.summary.total8PM / data.summary.totalSales) * 100).toFixed(1)}%</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-3">
+              <div 
+                className="bg-purple-600 h-3 rounded-full" 
+                style={{ width: `${(data.summary.total8PM / data.summary.totalSales) * 100}%` }}
+              ></div>
+            </div>
+            <div className="text-sm text-gray-500 mt-1">{data.summary.total8PM.toLocaleString()} cases</div>
+          </div>
+          <div>
+            <div className="flex justify-between text-sm">
+              <span>VERVE Family</span>
+              <span>{((data.summary.totalVERVE / data.summary.totalSales) * 100).toFixed(1)}%</span>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-3">
+              <div 
+                className="bg-orange-600 h-3 rounded-full" 
+                style={{ width: `${(data.summary.totalVERVE / data.summary.totalSales) * 100}%` }}
+              ></div>
+            </div>
+            <div className="text-sm text-gray-500 mt-1">{data.summary.totalVERVE.toLocaleString()} cases</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Achievement Summary */}
+      <div className="bg-white p-6 rounded-lg shadow">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Achievement Summary - May 2025</h3>
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">8PM Achievement:</span>
+            <span className={`text-lg font-bold ${
+              parseFloat(data.summary.eightPmAchievement) >= 100 ? 'text-green-600' : 
+              parseFloat(data.summary.eightPmAchievement) >= 80 ? 'text-yellow-600' : 'text-red-600'
+            }`}>
+              {data.summary.eightPmAchievement}%
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">VERVE Achievement:</span>
+            <span className={`text-lg font-bold ${
+              parseFloat(data.summary.verveAchievement) >= 100 ? 'text-green-600' : 
+              parseFloat(data.summary.verveAchievement) >= 80 ? 'text-yellow-600' : 'text-red-600'
+            }`}>
+              {data.summary.verveAchievement}%
+            </span>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-sm font-medium">Market Coverage:</span>
+            <span className={`text-lg font-bold ${
+              parseFloat(data.summary.coverage) >= 80 ? 'text-green-600' : 
+              parseFloat(data.summary.coverage) >= 60 ? 'text-yellow-600' : 'text-red-600'
+            }`}>
+              {data.summary.coverage}%
+            </span>
+          </div>
+        </div>
+      </div>
+    </div>
     <div className="bg-white p-6 rounded-lg shadow">
       <h3 className="text-lg font-medium text-gray-900 mb-4">Quick Statistics - May 2025</h3>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
@@ -1885,7 +1974,7 @@ const OverviewTab = ({ data }: { data: DashboardData }) => (
           <div className="text-xs text-gray-600">Consistent</div>
         </div>
         <div className="text-center">
-          <div className="text-xl font-bold text-orange-600">${data.customerInsights.decliningPerformers}</div>
+          <div className="text-xl font-bold text-orange-600">{data.customerInsights.decliningPerformers}</div>
           <div className="text-xs text-gray-600">Declining</div>
         </div>
       </div>
