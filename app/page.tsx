@@ -1448,7 +1448,7 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
             <div className="text-xl font-bold text-blue-600">
               {sortedSalesmen.filter((s: any) => s.coverage >= 80).length}
             </div>
-            <div className="text-xs text-gray-600">High Coverage (>80%)</div>
+            <div className="text-xs text-gray-600">High Coverage ({'>'}80%)</div>
           </div>
           <div className="text-center">
             <div className="text-xl font-bold text-purple-600">
