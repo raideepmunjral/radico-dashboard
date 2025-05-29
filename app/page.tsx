@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Download, RefreshCw, MapPin, TrendingUp, Users, ShoppingBag, BarChart3, Calendar, Trophy, Building, Target, Activity, FileText, Table, X, ChevronLeft, ChevronRight, Star, AlertTriangle, TrendingDown, UserPlus, Search, Filter, History } from 'lucide-react';
+import { Download, RefreshCw, MapPin, TrendingUp, Users, ShoppingBag, BarChart3, Calendar, Trophy, Building, Target, Activity, FileText, Table, X, ChevronLeft, ChevronRight, Star, AlertTriangle, TrendingDown, UserPlus, Search, Filter, History, Package } from 'lucide-react';
 
 // ==========================================
 // PART 1: TYPE DEFINITIONS & INTERFACES
@@ -92,10 +92,7 @@ interface FilterState {
 // ==========================================
 
 const RadicoDashboard = () => {
-  const [activeTab, setActiveTab] = useState('overview');
-  const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+const [showInventory, setShowInventory] = useState(false);
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [showSKUModal, setShowSKUModal] = useState(false);
   const [selectedShopSKU, setSelectedShopSKU] = useState<ShopData | null>(null);
@@ -1048,29 +1045,31 @@ const RadicoDashboard = () => {
               <span className="text-sm text-gray-500">
                 Last updated: {lastUpdated.toLocaleTimeString()}
               </span>
-              <div className="flex space-x-2">
-                <button
-                  onClick={fetchDashboardData}
-                  className="p-2 text-gray-400 hover:text-gray-600 transition-colors"
-                  title="Refresh data"
-                >
-                  <RefreshCw className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={generatePDFReport}
-                  className="bg-blue-600 hover:bg-blue-700 text-white px-3 sm:px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors text-sm"
-                >
-                  <Download className="w-4 h-4" />
-                  <span>PDF</span>
-                </button>
-                <button
-                  onClick={exportToExcel}
-                  className="bg-green-600 hover:bg-green-700 text-white px-3 sm:px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors text-sm"
-                >
-                  <Table className="w-4 h-4" />
-                  <span>CSV</span>
-                </button>
-              </div>
+             <div className="flex space-x-2">
+  <button onClick={fetchDashboardData}>
+    <RefreshCw className="w-5 h-5" />
+  </button>
+  
+  {/* ADD THIS NEW BUTTON HERE */}
+  <button 
+    onClick={() => setShowInventory(!showInventory)}
+    className={`px-3 py-2 rounded-lg flex items-center space-x-2 ${
+      showInventory ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-700'
+    }`}
+  >
+    <Package className="w-4 h-4" />
+    <span>{showInventory ? 'Sales' : 'Inventory'}</span>
+  </button>
+  
+  <button className="bg-blue-600">
+    <Download className="w-4 h-4" />
+    <span>PDF</span>
+  </button>
+  <button className="bg-green-600">
+    <Table className="w-4 h-4" />
+    <span>CSV</span>
+  </button>
+</div>
             </div>
           </div>
         </div>
@@ -1104,30 +1103,34 @@ const RadicoDashboard = () => {
         </div>
       </nav>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-        {dashboardData && (
-          <>
-            {activeTab === 'overview' && <OverviewTab data={dashboardData} />}
-            {activeTab === 'shops' && <TopShopsTab data={dashboardData} />}
-            {activeTab === 'department' && <DepartmentTab data={dashboardData} />}
-            {activeTab === 'salesman' && <SalesmanPerformanceTab data={dashboardData} />}
-            {activeTab === 'analytics' && <AdvancedAnalyticsTab 
-              data={dashboardData} 
-              onShowSKU={(shop) => {
-                setSelectedShopSKU(shop);
-                setShowSKUModal(true);
-              }}
-              currentPage={currentPage}
-              setCurrentPage={setCurrentPage}
-              itemsPerPage={itemsPerPage}
-              filters={filters}
-              setFilters={setFilters}
-              getFilteredShops={getFilteredShops}
-            />}
-            {activeTab === 'historical' && <HistoricalAnalysisTab data={dashboardData} />}
-          </>
-        )}
-      </main>
+     <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+  {showInventory ? (
+    <InventoryDashboard />
+  ) : (
+    dashboardData && (
+      <>
+        {activeTab === 'overview' && <OverviewTab data={dashboardData} />}
+        {activeTab === 'shops' && <TopShopsTab data={dashboardData} />}
+        {activeTab === 'department' && <DepartmentTab data={dashboardData} />}
+        {activeTab === 'salesman' && <SalesmanPerformanceTab data={dashboardData} />}
+        {activeTab === 'analytics' && <AdvancedAnalyticsTab 
+          data={dashboardData} 
+          onShowSKU={(shop) => {
+            setSelectedShopSKU(shop);
+            setShowSKUModal(true);
+          }}
+          currentPage={currentPage}
+          setCurrentPage={setCurrentPage}
+          itemsPerPage={itemsPerPage}
+          filters={filters}
+          setFilters={setFilters}
+          getFilteredShops={getFilteredShops}
+        />}
+        {activeTab === 'historical' && <HistoricalAnalysisTab data={dashboardData} />}
+      </>
+    )
+  )}
+</main>
 
       {showSKUModal && selectedShopSKU && (
         <EnhancedSKUModal 
