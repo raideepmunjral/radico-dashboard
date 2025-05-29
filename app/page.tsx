@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Download, RefreshCw, MapPin, TrendingUp, Users, ShoppingBag, BarChart3, Calendar, Trophy, Building, Target, Activity, FileText, Table, X, ChevronLeft, ChevronRight, Star, AlertTriangle, TrendingDown, UserPlus, Search, Filter, History, Package } from 'lucide-react';
+import InventoryDashboard from '../components/InventoryDashboard';
 
 // ==========================================
 // PART 1: TYPE DEFINITIONS & INTERFACES
@@ -1145,43 +1146,7 @@ const RadicoDashboard = () => {
 
       {/* Conditional Rendering: Show Inventory or Sales Dashboard */}
       {showInventory ? (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-          <div className="bg-white p-8 rounded-lg shadow text-center">
-            <Package className="w-16 h-16 mx-auto mb-4 text-purple-600" />
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Inventory Dashboard</h2>
-            <p className="text-gray-600 mb-4">
-              Inventory management features will be implemented next. This will include:
-            </p>
-            <div className="text-left max-w-md mx-auto space-y-2">
-              <div className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-purple-600 rounded-full"></div>
-                <span className="text-sm text-gray-700">Stock level tracking across all shops</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-purple-600 rounded-full"></div>
-                <span className="text-sm text-gray-700">Aging inventory analysis (15+, 30+, 60+ days)</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-purple-600 rounded-full"></div>
-                <span className="text-sm text-gray-700">Out-of-stock alerts and monitoring</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-purple-600 rounded-full"></div>
-                <span className="text-sm text-gray-700">Salesman visit compliance tracking</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-purple-600 rounded-full"></div>
-                <span className="text-sm text-gray-700">Supply chain gap analysis</span>
-              </div>
-            </div>
-            <button
-              onClick={() => setShowInventory(false)}
-              className="mt-6 bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded-lg"
-            >
-              Back to Sales Dashboard
-            </button>
-          </div>
-        </div>
+      <InventoryDashboard />
       ) : (
         <>
           <nav className="bg-white border-b overflow-x-auto">
