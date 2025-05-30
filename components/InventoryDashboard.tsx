@@ -164,14 +164,22 @@ const InventoryDashboard = () => {
       }
     }
     
-    // Determine brand family
+    // Determine brand family with enhanced matching
     let family = 'OTHER';
     if (cleanBrand.includes('8PM') || cleanBrand.includes('8 PM') || 
-        cleanBrand.includes('PREMIUM BLACK') || cleanBrand.includes('BLACK BLENDED')) {
+        cleanBrand.includes('PREMIUM BLACK') || cleanBrand.includes('BLACK BLENDED') ||
+        cleanBrand.includes('BLACK WHISKY')) {
       family = '8PM';
     } else if (cleanBrand.includes('VERVE') || cleanBrand.includes('M2M') || 
-               cleanBrand.includes('MAGIC MOMENTS')) {
+               cleanBrand.includes('MAGIC MOMENTS') || cleanBrand.includes('CRANBERRY') ||
+               cleanBrand.includes('GREEN APPLE') || cleanBrand.includes('LEMON LUSH') ||
+               cleanBrand.includes('GRAIN VODKA')) {
       family = 'VERVE';
+    }
+    
+    // Default size if not found
+    if (!extractedSize) {
+      extractedSize = '750'; // Default to 750ml
     }
     
     // Create standardized key for matching
@@ -476,6 +484,11 @@ const InventoryDashboard = () => {
         
         // Track all unique SKUs (FIXED: Process ALL brands, not just mapped ones)
         processedSKUs.add(brand);
+        
+        // DEBUG: Log brand processing for first few items
+        if (processedSKUs.size <= 10) {
+          console.log(`🏷️ Processing brand: "${brand}" -> Family: ${getBrandFamily(undefined, brand) || 'OTHER'}`);
+        }
 
         // ENHANCED: Get accurate supply date using Shop ID + Brand matching
         const lastSupplyFromHistory = getLastSupplyDate(shopVisit.shopId, brand, supplyHistory);
@@ -510,13 +523,28 @@ const InventoryDashboard = () => {
         else if (ageInDays >= 45) ageCategory = 'days45to60';
         else if (ageInDays >= 30) ageCategory = 'days30to45';
 
-        // ENHANCED: Check if supplied after out of stock using Shop ID
+        // ENHANCED: Check if supplied after out of stock using Shop ID + Brand matching
         const suppliedAfterOutOfStock = checkSuppliedAfterOutOfStock(
           shopVisit.shopId, 
           brand, 
           shopVisit.visitDate, 
           recentSupplies
         );
+        
+        // DEBUG: Special logging for NAJAFGARH ROSHANPURA using correct Shop ID
+        if (shopInventory.shopName?.toUpperCase().includes('NAJAFGARH') || shopVisit.shopId === '01/2024/0324') {
+          console.log(`🎯 NAJAFGARH Processing:`, {
+            shopId: shopVisit.shopId,
+            shopName: shopInventory.shopName,
+            brand: brand,
+            visitDate: shopVisit.visitDate.toLocaleDateString('en-GB'),
+            suppliedAfterOutOfStock,
+            quantity,
+            lastSupplyDate: lastSupplyDate?.toLocaleDateString('en-GB') || 'None',
+            isEstimatedAge,
+            ageInDays
+          });
+        }
 
         // Determine supply status
         let supplyStatus: InventoryItem['supplyStatus'] = 'unknown';
@@ -683,7 +711,9 @@ const InventoryDashboard = () => {
       totalOutOfStock,
       totalAging,
       recentlyRestockedItems,
-      processedSKUs: processedSKUs.size
+      processedSKUs: processedSKUs.size,
+      recentSuppliesCount: Object.keys(recentSupplies).length,
+      historicalEntriesCount: Object.keys(supplyHistory).length
     });
 
     return {
@@ -783,77 +813,123 @@ const InventoryDashboard = () => {
     const headers = pendingChallans[0];
     const rows = pendingChallans.slice(1);
     
-    // Find column indices
-    const shopIdIndex = headers.findIndex(h => h?.toLowerCase().includes('shop') && h?.toLowerCase().includes('id'));
-    const brandIndex = headers.findIndex(h => h?.toLowerCase().includes('brand') && !h?.toLowerCase().includes('short'));
-    const sizeIndex = headers.findIndex(h => h?.toLowerCase().includes('size'));
-    const dateIndex = headers.findIndex(h => h?.toLowerCase().includes('challandate') || h?.toLowerCase().includes('date'));
-    const casesIndex = headers.findIndex(h => h?.toLowerCase().includes('cases'));
+    console.log('📦 Processing Pending Challans headers:', headers);
     
-    if (shopIdIndex === -1 || brandIndex === -1 || dateIndex === -1) {
-      console.warn('⚠️ Pending Challans columns not found', { shopIdIndex, brandIndex, dateIndex });
-      return recentSupplies;
-    }
+    // CORRECTED: Find the right column indices based on actual structure
+    const shopIdIndex = 8; // Column I (index 8) = Shop_Id like "01/2024/0324"
+    const shopNameIndex = 9; // Column J (index 9) = shop_name
+    const brandIndex = 11; // Column L (index 11) = brand
+    const sizeIndex = 12; // Column M (index 12) = size
+    const casesIndex = 14; // Column O (index 14) = cases
+    const dateIndex = 1; // Column B (index 1) = challandate
     
-    console.log('📦 Processing Pending Challans with columns:', { shopIdIndex, brandIndex, sizeIndex, dateIndex, casesIndex });
+    console.log('📦 Using CORRECTED column indices:', { 
+      shopIdIndex, shopNameIndex, brandIndex, sizeIndex, dateIndex, casesIndex 
+    });
     
     let processedEntries = 0;
     
-    rows.forEach(row => {
+    rows.forEach((row, index) => {
       if (row.length > Math.max(shopIdIndex, brandIndex, dateIndex, casesIndex)) {
-        const shopId = row[shopIdIndex]?.toString().trim();
+        const shopId = row[shopIdIndex]?.toString().trim(); // Real Shop_Id like "01/2024/0324"
         const brand = row[brandIndex]?.toString().trim();
-        const size = sizeIndex !== -1 ? row[sizeIndex]?.toString().trim() : '';
+        const size = row[sizeIndex]?.toString().trim() || '';
         const dateStr = row[dateIndex]?.toString().trim();
-        const cases = casesIndex !== -1 ? parseFloat(row[casesIndex]) || 0 : 1;
+        const cases = parseFloat(row[casesIndex]) || 0;
+        const shopName = row[shopNameIndex]?.toString().trim() || '';
         
         if (shopId && brand && dateStr && cases > 0) {
           try {
-            const date = new Date(dateStr);
+            // Parse DD-MM-YYYY format from challandate
+            let date: Date;
+            if (dateStr.includes('-')) {
+              const dateParts = dateStr.split('-');
+              if (dateParts.length === 3) {
+                date = new Date(`${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`);
+              } else {
+                date = new Date(dateStr);
+              }
+            } else {
+              date = new Date(dateStr);
+            }
+            
             if (!isNaN(date.getTime())) {
-              // ENHANCED: Create brand key using Shop ID + Brand + Size
-              const key = createBrandMatchingKey(shopId, brand, size);
-              if (!recentSupplies[key] || date > recentSupplies[key]) {
-                recentSupplies[key] = date;
-                processedEntries++;
+              // CORRECTED: Create keys using the actual Shop_Id format
+              const brandInfo = normalizeBrandInfo(brand);
+              const possibleKeys = [
+                createBrandMatchingKey(shopId, brand, size),
+                `${shopId}_${brandInfo.family}_${brandInfo.size}`,
+                `${shopId}_8PM_750`,
+                `${shopId}_VERVE_750`,
+                `${shopId}_8PM_375`,
+                `${shopId}_VERVE_375`
+              ];
+              
+              // Store under all possible keys for better matching
+              possibleKeys.forEach(key => {
+                if (!recentSupplies[key] || date > recentSupplies[key]) {
+                  recentSupplies[key] = date;
+                }
+              });
+              
+              processedEntries++;
+              
+              // Special logging for NAJAFGARH ROSHANPURA with correct Shop_Id
+              if (shopName?.toUpperCase().includes('NAJAFGARH') || shopId === '01/2024/0324') {
+                console.log(`🎯 NAJAFGARH ROSHANPURA Supply Found:`, {
+                  shopId, shopName, brand, date: date.toLocaleDateString('en-GB'), 
+                  possibleKeys, cases
+                });
               }
             }
           } catch (error) {
-            // Skip invalid dates
+            console.warn(`Error parsing date: ${dateStr}`, error);
           }
         }
       }
     });
     
     console.log('📦 Recent supplies processed:', processedEntries, 'valid entries out of', rows.length, 'rows');
+    console.log('📦 Sample recent supply keys:', Object.keys(recentSupplies).slice(0, 10));
+    
     return recentSupplies;
   };
 
   // ENHANCED: Get last supply date using Shop ID + Brand family + Size matching
   const getLastSupplyDate = (shopId: string, brandName: string, supplyHistory: Record<string, Date>) => {
-    const key = createBrandMatchingKey(shopId, brandName);
-    const exactMatch = supplyHistory[key];
-    
-    if (exactMatch) {
-      console.log(`✅ Found exact supply match for ${key}:`, exactMatch.toLocaleDateString());
-      return exactMatch;
-    }
-    
-    // Try alternative brand representations
+    // Try multiple shop ID and brand combinations for better matching
     const brandInfo = normalizeBrandInfo(brandName);
-    const alternativeKeys = [
+    
+    // Create multiple possible keys using the ACTUAL Shop_Id format
+    const possibleKeys = [
+      // Exact Shop ID + Brand combinations using real format like "01/2024/0324"
+      createBrandMatchingKey(shopId, brandName),
       `${shopId}_${brandInfo.family}_${brandInfo.size}`,
-      `${shopId}_8PM_${brandInfo.size}`, // Try 8PM variation
-      `${shopId}_VERVE_${brandInfo.size}` // Try VERVE variation
+      `${shopId}_8PM_${brandInfo.size}`,
+      `${shopId}_VERVE_${brandInfo.size}`,
+      `${shopId}_8PM_750`,
+      `${shopId}_VERVE_750`,
+      `${shopId}_8PM_375`,
+      `${shopId}_VERVE_375`
     ];
     
-    for (const altKey of alternativeKeys) {
-      if (supplyHistory[altKey]) {
-        console.log(`✅ Found alternative supply match for ${altKey}:`, supplyHistory[altKey].toLocaleDateString());
-        return supplyHistory[altKey];
+    console.log(`🔍 Searching for supply data for Shop ID: ${shopId}, Brand: ${brandName}`);
+    console.log(`🔍 Trying keys:`, possibleKeys);
+    
+    // Special debug for NAJAFGARH ROSHANPURA
+    if (shopId === '01/2024/0324') {
+      console.log(`🎯 NAJAFGARH HISTORICAL SEARCH - Shop ID: ${shopId}, Brand: ${brandName}`);
+      console.log(`🎯 Available historical keys sample:`, Object.keys(supplyHistory).slice(0, 10));
+    }
+    
+    for (const key of possibleKeys) {
+      if (supplyHistory[key]) {
+        console.log(`✅ Found supply match for ${key}:`, supplyHistory[key].toLocaleDateString('en-GB'));
+        return supplyHistory[key];
       }
     }
     
+    console.log(`❌ No supply data found for Shop ID: ${shopId}, Brand: ${brandName}`);
     return null;
   };
 
@@ -864,40 +940,75 @@ const InventoryDashboard = () => {
     visitDate: Date, 
     recentSupplies: Record<string, Date>
   ) => {
-    const key = createBrandMatchingKey(shopId, brandName);
-    const supplyDate = recentSupplies[key];
+    console.log(`🔍 Checking supply after OOS for Shop ID: ${shopId}, Brand: ${brandName}, Visit: ${visitDate.toLocaleDateString('en-GB')}`);
     
-    if (!supplyDate) {
-      // Try alternative brand representations
-      const brandInfo = normalizeBrandInfo(brandName);
-      const alternativeKeys = [
-        `${shopId}_${brandInfo.family}_${brandInfo.size}`,
-        `${shopId}_8PM_${brandInfo.size}`,
-        `${shopId}_VERVE_${brandInfo.size}`
-      ];
+    // Try multiple shop ID and brand combinations for better matching
+    const brandInfo = normalizeBrandInfo(brandName);
+    
+    // Create multiple possible keys using the ACTUAL Shop_Id format
+    const possibleKeys = [
+      createBrandMatchingKey(shopId, brandName),
+      `${shopId}_${brandInfo.family}_${brandInfo.size}`,
+      `${shopId}_8PM_${brandInfo.size}`,
+      `${shopId}_VERVE_${brandInfo.size}`,
+      `${shopId}_8PM_750`,
+      `${shopId}_VERVE_750`,
+      `${shopId}_8PM_375`,
+      `${shopId}_VERVE_375`
+    ];
+    
+    console.log(`🔍 Trying supply keys:`, possibleKeys);
+    console.log(`📦 Available recent supplies:`, Object.keys(recentSupplies).slice(0, 20));
+    
+    // Special debug for NAJAFGARH ROSHANPURA
+    if (shopId === '01/2024/0324') {
+      console.log(`🎯 NAJAFGARH DEBUGGING - Shop ID: ${shopId}, Brand: ${brandName}, Visit: ${visitDate.toLocaleDateString('en-GB')}`);
+      console.log(`🎯 NAJAFGARH Keys to try:`, possibleKeys);
       
-      for (const altKey of alternativeKeys) {
-        const altSupplyDate = recentSupplies[altKey];
-        if (altSupplyDate) {
-          const daysDiff = Math.floor((altSupplyDate.getTime() - visitDate.getTime()) / (1000 * 60 * 60 * 24));
-          if (daysDiff > 0 && daysDiff <= 7) {
-            console.log(`✅ Found supply after OOS for ${altKey}: ${daysDiff} days after visit`);
-            return true;
-          }
+      // Check each key individually for NAJAFGARH
+      possibleKeys.forEach(key => {
+        if (recentSupplies[key]) {
+          const supplyDate = recentSupplies[key];
+          const daysDiff = Math.floor((supplyDate.getTime() - visitDate.getTime()) / (1000 * 60 * 60 * 24));
+          console.log(`🎯 NAJAFGARH Key ${key}: Supply Date: ${supplyDate.toLocaleDateString('en-GB')}, Days Diff: ${daysDiff}`);
+        } else {
+          console.log(`🎯 NAJAFGARH Key ${key}: NO SUPPLY FOUND`);
+        }
+      });
+    }
+    
+    for (const key of possibleKeys) {
+      const supplyDate = recentSupplies[key];
+      if (supplyDate) {
+        const daysDiff = Math.floor((supplyDate.getTime() - visitDate.getTime()) / (1000 * 60 * 60 * 24));
+        console.log(`📅 Found supply for ${key}: Supply Date: ${supplyDate.toLocaleDateString('en-GB')}, Days Diff: ${daysDiff}`);
+        
+        if (daysDiff > 0 && daysDiff <= 14) { // Extended to 14 days for better detection
+          console.log(`✅ SUPPLY AFTER OOS DETECTED for ${key}: ${daysDiff} days after visit`);
+          return true;
         }
       }
-      return false;
     }
     
-    // Check if supply was made after visit (within 7 days forward)
-    const daysDiff = Math.floor((supplyDate.getTime() - visitDate.getTime()) / (1000 * 60 * 60 * 24));
-    const supplied = daysDiff > 0 && daysDiff <= 7;
+    console.log(`❌ No supply after OOS found for Shop ID: ${shopId}, Brand: ${brandName}`);
+    return false;
+  };
+
+  // Helper function for brand family lookup
+  const getBrandFamily = (brandShort?: string, brand?: string): string | null => {
+    const cleanBrandShort = brandShort?.toString().trim().toUpperCase();
+    const cleanBrand = brand?.toString().trim().toUpperCase();
     
-    if (supplied) {
-      console.log(`✅ Found supply after OOS for ${key}: ${daysDiff} days after visit`);
-    }
+    const combinedText = ((cleanBrandShort || '') + ' ' + (cleanBrand || '')).toUpperCase();
     
-    return supplied;
+    // VERVE pattern matching
+    if (combinedText.includes('VERVE') || combinedText.includes('M2 MAGIC MOMENTS VERVE')) return 'VERVE';
+    
+    // 8PM pattern matching
+    if (combinedText.includes('8PM') || combinedText.includes('8 PM')) return '8PM';
+    if (combinedText.includes('PREMIUM BLACK') && (combinedText.includes('WHISKY') || combinedText.includes('BLENDED'))) return '8PM';
+    
+    return null;
   };
 
   // ==========================================
@@ -1495,7 +1606,7 @@ const EnhancedShopInventoryTab = ({
                         </div>
                         {item.lastSupplyDate && (
                           <div className="text-xs text-blue-600">
-                            Last Supply: {item.lastSupplyDate.toLocaleDateString()}
+                            Last Supply: {item.lastSupplyDate.toLocaleDateString('en-GB')}
                           </div>
                         )}
                         {item.reasonNoStock && (
@@ -1682,7 +1793,7 @@ const EnhancedAgingAnalysisTab = ({
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{location.quantity}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                    {location.lastSupplyDate ? location.lastSupplyDate.toLocaleDateString() : 'Apr 1 (fallback)'}
+                    {location.lastSupplyDate ? location.lastSupplyDate.toLocaleDateString('en-GB') : 'Apr 1 (fallback)'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
@@ -1946,7 +2057,7 @@ const EnhancedStockIntelligenceTab = ({
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.department}</td>
                   <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{item.salesman}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{item.reasonNoStock}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{item.visitDate.toLocaleDateString()}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{item.visitDate.toLocaleDateString('en-GB')}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     {item.suppliedAfterOutOfStock ? (
                       <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
