@@ -1877,11 +1877,7 @@ const EnhancedAgingAnalysisTab = ({
   );
 };
 
-export default InventoryDashboard;3 py-2"
-          >
-            <option value="">All Brands</option>
-            {brands.map((brand: string) => (
-              <option key={brand} value={brand}>{brand}</option>
+export default InventoryDashboard;={brand} value={brand}>{brand}</option>
             ))}
           </select>
 
@@ -2149,4 +2145,8 @@ const EnhancedStockIntelligenceTab = ({
           <select
             value={filters.brand}
             onChange={(e) => setFilters({ ...filters, brand: e.target.value })}
-            className="border border-gray-300 rounded-lg px-
+            className="border border-gray-300 rounded-lg px-3 py-2"
+          >
+            <option value="">All Brands</option>
+            {brands.map((brand: string) => (
+              <option key
