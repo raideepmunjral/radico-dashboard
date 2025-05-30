@@ -147,68 +147,43 @@ const InventoryDashboard = () => {
     apiKey: process.env.NEXT_PUBLIC_GOOGLE_API_KEY
   };
 
-  // ENHANCED BRAND FAMILY MAPPING - ALL BRANDS
-  const brandFamily: Record<string, string> = {
-    // 8PM Family - All Variants
-    "8 PM PREMIUM BLACK BLENDED WHISKY": "8PM",
-    "8 PM PREMIUM BLACK BLENDED WHISKY Pet": "8PM",
-    "8 PM PREMIUM BLACK BLENDED WHISKY PET": "8PM",
-    "8 PM PREMIUM BLACK SUPERIOR WHISKY": "8PM",
-    "8 PM BLACK 750": "8PM",
-    "8 PM BLACK 375": "8PM",
-    "8 PM BLACK 180": "8PM",
-    "8 PM BLACK 90": "8PM",
-    "8 PM BLACK 60": "8PM",
-    "8PM PREMIUM BLACK BLENDED WHISKY": "8PM",
-    "8PM BLACK": "8PM",
-    "8 PM": "8PM",
-    "8PM": "8PM",
-    
-    // VERVE Family - All Variants
-    "M2M VERVE CRANBERRY TEASE SP FL VODKA": "VERVE",
-    "M2M VERVE GREEN APPLE SUPERIOR FL. VODKA": "VERVE",
-    "M2M VERVE LEMON LUSH SUP FL VODKA": "VERVE",
-    "M2M VERVE SUPERIOR GRAIN VODKA": "VERVE",
-    "M2 MAGIC MOMENTS VERVE CRANBERRY TEASE SUPERIOR FLAVOURED VODKA": "VERVE",
-    "M2 MAGIC MOMENTS VERVE GREEN APPLE SUPERIOR FLAVOURED VODKA": "VERVE",
-    "M2 MAGIC MOMENTS VERVE LEMON LUSH SUPERIOR FLAVOURED VODKA": "VERVE",
-    "M2 MAGIC MOMENTS VERVE SUPERIOR GRAIN VODKA": "VERVE",
-    "VERVE CRANBERRY 750": "VERVE",
-    "VERVE CRANBERRY 375": "VERVE",
-    "VERVE CRANBERRY 180": "VERVE",
-    "VERVE GREEN APPLE 750": "VERVE",
-    "VERVE GREEN APPLE 375": "VERVE",
-    "VERVE GREEN APPLE 180": "VERVE",
-    "VERVE LEMON LUSH 750": "VERVE",
-    "VERVE LEMON LUSH 375": "VERVE",
-    "VERVE LEMON LUSH 180": "VERVE",
-    "VERVE GRAIN 750": "VERVE",
-    "VERVE GRAIN 375": "VERVE",
-    "VERVE GRAIN 180": "VERVE",
-    "VERVE": "VERVE"
-  };
-  
-  // ENHANCED: Helper function to get brand family
-  const getBrandFamily = (brandName: string): string => {
+  // ==========================================
+  // ENHANCED BRAND NORMALIZATION SYSTEM
+  // ==========================================
+
+  // Extract brand family and size from different naming conventions
+  const normalizeBrandInfo = (brandName: string, size?: string): { family: string, size: string, fullKey: string } => {
     const cleanBrand = brandName?.toString().trim().toUpperCase();
+    let extractedSize = size?.toString() || '';
     
-    // Direct mapping first
-    for (const [key, family] of Object.entries(brandFamily)) {
-      if (cleanBrand === key.toUpperCase()) {
-        return family;
+    // Extract size from brand name if not provided separately
+    if (!extractedSize) {
+      const sizeMatch = cleanBrand.match(/(\d+)\s?(P|ML)?$/);
+      if (sizeMatch) {
+        extractedSize = sizeMatch[1];
       }
     }
     
-    // Pattern matching for any missed variants
-    if (cleanBrand.includes('8PM') || cleanBrand.includes('8 PM') || cleanBrand.includes('PREMIUM BLACK')) {
-      return '8PM';
-    }
-    if (cleanBrand.includes('VERVE') || cleanBrand.includes('M2M') || cleanBrand.includes('MAGIC MOMENTS')) {
-      return 'VERVE';
+    // Determine brand family
+    let family = 'OTHER';
+    if (cleanBrand.includes('8PM') || cleanBrand.includes('8 PM') || 
+        cleanBrand.includes('PREMIUM BLACK') || cleanBrand.includes('BLACK BLENDED')) {
+      family = '8PM';
+    } else if (cleanBrand.includes('VERVE') || cleanBrand.includes('M2M') || 
+               cleanBrand.includes('MAGIC MOMENTS')) {
+      family = 'VERVE';
     }
     
-    // Return the original brand name if no family match
-    return cleanBrand;
+    // Create standardized key for matching
+    const fullKey = `${family}_${extractedSize}`;
+    
+    return { family, size: extractedSize, fullKey };
+  };
+
+  // Match brands across different sheets using Shop ID + Brand Family + Size
+  const createBrandMatchingKey = (shopId: string, brandName: string, size?: string): string => {
+    const brandInfo = normalizeBrandInfo(brandName, size);
+    return `${shopId}_${brandInfo.fullKey}`;
   };
 
   // ==========================================
@@ -224,7 +199,7 @@ const InventoryDashboard = () => {
         throw new Error('Google API key not configured');
       }
 
-      console.log('🔄 Fetching enhanced inventory data...');
+      console.log('🔄 Fetching enhanced inventory data with Shop ID matching...');
 
       // Fetch all data sources
       const [visitData, historicalData, masterData] = await Promise.all([
@@ -317,7 +292,7 @@ const InventoryDashboard = () => {
   // ==========================================
 
   const processEnhancedInventoryData = (visitData: any[][], historicalData: any[][], pendingChallans: any[][]): InventoryData => {
-    console.log('🔧 Processing enhanced inventory data...');
+    console.log('🔧 Processing enhanced inventory data with Shop ID based matching...');
     
     if (visitData.length === 0) {
       throw new Error('No visit data found');
@@ -354,9 +329,14 @@ const InventoryDashboard = () => {
       }
     }
 
-    // Process historical supply data for accurate aging
+    // Process historical supply data for accurate aging (FIXED: Shop ID based)
     const supplyHistory = processHistoricalSupplyData(historicalData);
     const recentSupplies = processPendingChallans(pendingChallans);
+    
+    console.log('📊 Supply data processed:', {
+      historicalEntries: Object.keys(supplyHistory).length,
+      recentSupplies: Object.keys(recentSupplies).length
+    });
     
     // Filter for MONTHLY data (current month)
     const today = new Date();
@@ -377,6 +357,8 @@ const InventoryDashboard = () => {
         return false;
       }
     });
+
+    console.log(`📅 Current month visits: ${currentMonthRows.length} out of ${rows.length} total rows`);
 
     // Find latest visits for each shop in current month
     const shopLatestVisits: Record<string, any> = {};
@@ -408,6 +390,8 @@ const InventoryDashboard = () => {
       }
     });
 
+    console.log(`🏪 Latest visits found for ${Object.keys(shopLatestVisits).length} unique shops`);
+
     // Group inventory data by shop's latest visit
     currentMonthRows.forEach(row => {
       const shopId = row[columnIndices.shopId];
@@ -434,6 +418,7 @@ const InventoryDashboard = () => {
     const allAgingLocations: Array<any> = [];
     const outOfStockItems: Array<any> = [];
     const salesmenVisits: Record<string, any> = {};
+    const processedSKUs = new Set<string>();
 
     // Track monthly visit metrics
     let monthlyVisitCount = 0;
@@ -480,7 +465,7 @@ const InventoryDashboard = () => {
         salesmenVisits[shopVisit.salesman].yesterdayVisits++;
       }
 
-      // Process each inventory item with enhanced aging logic
+      // ENHANCED: Process each inventory item with Shop ID based supply matching
       shopVisit.rows.forEach((row: any[]) => {
         const brand = row[columnIndices.invBrand]?.toString().trim();
         const quantity = parseFloat(row[columnIndices.invQuantity]) || 0;
@@ -488,8 +473,11 @@ const InventoryDashboard = () => {
         const lsDate = row[columnIndices.lsDate];
 
         if (!brand) return;
+        
+        // Track all unique SKUs (FIXED: Process ALL brands, not just mapped ones)
+        processedSKUs.add(brand);
 
-        // ENHANCED: Get accurate supply date from historical data
+        // ENHANCED: Get accurate supply date using Shop ID + Brand matching
         const lastSupplyFromHistory = getLastSupplyDate(shopVisit.shopId, brand, supplyHistory);
         const lastSupplyFromLS = lsDate ? new Date(lsDate) : null;
         
@@ -497,7 +485,7 @@ const InventoryDashboard = () => {
         let isEstimatedAge = true;
         let ageInDays = 0;
         
-        // Priority: Historical data > LS Date > Estimation
+        // Priority: Historical data > LS Date > April 1 fallback
         if (lastSupplyFromHistory && !isNaN(lastSupplyFromHistory.getTime())) {
           lastSupplyDate = lastSupplyFromHistory;
           ageInDays = Math.floor((shopVisit.visitDate.getTime() - lastSupplyDate.getTime()) / (1000 * 60 * 60 * 24));
@@ -507,8 +495,10 @@ const InventoryDashboard = () => {
           ageInDays = Math.floor((shopVisit.visitDate.getTime() - lastSupplyDate.getTime()) / (1000 * 60 * 60 * 24));
           isEstimatedAge = false;
         } else {
-          // Fallback: Estimate based on typical supply cycle (30 days)
-          ageInDays = 30;
+          // FIXED: Fallback to April 1, 2025 as requested
+          const fallbackDate = new Date('2025-04-01');
+          lastSupplyDate = fallbackDate;
+          ageInDays = Math.floor((shopVisit.visitDate.getTime() - fallbackDate.getTime()) / (1000 * 60 * 60 * 24));
           isEstimatedAge = true;
         }
 
@@ -520,7 +510,7 @@ const InventoryDashboard = () => {
         else if (ageInDays >= 45) ageCategory = 'days45to60';
         else if (ageInDays >= 30) ageCategory = 'days30to45';
 
-        // Check if supplied after out of stock
+        // ENHANCED: Check if supplied after out of stock using Shop ID
         const suppliedAfterOutOfStock = checkSuppliedAfterOutOfStock(
           shopVisit.shopId, 
           brand, 
@@ -570,8 +560,8 @@ const InventoryDashboard = () => {
         else if (isLowStock) shopInventory.lowStockCount++;
         else if (isOutOfStock) shopInventory.outOfStockCount++;
 
-        // Track aging inventory (30+ days)
-        if (ageInDays >= 30) {
+        // FIXED: Track aging inventory (30+ days) ONLY for items with stock > 0
+        if (ageInDays >= 30 && quantity > 0) {
           shopInventory.agingInventoryCount++;
           
           allAgingLocations.push({
@@ -599,12 +589,12 @@ const InventoryDashboard = () => {
             visitDate: shopInventory.visitDate,
             suppliedAfterOutOfStock,
             daysAfterSupply: suppliedAfterOutOfStock ? 
-              Math.floor((shopVisit.visitDate.getTime() - (recentSupplies[`${shopVisit.shopId}_${brand}`]?.getTime() || 0)) / (1000 * 60 * 60 * 24)) : 
+              Math.floor((shopVisit.visitDate.getTime() - (recentSupplies[createBrandMatchingKey(shopVisit.shopId, brand)]?.getTime() || 0)) / (1000 * 60 * 60 * 24)) : 
               undefined
           });
         }
 
-        // Enhanced SKU performance tracking
+        // Enhanced SKU performance tracking (FIXED: Track ALL brands)
         if (!skuTracker[brand]) {
           skuTracker[brand] = {
             name: brand,
@@ -634,6 +624,8 @@ const InventoryDashboard = () => {
 
       shops[shopVisit.shopId] = shopInventory;
     });
+
+    console.log(`✅ Processed ${Object.keys(shops).length} shops with ${processedSKUs.size} unique SKUs`);
 
     // Calculate last month visits
     rows.forEach(row => {
@@ -690,7 +682,8 @@ const InventoryDashboard = () => {
       totalSKUs,
       totalOutOfStock,
       totalAging,
-      recentlyRestockedItems
+      recentlyRestockedItems,
+      processedSKUs: processedSKUs.size
     });
 
     return {
@@ -720,7 +713,10 @@ const InventoryDashboard = () => {
     };
   };
 
-  // ENHANCED: Helper functions for supply data processing
+  // ==========================================
+  // ENHANCED SUPPLY DATA PROCESSING FUNCTIONS
+  // ==========================================
+
   const processHistoricalSupplyData = (historicalData: any[][]) => {
     const supplyHistory: Record<string, Date> = {};
     
@@ -730,33 +726,41 @@ const InventoryDashboard = () => {
     const rows = historicalData.slice(1);
     
     // Find column indices
-    const shopIdIndex = headers.findIndex(h => h.toLowerCase().includes('shop_id'));
-    const brandIndex = headers.findIndex(h => h.toLowerCase().includes('brand'));
-    const dateIndex = headers.findIndex(h => h.toLowerCase().includes('date'));
-    const casesIndex = headers.findIndex(h => h.toLowerCase().includes('cases'));
+    const shopIdIndex = headers.findIndex(h => h?.toLowerCase().includes('shop_id'));
+    const brandShortIndex = headers.findIndex(h => h?.toLowerCase().includes('brand short') || h?.toLowerCase().includes('brand_short'));
+    const sizeIndex = headers.findIndex(h => h?.toLowerCase().includes('size'));
+    const dateIndex = headers.findIndex(h => h?.toLowerCase().includes('date'));
+    const casesIndex = headers.findIndex(h => h?.toLowerCase().includes('cases'));
     
-    if (shopIdIndex === -1 || brandIndex === -1 || dateIndex === -1) {
-      console.warn('⚠️ Historical data columns not found');
+    if (shopIdIndex === -1 || brandShortIndex === -1 || dateIndex === -1) {
+      console.warn('⚠️ Historical data columns not found', { shopIdIndex, brandShortIndex, dateIndex });
       return supplyHistory;
     }
     
-    rows.forEach(row => {
-      if (row.length > Math.max(shopIdIndex, brandIndex, dateIndex, casesIndex)) {
+    console.log('📊 Processing historical data with columns:', { shopIdIndex, brandShortIndex, sizeIndex, dateIndex, casesIndex });
+    
+    let processedEntries = 0;
+    
+    rows.forEach((row, index) => {
+      if (row.length > Math.max(shopIdIndex, brandShortIndex, dateIndex, casesIndex)) {
         const shopId = row[shopIdIndex]?.toString().trim();
-        const brand = row[brandIndex]?.toString().trim();
+        const brandShort = row[brandShortIndex]?.toString().trim();
+        const size = sizeIndex !== -1 ? row[sizeIndex]?.toString().trim() : '';
         const dateStr = row[dateIndex]?.toString().trim();
-        const cases = parseFloat(row[casesIndex]) || 0;
+        const cases = casesIndex !== -1 ? parseFloat(row[casesIndex]) || 0 : 1;
         
-        if (shopId && brand && dateStr && cases > 0) {
+        if (shopId && brandShort && dateStr && cases > 0) {
           try {
             // Parse DD-MM-YYYY format
             const dateParts = dateStr.split('-');
             if (dateParts.length === 3) {
               const date = new Date(`${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`);
               if (!isNaN(date.getTime())) {
-                const key = `${shopId}_${brand}`;
+                // ENHANCED: Create brand key using Shop ID + Brand + Size
+                const key = createBrandMatchingKey(shopId, brandShort, size);
                 if (!supplyHistory[key] || date > supplyHistory[key]) {
                   supplyHistory[key] = date;
+                  processedEntries++;
                 }
               }
             }
@@ -767,7 +771,7 @@ const InventoryDashboard = () => {
       }
     });
     
-    console.log('📊 Historical supply data processed:', Object.keys(supplyHistory).length, 'entries');
+    console.log('📊 Historical supply data processed:', processedEntries, 'valid entries out of', rows.length, 'rows');
     return supplyHistory;
   };
 
@@ -779,31 +783,39 @@ const InventoryDashboard = () => {
     const headers = pendingChallans[0];
     const rows = pendingChallans.slice(1);
     
-    // Find column indices (adjust based on your sheet structure)
-    const shopIdIndex = headers.findIndex(h => h.toLowerCase().includes('shop') && h.toLowerCase().includes('id'));
-    const brandIndex = headers.findIndex(h => h.toLowerCase().includes('brand'));
-    const dateIndex = headers.findIndex(h => h.toLowerCase().includes('date'));
-    const casesIndex = headers.findIndex(h => h.toLowerCase().includes('cases'));
+    // Find column indices
+    const shopIdIndex = headers.findIndex(h => h?.toLowerCase().includes('shop') && h?.toLowerCase().includes('id'));
+    const brandIndex = headers.findIndex(h => h?.toLowerCase().includes('brand') && !h?.toLowerCase().includes('short'));
+    const sizeIndex = headers.findIndex(h => h?.toLowerCase().includes('size'));
+    const dateIndex = headers.findIndex(h => h?.toLowerCase().includes('challandate') || h?.toLowerCase().includes('date'));
+    const casesIndex = headers.findIndex(h => h?.toLowerCase().includes('cases'));
     
     if (shopIdIndex === -1 || brandIndex === -1 || dateIndex === -1) {
-      console.warn('⚠️ Pending Challans columns not found');
+      console.warn('⚠️ Pending Challans columns not found', { shopIdIndex, brandIndex, dateIndex });
       return recentSupplies;
     }
+    
+    console.log('📦 Processing Pending Challans with columns:', { shopIdIndex, brandIndex, sizeIndex, dateIndex, casesIndex });
+    
+    let processedEntries = 0;
     
     rows.forEach(row => {
       if (row.length > Math.max(shopIdIndex, brandIndex, dateIndex, casesIndex)) {
         const shopId = row[shopIdIndex]?.toString().trim();
         const brand = row[brandIndex]?.toString().trim();
+        const size = sizeIndex !== -1 ? row[sizeIndex]?.toString().trim() : '';
         const dateStr = row[dateIndex]?.toString().trim();
-        const cases = parseFloat(row[casesIndex]) || 0;
+        const cases = casesIndex !== -1 ? parseFloat(row[casesIndex]) || 0 : 1;
         
         if (shopId && brand && dateStr && cases > 0) {
           try {
             const date = new Date(dateStr);
             if (!isNaN(date.getTime())) {
-              const key = `${shopId}_${brand}`;
+              // ENHANCED: Create brand key using Shop ID + Brand + Size
+              const key = createBrandMatchingKey(shopId, brand, size);
               if (!recentSupplies[key] || date > recentSupplies[key]) {
                 recentSupplies[key] = date;
+                processedEntries++;
               }
             }
           } catch (error) {
@@ -813,29 +825,79 @@ const InventoryDashboard = () => {
       }
     });
     
-    console.log('📦 Recent supplies processed:', Object.keys(recentSupplies).length, 'entries');
+    console.log('📦 Recent supplies processed:', processedEntries, 'valid entries out of', rows.length, 'rows');
     return recentSupplies;
   };
 
-  const getLastSupplyDate = (shopId: string, brand: string, supplyHistory: Record<string, Date>) => {
-    const key = `${shopId}_${brand}`;
-    return supplyHistory[key];
+  // ENHANCED: Get last supply date using Shop ID + Brand family + Size matching
+  const getLastSupplyDate = (shopId: string, brandName: string, supplyHistory: Record<string, Date>) => {
+    const key = createBrandMatchingKey(shopId, brandName);
+    const exactMatch = supplyHistory[key];
+    
+    if (exactMatch) {
+      console.log(`✅ Found exact supply match for ${key}:`, exactMatch.toLocaleDateString());
+      return exactMatch;
+    }
+    
+    // Try alternative brand representations
+    const brandInfo = normalizeBrandInfo(brandName);
+    const alternativeKeys = [
+      `${shopId}_${brandInfo.family}_${brandInfo.size}`,
+      `${shopId}_8PM_${brandInfo.size}`, // Try 8PM variation
+      `${shopId}_VERVE_${brandInfo.size}` // Try VERVE variation
+    ];
+    
+    for (const altKey of alternativeKeys) {
+      if (supplyHistory[altKey]) {
+        console.log(`✅ Found alternative supply match for ${altKey}:`, supplyHistory[altKey].toLocaleDateString());
+        return supplyHistory[altKey];
+      }
+    }
+    
+    return null;
   };
 
+  // ENHANCED: Check if supplied after out of stock using Shop ID + Brand matching
   const checkSuppliedAfterOutOfStock = (
     shopId: string, 
-    brand: string, 
+    brandName: string, 
     visitDate: Date, 
     recentSupplies: Record<string, Date>
   ) => {
-    const key = `${shopId}_${brand}`;
+    const key = createBrandMatchingKey(shopId, brandName);
     const supplyDate = recentSupplies[key];
     
-    if (!supplyDate) return false;
+    if (!supplyDate) {
+      // Try alternative brand representations
+      const brandInfo = normalizeBrandInfo(brandName);
+      const alternativeKeys = [
+        `${shopId}_${brandInfo.family}_${brandInfo.size}`,
+        `${shopId}_8PM_${brandInfo.size}`,
+        `${shopId}_VERVE_${brandInfo.size}`
+      ];
+      
+      for (const altKey of alternativeKeys) {
+        const altSupplyDate = recentSupplies[altKey];
+        if (altSupplyDate) {
+          const daysDiff = Math.floor((altSupplyDate.getTime() - visitDate.getTime()) / (1000 * 60 * 60 * 24));
+          if (daysDiff > 0 && daysDiff <= 7) {
+            console.log(`✅ Found supply after OOS for ${altKey}: ${daysDiff} days after visit`);
+            return true;
+          }
+        }
+      }
+      return false;
+    }
     
     // Check if supply was made after visit (within 7 days forward)
     const daysDiff = Math.floor((supplyDate.getTime() - visitDate.getTime()) / (1000 * 60 * 60 * 24));
-    return daysDiff > 0 && daysDiff <= 7;
+    const supplied = daysDiff > 0 && daysDiff <= 7;
+    
+    if (supplied) {
+      console.log(`✅ Found supply after OOS for ${key}: ${daysDiff} days after visit`);
+    }
+    
+    return supplied;
   };
 
   // ==========================================
@@ -1017,7 +1079,7 @@ const InventoryDashboard = () => {
         <div className="text-center">
           <Package className="w-12 h-12 animate-pulse mx-auto mb-4 text-purple-600" />
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Loading Enhanced Inventory Dashboard</h2>
-          <p className="text-gray-600">Processing comprehensive inventory data with supply chain intelligence...</p>
+          <p className="text-gray-600">Processing comprehensive inventory data with Shop ID based supply intelligence...</p>
         </div>
       </div>
     );
@@ -1064,7 +1126,7 @@ const InventoryDashboard = () => {
             <div className="flex items-center mb-4 sm:mb-0">
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Enhanced Inventory Analytics</h1>
               <span className="ml-3 px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
-                Live Data + AI Intelligence
+                Live Data + Shop ID Intelligence
               </span>
             </div>
             <div className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4">
@@ -1181,7 +1243,7 @@ const EnhancedInventoryOverviewTab = ({ data }: { data: InventoryData }) => (
   <div className="space-y-6">
     <div className="text-center">
       <h2 className="text-2xl font-bold text-gray-900 mb-2">Enhanced Inventory Overview</h2>
-      <p className="text-gray-600">Real-time inventory status with supply chain intelligence (Current Month)</p>
+      <p className="text-gray-600">Real-time inventory status with Shop ID based supply intelligence (Current Month)</p>
     </div>
 
     {/* Enhanced Summary Cards */}
@@ -1251,7 +1313,7 @@ const EnhancedInventoryOverviewTab = ({ data }: { data: InventoryData }) => (
     <div className="bg-white rounded-lg shadow">
       <div className="px-6 py-4 border-b border-gray-200">
         <h3 className="text-lg font-medium text-gray-900">All SKU Stock Status</h3>
-        <p className="text-sm text-gray-500">Complete inventory status across all tracked products</p>
+        <p className="text-sm text-gray-500">Complete inventory status across all tracked products (Shop ID based matching)</p>
       </div>
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
@@ -1363,7 +1425,7 @@ const EnhancedShopInventoryTab = ({
     <div className="bg-white rounded-lg shadow">
       <div className="px-6 py-4 border-b border-gray-200">
         <h3 className="text-lg font-medium text-gray-900">Shop Inventory Status</h3>
-        <p className="text-sm text-gray-500">Showing {filteredShops.length} shops with enhanced supply intelligence</p>
+        <p className="text-sm text-gray-500">Showing {filteredShops.length} shops with enhanced Shop ID based supply intelligence</p>
       </div>
       <div className="divide-y divide-gray-200">
         {filteredShops.map((shop: ShopInventory) => (
@@ -1375,7 +1437,7 @@ const EnhancedShopInventoryTab = ({
               <div className="flex items-center space-x-4">
                 <div>
                   <h4 className="text-lg font-medium text-gray-900">{shop.shopName}</h4>
-                  <p className="text-sm text-gray-500">{shop.department} • {shop.salesman}</p>
+                  <p className="text-sm text-gray-500">{shop.department} • {shop.salesman} • ID: {shop.shopId}</p>
                 </div>
                 <div className="flex space-x-4">
                   <div className="text-center">
@@ -1477,7 +1539,7 @@ const EnhancedAgingAnalysisTab = ({
     <div className="space-y-6">
       <div className="text-center">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Enhanced Aging Inventory Analysis</h2>
-        <p className="text-gray-600">All aging products (30+ days) with supply intelligence and accurate dating</p>
+        <p className="text-gray-600">All aging products (30+ days) with Shop ID based supply intelligence and accurate dating</p>
       </div>
 
       {/* Enhanced Filter Controls */}
@@ -1579,7 +1641,7 @@ const EnhancedAgingAnalysisTab = ({
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900">All Aging Inventory Locations (30+ Days)</h3>
           <p className="text-sm text-gray-500">
-            Showing {startIndex + 1}-{Math.min(endIndex, filteredAging.length)} of {filteredAging.length} aging items
+            Showing {startIndex + 1}-{Math.min(endIndex, filteredAging.length)} of {filteredAging.length} aging items with Shop ID based matching
           </p>
         </div>
         <div className="overflow-x-auto">
@@ -1620,7 +1682,7 @@ const EnhancedAgingAnalysisTab = ({
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{location.quantity}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                    {location.lastSupplyDate ? location.lastSupplyDate.toLocaleDateString() : 'Unknown'}
+                    {location.lastSupplyDate ? location.lastSupplyDate.toLocaleDateString() : 'Apr 1 (fallback)'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
@@ -1749,7 +1811,7 @@ const EnhancedStockIntelligenceTab = ({
     <div className="space-y-6">
       <div className="text-center">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Stock Intelligence & Supply Chain Analysis</h2>
-        <p className="text-gray-600">Advanced out-of-stock analysis with supply chain intelligence</p>
+        <p className="text-gray-600">Advanced out-of-stock analysis with Shop ID based supply chain intelligence</p>
       </div>
 
       {/* Enhanced Filter Controls */}
@@ -1860,7 +1922,7 @@ const EnhancedStockIntelligenceTab = ({
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900">Out of Stock Intelligence</h3>
           <p className="text-sm text-gray-500">
-            Complete out-of-stock analysis with supply chain tracking ({filteredOutOfStock.length} items)
+            Complete out-of-stock analysis with Shop ID based supply chain tracking ({filteredOutOfStock.length} items)
           </p>
         </div>
         <div className="overflow-x-auto">
@@ -1912,7 +1974,7 @@ const EnhancedStockIntelligenceTab = ({
             <AlertTriangle className="w-5 h-5 text-red-600 mr-2" />
             Critical SKUs (High Out-of-Stock Rate)
           </h3>
-          <p className="text-sm text-gray-500">Products with 30%+ out-of-stock rate requiring immediate attention</p>
+          <p className="text-sm text-gray-500">Products with 30%+ out-of-stock rate requiring immediate attention (Shop ID based tracking)</p>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
@@ -1965,7 +2027,7 @@ const EnhancedStockIntelligenceTab = ({
       <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 p-6 rounded-lg">
         <h3 className="text-lg font-medium text-blue-900 mb-4 flex items-center">
           <Eye className="w-5 h-5 mr-2" />
-          AI-Powered Recommendations
+          AI-Powered Recommendations (Shop ID Intelligence)
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-3">
@@ -1974,7 +2036,7 @@ const EnhancedStockIntelligenceTab = ({
               <div>
                 <div className="text-sm font-medium text-blue-900">Immediate Action Required</div>
                 <div className="text-sm text-blue-700">
-                  {data.summary.totalOutOfStock} items out of stock. Supply chain intervention needed for critical SKUs.
+                  {data.summary.totalOutOfStock} items out of stock. Shop ID based supply chain intervention needed for critical SKUs.
                 </div>
               </div>
             </div>
@@ -1992,9 +2054,9 @@ const EnhancedStockIntelligenceTab = ({
             <div className="flex items-start space-x-3">
               <div className="w-2 h-2 bg-green-600 rounded-full mt-2"></div>
               <div>
-                <div className="text-sm font-medium text-blue-900">Supply Chain Intelligence</div>
+                <div className="text-sm font-medium text-blue-900">Enhanced Supply Chain Intelligence</div>
                 <div className="text-sm text-blue-700">
-                  {data.summary.recentlyRestockedItems} items recently restocked after out-of-stock reports. Monitor effectiveness.
+                  {data.summary.recentlyRestockedItems} items recently restocked after out-of-stock reports using Shop ID tracking. Monitor effectiveness.
                 </div>
               </div>
             </div>
@@ -2003,10 +2065,23 @@ const EnhancedStockIntelligenceTab = ({
               <div>
                 <div className="text-sm font-medium text-blue-900">Visit Optimization</div>
                 <div className="text-sm text-blue-700">
-                  Focus visits on high out-of-stock locations. {data.visitCompliance.monthlyVisits} monthly visits tracked.
+                  Focus visits on high out-of-stock locations. {data.visitCompliance.monthlyVisits} monthly visits tracked with Shop ID precision.
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+        
+        {/* Success Indicators */}
+        <div className="mt-6 p-4 bg-white rounded-lg border border-green-200">
+          <h4 className="text-sm font-medium text-green-900 mb-2">✅ Enhanced Features Active:</h4>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs text-green-700">
+            <div>• Shop ID based brand matching</div>
+            <div>• ALL SKUs tracked (not just 8PM BLACK 750)</div>
+            <div>• April 1 fallback aging calculation</div>
+            <div>• Historical data integration</div>
+            <div>• Pending Challans supply detection</div>
+            <div>• Zero stock aging exclusion</div>
           </div>
         </div>
       </div>
