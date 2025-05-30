@@ -207,7 +207,7 @@ const InventoryDashboard = () => {
         throw new Error('Google API key not configured');
       }
 
-      console.log('🔄 Fetching enhanced inventory data with FIXED Shop ID matching...');
+      console.log('🔄 Fetching enhanced inventory data with Shop ID matching...');
 
       // Fetch all data sources
       const [visitData, historicalData, masterData] = await Promise.all([
@@ -216,7 +216,7 @@ const InventoryDashboard = () => {
         fetchMasterSheetData()
       ]);
       
-      // Process with FIXED logic
+      // Process with enhanced logic
       const processedData = processEnhancedInventoryData(visitData, historicalData, masterData);
       setInventoryData(processedData);
       
@@ -296,11 +296,11 @@ const InventoryDashboard = () => {
   };
 
   // ==========================================
-  // FIXED DATA PROCESSING LOGIC
+  // ENHANCED DATA PROCESSING LOGIC
   // ==========================================
 
   const processEnhancedInventoryData = (visitData: any[][], historicalData: any[][], pendingChallans: any[][]): InventoryData => {
-    console.log('🔧 Processing FIXED inventory data with correct Shop ID based matching...');
+    console.log('🔧 Processing enhanced inventory data with Shop ID based matching...');
     
     if (visitData.length === 0) {
       throw new Error('No visit data found');
@@ -337,7 +337,7 @@ const InventoryDashboard = () => {
       }
     }
 
-    // Process historical supply data for accurate aging
+    // Process historical supply data for accurate aging (FIXED: Shop ID based)
     const supplyHistory = processHistoricalSupplyData(historicalData);
     const recentSupplies = processPendingChallans(pendingChallans);
     
@@ -368,74 +368,59 @@ const InventoryDashboard = () => {
 
     console.log(`📅 Current month visits: ${currentMonthRows.length} out of ${rows.length} total rows`);
 
-    // ==========================================
-    // FIXED: PROPER SHOP VISIT GROUPING LOGIC
-    // ==========================================
-
-    // Step 1: Group ALL rows by exact shop visit (Shop ID + exact timestamp)
-    const shopVisitGroups: Record<string, any> = {};
-
+    // Find latest visits for each shop in current month
+    const shopLatestVisits: Record<string, any> = {};
+    
     currentMonthRows.forEach(row => {
       const shopId = row[columnIndices.shopId];
       const shopName = row[columnIndices.shopName];
       const department = row[columnIndices.department];
       const salesman = row[columnIndices.salesman];
       const checkInDateTime = row[columnIndices.checkInDateTime];
-      const invBrand = row[columnIndices.invBrand];
       
-      if (!shopId || !checkInDateTime || !invBrand) return;
+      if (!shopId || !checkInDateTime) return;
       
-      // Create unique visit key: Shop ID + exact timestamp
-      const visitKey = `${shopId}_${checkInDateTime}`;
-      
-      // Initialize visit group if doesn't exist
-      if (!shopVisitGroups[visitKey]) {
-        try {
-          shopVisitGroups[visitKey] = {
+      try {
+        const visitDate = new Date(checkInDateTime);
+        
+        if (!shopLatestVisits[shopId] || visitDate > shopLatestVisits[shopId].visitDate) {
+          shopLatestVisits[shopId] = {
             shopId,
             shopName: shopName || 'Unknown Shop',
             department: department || 'Unknown',
             salesman: salesman || 'Unknown',
-            visitDate: new Date(checkInDateTime),
+            visitDate,
             rows: []
           };
-        } catch (error) {
-          console.warn(`Invalid date format: ${checkInDateTime}`);
-          return;
         }
-      }
-      
-      // Add ALL brand rows to this visit
-      shopVisitGroups[visitKey].rows.push(row);
-    });
-
-    console.log(`🏪 FIXED: Grouped into ${Object.keys(shopVisitGroups).length} unique shop visits`);
-
-    // Step 2: Find latest visit per shop
-    const shopLatestVisits: Record<string, any> = {};
-    
-    Object.values(shopVisitGroups).forEach((visit: any) => {
-      const shopId = visit.shopId;
-      
-      if (!shopLatestVisits[shopId] || visit.visitDate > shopLatestVisits[shopId].visitDate) {
-        shopLatestVisits[shopId] = visit;
+      } catch (error) {
+        console.warn(`Invalid date format: ${checkInDateTime}`);
       }
     });
 
-    console.log(`✅ FIXED: Found latest visits for ${Object.keys(shopLatestVisits).length} unique shops`);
+    console.log(`🏪 Latest visits found for ${Object.keys(shopLatestVisits).length} unique shops`);
 
-    // DEBUG: Log sample shop data
-    const sampleShop = Object.values(shopLatestVisits)[0] as any;
-    if (sampleShop) {
-      console.log(`🔍 Sample shop: ${sampleShop.shopName}`);
-      console.log(`🔍 Brands collected: ${sampleShop.rows.length}`);
-      console.log(`🔍 Brand names:`, sampleShop.rows.map((r: any) => r[columnIndices.invBrand]).slice(0, 10));
-    }
+    // Group inventory data by shop's latest visit
+    currentMonthRows.forEach(row => {
+      const shopId = row[columnIndices.shopId];
+      const checkInDateTime = row[columnIndices.checkInDateTime];
+      const invBrand = row[columnIndices.invBrand];
+      
+      if (!shopId || !checkInDateTime || !invBrand) return;
+      
+      try {
+        const visitDate = new Date(checkInDateTime);
+        const latestVisit = shopLatestVisits[shopId];
+        
+        if (latestVisit && visitDate.getTime() === latestVisit.visitDate.getTime()) {
+          latestVisit.rows.push(row);
+        }
+      } catch (error) {
+        // Skip invalid dates
+      }
+    });
 
-    // ==========================================
-    // PROCESS INVENTORY FOR EACH SHOP
-    // ==========================================
-
+    // Process inventory for each shop with enhanced logic
     const shops: Record<string, ShopInventory> = {};
     const skuTracker: Record<string, any> = {};
     const allAgingLocations: Array<any> = [];
@@ -488,7 +473,7 @@ const InventoryDashboard = () => {
         salesmenVisits[shopVisit.salesman].yesterdayVisits++;
       }
 
-      // FIXED: Process ALL inventory items for this shop visit
+      // ENHANCED: Process each inventory item with Shop ID based supply matching
       shopVisit.rows.forEach((row: any[]) => {
         const brand = row[columnIndices.invBrand]?.toString().trim();
         const quantity = parseFloat(row[columnIndices.invQuantity]) || 0;
@@ -497,10 +482,15 @@ const InventoryDashboard = () => {
 
         if (!brand) return;
         
-        // Track all unique SKUs
+        // Track all unique SKUs (FIXED: Process ALL brands, not just mapped ones)
         processedSKUs.add(brand);
+        
+        // DEBUG: Log brand processing for first few items
+        if (processedSKUs.size <= 10) {
+          console.log(`🏷️ Processing brand: "${brand}" -> Family: ${getBrandFamily(undefined, brand) || 'OTHER'}`);
+        }
 
-        // Get accurate supply date using Shop ID + Brand matching
+        // ENHANCED: Get accurate supply date using Shop ID + Brand matching
         const lastSupplyFromHistory = getLastSupplyDate(shopVisit.shopId, brand, supplyHistory);
         const lastSupplyFromLS = lsDate ? new Date(lsDate) : null;
         
@@ -518,7 +508,7 @@ const InventoryDashboard = () => {
           ageInDays = Math.floor((shopVisit.visitDate.getTime() - lastSupplyDate.getTime()) / (1000 * 60 * 60 * 24));
           isEstimatedAge = false;
         } else {
-          // Fallback to April 1, 2025
+          // FIXED: Fallback to April 1, 2025 as requested
           const fallbackDate = new Date('2025-04-01');
           lastSupplyDate = fallbackDate;
           ageInDays = Math.floor((shopVisit.visitDate.getTime() - fallbackDate.getTime()) / (1000 * 60 * 60 * 24));
@@ -533,13 +523,28 @@ const InventoryDashboard = () => {
         else if (ageInDays >= 45) ageCategory = 'days45to60';
         else if (ageInDays >= 30) ageCategory = 'days30to45';
 
-        // Check if supplied after out of stock using Shop ID + Brand matching
+        // ENHANCED: Check if supplied after out of stock using Shop ID + Brand matching
         const suppliedAfterOutOfStock = checkSuppliedAfterOutOfStock(
           shopVisit.shopId, 
           brand, 
           shopVisit.visitDate, 
           recentSupplies
         );
+        
+        // DEBUG: Special logging for NAJAFGARH ROSHANPURA using correct Shop ID
+        if (shopInventory.shopName?.toUpperCase().includes('NAJAFGARH') || shopVisit.shopId === '01/2024/0324') {
+          console.log(`🎯 NAJAFGARH Processing:`, {
+            shopId: shopVisit.shopId,
+            shopName: shopInventory.shopName,
+            brand: brand,
+            visitDate: shopVisit.visitDate.toLocaleDateString('en-GB'),
+            suppliedAfterOutOfStock,
+            quantity,
+            lastSupplyDate: lastSupplyDate?.toLocaleDateString('en-GB') || 'None',
+            isEstimatedAge,
+            ageInDays
+          });
+        }
 
         // Determine supply status
         let supplyStatus: InventoryItem['supplyStatus'] = 'unknown';
@@ -583,7 +588,7 @@ const InventoryDashboard = () => {
         else if (isLowStock) shopInventory.lowStockCount++;
         else if (isOutOfStock) shopInventory.outOfStockCount++;
 
-        // Track aging inventory (30+ days) ONLY for items with stock > 0
+        // FIXED: Track aging inventory (30+ days) ONLY for items with stock > 0
         if (ageInDays >= 30 && quantity > 0) {
           shopInventory.agingInventoryCount++;
           
@@ -617,7 +622,7 @@ const InventoryDashboard = () => {
           });
         }
 
-        // Enhanced SKU performance tracking
+        // Enhanced SKU performance tracking (FIXED: Track ALL brands)
         if (!skuTracker[brand]) {
           skuTracker[brand] = {
             name: brand,
@@ -648,7 +653,7 @@ const InventoryDashboard = () => {
       shops[shopVisit.shopId] = shopInventory;
     });
 
-    console.log(`✅ FIXED: Processed ${Object.keys(shops).length} shops with ${processedSKUs.size} unique SKUs`);
+    console.log(`✅ Processed ${Object.keys(shops).length} shops with ${processedSKUs.size} unique SKUs`);
 
     // Calculate last month visits
     rows.forEach(row => {
@@ -700,13 +705,15 @@ const InventoryDashboard = () => {
       lastMonthVisits: salesman.lastMonthVisits
     })).sort((a, b) => b.monthlyVisits - a.monthlyVisits);
 
-    console.log('✅ FIXED inventory processing complete:', {
+    console.log('✅ Enhanced inventory processing complete:', {
       totalShops,
       totalSKUs,
       totalOutOfStock,
       totalAging,
       recentlyRestockedItems,
-      processedSKUs: processedSKUs.size
+      processedSKUs: processedSKUs.size,
+      recentSuppliesCount: Object.keys(recentSupplies).length,
+      historicalEntriesCount: Object.keys(supplyHistory).length
     });
 
     return {
@@ -779,7 +786,7 @@ const InventoryDashboard = () => {
             if (dateParts.length === 3) {
               const date = new Date(`${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`);
               if (!isNaN(date.getTime())) {
-                // Create brand key using Shop ID + Brand + Size
+                // ENHANCED: Create brand key using Shop ID + Brand + Size
                 const key = createBrandMatchingKey(shopId, brandShort, size);
                 if (!supplyHistory[key] || date > supplyHistory[key]) {
                   supplyHistory[key] = date;
@@ -847,7 +854,7 @@ const InventoryDashboard = () => {
             }
             
             if (!isNaN(date.getTime())) {
-              // Create keys using the actual Shop_Id format
+              // CORRECTED: Create keys using the actual Shop_Id format
               const brandInfo = normalizeBrandInfo(brand);
               const possibleKeys = [
                 createBrandMatchingKey(shopId, brand, size),
@@ -866,6 +873,14 @@ const InventoryDashboard = () => {
               });
               
               processedEntries++;
+              
+              // Special logging for NAJAFGARH ROSHANPURA with correct Shop_Id
+              if (shopName?.toUpperCase().includes('NAJAFGARH') || shopId === '01/2024/0324') {
+                console.log(`🎯 NAJAFGARH ROSHANPURA Supply Found:`, {
+                  shopId, shopName, brand, date: date.toLocaleDateString('en-GB'), 
+                  possibleKeys, cases
+                });
+              }
             }
           } catch (error) {
             console.warn(`Error parsing date: ${dateStr}`, error);
@@ -880,13 +895,14 @@ const InventoryDashboard = () => {
     return recentSupplies;
   };
 
-  // Get last supply date using Shop ID + Brand family + Size matching
+  // ENHANCED: Get last supply date using Shop ID + Brand family + Size matching
   const getLastSupplyDate = (shopId: string, brandName: string, supplyHistory: Record<string, Date>) => {
     // Try multiple shop ID and brand combinations for better matching
     const brandInfo = normalizeBrandInfo(brandName);
     
     // Create multiple possible keys using the ACTUAL Shop_Id format
     const possibleKeys = [
+      // Exact Shop ID + Brand combinations using real format like "01/2024/0324"
       createBrandMatchingKey(shopId, brandName),
       `${shopId}_${brandInfo.family}_${brandInfo.size}`,
       `${shopId}_8PM_${brandInfo.size}`,
@@ -897,22 +913,35 @@ const InventoryDashboard = () => {
       `${shopId}_VERVE_375`
     ];
     
+    console.log(`🔍 Searching for supply data for Shop ID: ${shopId}, Brand: ${brandName}`);
+    console.log(`🔍 Trying keys:`, possibleKeys);
+    
+    // Special debug for NAJAFGARH ROSHANPURA
+    if (shopId === '01/2024/0324') {
+      console.log(`🎯 NAJAFGARH HISTORICAL SEARCH - Shop ID: ${shopId}, Brand: ${brandName}`);
+      console.log(`🎯 Available historical keys sample:`, Object.keys(supplyHistory).slice(0, 10));
+    }
+    
     for (const key of possibleKeys) {
       if (supplyHistory[key]) {
+        console.log(`✅ Found supply match for ${key}:`, supplyHistory[key].toLocaleDateString('en-GB'));
         return supplyHistory[key];
       }
     }
     
+    console.log(`❌ No supply data found for Shop ID: ${shopId}, Brand: ${brandName}`);
     return null;
   };
 
-  // Check if supplied after out of stock using Shop ID + Brand matching
+  // ENHANCED: Check if supplied after out of stock using Shop ID + Brand matching
   const checkSuppliedAfterOutOfStock = (
     shopId: string, 
     brandName: string, 
     visitDate: Date, 
     recentSupplies: Record<string, Date>
   ) => {
+    console.log(`🔍 Checking supply after OOS for Shop ID: ${shopId}, Brand: ${brandName}, Visit: ${visitDate.toLocaleDateString('en-GB')}`);
+    
     // Try multiple shop ID and brand combinations for better matching
     const brandInfo = normalizeBrandInfo(brandName);
     
@@ -928,17 +957,40 @@ const InventoryDashboard = () => {
       `${shopId}_VERVE_375`
     ];
     
+    console.log(`🔍 Trying supply keys:`, possibleKeys);
+    console.log(`📦 Available recent supplies:`, Object.keys(recentSupplies).slice(0, 20));
+    
+    // Special debug for NAJAFGARH ROSHANPURA
+    if (shopId === '01/2024/0324') {
+      console.log(`🎯 NAJAFGARH DEBUGGING - Shop ID: ${shopId}, Brand: ${brandName}, Visit: ${visitDate.toLocaleDateString('en-GB')}`);
+      console.log(`🎯 NAJAFGARH Keys to try:`, possibleKeys);
+      
+      // Check each key individually for NAJAFGARH
+      possibleKeys.forEach(key => {
+        if (recentSupplies[key]) {
+          const supplyDate = recentSupplies[key];
+          const daysDiff = Math.floor((supplyDate.getTime() - visitDate.getTime()) / (1000 * 60 * 60 * 24));
+          console.log(`🎯 NAJAFGARH Key ${key}: Supply Date: ${supplyDate.toLocaleDateString('en-GB')}, Days Diff: ${daysDiff}`);
+        } else {
+          console.log(`🎯 NAJAFGARH Key ${key}: NO SUPPLY FOUND`);
+        }
+      });
+    }
+    
     for (const key of possibleKeys) {
       const supplyDate = recentSupplies[key];
       if (supplyDate) {
         const daysDiff = Math.floor((supplyDate.getTime() - visitDate.getTime()) / (1000 * 60 * 60 * 24));
+        console.log(`📅 Found supply for ${key}: Supply Date: ${supplyDate.toLocaleDateString('en-GB')}, Days Diff: ${daysDiff}`);
         
         if (daysDiff > 0 && daysDiff <= 14) { // Extended to 14 days for better detection
+          console.log(`✅ SUPPLY AFTER OOS DETECTED for ${key}: ${daysDiff} days after visit`);
           return true;
         }
       }
     }
     
+    console.log(`❌ No supply after OOS found for Shop ID: ${shopId}, Brand: ${brandName}`);
     return false;
   };
 
@@ -1047,7 +1099,7 @@ const InventoryDashboard = () => {
       const doc = new jsPDF();
       
       doc.setFontSize(20);
-      doc.text('FIXED Inventory Analytics Report', 20, 20);
+      doc.text('Enhanced Inventory Analytics Report', 20, 20);
       doc.setFontSize(12);
       doc.text(`Generated: ${new Date().toLocaleString()}`, 20, 30);
       
@@ -1071,7 +1123,7 @@ const InventoryDashboard = () => {
         theme: 'grid'
       });
 
-      doc.save(`FIXED_Inventory_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+      doc.save(`Enhanced_Inventory_Report_${new Date().toISOString().split('T')[0]}.pdf`);
     } catch (error) {
       console.error('Error generating PDF:', error);
       alert('Error generating PDF report. Please try again.');
@@ -1083,7 +1135,7 @@ const InventoryDashboard = () => {
 
     try {
       let csvContent = "data:text/csv;charset=utf-8,";
-      csvContent += "FIXED Inventory Analytics Report - " + new Date().toLocaleDateString() + "\n";
+      csvContent += "Enhanced Inventory Analytics Report - " + new Date().toLocaleDateString() + "\n";
       csvContent += "Filters Applied: " + JSON.stringify(filters) + "\n\n";
       
       // Aging Inventory Export
@@ -1110,7 +1162,7 @@ const InventoryDashboard = () => {
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement("a");
       link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `FIXED_Inventory_${activeTab}_${new Date().toISOString().split('T')[0]}.csv`);
+      link.setAttribute("download", `Inventory_${activeTab}_${new Date().toISOString().split('T')[0]}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -1137,8 +1189,8 @@ const InventoryDashboard = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <Package className="w-12 h-12 animate-pulse mx-auto mb-4 text-purple-600" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Loading FIXED Inventory Dashboard</h2>
-          <p className="text-gray-600">Processing comprehensive inventory data with CORRECTED Shop ID based supply intelligence...</p>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Loading Enhanced Inventory Dashboard</h2>
+          <p className="text-gray-600">Processing comprehensive inventory data with Shop ID based supply intelligence...</p>
         </div>
       </div>
     );
@@ -1183,9 +1235,9 @@ const InventoryDashboard = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row justify-between items-center h-auto sm:h-16 py-4 sm:py-0">
             <div className="flex items-center mb-4 sm:mb-0">
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">FIXED Inventory Analytics</h1>
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Enhanced Inventory Analytics</h1>
               <span className="ml-3 px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
-                CORRECTED • Live Data + Shop ID Intelligence
+                Live Data + Shop ID Intelligence
               </span>
             </div>
             <div className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4">
@@ -1301,8 +1353,8 @@ const InventoryDashboard = () => {
 const EnhancedInventoryOverviewTab = ({ data }: { data: InventoryData }) => (
   <div className="space-y-6">
     <div className="text-center">
-      <h2 className="text-2xl font-bold text-gray-900 mb-2">FIXED Inventory Overview</h2>
-      <p className="text-gray-600">Real-time inventory status with CORRECTED Shop ID based supply intelligence (Current Month)</p>
+      <h2 className="text-2xl font-bold text-gray-900 mb-2">Enhanced Inventory Overview</h2>
+      <p className="text-gray-600">Real-time inventory status with Shop ID based supply intelligence (Current Month)</p>
     </div>
 
     {/* Enhanced Summary Cards */}
@@ -1326,7 +1378,7 @@ const EnhancedInventoryOverviewTab = ({ data }: { data: InventoryData }) => (
           </div>
           <div className="ml-4">
             <div className="text-2xl font-bold text-gray-900">{data.summary.totalSKUs}</div>
-            <div className="text-sm text-gray-500">SKUs Tracked ✅</div>
+            <div className="text-sm text-gray-500">SKUs Tracked</div>
           </div>
         </div>
       </div>
@@ -1371,8 +1423,8 @@ const EnhancedInventoryOverviewTab = ({ data }: { data: InventoryData }) => (
     {/* Enhanced SKU Performance */}
     <div className="bg-white rounded-lg shadow">
       <div className="px-6 py-4 border-b border-gray-200">
-        <h3 className="text-lg font-medium text-gray-900">All SKU Stock Status ✅ FIXED</h3>
-        <p className="text-sm text-gray-500">Complete inventory status across all tracked products (CORRECTED Shop ID based matching)</p>
+        <h3 className="text-lg font-medium text-gray-900">All SKU Stock Status</h3>
+        <p className="text-sm text-gray-500">Complete inventory status across all tracked products (Shop ID based matching)</p>
       </div>
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
@@ -1483,8 +1535,8 @@ const EnhancedShopInventoryTab = ({
     {/* Enhanced Shop Inventory List */}
     <div className="bg-white rounded-lg shadow">
       <div className="px-6 py-4 border-b border-gray-200">
-        <h3 className="text-lg font-medium text-gray-900">Shop Inventory Status ✅ FIXED</h3>
-        <p className="text-sm text-gray-500">Showing {filteredShops.length} shops with CORRECTED Shop ID based supply intelligence</p>
+        <h3 className="text-lg font-medium text-gray-900">Shop Inventory Status</h3>
+        <p className="text-sm text-gray-500">Showing {filteredShops.length} shops with enhanced Shop ID based supply intelligence</p>
       </div>
       <div className="divide-y divide-gray-200">
         {filteredShops.map((shop: ShopInventory) => (
@@ -1497,7 +1549,6 @@ const EnhancedShopInventoryTab = ({
                 <div>
                   <h4 className="text-lg font-medium text-gray-900">{shop.shopName}</h4>
                   <p className="text-sm text-gray-500">{shop.department} • {shop.salesman} • ID: {shop.shopId}</p>
-                  <p className="text-xs text-green-600">✅ {shop.totalItems} brands collected</p>
                 </div>
                 <div className="flex space-x-4">
                   <div className="text-center">
@@ -1598,13 +1649,285 @@ const EnhancedAgingAnalysisTab = ({
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">FIXED Aging Inventory Analysis</h2>
-        <p className="text-gray-600">All aging products (30+ days) with CORRECTED Shop ID based supply intelligence and accurate dating</p>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Enhanced Aging Inventory Analysis</h2>
+        <p className="text-gray-600">All aging products (30+ days) with Shop ID based supply intelligence and accurate dating</p>
       </div>
 
       {/* Enhanced Filter Controls */}
       <div className="bg-white p-4 rounded-lg shadow">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+          <select
+            value={filters.department}
+            onChange={(e) => setFilters({ ...filters, department: e.target.value })}
+            className="border border-gray-300 rounded-lg px-3 py-2"
+          >
+            <option value="">All Departments</option>
+            {departments.map((dept: string) => (
+              <option key={dept} value={dept}>{dept}</option>
+            ))}
+          </select>
+
+          <select
+            value={filters.salesman}
+            onChange={(e) => setFilters({ ...filters, salesman: e.target.value })}
+            className="border border-gray-300 rounded-lg px-3 py-2"
+          >
+            <option value="">All Salesmen</option>
+            {salesmen.map((salesman: string) => (
+              <option key={salesman} value={salesman}>{salesman}</option>
+            ))}
+          </select>
+
+          <select
+            value={filters.brand}
+            onChange={(e) => setFilters({ ...filters, brand: e.target.value })}
+            className="border border-gray-300 rounded-lg px-3 py-2"
+          >
+            <option value="">All Brands</option>
+            {brands.map((brand: string) => (
+              <option key={brand} value={brand}>{brand}</option>
+            ))}
+          </select>
+
+          <select
+            value={filters.ageCategory}
+            onChange={(e) => setFilters({ ...filters, ageCategory: e.target.value })}
+            className="border border-gray-300 rounded-lg px-3 py-2"
+          >
+            <option value="">All Ages</option>
+            <option value="30+">30+ Days</option>
+            <option value="45+">45+ Days</option>
+            <option value="60+">60+ Days</option>
+            <option value="75+">75+ Days</option>
+            <option value="90+">90+ Days</option>
+          </select>
+
+          <select
+            value={filters.supplyStatus}
+            onChange={(e) => setFilters({ ...filters, supplyStatus: e.target.value })}
+            className="border border-gray-300 rounded-lg px-3 py-2"
+          >
+            <option value="">All Supply Status</option>
+            <option value="current">Current Stock</option>
+            <option value="restocked_after_oos">Recently Restocked</option>
+            <option value="awaiting_supply">Awaiting Supply</option>
+          </select>
+
+          <button
+            onClick={() => setFilters({ ...filters, department: '', salesman: '', brand: '', ageCategory: '', supplyStatus: '' })}
+            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center justify-center space-x-2"
+          >
+            <X className="w-4 h-4" />
+            <span>Clear</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Aging Statistics */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="bg-white p-6 rounded-lg shadow text-center">
+          <div className="text-3xl font-bold text-yellow-600">{filteredAging.length}</div>
+          <div className="text-sm text-gray-500">Total Aging Items</div>
+        </div>
+        <div className="bg-white p-6 rounded-lg shadow text-center">
+          <div className="text-3xl font-bold text-orange-600">{data.summary.avgAge}</div>
+          <div className="text-sm text-gray-500">Average Age (Days)</div>
+        </div>
+        <div className="bg-white p-6 rounded-lg shadow text-center">
+          <div className="text-3xl font-bold text-red-600">
+            {filteredAging.filter((item: any) => item.ageInDays >= 60).length}
+          </div>
+          <div className="text-sm text-gray-500">Critical (60+ Days)</div>
+        </div>
+        <div className="bg-white p-6 rounded-lg shadow text-center">
+          <div className="text-3xl font-bold text-green-600">
+            {filteredAging.filter((item: any) => !item.isEstimatedAge).length}
+          </div>
+          <div className="text-sm text-gray-500">Accurate Dates</div>
+        </div>
+      </div>
+
+      {/* All Aging Locations with Pagination */}
+      <div className="bg-white rounded-lg shadow">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-medium text-gray-900">All Aging Inventory Locations (30+ Days)</h3>
+          <p className="text-sm text-gray-500">
+            Showing {startIndex + 1}-{Math.min(endIndex, filteredAging.length)} of {filteredAging.length} aging items with Shop ID based matching
+          </p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rank</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shop</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Salesman</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Age (Days)</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Supply</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {currentItems.map((location: any, index: number) => (
+                <tr key={`${location.shopName}-${location.sku}`} className={startIndex + index < 10 ? 'bg-red-50' : ''}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {startIndex + index + 1}
+                    {startIndex + index < 10 && <span className="ml-2 text-red-600">🔥</span>}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{location.sku}</td>
+                  <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{location.shopName}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{location.department}</td>
+                  <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{location.salesman}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      location.ageInDays > 90 ? 'bg-red-100 text-red-800' :
+                      location.ageInDays > 60 ? 'bg-orange-100 text-orange-800' :
+                      location.ageInDays > 45 ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-blue-100 text-blue-800'
+                    }`}>
+                      {location.ageInDays} {location.isEstimatedAge && '(est.)'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{location.quantity}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                    {location.lastSupplyDate ? location.lastSupplyDate.toLocaleDateString('en-GB') : 'Apr 1 (fallback)'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      location.supplyStatus === 'current' ? 'bg-green-100 text-green-800' :
+                      location.supplyStatus === 'restocked_after_oos' ? 'bg-blue-100 text-blue-800' :
+                      location.supplyStatus === 'awaiting_supply' ? 'bg-red-100 text-red-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {location.supplyStatus.replace('_', ' ')}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Enhanced Pagination */}
+        <div className="px-6 py-3 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center">
+          <div className="text-sm text-gray-700 mb-2 sm:mb-0">
+            Showing {startIndex + 1} to {Math.min(endIndex, filteredAging.length)} of {filteredAging.length} aging items
+          </div>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="px-3 py-1 text-sm text-gray-700">
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const EnhancedVisitComplianceTab = ({ data }: { data: InventoryData }) => (
+  <div className="space-y-6">
+    <div className="text-center">
+      <h2 className="text-2xl font-bold text-gray-900 mb-2">Enhanced Visit Compliance Dashboard</h2>
+      <p className="text-gray-600">Monthly visit metrics with yesterday and last month comparisons</p>
+    </div>
+
+    {/* Enhanced Visit Summary */}
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+      <div className="bg-white p-6 rounded-lg shadow text-center">
+        <div className="text-3xl font-bold text-blue-600">{data.visitCompliance.totalSalesmen}</div>
+        <div className="text-sm text-gray-500">Total Salesmen</div>
+      </div>
+      <div className="bg-white p-6 rounded-lg shadow text-center">
+        <div className="text-3xl font-bold text-green-600">{data.visitCompliance.monthlyVisits}</div>
+        <div className="text-sm text-gray-500">Monthly Visits</div>
+      </div>
+      <div className="bg-white p-6 rounded-lg shadow text-center">
+        <div className="text-3xl font-bold text-purple-600">{data.visitCompliance.yesterdayVisits}</div>
+        <div className="text-sm text-gray-500">Yesterday's Visits</div>
+      </div>
+      <div className="bg-white p-6 rounded-lg shadow text-center">
+        <div className="text-3xl font-bold text-orange-600">{data.visitCompliance.lastMonthVisits}</div>
+        <div className="text-sm text-gray-500">Last Month Total</div>
+      </div>
+    </div>
+
+    {/* Enhanced Salesman Performance */}
+    <div className="bg-white rounded-lg shadow">
+      <div className="px-6 py-4 border-b border-gray-200">
+        <h3 className="text-lg font-medium text-gray-900">Monthly Salesman Performance</h3>
+        <p className="text-sm text-gray-500">Individual visit statistics and compliance (Current Month)</p>
+      </div>
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rank</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Salesman</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Monthly Visits</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unique Shops</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Yesterday Visits</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Month Visits</th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {data.visitCompliance.salesmenStats.map((salesman, index) => (
+              <tr key={salesman.name} className={index < 3 ? 'bg-green-50' : ''}>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  {index + 1}
+                  {index < 3 && <span className="ml-2">🏆</span>}
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{salesman.name}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">{salesman.monthlyVisits}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{salesman.uniqueShops}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-purple-600">{salesman.yesterdayVisits}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600">{salesman.lastMonthVisits}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+);
+
+const EnhancedStockIntelligenceTab = ({ 
+  data, 
+  filters, 
+  setFilters, 
+  getFilteredItems, 
+  departments, 
+  salesmen, 
+  brands
+}: any) => {
+  const filteredOutOfStock = getFilteredItems(data.outOfStockItems);
+
+  return (
+    <div className="space-y-6">
+      <div className="text-center">
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Stock Intelligence & Supply Chain Analysis</h2>
+        <p className="text-gray-600">Advanced out-of-stock analysis with Shop ID based supply chain intelligence</p>
+      </div>
+
+      {/* Enhanced Filter Controls */}
+      <div className="bg-white p-4 rounded-lg shadow">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           <select
             value={filters.department}
             onChange={(e) => setFilters({ ...filters, department: e.target.value })}
@@ -1708,9 +2031,9 @@ const EnhancedAgingAnalysisTab = ({
       {/* Enhanced Out of Stock Analysis */}
       <div className="bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">Out of Stock Intelligence ✅ FIXED</h3>
+          <h3 className="text-lg font-medium text-gray-900">Out of Stock Intelligence</h3>
           <p className="text-sm text-gray-500">
-            Complete out-of-stock analysis with CORRECTED Shop ID based supply chain tracking ({filteredOutOfStock.length} items)
+            Complete out-of-stock analysis with Shop ID based supply chain tracking ({filteredOutOfStock.length} items)
           </p>
         </div>
         <div className="overflow-x-auto">
@@ -1760,9 +2083,9 @@ const EnhancedAgingAnalysisTab = ({
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900 flex items-center">
             <AlertTriangle className="w-5 h-5 text-red-600 mr-2" />
-            Critical SKUs (High Out-of-Stock Rate) ✅ FIXED
+            Critical SKUs (High Out-of-Stock Rate)
           </h3>
-          <p className="text-sm text-gray-500">Products with 30%+ out-of-stock rate requiring immediate attention (CORRECTED Shop ID based tracking)</p>
+          <p className="text-sm text-gray-500">Products with 30%+ out-of-stock rate requiring immediate attention (Shop ID based tracking)</p>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
@@ -1815,7 +2138,7 @@ const EnhancedAgingAnalysisTab = ({
       <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 p-6 rounded-lg">
         <h3 className="text-lg font-medium text-blue-900 mb-4 flex items-center">
           <Eye className="w-5 h-5 mr-2" />
-          AI-Powered Recommendations (CORRECTED Shop ID Intelligence) ✅
+          AI-Powered Recommendations (Shop ID Intelligence)
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-3">
@@ -1824,7 +2147,7 @@ const EnhancedAgingAnalysisTab = ({
               <div>
                 <div className="text-sm font-medium text-blue-900">Immediate Action Required</div>
                 <div className="text-sm text-blue-700">
-                  {data.summary.totalOutOfStock} items out of stock. CORRECTED Shop ID based supply chain intervention needed for critical SKUs.
+                  {data.summary.totalOutOfStock} items out of stock. Shop ID based supply chain intervention needed for critical SKUs.
                 </div>
               </div>
             </div>
@@ -1842,9 +2165,9 @@ const EnhancedAgingAnalysisTab = ({
             <div className="flex items-start space-x-3">
               <div className="w-2 h-2 bg-green-600 rounded-full mt-2"></div>
               <div>
-                <div className="text-sm font-medium text-blue-900">FIXED Supply Chain Intelligence</div>
+                <div className="text-sm font-medium text-blue-900">Enhanced Supply Chain Intelligence</div>
                 <div className="text-sm text-blue-700">
-                  {data.summary.recentlyRestockedItems} items recently restocked after out-of-stock reports using CORRECTED Shop ID tracking. Monitor effectiveness.
+                  {data.summary.recentlyRestockedItems} items recently restocked after out-of-stock reports using Shop ID tracking. Monitor effectiveness.
                 </div>
               </div>
             </div>
@@ -1853,7 +2176,7 @@ const EnhancedAgingAnalysisTab = ({
               <div>
                 <div className="text-sm font-medium text-blue-900">Visit Optimization</div>
                 <div className="text-sm text-blue-700">
-                  Focus visits on high out-of-stock locations. {data.visitCompliance.monthlyVisits} monthly visits tracked with CORRECTED Shop ID precision.
+                  Focus visits on high out-of-stock locations. {data.visitCompliance.monthlyVisits} monthly visits tracked with Shop ID precision.
                 </div>
               </div>
             </div>
@@ -1862,10 +2185,10 @@ const EnhancedAgingAnalysisTab = ({
         
         {/* Success Indicators */}
         <div className="mt-6 p-4 bg-white rounded-lg border border-green-200">
-          <h4 className="text-sm font-medium text-green-900 mb-2">✅ FIXED Features Active:</h4>
+          <h4 className="text-sm font-medium text-green-900 mb-2">✅ Enhanced Features Active:</h4>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs text-green-700">
-            <div>• CORRECTED Shop ID + exact timestamp grouping</div>
-            <div>• ALL brands collected per shop visit (FIXED)</div>
+            <div>• Shop ID based brand matching</div>
+            <div>• ALL SKUs tracked (not just 8PM BLACK 750)</div>
             <div>• April 1 fallback aging calculation</div>
             <div>• Historical data integration</div>
             <div>• Pending Challans supply detection</div>
@@ -1877,276 +2200,4 @@ const EnhancedAgingAnalysisTab = ({
   );
 };
 
-export default InventoryDashboard;={brand} value={brand}>{brand}</option>
-            ))}
-          </select>
-
-          <select
-            value={filters.ageCategory}
-            onChange={(e) => setFilters({ ...filters, ageCategory: e.target.value })}
-            className="border border-gray-300 rounded-lg px-3 py-2"
-          >
-            <option value="">All Ages</option>
-            <option value="30+">30+ Days</option>
-            <option value="45+">45+ Days</option>
-            <option value="60+">60+ Days</option>
-            <option value="75+">75+ Days</option>
-            <option value="90+">90+ Days</option>
-          </select>
-
-          <select
-            value={filters.supplyStatus}
-            onChange={(e) => setFilters({ ...filters, supplyStatus: e.target.value })}
-            className="border border-gray-300 rounded-lg px-3 py-2"
-          >
-            <option value="">All Supply Status</option>
-            <option value="current">Current Stock</option>
-            <option value="restocked_after_oos">Recently Restocked</option>
-            <option value="awaiting_supply">Awaiting Supply</option>
-          </select>
-
-          <button
-            onClick={() => setFilters({ ...filters, department: '', salesman: '', brand: '', ageCategory: '', supplyStatus: '' })}
-            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center justify-center space-x-2"
-          >
-            <X className="w-4 h-4" />
-            <span>Clear</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Aging Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-lg shadow text-center">
-          <div className="text-3xl font-bold text-yellow-600">{filteredAging.length}</div>
-          <div className="text-sm text-gray-500">Total Aging Items</div>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow text-center">
-          <div className="text-3xl font-bold text-orange-600">{data.summary.avgAge}</div>
-          <div className="text-sm text-gray-500">Average Age (Days)</div>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow text-center">
-          <div className="text-3xl font-bold text-red-600">
-            {filteredAging.filter((item: any) => item.ageInDays >= 60).length}
-          </div>
-          <div className="text-sm text-gray-500">Critical (60+ Days)</div>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow text-center">
-          <div className="text-3xl font-bold text-green-600">
-            {filteredAging.filter((item: any) => !item.isEstimatedAge).length}
-          </div>
-          <div className="text-sm text-gray-500">Accurate Dates</div>
-        </div>
-      </div>
-
-      {/* All Aging Locations with Pagination */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">All Aging Inventory Locations (30+ Days) ✅ FIXED</h3>
-          <p className="text-sm text-gray-500">
-            Showing {startIndex + 1}-{Math.min(endIndex, filteredAging.length)} of {filteredAging.length} aging items with CORRECTED Shop ID based matching
-          </p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rank</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shop</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Salesman</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Age (Days)</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Supply</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {currentItems.map((location: any, index: number) => (
-                <tr key={`${location.shopName}-${location.sku}`} className={startIndex + index < 10 ? 'bg-red-50' : ''}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {startIndex + index + 1}
-                    {startIndex + index < 10 && <span className="ml-2 text-red-600">🔥</span>}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{location.sku}</td>
-                  <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{location.shopName}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{location.department}</td>
-                  <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{location.salesman}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      location.ageInDays > 90 ? 'bg-red-100 text-red-800' :
-                      location.ageInDays > 60 ? 'bg-orange-100 text-orange-800' :
-                      location.ageInDays > 45 ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-blue-100 text-blue-800'
-                    }`}>
-                      {location.ageInDays} {location.isEstimatedAge && '(est.)'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{location.quantity}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                    {location.lastSupplyDate ? location.lastSupplyDate.toLocaleDateString('en-GB') : 'Apr 1 (fallback)'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      location.supplyStatus === 'current' ? 'bg-green-100 text-green-800' :
-                      location.supplyStatus === 'restocked_after_oos' ? 'bg-blue-100 text-blue-800' :
-                      location.supplyStatus === 'awaiting_supply' ? 'bg-red-100 text-red-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {location.supplyStatus.replace('_', ' ')}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Enhanced Pagination */}
-        <div className="px-6 py-3 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center">
-          <div className="text-sm text-gray-700 mb-2 sm:mb-0">
-            Showing {startIndex + 1} to {Math.min(endIndex, filteredAging.length)} of {filteredAging.length} aging items
-          </div>
-          <div className="flex space-x-2">
-            <button
-              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-              disabled={currentPage === 1}
-              className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <span className="px-3 py-1 text-sm text-gray-700">
-              Page {currentPage} of {totalPages}
-            </span>
-            <button
-              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-              disabled={currentPage === totalPages}
-              className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const EnhancedVisitComplianceTab = ({ data }: { data: InventoryData }) => (
-  <div className="space-y-6">
-    <div className="text-center">
-      <h2 className="text-2xl font-bold text-gray-900 mb-2">Visit Compliance Dashboard</h2>
-      <p className="text-gray-600">Monthly visit metrics with yesterday and last month comparisons</p>
-    </div>
-
-    {/* Enhanced Visit Summary */}
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-      <div className="bg-white p-6 rounded-lg shadow text-center">
-        <div className="text-3xl font-bold text-blue-600">{data.visitCompliance.totalSalesmen}</div>
-        <div className="text-sm text-gray-500">Total Salesmen</div>
-      </div>
-      <div className="bg-white p-6 rounded-lg shadow text-center">
-        <div className="text-3xl font-bold text-green-600">{data.visitCompliance.monthlyVisits}</div>
-        <div className="text-sm text-gray-500">Monthly Visits</div>
-      </div>
-      <div className="bg-white p-6 rounded-lg shadow text-center">
-        <div className="text-3xl font-bold text-purple-600">{data.visitCompliance.yesterdayVisits}</div>
-        <div className="text-sm text-gray-500">Yesterday's Visits</div>
-      </div>
-      <div className="bg-white p-6 rounded-lg shadow text-center">
-        <div className="text-3xl font-bold text-orange-600">{data.visitCompliance.lastMonthVisits}</div>
-        <div className="text-sm text-gray-500">Last Month Total</div>
-      </div>
-    </div>
-
-    {/* Enhanced Salesman Performance */}
-    <div className="bg-white rounded-lg shadow">
-      <div className="px-6 py-4 border-b border-gray-200">
-        <h3 className="text-lg font-medium text-gray-900">Monthly Salesman Performance</h3>
-        <p className="text-sm text-gray-500">Individual visit statistics and compliance (Current Month)</p>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rank</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Salesman</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Monthly Visits</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unique Shops</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Yesterday Visits</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Month Visits</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {data.visitCompliance.salesmenStats.map((salesman, index) => (
-              <tr key={salesman.name} className={index < 3 ? 'bg-green-50' : ''}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                  {index + 1}
-                  {index < 3 && <span className="ml-2">🏆</span>}
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{salesman.name}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">{salesman.monthlyVisits}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{salesman.uniqueShops}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-purple-600">{salesman.yesterdayVisits}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600">{salesman.lastMonthVisits}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-);
-
-const EnhancedStockIntelligenceTab = ({ 
-  data, 
-  filters, 
-  setFilters, 
-  getFilteredItems, 
-  departments, 
-  salesmen, 
-  brands
-}: any) => {
-  const filteredOutOfStock = getFilteredItems(data.outOfStockItems);
-
-  return (
-    <div className="space-y-6">
-      <div className="text-center">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Stock Intelligence & Supply Chain Analysis ✅ FIXED</h2>
-        <p className="text-gray-600">Advanced out-of-stock analysis with CORRECTED Shop ID based supply chain intelligence</p>
-      </div>
-
-      {/* Enhanced Filter Controls */}
-      <div className="bg-white p-4 rounded-lg shadow">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          <select
-            value={filters.department}
-            onChange={(e) => setFilters({ ...filters, department: e.target.value })}
-            className="border border-gray-300 rounded-lg px-3 py-2"
-          >
-            <option value="">All Departments</option>
-            {departments.map((dept: string) => (
-              <option key={dept} value={dept}>{dept}</option>
-            ))}
-          </select>
-
-          <select
-            value={filters.salesman}
-            onChange={(e) => setFilters({ ...filters, salesman: e.target.value })}
-            className="border border-gray-300 rounded-lg px-3 py-2"
-          >
-            <option value="">All Salesmen</option>
-            {salesmen.map((salesman: string) => (
-              <option key={salesman} value={salesman}>{salesman}</option>
-            ))}
-          </select>
-
-          <select
-            value={filters.brand}
-            onChange={(e) => setFilters({ ...filters, brand: e.target.value })}
-            className="border border-gray-300 rounded-lg px-3 py-2"
-          >
-            <option value="">All Brands</option>
-            {brands.map((brand: string) => (
-              <option key
+export default InventoryDashboard;
