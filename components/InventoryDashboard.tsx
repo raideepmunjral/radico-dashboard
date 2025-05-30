@@ -1417,7 +1417,12 @@ const EnhancedShopInventoryTab = ({
                             <AlertCircle className="w-4 h-4 text-yellow-500" />
                           )}
                           {item.suppliedAfterOutOfStock && (
-                            <Truck className="w-4 h-4 text-blue-500" title="Recently Restocked" />
+                            <div className="relative group">
+                              <Truck className="w-4 h-4 text-blue-500" />
+                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 px-2 py-1 text-xs text-white bg-gray-800 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                Recently Restocked
+                              </div>
+                            </div>
                           )}
                         </div>
                       </div>
