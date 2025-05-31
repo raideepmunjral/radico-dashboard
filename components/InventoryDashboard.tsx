@@ -391,51 +391,70 @@ const InventoryDashboard = () => {
     
     console.log(`🎉 Propagation complete: ${propagatedRows} brand rows updated`);
 
-    // STEP 2: Filter for MONTHLY data
+    // STEP 2: Filter for MONTHLY data with ENHANCED debugging for DD-MMM-YYYY format
     const today = new Date();
     const currentMonth = today.getMonth();
     const currentYear = today.getFullYear();
     const lastMonth = new Date(currentYear, currentMonth - 1, 1);
     const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
 
+    console.log(`📅 Current date: ${today.toLocaleDateString()}, Month: ${currentMonth}, Year: ${currentYear}`);
+
     const currentMonthRows = rows.filter(row => {
       const dateStr = row[columnIndices.checkInDateTime];
       if (!dateStr) return false;
       
       try {
-        const rowDate = new Date(dateStr);
-        return rowDate.getMonth() === currentMonth && rowDate.getFullYear() === currentYear;
-      } catch {
+        const rowDate = parseDate(dateStr);
+        if (!rowDate) return false;
+        
+        const isCurrentMonth = rowDate.getMonth() === currentMonth && rowDate.getFullYear() === currentYear;
+        
+        // Debug first few dates and any GREATER KAILASH entries
+        if (rows.indexOf(row) < 3 || row[columnIndices.shopName]?.includes('GREATER KAILASH')) {
+          console.log(`📅 Date parsing: "${dateStr}" -> ${rowDate.toLocaleDateString()} (Current month: ${isCurrentMonth}) Shop: ${row[columnIndices.shopName]}`);
+        }
+        
+        return isCurrentMonth;
+      } catch (error) {
+        console.warn(`Failed to parse date: ${dateStr}`, error);
         return false;
       }
     });
 
     console.log(`📅 Current month visits: ${currentMonthRows.length} out of ${rows.length} total rows`);
 
-    // STEP 3: Find latest visits for each shop
+    // STEP 3: Find latest visits for each shop with ENHANCED debugging for GREATER KAILASH
     const shopLatestVisits: Record<string, any> = {};
     
     currentMonthRows.forEach(row => {
       const shopId = row[columnIndices.shopId];
+      const shopName = row[columnIndices.shopName];
       const checkInDateTime = row[columnIndices.checkInDateTime];
       
       if (!shopId || !checkInDateTime) return;
       
       try {
-        const visitDate = new Date(checkInDateTime);
+        const visitDate = parseDate(checkInDateTime);
+        if (!visitDate) return;
         
         if (!shopLatestVisits[shopId] || visitDate > shopLatestVisits[shopId].visitDate) {
           shopLatestVisits[shopId] = {
             shopId,
-            shopName: row[columnIndices.shopName] || 'Unknown Shop',
+            shopName: shopName || 'Unknown Shop',
             department: row[columnIndices.department] || 'Unknown',
             salesman: row[columnIndices.salesman] || 'Unknown',
             visitDate,
             rows: []
           };
+          
+          // Debug specific shop - GREATER KAILASH
+          if (shopId === '01/2024/0535' || shopName?.includes('GREATER KAILASH')) {
+            console.log(`🏪 Shop ${shopId} (${shopName}) visit date: "${checkInDateTime}" -> ${visitDate.toLocaleDateString()}`);
+          }
         }
       } catch (error) {
-        console.warn(`Invalid date format: ${checkInDateTime}`);
+        console.warn(`Invalid date format for shop ${shopId}: ${checkInDateTime}`, error);
       }
     });
 
@@ -451,7 +470,9 @@ const InventoryDashboard = () => {
       if (!shopId || !checkInDateTime) return;
       
       try {
-        const visitDate = new Date(checkInDateTime);
+        const visitDate = parseDate(checkInDateTime);
+        if (!visitDate) return;
+        
         const latestVisit = shopLatestVisits[shopId];
         
         if (latestVisit && visitDate.getTime() === latestVisit.visitDate.getTime()) {
@@ -715,13 +736,15 @@ const InventoryDashboard = () => {
       shops[shopVisit.shopId] = shopInventory;
     });
 
-    // Calculate last month visits
+    // Calculate last month visits with ENHANCED date parsing
     rows.forEach(row => {
       const dateStr = row[columnIndices.checkInDateTime];
       if (!dateStr) return;
       
       try {
-        const rowDate = new Date(dateStr);
+        const rowDate = parseDate(dateStr);
+        if (!rowDate) return;
+        
         if (rowDate >= lastMonth && rowDate < new Date(currentYear, currentMonth, 1)) {
           lastMonthVisitCount++;
           
@@ -809,14 +832,45 @@ const InventoryDashboard = () => {
     if (!dateStr) return null;
     
     try {
-      // Handle DD-MM-YYYY format
-      if (dateStr.includes('-')) {
+      // Handle DD-MMM-YYYY HH:MM format (from visit sheet: "13-May-2025 15:43")
+      if (dateStr.includes('-') && (dateStr.includes('Jan') || dateStr.includes('Feb') || dateStr.includes('Mar') || 
+          dateStr.includes('Apr') || dateStr.includes('May') || dateStr.includes('Jun') || 
+          dateStr.includes('Jul') || dateStr.includes('Aug') || dateStr.includes('Sep') || 
+          dateStr.includes('Oct') || dateStr.includes('Nov') || dateStr.includes('Dec'))) {
+        // JavaScript can parse this format directly
+        const parsedDate = new Date(dateStr);
+        if (!isNaN(parsedDate.getTime())) {
+          return parsedDate;
+        }
+      }
+      
+      // Handle DD-MM-YYYY format (from Pending Challans)
+      if (dateStr.includes('-') && !dateStr.includes(':')) {
         const dateParts = dateStr.split('-');
         if (dateParts.length === 3) {
+          // Check if it's DD-MM-YYYY or YYYY-MM-DD
+          if (dateParts[0].length === 4) {
+            // YYYY-MM-DD format
+            return new Date(dateStr);
+          } else {
+            // DD-MM-YYYY format
+            return new Date(`${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`);
+          }
+        }
+      }
+      
+      // Handle DD/MM/YYYY format
+      if (dateStr.includes('/')) {
+        const dateParts = dateStr.split('/');
+        if (dateParts.length === 3) {
+          // Assume DD/MM/YYYY format
           return new Date(`${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`);
         }
       }
-      return new Date(dateStr);
+      
+      // Try direct parsing as fallback
+      const parsedDate = new Date(dateStr);
+      return isNaN(parsedDate.getTime()) ? null : parsedDate;
     } catch {
       return null;
     }
@@ -914,13 +968,20 @@ const InventoryDashboard = () => {
             
             processedEntries++;
             
-            // Debug logging for the specific case
-            if (shopId === '01/2024/0535') {
-              console.log(`📦 Supply found for shop ${shopId}: ${brand} (${size}) on ${dateStr}`, {
+            // Debug logging for GREATER KAILASH shop
+            if (shopId === '01/2024/0535' || shopId.includes('0535')) {
+              console.log(`📦 Supply found for shop ${shopId}: ${brand} (${size}) on "${dateStr}" -> ${date.toLocaleDateString()}`, {
                 key,
                 keyWithoutSize,
-                date: date.toLocaleDateString()
+                date: date.toLocaleDateString(),
+                rawDate: dateStr,
+                parsedDate: date
               });
+            }
+          } else {
+            // Debug failed date parsing
+            if (shopId === '01/2024/0535') {
+              console.log(`❌ Failed to parse date for shop ${shopId}: "${dateStr}"`);
             }
           }
         }
@@ -928,6 +989,7 @@ const InventoryDashboard = () => {
     });
     
     console.log('📦 Recent supplies processed:', processedEntries, 'valid entries');
+    console.log('📦 Sample supply keys for shop 01/2024/0535:', Object.keys(recentSupplies).filter(k => k.includes('01/2024/0535')).slice(0, 5));
     return recentSupplies;
   };
 
@@ -951,7 +1013,7 @@ const InventoryDashboard = () => {
     return null;
   };
 
-  // FIXED: Enhanced supply chain tracking with CORRECT brand matching
+  // FIXED: Enhanced supply chain tracking with CORRECT brand matching and FIXED date handling for DD-MMM-YYYY
   const checkSuppliedAfterOutOfStock = (
     shopId: string, 
     brandName: string, 
@@ -964,7 +1026,13 @@ const InventoryDashboard = () => {
     isInGracePeriod?: boolean,
     daysSinceSupply?: number
   } => {
-    console.log(`🔍 FIXED supply check for ${brandName} at shop ${shopId} visited on ${visitDate.toLocaleDateString()}`);
+    const isGreaterKailash = shopId === '01/2024/0535' || shopId.includes('0535');
+    
+    if (isGreaterKailash) {
+      console.log(`🔍 DETAILED supply check for ${brandName} at shop ${shopId} visited on ${visitDate.toLocaleDateString()} (${visitDate.toISOString()})`);
+    } else {
+      console.log(`🔍 FIXED supply check for ${brandName} at shop ${shopId} visited on ${visitDate.toLocaleDateString()}`);
+    }
     
     const today = new Date();
     const brandInfo = normalizeBrandInfo(brandName);
@@ -984,7 +1052,15 @@ const InventoryDashboard = () => {
     for (const key of possibleKeys) {
       const supplyDate = recentSupplies[key];
       if (supplyDate) {
-        console.log(`📦 Found supply for key ${key} on ${supplyDate.toLocaleDateString()}`);
+        if (isGreaterKailash) {
+          console.log(`📦 Found supply for key ${key} on ${supplyDate.toLocaleDateString()} (${supplyDate.toISOString()})`);
+          console.log(`🔍 Visit date: ${visitDate.toLocaleDateString()} (${visitDate.toISOString()}), Supply date: ${supplyDate.toLocaleDateString()} (${supplyDate.toISOString()})`);
+          console.log(`🔍 Supply after visit? ${supplyDate > visitDate} (${supplyDate.getTime()} > ${visitDate.getTime()})`);
+        } else {
+          console.log(`📦 Found supply for key ${key} on ${supplyDate.toLocaleDateString()}`);
+          console.log(`🔍 Visit date: ${visitDate.toLocaleDateString()}, Supply date: ${supplyDate.toLocaleDateString()}`);
+          console.log(`🔍 Supply after visit? ${supplyDate > visitDate}`);
+        }
         
         if (!latestSupplyDate || supplyDate > latestSupplyDate) {
           latestSupplyDate = supplyDate;
@@ -1011,7 +1087,11 @@ const InventoryDashboard = () => {
       };
     }
     
-    console.log(`❌ No supply found after visit for ${brandName}`);
+    if (isGreaterKailash) {
+      console.log(`❌ No supply found after visit for ${brandName}. Latest supply: ${latestSupplyDate ? `${latestSupplyDate.toLocaleDateString()} (${latestSupplyDate.toISOString()})` : 'None'}`);
+    } else {
+      console.log(`❌ No supply found after visit for ${brandName}. Latest supply: ${latestSupplyDate ? latestSupplyDate.toLocaleDateString() : 'None'}`);
+    }
     return { wasRestocked: false };
   };
 
