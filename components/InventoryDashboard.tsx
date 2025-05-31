@@ -335,30 +335,49 @@ const InventoryDashboard = () => {
       salesman: getColumnIndex(['salesman']),
       checkInDateTime: getColumnIndex(['check in date', 'check_in', 'datetime']),
       invBrand: getColumnIndex(['inv brand', 'inv_brand', 'brand', 'tva brand']),
-      invQuantity: getColumnIndex(['inv quantity', 'inv_quantity', 'quantity', 'tva target']),
-      reasonNoStock: getColumnIndex(['reason', 'no stock']),
+      invQuantity: getColumnIndex(['inv quantity', 'inv_quantity', 'quantity', 'tva target', 'bottles']),
+      reasonNoStock: getColumnIndex(['reason', 'no stock', 'reason for no stock']),
       lsDate: getColumnIndex(['ls date', 'ls_date'])
     };
 
     console.log('📊 Column indices found:', columnIndices);
 
-    // CRITICAL DEBUG: Check what's in the INV Brand column
-    console.log('🔍 DEBUGGING INV BRAND COLUMN:');
-    const invBrandIndex = columnIndices.invBrand;
-    if (invBrandIndex !== -1) {
-      console.log(`INV Brand column index: ${invBrandIndex}, header: "${headers[invBrandIndex]}"`);
+    // CRITICAL DEBUG: Check what's in the Quantity and Reason columns
+    console.log('🔍 DEBUGGING QUANTITY AND REASON COLUMNS:');
+    const invQuantityIndex = columnIndices.invQuantity;
+    const reasonIndex = columnIndices.reasonNoStock;
+    
+    if (invQuantityIndex !== -1) {
+      console.log(`Quantity column index: ${invQuantityIndex}, header: "${headers[invQuantityIndex]}"`);
       
-      // Sample the first 20 non-empty values in this column
-      let sampleCount = 0;
-      for (let i = 1; i < Math.min(rows.length, 100) && sampleCount < 20; i++) {
-        const brandValue = rows[i][invBrandIndex];
+      // Sample the first 10 quantity values
+      let qtySampleCount = 0;
+      for (let i = 1; i < Math.min(rows.length, 50) && qtySampleCount < 10; i++) {
+        const qtyValue = rows[i][invQuantityIndex];
+        const brandValue = rows[i][columnIndices.invBrand];
         if (brandValue && brandValue.toString().trim()) {
-          console.log(`Row ${i + 1}: "${brandValue}"`);
-          sampleCount++;
+          console.log(`Row ${i + 1}: Brand="${brandValue}", Qty="${qtyValue}"`);
+          qtySampleCount++;
         }
       }
     } else {
-      console.error('❌ INV Brand column not found! Available headers:', headers);
+      console.error('❌ Quantity column not found!');
+    }
+    
+    if (reasonIndex !== -1) {
+      console.log(`Reason column index: ${reasonIndex}, header: "${headers[reasonIndex]}"`);
+      
+      // Sample the first 10 non-empty reason values
+      let reasonSampleCount = 0;
+      for (let i = 1; i < Math.min(rows.length, 100) && reasonSampleCount < 10; i++) {
+        const reasonValue = rows[i][reasonIndex];
+        if (reasonValue && reasonValue.toString().trim()) {
+          console.log(`Row ${i + 1} reason: "${reasonValue}"`);
+          reasonSampleCount++;
+        }
+      }
+    } else {
+      console.error('❌ Reason for No Stock column not found! Available headers:', headers);
     }
 
     // Validate required columns
@@ -378,66 +397,62 @@ const InventoryDashboard = () => {
       recentSupplies: Object.keys(recentSupplies).length
     });
     
-    // STEP 1: CRITICAL DEBUG - Shop ID Propagation (learned from AppScript)
-    console.log('🔧 CRITICAL DEBUG: Starting Shop ID propagation...');
+    // STEP 1: REVERSE HIERARCHICAL FIX - Shop info comes AFTER brand rows!
+    console.log('🔧 REVERSE HIERARCHICAL FIX: Shop info comes AFTER brand rows...');
     
-    let currentShopId = null;
-    let currentShopName = null;
-    let currentCheckInDateTime = null;
-    let currentDepartment = null;
-    let currentSalesman = null;
-    let propagatedRows = 0;
-    let shopRowsFound = 0;
-    let brandRowsFound = 0;
-    
-    // CRITICAL DEBUG: Log the first 10 rows to understand structure
-    console.log('🔍 DEBUGGING FIRST 10 ROWS:');
-    for (let i = 1; i < Math.min(rows.length, 11); i++) {
-      const row = rows[i];
-      const shopId = row[columnIndices.shopId];
-      const invBrand = row[columnIndices.invBrand];
-      console.log(`Row ${i + 1}: ShopID="${shopId}" | Brand="${invBrand}" | Full row length: ${row.length}`);
-    }
-    
-    // First pass - propagate Shop IDs to all related product rows (HIERARCHICAL DATA FIX)
+    // First pass: Find all shop info rows
+    const shopInfoRows: Array<{index: number, row: any[]}> = [];
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
-      
-      // If this row has a Shop ID, update our current context
-      if (row[columnIndices.shopId]) {
-        currentShopId = row[columnIndices.shopId];
-        currentShopName = row[columnIndices.shopName];
-        currentCheckInDateTime = row[columnIndices.checkInDateTime];
-        currentDepartment = row[columnIndices.department];
-        currentSalesman = row[columnIndices.salesman];
-        shopRowsFound++;
-        console.log(`📍 New shop context: ${currentShopId} - ${currentShopName}`);
-      } 
-      // If no Shop ID but has inventory brand data, use the current shop context
-      else if (!row[columnIndices.shopId] && row[columnIndices.invBrand]) {
-        // Fill in Shop ID and other shop data for this product row
-        row[columnIndices.shopId] = currentShopId;
-        row[columnIndices.shopName] = currentShopName;
-        row[columnIndices.checkInDateTime] = currentCheckInDateTime;
-        row[columnIndices.department] = currentDepartment;
-        row[columnIndices.salesman] = currentSalesman;
-        propagatedRows++;
-        brandRowsFound++;
-        console.log(`✅ Propagated shop data to brand row: ${row[columnIndices.invBrand]}`);
-      }
-      // Log rows with brand data that already have Shop ID
-      else if (row[columnIndices.shopId] && row[columnIndices.invBrand]) {
-        brandRowsFound++;
-        console.log(`🔄 Existing brand row with Shop ID: ${row[columnIndices.invBrand]}`);
+      if (row[columnIndices.shopId] && row[columnIndices.shopName]) {
+        shopInfoRows.push({ index: i, row });
+        console.log(`📍 Found shop info at row ${i + 1}: ${row[columnIndices.shopId]} - ${row[columnIndices.shopName]}`);
       }
     }
     
-    console.log(`🎉 Shop ID propagation complete:`, {
-      shopRowsFound,
-      brandRowsFound,
-      propagatedRows,
-      totalRows: rows.length
+    console.log(`🏪 Found ${shopInfoRows.length} shop info rows`);
+    
+    // Second pass: For each shop, go BACKWARDS to collect brand rows above it
+    let propagatedRows = 0;
+    
+    shopInfoRows.forEach((shopInfo, shopIndex) => {
+      const shopRow = shopInfo.row;
+      const shopRowIndex = shopInfo.index;
+      
+      const shopId = shopRow[columnIndices.shopId];
+      const shopName = shopRow[columnIndices.shopName];
+      const checkInDateTime = shopRow[columnIndices.checkInDateTime];
+      const department = shopRow[columnIndices.department];
+      const salesman = shopRow[columnIndices.salesman];
+      
+      console.log(`🔄 Processing shop ${shopId}: ${shopName}`);
+      
+      // Find the start boundary (previous shop row or beginning)
+      const prevShopRowIndex = shopIndex > 0 ? shopInfoRows[shopIndex - 1].index : 0;
+      
+      // Go backwards from current shop row to collect brand rows
+      for (let i = shopRowIndex - 1; i > prevShopRowIndex; i--) {
+        const brandRow = rows[i];
+        const invBrand = brandRow[columnIndices.invBrand];
+        
+        // If this row has brand data but no shop ID, propagate shop info
+        if (invBrand && invBrand.toString().trim() && !brandRow[columnIndices.shopId]) {
+          brandRow[columnIndices.shopId] = shopId;
+          brandRow[columnIndices.shopName] = shopName;
+          brandRow[columnIndices.checkInDateTime] = checkInDateTime;
+          brandRow[columnIndices.department] = department;
+          brandRow[columnIndices.salesman] = salesman;
+          propagatedRows++;
+          console.log(`✅ Propagated to brand row ${i + 1}: ${invBrand}`);
+        }
+        // If this row already has shop ID and brand, just log it
+        else if (invBrand && invBrand.toString().trim() && brandRow[columnIndices.shopId]) {
+          console.log(`🔄 Brand row ${i + 1} already has shop ID: ${invBrand}`);
+        }
+      }
     });
+    
+    console.log(`🎉 REVERSE propagation complete: ${propagatedRows} brand rows updated`);
 
     // STEP 2: Filter for MONTHLY data (current month) - AFTER propagation
     const today = new Date();
@@ -656,12 +671,17 @@ const InventoryDashboard = () => {
           supplyStatus = 'awaiting_supply';
         }
 
-        // Determine stock status
-        const isNeverOrdered = reasonNoStock === 'Never Ordered';
-        const isDiscontinued = reasonNoStock === 'Discontinued';
+        // FIXED: Enhanced stock status detection with debugging
+        const isNeverOrdered = reasonNoStock && reasonNoStock.toLowerCase().includes('never');
+        const isDiscontinued = reasonNoStock && reasonNoStock.toLowerCase().includes('discontin');
         const isOutOfStock = quantity === 0 && !isNeverOrdered && !isDiscontinued;
         const isLowStock = quantity > 0 && quantity < 5;
         const isInStock = quantity > 0 && !isLowStock;
+        
+        // DEBUG: Log stock status for first few items
+        if (processedSKUs.size <= 10) {
+          console.log(`🔍 Stock Status Debug - Brand: ${brand}, Qty: ${quantity}, Reason: "${reasonNoStock}", OutOfStock: ${isOutOfStock}`);
+        }
 
         const inventoryItem: InventoryItem = {
           brand,
@@ -706,9 +726,9 @@ const InventoryDashboard = () => {
           });
         }
 
-        // Track out of stock items
+        // Track out of stock items with enhanced debugging
         if (isOutOfStock) {
-          outOfStockItems.push({
+          const outOfStockItem = {
             sku: brand,
             shopName: shopInventory.shopName,
             department: shopInventory.department,
@@ -719,7 +739,14 @@ const InventoryDashboard = () => {
             daysAfterSupply: suppliedAfterOutOfStock ? 
               Math.floor((shopVisit.visitDate.getTime() - (recentSupplies[createBrandMatchingKey(shopVisit.shopId, brand)]?.getTime() || 0)) / (1000 * 60 * 60 * 24)) : 
               undefined
-          });
+          };
+          
+          outOfStockItems.push(outOfStockItem);
+          
+          // DEBUG: Log first few out-of-stock items
+          if (outOfStockItems.length <= 5) {
+            console.log(`📋 Out-of-stock item ${outOfStockItems.length}:`, outOfStockItem);
+          }
         }
 
         // Enhanced SKU performance tracking
@@ -814,7 +841,9 @@ const InventoryDashboard = () => {
       recentlyRestockedItems,
       processedSKUs: processedSKUs.size,
       recentSuppliesCount: Object.keys(recentSupplies).length,
-      historicalEntriesCount: Object.keys(supplyHistory).length
+      historicalEntriesCount: Object.keys(supplyHistory).length,
+      outOfStockItemsCollected: outOfStockItems.length,
+      agingLocationsCollected: allAgingLocations.length
     });
 
     return {
@@ -1227,8 +1256,8 @@ const InventoryDashboard = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <Package className="w-12 h-12 animate-pulse mx-auto mb-4 text-purple-600" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Loading DEBUGGING Enhanced Inventory Dashboard</h2>
-          <p className="text-gray-600">Processing with DETAILED column and data debugging...</p>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Loading REVERSE HIERARCHICAL FIXED Dashboard</h2>
+          <p className="text-gray-600">Processing with REVERSE propagation - shop info comes AFTER brand rows!</p>
         </div>
       </div>
     );
