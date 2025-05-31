@@ -979,14 +979,21 @@ const InventoryDashboard = () => {
     return null;
   };
 
-  // ENHANCED: Advanced supply chain tracking with grace period logic
+  // ENHANCED: Advanced supply chain tracking with BOTH scenarios
   const checkSuppliedAfterOutOfStock = (
     shopId: string, 
     brandName: string, 
     visitDate: Date, 
     recentSupplies: Record<string, Date>
-  ): { wasRestocked: boolean, daysOutOfStock?: number, supplyDate?: Date, isInGracePeriod?: boolean } => {
-    console.log(`🔍 Advanced supply check for ${brandName} at shop ${shopId} visited on ${visitDate.toLocaleDateString()}`);
+  ): { 
+    wasRestocked: boolean, 
+    daysOutOfStock?: number, 
+    supplyDate?: Date, 
+    isInGracePeriod?: boolean,
+    supplyChainFailure?: boolean,
+    daysSupplyBeforeVisit?: number
+  } => {
+    console.log(`🔍 Complete supply chain check for ${brandName} at shop ${shopId} visited on ${visitDate.toLocaleDateString()}`);
     
     const possibleKeys = createMultipleBrandKeys(shopId, brandName);
     const today = new Date();
@@ -996,7 +1003,7 @@ const InventoryDashboard = () => {
       if (supplyDate) {
         console.log(`📦 Found supply for key ${key} on ${supplyDate.toLocaleDateString()}`);
         
-        // Check if supply happened AFTER the out-of-stock visit
+        // SCENARIO A: Supply happened AFTER the out-of-stock visit (successful restocking)
         if (supplyDate > visitDate) {
           const daysOutOfStock = Math.floor((supplyDate.getTime() - visitDate.getTime()) / (1000 * 60 * 60 * 24));
           const daysSinceSupply = Math.floor((today.getTime() - supplyDate.getTime()) / (1000 * 60 * 60 * 24));
@@ -1006,20 +1013,37 @@ const InventoryDashboard = () => {
           
           // Only count supplies within reasonable timeframe (30 days)
           if (daysOutOfStock <= 30) {
-            console.log(`✅ Product was restocked after ${daysOutOfStock} days out of stock. Grace period: ${isInGracePeriod ? 'Active' : 'Expired'}`);
+            console.log(`✅ SCENARIO A: Product was restocked after ${daysOutOfStock} days out of stock. Grace period: ${isInGracePeriod ? 'Active' : 'Expired'}`);
             return { 
               wasRestocked: true, 
               daysOutOfStock: daysOutOfStock,
               supplyDate: supplyDate,
-              isInGracePeriod: isInGracePeriod
+              isInGracePeriod: isInGracePeriod,
+              supplyChainFailure: false
+            };
+          }
+        }
+        
+        // SCENARIO B: Supply happened BEFORE the visit but product is still out of stock (supply chain failure)
+        else if (supplyDate < visitDate) {
+          const daysSupplyBeforeVisit = Math.floor((visitDate.getTime() - supplyDate.getTime()) / (1000 * 60 * 60 * 24));
+          
+          // Only flag as supply chain failure if supply was recent (within 14 days before visit)
+          if (daysSupplyBeforeVisit <= 14 && daysSupplyBeforeVisit > 0) {
+            console.log(`⚠️ SCENARIO B: Supply chain failure - supply was ${daysSupplyBeforeVisit} days BEFORE visit but still out of stock`);
+            return {
+              wasRestocked: false,
+              supplyDate: supplyDate,
+              supplyChainFailure: true,
+              daysSupplyBeforeVisit: daysSupplyBeforeVisit
             };
           }
         }
       }
     }
     
-    console.log(`❌ No supply found after out-of-stock visit for ${brandName}`);
-    return { wasRestocked: false };
+    console.log(`❌ No relevant supply found for ${brandName}`);
+    return { wasRestocked: false, supplyChainFailure: false };
   };
 
   // NEW: Simplified advanced supply status (without next visit checking for now)
