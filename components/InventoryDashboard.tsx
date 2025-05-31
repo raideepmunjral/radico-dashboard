@@ -92,7 +92,9 @@ interface InventoryData {
     reasonNoStock: string;
     visitDate: Date;
     suppliedAfterOutOfStock?: boolean;
-    daysAfterSupply?: number;
+    daysOutOfStock?: number; // Days between visit and supply
+    currentDaysOutOfStock?: number; // Days since visit to today
+    supplyDateAfterVisit?: Date;
   }>;
   visitCompliance: {
     totalSalesmen: number;
@@ -1039,6 +1041,33 @@ const InventoryDashboard = () => {
   // ENHANCED FILTERING & UTILITIES
   // ==========================================
 
+  // ENHANCED: Generate supply status display with detailed messaging
+  const getEnhancedSupplyStatusDisplay = (item: any) => {
+    if (item.suppliedAfterOutOfStock && item.daysOutOfStock) {
+      return `Recently Restocked (was out ${item.daysOutOfStock} days)`;
+    } else if (item.supplyStatus === 'awaiting_supply' && item.currentDaysOutOfStock) {
+      return `Awaiting Supply (out for ${item.currentDaysOutOfStock} days)`;
+    } else {
+      // For other statuses, use the standard format
+      return item.supplyStatus?.replace(/_/g, ' ') || 'Unknown';
+    }
+  };
+
+  // ENHANCED: Calculate days for display (handles both scenarios)
+  const calculateDaysAfterSupply = (item: any) => {
+    // For recently restocked items
+    if (item.daysOutOfStock) {
+      return `was out ${item.daysOutOfStock}d`;
+    }
+    
+    // For items still awaiting supply
+    if (item.currentDaysOutOfStock) {
+      return `out for ${item.currentDaysOutOfStock}d`;
+    }
+    
+    return 'N/A';
+  };
+
   const getFilteredItems = (items: any[]) => {
     return items.filter(item => {
       const matchesDepartment = !filters.department || item.department === filters.department;
@@ -1170,10 +1199,15 @@ const InventoryDashboard = () => {
       
       else if (activeTab === 'alerts') {
         csvContent += "OUT OF STOCK ANALYSIS\n";
-        csvContent += "SKU,Shop Name,Department,Salesman,Reason,Visit Date,Supplied After OOS,Days After Supply\n";
+        csvContent += "SKU,Shop Name,Department,Salesman,Reason,Visit Date,Supply Status,Days Info\n";
         
         inventoryData.outOfStockItems.forEach(item => {
-          csvContent += `"${item.sku}","${item.shopName}","${item.department}","${item.salesman}","${item.reasonNoStock}","${item.visitDate.toLocaleDateString()}","${item.suppliedAfterOutOfStock ? 'Yes' : 'No'}","${item.daysAfterSupply || 'N/A'}"\n`;
+          const supplyStatus = item.suppliedAfterOutOfStock ? 'Recently Restocked' : 'Awaiting Supply';
+          const daysInfo = item.suppliedAfterOutOfStock ? 
+            `was out ${item.daysOutOfStock || 'N/A'} days` : 
+            `out for ${item.currentDaysOutOfStock || 'N/A'} days`;
+          
+          csvContent += `"${item.sku}","${item.shopName}","${item.department}","${item.salesman}","${item.reasonNoStock}","${item.visitDate.toLocaleDateString()}","${supplyStatus}","${daysInfo}"\n`;
         });
       }
 
@@ -1327,6 +1361,7 @@ const InventoryDashboard = () => {
             filteredShops={getFilteredShops()}
             filters={filters}
             setFilters={setFilters}
+            getEnhancedSupplyStatusDisplay={getEnhancedSupplyStatusDisplay}
             departments={getDepartments()}
             salesmen={getSalesmen()}
             expandedShop={expandedShop}
@@ -1339,6 +1374,7 @@ const InventoryDashboard = () => {
             filters={filters}
             setFilters={setFilters}
             getFilteredItems={getFilteredItems}
+            getEnhancedSupplyStatusDisplay={getEnhancedSupplyStatusDisplay}
             departments={getDepartments()}
             salesmen={getSalesmen()}
             brands={getBrands()}
@@ -1354,6 +1390,7 @@ const InventoryDashboard = () => {
             filters={filters}
             setFilters={setFilters}
             getFilteredItems={getFilteredItems}
+            getEnhancedSupplyStatusDisplay={getEnhancedSupplyStatusDisplay}
             departments={getDepartments()}
             salesmen={getSalesmen()}
             brands={getBrands()}
@@ -1490,6 +1527,7 @@ const EnhancedShopInventoryTab = ({
   filteredShops, 
   filters, 
   setFilters, 
+  getEnhancedSupplyStatusDisplay,
   departments, 
   salesmen,
   expandedShop,
@@ -1662,6 +1700,7 @@ const EnhancedAgingAnalysisTab = ({
   filters, 
   setFilters, 
   getFilteredItems, 
+  getEnhancedSupplyStatusDisplay,
   departments, 
   salesmen, 
   brands,
@@ -1831,12 +1870,12 @@ const EnhancedAgingAnalysisTab = ({
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                       location.supplyStatus === 'current' ? 'bg-green-100 text-green-800' :
-                      location.supplyStatus === 'recently_restocked' ? 'bg-blue-100 text-blue-800' :
-                      location.supplyStatus.startsWith('aging') ? 'bg-yellow-100 text-yellow-800' :
+                      location.suppliedAfterOutOfStock ? 'bg-blue-100 text-blue-800' :
                       location.supplyStatus === 'awaiting_supply' ? 'bg-red-100 text-red-800' :
+                      location.supplyStatus?.startsWith('aging') ? 'bg-yellow-100 text-yellow-800' :
                       'bg-gray-100 text-gray-800'
                     }`}>
-                      {location.supplyStatus.replace(/_/g, ' ')}
+                      {getEnhancedSupplyStatusDisplay(location)}
                     </span>
                   </td>
                 </tr>
@@ -1946,6 +1985,7 @@ const EnhancedStockIntelligenceTab = ({
   filters, 
   setFilters, 
   getFilteredItems, 
+  getEnhancedSupplyStatusDisplay,
   departments, 
   salesmen, 
   brands,
@@ -2126,12 +2166,12 @@ const EnhancedStockIntelligenceTab = ({
                     {item.suppliedAfterOutOfStock ? (
                       <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
                         <Truck className="w-3 h-3 mr-1" />
-                        Restocked ({calculateDaysAfterSupply(item)})
+                        Restocked (was out {item.daysOutOfStock || 'N/A'} days)
                       </span>
                     ) : (
                       <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
                         <AlertTriangle className="w-3 h-3 mr-1" />
-                        Awaiting Supply
+                        Awaiting Supply (out for {item.currentDaysOutOfStock || 'N/A'} days)
                       </span>
                     )}
                   </td>
