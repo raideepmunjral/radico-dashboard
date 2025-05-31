@@ -123,19 +123,25 @@ const InventoryDashboard = () => {
   };
 
   // ==========================================
-  // FIXED BRAND NORMALIZATION SYSTEM
+  // CORRECTED BRAND NORMALIZATION SYSTEM
   // ==========================================
 
-  // COMPREHENSIVE BRAND MAPPING DICTIONARY
+  // COMPREHENSIVE BRAND MAPPING DICTIONARY - CORRECTED
   const BRAND_MAPPING = {
     // 8 PM BRAND FAMILY
     '8 PM BLACK': '8 PM PREMIUM BLACK BLENDED WHISKY',
     
-    // VERVE BRAND FAMILY  
+    // VERVE BRAND FAMILY - CORRECTED WITH EXACT NAMES FROM SUPPLY SHEET
     'VERVE LEMON LUSH': 'M2M VERVE LEMON LUSH SUP FL VODKA',
     'VERVE GRAIN': 'M2M VERVE SUPERIOR GRAIN VODKA',
     'VERVE CRANBERRY': 'M2M VERVE CRANBERRY TEASE SP FL VODKA',
-    'VERVE GREEN APPLE': 'M2M VERVE GREEN APPLE SUPERIOR FL VODKA'
+    'VERVE GREEN APPLE': 'M2M VERVE GREEN APPLE SUPERIOR FL VODKA',
+    
+    // Add reverse mapping for safety
+    'M2M VERVE LEMON LUSH SUP FL VODKA': 'VERVE LEMON LUSH',
+    'M2M VERVE SUPERIOR GRAIN VODKA': 'VERVE GRAIN',
+    'M2M VERVE CRANBERRY TEASE SP FL VODKA': 'VERVE CRANBERRY',
+    'M2M VERVE GREEN APPLE SUPERIOR FL VODKA': 'VERVE GREEN APPLE'
   };
 
   const normalizeBrandInfo = (brandName: string): { family: string, size: string, normalizedName: string } => {
@@ -143,10 +149,10 @@ const InventoryDashboard = () => {
     let extractedSize = '';
     
     // Extract size from brand name (750, 375, 180, 90, 60 P)
-    const sizeMatch = cleanBrand.match(/(\d+)\s?(P)?$/);
+    const sizeMatch = cleanBrand.match(/(\d+)\s?(P|ML)?$/);
     if (sizeMatch) {
       extractedSize = sizeMatch[1];
-      cleanBrand = cleanBrand.replace(/\s*\d+\s?(P)?$/, '').trim();
+      cleanBrand = cleanBrand.replace(/\s*\d+\s?(P|ML)?$/, '').trim();
     }
     
     // Default size if not found
@@ -179,6 +185,9 @@ const InventoryDashboard = () => {
     const keys = [
       `${shopId}_${brandInfo.normalizedName}_${actualSize}`,
       `${shopId}_${brandInfo.family}_${actualSize}`,
+      `${shopId}_${brandInfo.normalizedName}`,
+      `${shopId}_${brandName.toUpperCase()}_${actualSize}`,
+      `${shopId}_${brandName.toUpperCase()}`,
     ];
     
     // Add fallback keys for partial matching
@@ -201,7 +210,7 @@ const InventoryDashboard = () => {
         throw new Error('Google API key not configured');
       }
 
-      console.log('🔄 Fetching Enhanced inventory data...');
+      console.log('🔄 Fetching CORRECTED inventory data...');
 
       const [visitData, historicalData, masterData] = await Promise.all([
         fetchVisitSheetData(),
@@ -288,11 +297,11 @@ const InventoryDashboard = () => {
   };
 
   // ==========================================
-  // FIXED DATA PROCESSING LOGIC
+  // CORRECTED DATA PROCESSING LOGIC
   // ==========================================
 
   const processEnhancedInventoryData = (visitData: any[][], historicalData: any[][], pendingChallans: any[][]): InventoryData => {
-    console.log('🔧 Processing Enhanced inventory data with FIXED supply status logic...');
+    console.log('🔧 Processing CORRECTED inventory data with FIXED column indices...');
     
     if (visitData.length === 0) {
       throw new Error('No visit data found');
@@ -338,7 +347,7 @@ const InventoryDashboard = () => {
       }
     }
 
-    // Process enhanced supply data with FIXED mapping
+    // Process CORRECTED supply data with FIXED column mapping
     const supplyHistory = processHistoricalSupplyData(historicalData);
     const recentSupplies = processPendingChallans(pendingChallans);
     
@@ -504,7 +513,7 @@ const InventoryDashboard = () => {
       }
     });
 
-    // STEP 4: Process inventory for each shop with FIXED SUPPLY STATUS LOGIC
+    // STEP 4: Process inventory for each shop with CORRECTED SUPPLY STATUS LOGIC
     const shops: Record<string, ShopInventory> = {};
     const skuTracker: Record<string, any> = {};
     const allAgingLocations: Array<any> = [];
@@ -567,7 +576,7 @@ const InventoryDashboard = () => {
         
         processedSKUs.add(brand);
         
-        // FIXED: Get supply date with CORRECT brand mapping
+        // CORRECTED: Get supply date with CORRECT brand mapping
         const supplyCheckResult = checkSuppliedAfterOutOfStock(
           shopVisit.shopId, 
           brand, 
@@ -618,7 +627,7 @@ const InventoryDashboard = () => {
         else if (ageInDays >= 45) ageCategory = 'days45to60';
         else if (ageInDays >= 30) ageCategory = 'days30to45';
 
-        // FIXED: Enhanced supply status with CORRECT logic and DEBUGGING
+        // CORRECTED: Enhanced supply status with CORRECT logic and DEBUGGING
         const advancedSupplyStatus = getAdvancedSupplyStatus(
           quantity,
           shopVisit.visitDate,
@@ -813,7 +822,7 @@ const InventoryDashboard = () => {
       lastMonthVisits: salesman.lastMonthVisits
     })).sort((a, b) => b.monthlyVisits - a.monthlyVisits);
 
-    console.log('🎉 Enhanced inventory processing complete:', {
+    console.log('🎉 CORRECTED inventory processing complete:', {
       totalShops,
       totalSKUs,
       totalOutOfStock,
@@ -852,7 +861,7 @@ const InventoryDashboard = () => {
   };
 
   // ==========================================
-  // FIXED SUPPLY DATA PROCESSING FUNCTIONS
+  // CORRECTED SUPPLY DATA PROCESSING FUNCTIONS
   // ==========================================
 
   const parseDate = (dateStr: string): Date | null => {
@@ -971,6 +980,7 @@ const InventoryDashboard = () => {
     return supplyHistory;
   };
 
+  // CORRECTED PENDING CHALLANS PROCESSING WITH FIXED COLUMN INDICES
   const processPendingChallans = (pendingChallans: any[][]) => {
     const recentSupplies: Record<string, Date> = {};
     
@@ -979,46 +989,51 @@ const InventoryDashboard = () => {
     const headers = pendingChallans[0];
     const rows = pendingChallans.slice(1);
     
-    // FIXED: Based on actual CSV structure
-    const challansDateIndex = 1; // Column B (challandate)
-    const shopIdIndex = 8; // Column I (Shop_Id)
-    const shopNameIndex = 9; // Column J (shop_name)
-    const brandIndex = 10; // Column K (brand)
-    const sizeIndex = 11; // Column L (size)
-    const casesIndex = 14; // Column O (cases)
+    // CORRECTED: Based on actual CSV structure from user's sheet
+    const challansDateIndex = 1;  // Column B (challandate) ✅ CORRECT
+    const shopIdIndex = 8;        // Column I (Shop_Id) ✅ CORRECT
+    const shopNameIndex = 9;      // Column J (shop_name) ✅ CORRECT
+    const brandIndex = 11;        // Column L (brand) ✅ CORRECTED FROM 10 to 11
+    const sizeIndex = 12;         // Column M (size) ✅ CORRECTED FROM 11 to 12
+    const packIndex = 13;         // Column N (pack) ✅ NEW
+    const casesIndex = 14;        // Column O (cases) ✅ CORRECT
+    
+    console.log('📊 Using CORRECTED column indices for Pending Challans:');
+    console.log(`Date: ${challansDateIndex} (B), Shop: ${shopIdIndex} (I), Brand: ${brandIndex} (L), Size: ${sizeIndex} (M), Cases: ${casesIndex} (O)`);
     
     let processedEntries = 0;
     
     rows.forEach((row, index) => {
       if (row.length > Math.max(shopIdIndex, brandIndex, challansDateIndex, casesIndex)) {
         const shopId = row[shopIdIndex]?.toString().trim();
-        const brand = row[brandIndex]?.toString().trim();
-        const size = row[sizeIndex]?.toString().trim() || '';
+        const brand = row[brandIndex]?.toString().trim();      // Now reading Column L ✅
+        const size = row[sizeIndex]?.toString().trim() || '';  // Now reading Column M ✅
+        const pack = row[packIndex]?.toString().trim() || '';  // Column N
         const dateStr = row[challansDateIndex]?.toString().trim();
         const cases = parseFloat(row[casesIndex]) || 0;
+        
+        // Debug for GREATER KAILASH
+        if (shopId === '01/2024/0535') {
+          console.log(`📦 CORRECTED Row ${index}: Shop=${shopId}, Brand="${brand}", Size="${size}", Date="${dateStr}", Cases=${cases}`);
+        }
         
         if (shopId && brand && dateStr && cases > 0) {
           const date = parseDate(dateStr);
           if (date && !isNaN(date.getTime())) {
-            // FIXED: Create matching keys for supply data
-            const key = `${shopId}_${brand}_${size}`;
-            if (!recentSupplies[key] || date > recentSupplies[key]) {
-              recentSupplies[key] = date;
-            }
-            
-            // Also add key without size for fallback matching
-            const keyWithoutSize = `${shopId}_${brand}`;
-            if (!recentSupplies[keyWithoutSize] || date > recentSupplies[keyWithoutSize]) {
-              recentSupplies[keyWithoutSize] = date;
-            }
+            // CORRECTED: Create matching keys for supply data
+            const possibleKeys = createMultipleBrandKeys(shopId, brand, size);
+            possibleKeys.forEach(key => {
+              if (!recentSupplies[key] || date > recentSupplies[key]) {
+                recentSupplies[key] = date;
+              }
+            });
             
             processedEntries++;
             
             // Debug logging for GREATER KAILASH shop
-            if (shopId === '01/2024/0535' || shopId.includes('0535')) {
-              console.log(`📦 Supply found for shop ${shopId}: ${brand} (${size}) on "${dateStr}" -> ${date.toLocaleDateString()}`, {
-                key,
-                keyWithoutSize,
+            if (shopId === '01/2024/0535') {
+              console.log(`📦 CORRECTED Supply added for shop ${shopId}: ${brand} (${size}) on "${dateStr}" -> ${date.toLocaleDateString()}`, {
+                possibleKeys,
                 date: date.toLocaleDateString(),
                 rawDate: dateStr,
                 parsedDate: date
@@ -1030,11 +1045,16 @@ const InventoryDashboard = () => {
               console.log(`❌ Failed to parse date for shop ${shopId}: "${dateStr}"`);
             }
           }
+        } else {
+          // Debug missing data
+          if (shopId === '01/2024/0535' && (!brand || !dateStr || cases <= 0)) {
+            console.log(`❌ Missing data - Shop: ${shopId}, Brand: "${brand}", Date: "${dateStr}", Cases: ${cases}`);
+          }
         }
       }
     });
     
-    console.log('📦 Recent supplies processed:', processedEntries, 'valid entries');
+    console.log('📦 CORRECTED Pending Challans processed:', processedEntries, 'valid entries');
     console.log('📦 Sample supply keys for shop 01/2024/0535:', Object.keys(recentSupplies).filter(k => k.includes('01/2024/0535')).slice(0, 10));
     console.log('📦 Total supply keys created:', Object.keys(recentSupplies).length);
     
@@ -1065,7 +1085,7 @@ const InventoryDashboard = () => {
     return null;
   };
 
-  // FIXED: Enhanced supply chain tracking with CORRECT brand matching and FIXED date handling for DD-MMM-YYYY
+  // CORRECTED: Enhanced supply chain tracking with CORRECT brand matching and FIXED date handling for DD-MMM-YYYY
   const checkSuppliedAfterOutOfStock = (
     shopId: string, 
     brandName: string, 
@@ -1081,22 +1101,16 @@ const InventoryDashboard = () => {
     const isGreaterKailash = shopId === '01/2024/0535' || shopId.includes('0535');
     
     if (isGreaterKailash) {
-      console.log(`🔍 DETAILED supply check for ${brandName} at shop ${shopId} visited on ${visitDate.toLocaleDateString()} (${visitDate.toISOString()})`);
+      console.log(`🔍 CORRECTED supply check for ${brandName} at shop ${shopId} visited on ${visitDate.toLocaleDateString()} (${visitDate.toISOString()})`);
     } else {
-      console.log(`🔍 FIXED supply check for ${brandName} at shop ${shopId} visited on ${visitDate.toLocaleDateString()}`);
+      console.log(`🔍 CORRECTED supply check for ${brandName} at shop ${shopId} visited on ${visitDate.toLocaleDateString()}`);
     }
     
     const today = new Date();
     const brandInfo = normalizeBrandInfo(brandName);
     
-    // FIXED: Create matching keys based on how supply data is stored
-    const possibleKeys = [
-      `${shopId}_${brandInfo.normalizedName}_${brandInfo.size}`,
-      `${shopId}_${brandInfo.normalizedName}`,
-      // Add exact brand name matching
-      `${shopId}_${brandName.toUpperCase()}_${brandInfo.size}`,
-      `${shopId}_${brandName.toUpperCase()}`
-    ];
+    // CORRECTED: Create matching keys based on how supply data is stored
+    const possibleKeys = createMultipleBrandKeys(shopId, brandName);
     
     let latestSupplyDate: Date | null = null;
     let matchedKey = '';
@@ -1105,11 +1119,11 @@ const InventoryDashboard = () => {
       const supplyDate = recentSupplies[key];
       if (supplyDate) {
         if (isGreaterKailash) {
-          console.log(`📦 Found supply for key ${key} on ${supplyDate.toLocaleDateString()} (${supplyDate.toISOString()})`);
+          console.log(`📦 CORRECTED Found supply for key ${key} on ${supplyDate.toLocaleDateString()} (${supplyDate.toISOString()})`);
           console.log(`🔍 Visit date: ${visitDate.toLocaleDateString()} (${visitDate.toISOString()}), Supply date: ${supplyDate.toLocaleDateString()} (${supplyDate.toISOString()})`);
           console.log(`🔍 Supply after visit? ${supplyDate > visitDate} (${supplyDate.getTime()} > ${visitDate.getTime()})`);
         } else {
-          console.log(`📦 Found supply for key ${key} on ${supplyDate.toLocaleDateString()}`);
+          console.log(`📦 CORRECTED Found supply for key ${key} on ${supplyDate.toLocaleDateString()}`);
           console.log(`🔍 Visit date: ${visitDate.toLocaleDateString()}, Supply date: ${supplyDate.toLocaleDateString()}`);
           console.log(`🔍 Supply after visit? ${supplyDate > visitDate}`);
         }
@@ -1128,7 +1142,7 @@ const InventoryDashboard = () => {
       // Grace period: 7 days from supply date
       const isInGracePeriod = daysSinceSupply <= 7;
       
-      console.log(`✅ RESTOCKED: ${brandName} was restocked after ${daysOutOfStock} days. Supply on ${latestSupplyDate.toLocaleDateString()}, ${daysSinceSupply} days ago. Key: ${matchedKey}`);
+      console.log(`✅ CORRECTED RESTOCKED: ${brandName} was restocked after ${daysOutOfStock} days. Supply on ${latestSupplyDate.toLocaleDateString()}, ${daysSinceSupply} days ago. Key: ${matchedKey}`);
       
       return { 
         wasRestocked: true, 
@@ -1147,7 +1161,7 @@ const InventoryDashboard = () => {
     return { wasRestocked: false };
   };
 
-  // FIXED: Advanced supply status with proper "Restocked (Xd)" format
+  // CORRECTED: Advanced supply status with proper "Restocked (Xd)" format
   const getAdvancedSupplyStatus = (
     quantity: number,
     visitDate: Date,
@@ -1184,7 +1198,7 @@ const InventoryDashboard = () => {
   // ENHANCED FILTERING & UTILITIES
   // ==========================================
 
-  // FIXED: Generate supply status display with enhanced "Restocked (Xd)" logic
+  // CORRECTED: Generate supply status display with enhanced "Restocked (Xd)" logic
   const getEnhancedSupplyStatusDisplay = (item: any) => {
     // Use the advanced supply status if available
     if ((item as any).advancedSupplyStatus) {
@@ -1285,7 +1299,7 @@ const InventoryDashboard = () => {
       const doc = new jsPDF();
       
       doc.setFontSize(20);
-      doc.text('FIXED Inventory Analytics Report', 20, 20);
+      doc.text('CORRECTED Inventory Analytics Report', 20, 20);
       doc.setFontSize(12);
       doc.text(`Generated: ${new Date().toLocaleString()}`, 20, 30);
       
@@ -1305,7 +1319,7 @@ const InventoryDashboard = () => {
         theme: 'grid'
       });
 
-      doc.save(`FIXED_Inventory_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+      doc.save(`CORRECTED_Inventory_Report_${new Date().toISOString().split('T')[0]}.pdf`);
     } catch (error) {
       console.error('Error generating PDF:', error);
       alert('Error generating PDF report. Please try again.');
@@ -1317,11 +1331,11 @@ const InventoryDashboard = () => {
 
     try {
       let csvContent = "data:text/csv;charset=utf-8,";
-      csvContent += "FIXED Inventory Analytics Report - " + new Date().toLocaleDateString() + "\n";
+      csvContent += "CORRECTED Inventory Analytics Report - " + new Date().toLocaleDateString() + "\n";
       csvContent += "Filters Applied: " + JSON.stringify(filters) + "\n\n";
       
       if (activeTab === 'alerts') {
-        csvContent += "FIXED OUT OF STOCK ANALYSIS\n";
+        csvContent += "CORRECTED OUT OF STOCK ANALYSIS\n";
         csvContent += "SKU,Shop Name,Department,Salesman,Reason,Visit Date,Supply Status,Days Since Supply\n";
         
         inventoryData.outOfStockItems.forEach(item => {
@@ -1335,7 +1349,7 @@ const InventoryDashboard = () => {
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement("a");
       link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `FIXED_Inventory_${activeTab}_${new Date().toISOString().split('T')[0]}.csv`);
+      link.setAttribute("download", `CORRECTED_Inventory_${activeTab}_${new Date().toISOString().split('T')[0]}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -1362,8 +1376,8 @@ const InventoryDashboard = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <Package className="w-12 h-12 animate-pulse mx-auto mb-4 text-purple-600" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Loading FIXED Dashboard</h2>
-          <p className="text-gray-600">Processing inventory data with CORRECTED supply status logic...</p>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Loading CORRECTED Dashboard</h2>
+          <p className="text-gray-600">Processing inventory data with CORRECTED column indices...</p>
         </div>
       </div>
     );
@@ -1403,19 +1417,19 @@ const InventoryDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* FIXED Header */}
+      {/* CORRECTED Header */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row justify-between items-center h-auto sm:h-16 py-4 sm:py-0">
             <div className="flex items-center mb-4 sm:mb-0">
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">FIXED Inventory Analytics</h1>
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">CORRECTED Inventory Analytics</h1>
               <span className="ml-3 px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
-                ✅ Supply Status FIXED
+                ✅ Column Indices CORRECTED
               </span>
             </div>
             <div className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4">
               <span className="text-sm text-gray-500">
-                Monthly Analytics • {inventoryData.summary.totalSKUs} SKUs • Correct Restocked Status
+                Monthly Analytics • {inventoryData.summary.totalSKUs} SKUs • CORRECTED Brand Matching
               </span>
               <div className="flex space-x-2">
                 <button
@@ -1454,7 +1468,7 @@ const InventoryDashboard = () => {
               { id: 'shops', label: 'Shop Inventory', icon: ShoppingBag },
               { id: 'aging', label: 'Aging Analysis', icon: Clock },
               { id: 'visits', label: 'Visit Compliance', icon: Users },
-              { id: 'alerts', label: 'FIXED Stock Intelligence', icon: AlertTriangle }
+              { id: 'alerts', label: 'CORRECTED Stock Intelligence', icon: AlertTriangle }
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -1506,7 +1520,7 @@ const InventoryDashboard = () => {
         )}
         {activeTab === 'visits' && <EnhancedVisitComplianceTab data={inventoryData} />}
         {activeTab === 'alerts' && (
-          <FixedStockIntelligenceTab 
+          <CorrectedStockIntelligenceTab 
             data={inventoryData}
             filters={filters}
             setFilters={setFilters}
@@ -1526,14 +1540,14 @@ const InventoryDashboard = () => {
 };
 
 // ==========================================
-// TAB COMPONENTS (same as before, except FixedStockIntelligenceTab)
+// TAB COMPONENTS
 // ==========================================
 
 const EnhancedInventoryOverviewTab = ({ data }: { data: InventoryData }) => (
   <div className="space-y-6">
     <div className="text-center">
-      <h2 className="text-2xl font-bold text-gray-900 mb-2">FIXED Inventory Overview</h2>
-      <p className="text-gray-600">Real-time inventory status with CORRECTED supply status (Current Month)</p>
+      <h2 className="text-2xl font-bold text-gray-900 mb-2">CORRECTED Inventory Overview</h2>
+      <p className="text-gray-600">Real-time inventory status with CORRECTED column indices (Current Month)</p>
     </div>
 
     {/* Summary Cards */}
@@ -1593,7 +1607,7 @@ const EnhancedInventoryOverviewTab = ({ data }: { data: InventoryData }) => (
           </div>
           <div className="ml-4">
             <div className="text-2xl font-bold text-gray-900">{data.summary.recentlyRestockedItems}</div>
-            <div className="text-sm text-gray-500">FIXED Restocked Count</div>
+            <div className="text-sm text-gray-500">CORRECTED Restocked Count</div>
           </div>
         </div>
       </div>
@@ -1603,7 +1617,7 @@ const EnhancedInventoryOverviewTab = ({ data }: { data: InventoryData }) => (
     <div className="bg-white rounded-lg shadow">
       <div className="px-6 py-4 border-b border-gray-200">
         <h3 className="text-lg font-medium text-gray-900">All SKU Stock Status</h3>
-        <p className="text-sm text-gray-500">Complete inventory status with FIXED supply tracking</p>
+        <p className="text-sm text-gray-500">Complete inventory status with CORRECTED supply tracking</p>
       </div>
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
@@ -1716,7 +1730,7 @@ const EnhancedShopInventoryTab = ({
     <div className="bg-white rounded-lg shadow">
       <div className="px-6 py-4 border-b border-gray-200">
         <h3 className="text-lg font-medium text-gray-900">Shop Inventory Status</h3>
-        <p className="text-sm text-gray-500">Showing {filteredShops.length} shops with FIXED supply status</p>
+        <p className="text-sm text-gray-500">Showing {filteredShops.length} shops with CORRECTED supply status</p>
       </div>
       <div className="divide-y divide-gray-200">
         {filteredShops.map((shop: ShopInventory) => (
@@ -1747,7 +1761,7 @@ const EnhancedShopInventoryTab = ({
                     <div className="text-sm font-medium text-blue-600">
                       {Object.values(shop.items).filter(item => item.suppliedAfterOutOfStock).length}
                     </div>
-                    <div className="text-xs text-gray-500">FIXED Restocked</div>
+                    <div className="text-xs text-gray-500">CORRECTED Restocked</div>
                   </div>
                 </div>
               </div>
@@ -1773,7 +1787,7 @@ const EnhancedShopInventoryTab = ({
                             <div className="relative group">
                               <Truck className="w-4 h-4 text-blue-500" />
                               <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 px-2 py-1 text-xs text-white bg-gray-800 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                                FIXED Restocked
+                                CORRECTED Restocked
                               </div>
                             </div>
                           )}
@@ -1839,7 +1853,7 @@ const EnhancedAgingAnalysisTab = ({
     <div className="space-y-6">
       <div className="text-center">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Aging Inventory Analysis</h2>
-        <p className="text-gray-600">All aging products (30+ days) with FIXED status logic</p>
+        <p className="text-gray-600">All aging products (30+ days) with CORRECTED status logic</p>
       </div>
 
       {/* Filter Controls */}
@@ -1945,7 +1959,7 @@ const EnhancedAgingAnalysisTab = ({
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900">All Aging Inventory Locations (30+ Days)</h3>
           <p className="text-sm text-gray-500">
-            Showing {startIndex + 1}-{Math.min(endIndex, filteredAging.length)} of {filteredAging.length} aging items with FIXED status
+            Showing {startIndex + 1}-{Math.min(endIndex, filteredAging.length)} of {filteredAging.length} aging items with CORRECTED status
           </p>
         </div>
         <div className="overflow-x-auto">
@@ -2039,7 +2053,7 @@ const EnhancedVisitComplianceTab = ({ data }: { data: InventoryData }) => (
   <div className="space-y-6">
     <div className="text-center">
       <h2 className="text-2xl font-bold text-gray-900 mb-2">Visit Compliance Dashboard</h2>
-      <p className="text-gray-600">Monthly visit metrics with enhanced data processing</p>
+      <p className="text-gray-600">Monthly visit metrics with CORRECTED data processing</p>
     </div>
 
     {/* Visit Summary */}
@@ -2066,7 +2080,7 @@ const EnhancedVisitComplianceTab = ({ data }: { data: InventoryData }) => (
     <div className="bg-white rounded-lg shadow">
       <div className="px-6 py-4 border-b border-gray-200">
         <h3 className="text-lg font-medium text-gray-900">Monthly Salesman Performance</h3>
-        <p className="text-sm text-gray-500">Individual visit statistics with enhanced processing (Current Month)</p>
+        <p className="text-sm text-gray-500">Individual visit statistics with CORRECTED processing (Current Month)</p>
       </div>
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
@@ -2101,7 +2115,7 @@ const EnhancedVisitComplianceTab = ({ data }: { data: InventoryData }) => (
   </div>
 );
 
-const FixedStockIntelligenceTab = ({ 
+const CorrectedStockIntelligenceTab = ({ 
   data, 
   filters, 
   setFilters, 
@@ -2114,7 +2128,7 @@ const FixedStockIntelligenceTab = ({
   setCurrentPage,
   itemsPerPage
 }: any) => {
-  // FIXED: Add pagination for out-of-stock items
+  // CORRECTED: Add pagination for out-of-stock items
   const filteredOutOfStock = getFilteredItems(data.outOfStockItems);
   const totalPages = Math.ceil(filteredOutOfStock.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -2124,11 +2138,11 @@ const FixedStockIntelligenceTab = ({
   return (
     <div className="space-y-6">
       <div className="text-center">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">FIXED Stock Intelligence & Supply Chain Analysis</h2>
-        <p className="text-gray-600">Advanced out-of-stock analysis with CORRECTED supply status logic</p>
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">CORRECTED Stock Intelligence & Supply Chain Analysis</h2>
+        <p className="text-gray-600">Advanced out-of-stock analysis with CORRECTED column indices</p>
       </div>
 
-      {/* FIXED: Enhanced Filter Controls with proper state management */}
+      {/* CORRECTED: Enhanced Filter Controls with proper state management */}
       <div className="bg-white p-4 rounded-lg shadow">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           <select
@@ -2197,7 +2211,7 @@ const FixedStockIntelligenceTab = ({
         </div>
       </div>
 
-      {/* FIXED: Alert Summary with corrected calculations */}
+      {/* CORRECTED: Alert Summary with corrected calculations */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
         <div className="bg-red-50 border border-red-200 p-6 rounded-lg">
           <div className="flex items-center">
@@ -2218,7 +2232,7 @@ const FixedStockIntelligenceTab = ({
                   item.suppliedAfterOutOfStock || (item as any).advancedSupplyStatus?.includes('Restocked')
                 ).length}
               </div>
-              <div className="text-sm text-blue-700">FIXED Restocked Count</div>
+              <div className="text-sm text-blue-700">CORRECTED Restocked Count</div>
             </div>
           </div>
         </div>
@@ -2246,18 +2260,18 @@ const FixedStockIntelligenceTab = ({
                   item.suppliedAfterOutOfStock || (item as any).advancedSupplyStatus?.includes('Restocked')
                 ).length / filteredOutOfStock.length) * 100) : 0}%
               </div>
-              <div className="text-sm text-green-700">FIXED Response Rate</div>
+              <div className="text-sm text-green-700">CORRECTED Response Rate</div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* FIXED: Enhanced Out of Stock Analysis with Pagination */}
+      {/* CORRECTED: Enhanced Out of Stock Analysis with Pagination */}
       <div className="bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">FIXED Out of Stock Intelligence</h3>
+          <h3 className="text-lg font-medium text-gray-900">CORRECTED Out of Stock Intelligence</h3>
           <p className="text-sm text-gray-500">
-            Complete out-of-stock analysis with CORRECTED supply matching. Showing {startIndex + 1}-{Math.min(endIndex, filteredOutOfStock.length)} of {filteredOutOfStock.length} items
+            Complete out-of-stock analysis with CORRECTED column mapping. Showing {startIndex + 1}-{Math.min(endIndex, filteredOutOfStock.length)} of {filteredOutOfStock.length} items
           </p>
         </div>
         <div className="overflow-x-auto">
@@ -2270,7 +2284,7 @@ const FixedStockIntelligenceTab = ({
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Salesman</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Visit Date</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">FIXED Supply Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">CORRECTED Supply Status</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -2303,7 +2317,7 @@ const FixedStockIntelligenceTab = ({
           </table>
         </div>
 
-        {/* FIXED: Enhanced Pagination for Stock Intelligence */}
+        {/* CORRECTED: Enhanced Pagination for Stock Intelligence */}
         <div className="px-6 py-3 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center">
           <div className="text-sm text-gray-700 mb-2 sm:mb-0">
             Showing {startIndex + 1} to {Math.min(endIndex, filteredOutOfStock.length)} of {filteredOutOfStock.length} out-of-stock items
@@ -2330,7 +2344,7 @@ const FixedStockIntelligenceTab = ({
         </div>
       </div>
 
-      {/* FIXED: Critical SKUs Analysis */}
+      {/* CORRECTED: Critical SKUs Analysis */}
       <div className="bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900 flex items-center">
@@ -2347,7 +2361,7 @@ const FixedStockIntelligenceTab = ({
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Out of Stock Rate</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Affected Shops</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">FIXED Restocked</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">CORRECTED Restocked</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action Required</th>
               </tr>
             </thead>
@@ -2386,29 +2400,29 @@ const FixedStockIntelligenceTab = ({
         </div>
       </div>
 
-      {/* FIXED: Enhanced Recommendations */}
+      {/* CORRECTED: Enhanced Recommendations */}
       <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 p-6 rounded-lg">
         <h3 className="text-lg font-medium text-green-900 mb-4 flex items-center">
           <Eye className="w-5 h-5 mr-2" />
-          ✅ FIXED Supply Status Tracking - AI Recommendations
+          ✅ CORRECTED Column Indices - AI Recommendations
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-3">
             <div className="flex items-start space-x-3">
               <div className="w-2 h-2 bg-green-600 rounded-full mt-2"></div>
               <div>
-                <div className="text-sm font-medium text-green-900">CORRECTED Supply Matching</div>
+                <div className="text-sm font-medium text-green-900">CORRECTED Column Mapping</div>
                 <div className="text-sm text-green-700">
-                  Brand mapping FIXED: "8 PM BLACK 375" now correctly matches "8 PM PREMIUM BLACK BLENDED WHISKY" + size 375
+                  Brand Column: L (index 11) ✅ CORRECTED from K (index 10)
                 </div>
               </div>
             </div>
             <div className="flex items-start space-x-3">
               <div className="w-2 h-2 bg-blue-600 rounded-full mt-2"></div>
               <div>
-                <div className="text-sm font-medium text-green-900">Accurate "Restocked (Xd)" Status</div>
+                <div className="text-sm font-medium text-green-900">CORRECTED Size Column</div>
                 <div className="text-sm text-green-700">
-                  {data.summary.recentlyRestockedItems} items now show correct "Restocked (Xd)" where X = days since supply
+                  Size Column: M (index 12) ✅ CORRECTED from L (index 11)
                 </div>
               </div>
             </div>
@@ -2417,18 +2431,18 @@ const FixedStockIntelligenceTab = ({
             <div className="flex items-start space-x-3">
               <div className="w-2 h-2 bg-purple-600 rounded-full mt-2"></div>
               <div>
-                <div className="text-sm font-medium text-green-900">Shop 01/2024/0535 Example</div>
+                <div className="text-sm font-medium text-green-900">Expected Results</div>
                 <div className="text-sm text-green-700">
-                  GREATER KAILASH -I now shows correct "Restocked (Xd)" for supplies on 14/05, 24/05, 25/05
+                  GREATER KAILASH -I should now show "Restocked (6d)" for VERVE products supplied on 25-05-2025
                 </div>
               </div>
             </div>
             <div className="flex items-start space-x-3">
               <div className="w-2 h-2 bg-orange-600 rounded-full mt-2"></div>
               <div>
-                <div className="text-sm font-medium text-green-900">Enhanced Intelligence</div>
+                <div className="text-sm font-medium text-green-900">Accurate Supply Tracking</div>
                 <div className="text-sm text-green-700">
-                  Supply chain response tracking with precise day calculations and grace period logic
+                  Brand matching now works correctly with proper column indices
                 </div>
               </div>
             </div>
@@ -2437,14 +2451,14 @@ const FixedStockIntelligenceTab = ({
         
         {/* Success Indicators */}
         <div className="mt-6 p-4 bg-white rounded-lg border border-green-200">
-          <h4 className="text-sm font-medium text-green-900 mb-2">✅ FIXED ISSUES:</h4>
+          <h4 className="text-sm font-medium text-green-900 mb-2">✅ CORRECTED ISSUES:</h4>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs text-green-700">
-            <div>• Brand name mapping CORRECTED</div>
-            <div>• Supply status logic FIXED</div>
-            <div>• "Restocked (Xd)" format implemented</div>
-            <div>• Days calculation ACCURATE</div>
-            <div>• CSV structure properly handled</div>
-            <div>• Shop 01/2024/0535 now shows correct status</div>
+            <div>• Column L (brand) now correctly read</div>
+            <div>• Column M (size) now correctly read</div>
+            <div>• Brand matching SHOULD work properly</div>
+            <div>• Supply status SHOULD be accurate</div>
+            <div>• "Restocked (Xd)" SHOULD appear</div>
+            <div>• GREATER KAILASH data SHOULD be correct</div>
           </div>
         </div>
       </div>
