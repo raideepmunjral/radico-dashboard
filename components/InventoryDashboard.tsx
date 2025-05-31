@@ -696,12 +696,12 @@ const InventoryDashboard = () => {
           lastSupplyDate,
           isEstimatedAge,
           suppliedAfterOutOfStock,
-          daysOutOfStock: daysOutOfStock,
-          supplyDateAfterVisit: supplyDateAfterVisit,
-          currentDaysOutOfStock: isOutOfStock ? calculateDaysCurrentlyOutOfStock(shopVisit.visitDate) : undefined,
-          isInGracePeriod: isInGracePeriod,
-          advancedSupplyStatus: advancedSupplyStatus,
           daysSinceLastSupply: lastSupplyDate ? Math.floor((shopVisit.visitDate.getTime() - lastSupplyDate.getTime()) / (1000 * 60 * 60 * 24)) : undefined,
+          daysOutOfStock,
+          supplyDateAfterVisit,
+          currentDaysOutOfStock: isOutOfStock ? calculateDaysCurrentlyOutOfStock(shopVisit.visitDate) : undefined,
+          isInGracePeriod,
+          advancedSupplyStatus,
           supplyStatus
         };
 
