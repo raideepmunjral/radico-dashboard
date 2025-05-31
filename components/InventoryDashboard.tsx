@@ -22,6 +22,9 @@ interface InventoryItem {
   isEstimatedAge: boolean;
   suppliedAfterOutOfStock?: boolean;
   daysSinceLastSupply?: number;
+  daysOutOfStock?: number; // NEW: Days the product was out of stock
+  supplyDateAfterVisit?: Date; // NEW: Date when supply came after out-of-stock visit
+  currentDaysOutOfStock?: number; // NEW: Current days out of stock (for awaiting supply)
   supplyStatus: 'current' | 'aging_30_45' | 'aging_45_60' | 'aging_60_75' | 'aging_75_90' | 'aging_critical' | 'recently_restocked' | 'awaiting_supply' | 'unknown';
 }
 
@@ -148,43 +151,99 @@ const InventoryDashboard = () => {
   };
 
   // ==========================================
-  // ENHANCED BRAND NORMALIZATION SYSTEM
+  // FIXED BRAND NORMALIZATION SYSTEM
   // ==========================================
 
-  const normalizeBrandInfo = (brandName: string, size?: string): { family: string, size: string, fullKey: string } => {
-    const cleanBrand = brandName?.toString().trim().toUpperCase();
+  const normalizeBrandInfo = (brandName: string, size?: string): { family: string, size: string, fullKey: string, normalizedName: string } => {
+    let cleanBrand = brandName?.toString().trim().toUpperCase();
     let extractedSize = size?.toString() || '';
     
+    // Remove M2M prefix and common suffixes for better matching
+    cleanBrand = cleanBrand
+      .replace(/^M2M\s+/, '') // Remove M2M prefix
+      .replace(/\s+SUPERIOR\s+/g, ' ') // Remove SUPERIOR
+      .replace(/\s+FL\s+/g, ' ') // Remove FL
+      .replace(/\s+TEASE\s+/g, ' ') // Remove TEASE
+      .replace(/\s+SP\s+/g, ' ') // Remove SP
+      .replace(/\s+VODKA$/g, '') // Remove VODKA suffix
+      .replace(/\s+WHISKY$/g, '') // Remove WHISKY suffix
+      .replace(/\s+/g, ' ') // Normalize spaces
+      .trim();
+    
+    // Extract size from brand name if not provided separately
     if (!extractedSize) {
       const sizeMatch = cleanBrand.match(/(\d+)\s?(P|ML)?$/);
       if (sizeMatch) {
         extractedSize = sizeMatch[1];
+        cleanBrand = cleanBrand.replace(/\s*\d+\s?(P|ML)?$/, '').trim(); // Remove size from brand name
       }
     }
     
+    // Determine brand family with enhanced matching
     let family = 'OTHER';
+    let normalizedName = cleanBrand;
+    
     if (cleanBrand.includes('8PM') || cleanBrand.includes('8 PM') || 
         cleanBrand.includes('PREMIUM BLACK') || cleanBrand.includes('BLACK BLENDED') ||
-        cleanBrand.includes('BLACK WHISKY')) {
+        cleanBrand.includes('BLACK WHISKY') || cleanBrand.includes('BLACK')) {
       family = '8PM';
-    } else if (cleanBrand.includes('VERVE') || cleanBrand.includes('M2M') || 
-               cleanBrand.includes('MAGIC MOMENTS') || cleanBrand.includes('CRANBERRY') ||
-               cleanBrand.includes('GREEN APPLE') || cleanBrand.includes('LEMON LUSH') ||
-               cleanBrand.includes('GRAIN VODKA')) {
+      // Normalize 8PM variants
+      if (cleanBrand.includes('BLACK')) {
+        normalizedName = 'BLACK';
+      }
+    } else if (cleanBrand.includes('VERVE') || cleanBrand.includes('MAGIC MOMENTS') || 
+               cleanBrand.includes('CRANBERRY') || cleanBrand.includes('GREEN APPLE') || 
+               cleanBrand.includes('LEMON LUSH') || cleanBrand.includes('GRAIN')) {
       family = 'VERVE';
+      // Normalize VERVE variants
+      if (cleanBrand.includes('GREEN APPLE')) {
+        normalizedName = 'GREEN APPLE';
+      } else if (cleanBrand.includes('CRANBERRY')) {
+        normalizedName = 'CRANBERRY';
+      } else if (cleanBrand.includes('LEMON LUSH')) {
+        normalizedName = 'LEMON LUSH';
+      } else if (cleanBrand.includes('GRAIN')) {
+        normalizedName = 'GRAIN';
+      }
     }
     
+    // Default size if not found
     if (!extractedSize) {
       extractedSize = '750';
     }
     
-    const fullKey = `${family}_${extractedSize}`;
-    return { family, size: extractedSize, fullKey };
+    const fullKey = `${family}_${normalizedName}_${extractedSize}`;
+    return { family, size: extractedSize, fullKey, normalizedName };
   };
 
   const createBrandMatchingKey = (shopId: string, brandName: string, size?: string): string => {
     const brandInfo = normalizeBrandInfo(brandName, size);
     return `${shopId}_${brandInfo.fullKey}`;
+  };
+
+  // FIXED: Enhanced brand matching for better accuracy
+  const createMultipleBrandKeys = (shopId: string, brandName: string, size?: string): string[] => {
+    const brandInfo = normalizeBrandInfo(brandName, size);
+    const keys = [
+      `${shopId}_${brandInfo.fullKey}`,
+      `${shopId}_${brandInfo.family}_${brandInfo.size}`,
+      `${shopId}_${brandInfo.family}_${brandInfo.normalizedName}_${brandInfo.size}`
+    ];
+    
+    // Add fallback keys for common variations
+    if (brandInfo.family === '8PM') {
+      keys.push(
+        `${shopId}_8PM_BLACK_${brandInfo.size}`,
+        `${shopId}_8PM_${brandInfo.size}`
+      );
+    } else if (brandInfo.family === 'VERVE') {
+      keys.push(
+        `${shopId}_VERVE_${brandInfo.normalizedName}_${brandInfo.size}`,
+        `${shopId}_VERVE_${brandInfo.size}`
+      );
+    }
+    
+    return [...new Set(keys)]; // Remove duplicates
   };
 
   // ==========================================
@@ -537,19 +596,25 @@ const InventoryDashboard = () => {
         let ageInDays = 0;
         
         // FIXED: Priority order - Recent supplies > Historical > LS Date > Fallback
-        if (lastSupplyFromRecent && !isNaN(lastSupplyFromRecent.getTime())) {
-          lastSupplyDate = lastSupplyFromRecent;
-          ageInDays = Math.floor((shopVisit.visitDate.getTime() - lastSupplyDate.getTime()) / (1000 * 60 * 60 * 24));
+        // But ONLY count supplies that happened BEFORE the visit
+        let validSupplyDate: Date | null = null;
+        
+        if (lastSupplyFromRecent && !isNaN(lastSupplyFromRecent.getTime()) && lastSupplyFromRecent < shopVisit.visitDate) {
+          validSupplyDate = lastSupplyFromRecent;
           isEstimatedAge = false;
-        } else if (lastSupplyFromHistory && !isNaN(lastSupplyFromHistory.getTime())) {
-          lastSupplyDate = lastSupplyFromHistory;
-          ageInDays = Math.floor((shopVisit.visitDate.getTime() - lastSupplyDate.getTime()) / (1000 * 60 * 60 * 24));
+        } else if (lastSupplyFromHistory && !isNaN(lastSupplyFromHistory.getTime()) && lastSupplyFromHistory < shopVisit.visitDate) {
+          validSupplyDate = lastSupplyFromHistory;
           isEstimatedAge = false;
-        } else if (lastSupplyFromLS && !isNaN(lastSupplyFromLS.getTime())) {
-          lastSupplyDate = lastSupplyFromLS;
-          ageInDays = Math.floor((shopVisit.visitDate.getTime() - lastSupplyDate.getTime()) / (1000 * 60 * 60 * 24));
+        } else if (lastSupplyFromLS && !isNaN(lastSupplyFromLS.getTime()) && lastSupplyFromLS < shopVisit.visitDate) {
+          validSupplyDate = lastSupplyFromLS;
           isEstimatedAge = false;
+        }
+        
+        if (validSupplyDate) {
+          lastSupplyDate = validSupplyDate;
+          ageInDays = Math.floor((shopVisit.visitDate.getTime() - lastSupplyDate.getTime()) / (1000 * 60 * 60 * 24));
         } else {
+          // Fallback to April 1, 2025 only if no valid supply found
           const fallbackDate = new Date('2025-04-01');
           lastSupplyDate = fallbackDate;
           ageInDays = Math.floor((shopVisit.visitDate.getTime() - fallbackDate.getTime()) / (1000 * 60 * 60 * 24));
@@ -568,20 +633,28 @@ const InventoryDashboard = () => {
         else if (ageInDays >= 45) ageCategory = 'days45to60';
         else if (ageInDays >= 30) ageCategory = 'days30to45';
 
-        const suppliedAfterOutOfStock = checkSuppliedAfterOutOfStock(
+        // ENHANCED: Check if supplied after out of stock with enhanced details
+        const supplyCheckResult = checkSuppliedAfterOutOfStock(
           shopVisit.shopId, 
           brand, 
           shopVisit.visitDate, 
           recentSupplies
         );
 
-        // ENHANCED: Determine proper supply status (FIXED LOGIC)
+        const suppliedAfterOutOfStock = supplyCheckResult.wasRestocked;
+        const daysOutOfStock = supplyCheckResult.daysOutOfStock;
+        const supplyDateAfterVisit = supplyCheckResult.supplyDate;
+
+        // ENHANCED: Determine proper supply status with detailed messaging
         let supplyStatus: InventoryItem['supplyStatus'] = 'unknown';
         
-        if (suppliedAfterOutOfStock) {
-          supplyStatus = 'recently_restocked';
-        } else if (quantity === 0) {
-          supplyStatus = 'awaiting_supply';
+        if (quantity === 0) {
+          // Product is out of stock
+          if (suppliedAfterOutOfStock && daysOutOfStock) {
+            supplyStatus = 'recently_restocked';
+          } else {
+            supplyStatus = 'awaiting_supply';
+          }
         } else if (ageInDays >= 90) {
           supplyStatus = 'aging_critical';
         } else if (ageInDays >= 75) {
@@ -617,6 +690,9 @@ const InventoryDashboard = () => {
           lastSupplyDate,
           isEstimatedAge,
           suppliedAfterOutOfStock,
+          daysOutOfStock: daysOutOfStock,
+          supplyDateAfterVisit: supplyDateAfterVisit,
+          currentDaysOutOfStock: isOutOfStock ? calculateDaysCurrentlyOutOfStock(shopVisit.visitDate) : undefined,
           daysSinceLastSupply: lastSupplyDate ? Math.floor((shopVisit.visitDate.getTime() - lastSupplyDate.getTime()) / (1000 * 60 * 60 * 24)) : undefined,
           supplyStatus
         };
@@ -655,9 +731,9 @@ const InventoryDashboard = () => {
             reasonNoStock,
             visitDate: shopInventory.visitDate,
             suppliedAfterOutOfStock,
-            daysAfterSupply: suppliedAfterOutOfStock ? 
-              Math.floor((shopVisit.visitDate.getTime() - (recentSupplies[createBrandMatchingKey(shopVisit.shopId, brand)]?.getTime() || 0)) / (1000 * 60 * 60 * 24)) : 
-              undefined
+            daysOutOfStock: daysOutOfStock, // Days between visit and supply
+            currentDaysOutOfStock: calculateDaysCurrentlyOutOfStock(shopVisit.visitDate), // Days since visit to today
+            supplyDateAfterVisit: supplyDateAfterVisit
           };
           
           outOfStockItems.push(outOfStockItem);
@@ -806,7 +882,6 @@ const InventoryDashboard = () => {
     const headers = historicalData[0];
     const rows = historicalData.slice(1);
     
-    // Based on the sheet structure shown in images
     const shopIdIndex = headers.findIndex(h => h?.toLowerCase().includes('shop_id'));
     const brandShortIndex = headers.findIndex(h => h?.toLowerCase().includes('brand_short'));
     const brandIndex = headers.findIndex(h => h?.toLowerCase().includes('brand') && !h?.toLowerCase().includes('short'));
@@ -832,11 +907,14 @@ const InventoryDashboard = () => {
         if (shopId && brand && dateStr && cases > 0) {
           const date = parseDate(dateStr);
           if (date && !isNaN(date.getTime())) {
-            const key = createBrandMatchingKey(shopId, brand, size);
-            if (!supplyHistory[key] || date > supplyHistory[key]) {
-              supplyHistory[key] = date;
-              processedEntries++;
-            }
+            // FIXED: Create multiple possible keys for better matching
+            const possibleKeys = createMultipleBrandKeys(shopId, brand, size);
+            possibleKeys.forEach(key => {
+              if (!supplyHistory[key] || date > supplyHistory[key]) {
+                supplyHistory[key] = date;
+              }
+            });
+            processedEntries++;
           }
         }
       }
@@ -875,16 +953,8 @@ const InventoryDashboard = () => {
         if (shopId && brand && dateStr && cases > 0) {
           const date = parseDate(dateStr);
           if (date && !isNaN(date.getTime())) {
-            const brandInfo = normalizeBrandInfo(brand);
-            const possibleKeys = [
-              createBrandMatchingKey(shopId, brand, size),
-              `${shopId}_${brandInfo.family}_${brandInfo.size}`,
-              `${shopId}_8PM_750`,
-              `${shopId}_VERVE_750`,
-              `${shopId}_8PM_375`,
-              `${shopId}_VERVE_375`
-            ];
-            
+            // FIXED: Create multiple possible keys for the specific brand
+            const possibleKeys = createMultipleBrandKeys(shopId, brand, size);
             possibleKeys.forEach(key => {
               if (!recentSupplies[key] || date > recentSupplies[key]) {
                 recentSupplies[key] = date;
@@ -892,6 +962,12 @@ const InventoryDashboard = () => {
             });
             
             processedEntries++;
+            
+            // Debug logging for the specific case
+            if (shopId === '01/2024/0535') {
+              console.log(`📦 Supply found for shop ${shopId}: ${brand} (${size}) on ${dateStr}`);
+              console.log(`   Keys created:`, possibleKeys.slice(0, 3));
+            }
           }
         }
       }
@@ -902,59 +978,61 @@ const InventoryDashboard = () => {
   };
 
   const getLastSupplyDate = (shopId: string, brandName: string, supplyHistory: Record<string, Date>) => {
-    const brandInfo = normalizeBrandInfo(brandName);
-    
-    const possibleKeys = [
-      createBrandMatchingKey(shopId, brandName),
-      `${shopId}_${brandInfo.family}_${brandInfo.size}`,
-      `${shopId}_8PM_${brandInfo.size}`,
-      `${shopId}_VERVE_${brandInfo.size}`,
-      `${shopId}_8PM_750`,
-      `${shopId}_VERVE_750`,
-      `${shopId}_8PM_375`,
-      `${shopId}_VERVE_375`
-    ];
+    // FIXED: Use multiple possible keys for better matching
+    const possibleKeys = createMultipleBrandKeys(shopId, brandName);
     
     for (const key of possibleKeys) {
       if (supplyHistory[key]) {
+        console.log(`✅ Supply found for ${brandName} with key: ${key}`);
         return supplyHistory[key];
       }
     }
     
+    console.log(`❌ No supply found for ${brandName} at shop ${shopId}`);
     return null;
   };
 
+  // ENHANCED: Check supplied after out of stock with days calculation
   const checkSuppliedAfterOutOfStock = (
     shopId: string, 
     brandName: string, 
     visitDate: Date, 
     recentSupplies: Record<string, Date>
-  ) => {
-    const brandInfo = normalizeBrandInfo(brandName);
+  ): { wasRestocked: boolean, daysOutOfStock?: number, supplyDate?: Date } => {
+    console.log(`🔍 Enhanced check for ${brandName} at shop ${shopId} visited on ${visitDate.toLocaleDateString()}`);
     
-    const possibleKeys = [
-      createBrandMatchingKey(shopId, brandName),
-      `${shopId}_${brandInfo.family}_${brandInfo.size}`,
-      `${shopId}_8PM_${brandInfo.size}`,
-      `${shopId}_VERVE_${brandInfo.size}`,
-      `${shopId}_8PM_750`,
-      `${shopId}_VERVE_750`,
-      `${shopId}_8PM_375`,
-      `${shopId}_VERVE_375`
-    ];
+    const possibleKeys = createMultipleBrandKeys(shopId, brandName);
     
     for (const key of possibleKeys) {
       const supplyDate = recentSupplies[key];
       if (supplyDate) {
-        const daysDiff = Math.floor((supplyDate.getTime() - visitDate.getTime()) / (1000 * 60 * 60 * 24));
+        console.log(`📦 Found supply for key ${key} on ${supplyDate.toLocaleDateString()}`);
         
-        if (daysDiff > 0 && daysDiff <= 14) {
-          return true;
+        // Check if supply happened AFTER the out-of-stock visit
+        if (supplyDate > visitDate) {
+          const daysOutOfStock = Math.floor((supplyDate.getTime() - visitDate.getTime()) / (1000 * 60 * 60 * 24));
+          
+          // Only count supplies within reasonable timeframe (30 days)
+          if (daysOutOfStock <= 30) {
+            console.log(`✅ Product was restocked after ${daysOutOfStock} days out of stock`);
+            return { 
+              wasRestocked: true, 
+              daysOutOfStock: daysOutOfStock,
+              supplyDate: supplyDate
+            };
+          }
         }
       }
     }
     
-    return false;
+    console.log(`❌ No supply found after out-of-stock visit for ${brandName}`);
+    return { wasRestocked: false };
+  };
+
+  // NEW: Calculate days currently out of stock (for items still awaiting supply)
+  const calculateDaysCurrentlyOutOfStock = (visitDate: Date): number => {
+    const today = new Date();
+    return Math.floor((today.getTime() - visitDate.getTime()) / (1000 * 60 * 60 * 24));
   };
 
   // ==========================================
@@ -1558,12 +1636,12 @@ const EnhancedShopInventoryTab = ({
                         <div className="text-xs">
                           <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                             item.supplyStatus === 'current' ? 'bg-green-100 text-green-800' :
-                            item.supplyStatus === 'recently_restocked' ? 'bg-blue-100 text-blue-800' :
-                            item.supplyStatus.startsWith('aging') ? 'bg-yellow-100 text-yellow-800' :
+                            item.suppliedAfterOutOfStock ? 'bg-blue-100 text-blue-800' :
                             item.supplyStatus === 'awaiting_supply' ? 'bg-red-100 text-red-800' :
+                            item.supplyStatus?.startsWith('aging') ? 'bg-yellow-100 text-yellow-800' :
                             'bg-gray-100 text-gray-800'
                           }`}>
-                            {item.supplyStatus.replace(/_/g, ' ')}
+                            {getEnhancedSupplyStatusDisplay(item)}
                           </span>
                         </div>
                       </div>
