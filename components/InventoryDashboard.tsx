@@ -566,23 +566,65 @@ const InventoryDashboard = () => {
       const visitRows = shopLatestVisitRows[shopVisit.shopId] || [];
       console.log(`🔧 Processing ${visitRows.length} rows for shop ${shopVisit.shopId}`);
       
+      // ENHANCED DEBUG for Jhilmil Phase-II
+      if (shopVisit.shopId === '01/2024/1707') {
+        console.log(`\n🏪 DEBUGGING Jhilmil Phase-II (${shopVisit.shopId}):`);
+        console.log(`📅 Visit Date: ${shopVisit.visitDate.toLocaleDateString()}`);
+        console.log(`👤 Salesman: ${shopVisit.salesman}`);
+        console.log(`📊 Total rows to process: ${visitRows.length}`);
+      }
+      
       visitRows.forEach((row: any[], rowIndex: number) => {
         const brand = row[columnIndices.invBrand]?.toString().trim();
         const quantity = parseFloat(row[columnIndices.invQuantity]) || 0;
         const reasonNoStock = row[columnIndices.reasonNoStock]?.toString().trim() || '';
         const lsDate = row[columnIndices.lsDate];
 
+        // COMPREHENSIVE DEBUG for specific products at Jhilmil Phase-II
+        if (shopVisit.shopId === '01/2024/1707' && brand && 
+            (brand.includes('8 PM BLACK') || brand.includes('VERVE CRANBERRY'))) {
+          
+          console.log(`\n🔍 VISIT DATA DEBUG for ${brand} (Row ${rowIndex}):`);
+          console.log(`📊 Raw quantity cell [${columnIndices.invQuantity}]: "${row[columnIndices.invQuantity]}"`);
+          console.log(`🔢 Parsed quantity: ${quantity}`);
+          console.log(`📝 Reason no stock: "${reasonNoStock}"`);
+          console.log(`📍 Column indices: invBrand=${columnIndices.invBrand}, invQuantity=${columnIndices.invQuantity}`);
+          console.log(`🔎 Brand cell [${columnIndices.invBrand}]: "${row[columnIndices.invBrand]}"`);
+          console.log(`📋 Full row data:`, row);
+          
+          // Validate expected vs actual
+          if (brand.includes('8 PM BLACK 750')) {
+            console.log(`✅ EXPECTED: 8 PM BLACK 750 should have quantity = 120`);
+            console.log(`🎯 ACTUAL: quantity = ${quantity} ${quantity === 120 ? '✅' : '❌'}`);
+          }
+          if (brand.includes('VERVE CRANBERRY')) {
+            console.log(`✅ EXPECTED: VERVE CRANBERRY should have quantity = 0`);
+            console.log(`🎯 ACTUAL: quantity = ${quantity} ${quantity === 0 ? '✅' : '❌'}`);
+          }
+        }
+
         if (!brand) return;
         
         processedSKUs.add(brand);
         
-        // CORRECTED: Get supply date with CORRECT brand mapping
+        // CORRECTED: Get supply date with CORRECT brand mapping and ENHANCED DEBUGGING
         const supplyCheckResult = checkSuppliedAfterOutOfStock(
           shopVisit.shopId, 
           brand, 
           shopVisit.visitDate, 
           recentSupplies
         );
+
+        // ENHANCED DEBUG for supply status determination
+        if (shopVisit.shopId === '01/2024/1707' && brand && 
+            (brand.includes('8 PM BLACK') || brand.includes('VERVE CRANBERRY'))) {
+          console.log(`\n🎯 SUPPLY STATUS LOGIC for ${brand}:`);
+          console.log(`📦 Was Restocked: ${supplyCheckResult.wasRestocked}`);
+          console.log(`📅 Supply Date: ${supplyCheckResult.supplyDate ? supplyCheckResult.supplyDate.toLocaleDateString() : 'None'}`);
+          console.log(`⏰ Days Since Supply: ${supplyCheckResult.daysSinceSupply || 'N/A'}`);
+          console.log(`🔑 Matched Key: ${(supplyCheckResult as any).matchedKey || 'None'}`);
+          console.log(`🔢 Visit Quantity: ${quantity}`);
+        }
 
         let lastSupplyDate: Date | undefined;
         let isEstimatedAge = true;
@@ -634,7 +676,7 @@ const InventoryDashboard = () => {
           supplyCheckResult
         );
 
-        // Determine base supply status with DEBUGGING
+        // Determine base supply status with ENHANCED DEBUGGING
         let supplyStatus: InventoryItem['supplyStatus'] = 'unknown';
         
         if (supplyCheckResult.wasRestocked) {
@@ -651,6 +693,28 @@ const InventoryDashboard = () => {
           else if (ageInDays >= 30) supplyStatus = 'aging_30_45';
           else supplyStatus = 'current';
           console.log(`🎯 Setting supply status to '${supplyStatus}' for ${brand} at shop ${shopVisit.shopId} (age: ${ageInDays} days)`);
+        }
+        
+        // CRITICAL DEBUG for Jhilmil Phase-II status assignment
+        if (shopVisit.shopId === '01/2024/1707' && brand && 
+            (brand.includes('8 PM BLACK') || brand.includes('VERVE CRANBERRY'))) {
+          console.log(`\n🚨 FINAL STATUS ASSIGNMENT for ${brand}:`);
+          console.log(`📊 Visit Quantity: ${quantity}`);
+          console.log(`📦 Was Restocked: ${supplyCheckResult.wasRestocked}`);
+          console.log(`🎯 Final Supply Status: ${supplyStatus}`);
+          console.log(`🔮 Advanced Status: ${getAdvancedSupplyStatus(quantity, shopVisit.visitDate, supplyCheckResult)}`);
+          
+          // Validation checks
+          if (brand.includes('8 PM BLACK 750')) {
+            const expected = quantity > 0 && !supplyCheckResult.wasRestocked ? 'current' : 'ERROR';
+            console.log(`✅ EXPECTED STATUS: ${expected} (had stock, no supply)`);
+            console.log(`❌ ACTUAL STATUS: ${supplyStatus} ${supplyStatus === expected ? '✅' : '❌ BUG!'}`);
+          }
+          if (brand.includes('VERVE CRANBERRY 180')) {
+            const expected = quantity === 0 && supplyCheckResult.wasRestocked ? 'recently_restocked' : 'ERROR';
+            console.log(`✅ EXPECTED STATUS: ${expected} (no stock, got supply)`);
+            console.log(`❌ ACTUAL STATUS: ${supplyStatus} ${supplyStatus === expected ? '✅' : '❌ BUG!'}`);
+          }
         }
 
         // Stock status detection
@@ -833,6 +897,40 @@ const InventoryDashboard = () => {
       agingLocationsCollected: allAgingLocations.length
     });
 
+    // COMPREHENSIVE DEBUG: Show all supply keys for Jhilmil Phase-II
+    console.log(`\n📦 ALL SUPPLY KEYS for Jhilmil Phase-II (01/2024/1707):`);
+    const shop1707Keys = Object.keys(recentSupplies).filter(k => k.includes('01/2024/1707'));
+    if (shop1707Keys.length > 0) {
+      shop1707Keys.forEach(key => {
+        console.log(`  ✅ ${key}: ${recentSupplies[key].toLocaleDateString()}`);
+      });
+    } else {
+      console.log(`  ❌ NO SUPPLY KEYS FOUND for shop 01/2024/1707`);
+    }
+
+    // VALIDATION: Expected vs Actual Results
+    console.log(`\n🔍 EXPECTED RESULTS for Jhilmil Phase-II (01/2024/1707):`);
+    console.log(`  📊 8 PM BLACK 750: Should show "In Stock (aging)" - NO supply should be found`);
+    console.log(`  📊 VERVE CRANBERRY 180: Should show "Restocked (Xd)" - visit qty should be 0`);
+    console.log(`  📊 VERVE CRANBERRY 375: Should show "Restocked (Xd)" - visit qty should be 0`);
+    
+    // Show what we actually found for Jhilmil Phase-II
+    const jhilmilShop = shops['01/2024/1707'];
+    if (jhilmilShop) {
+      console.log(`\n🎯 ACTUAL RESULTS for Jhilmil Phase-II:`);
+      Object.entries(jhilmilShop.items).forEach(([itemBrand, item]: [string, any]) => {
+        if (itemBrand.includes('8 PM BLACK') || itemBrand.includes('VERVE CRANBERRY')) {
+          const status = getAdvancedSupplyStatus(item.quantity, jhilmilShop.visitDate, {
+            wasRestocked: item.suppliedAfterOutOfStock,
+            daysSinceSupply: item.daysSinceSupply
+          });
+          console.log(`  📊 ${itemBrand}: quantity=${item.quantity}, status="${status}"`);
+        }
+      });
+    } else {
+      console.log(`  ❌ Jhilmil Phase-II shop not found in processed data`);
+    }
+
     return {
       summary: {
         totalShops,
@@ -1012,9 +1110,11 @@ const InventoryDashboard = () => {
         const dateStr = row[challansDateIndex]?.toString().trim();
         const cases = parseFloat(row[casesIndex]) || 0;
         
-        // Debug for GREATER KAILASH
+        // Debug for Jhilmil Phase-II and GREATER KAILASH
         if (shopId === '01/2024/0535') {
           console.log(`📦 CORRECTED Row ${index}: Shop=${shopId}, Brand="${brand}", Size="${size}", Date="${dateStr}", Cases=${cases}`);
+        } else if (shopId === '01/2024/1707') {
+          console.log(`📦 JHILMIL Row ${index}: Shop=${shopId}, Brand="${brand}", Size="${size}", Date="${dateStr}", Cases=${cases}`);
         }
         
         if (shopId && brand && dateStr && cases > 0) {
@@ -1030,9 +1130,16 @@ const InventoryDashboard = () => {
             
             processedEntries++;
             
-            // Debug logging for GREATER KAILASH shop
+            // Debug logging for GREATER KAILASH and Jhilmil Phase-II shops
             if (shopId === '01/2024/0535') {
               console.log(`📦 CORRECTED Supply added for shop ${shopId}: ${brand} (${size}) on "${dateStr}" -> ${date.toLocaleDateString()}`, {
+                possibleKeys,
+                date: date.toLocaleDateString(),
+                rawDate: dateStr,
+                parsedDate: date
+              });
+            } else if (shopId === '01/2024/1707') {
+              console.log(`📦 JHILMIL Supply added for shop ${shopId}: ${brand} (${size}) on "${dateStr}" -> ${date.toLocaleDateString()}`, {
                 possibleKeys,
                 date: date.toLocaleDateString(),
                 rawDate: dateStr,
@@ -1043,24 +1150,37 @@ const InventoryDashboard = () => {
             // Debug failed date parsing
             if (shopId === '01/2024/0535') {
               console.log(`❌ Failed to parse date for shop ${shopId}: "${dateStr}"`);
+            } else if (shopId === '01/2024/1707') {
+              console.log(`❌ JHILMIL Failed to parse date for shop ${shopId}: "${dateStr}"`);
             }
           }
         } else {
           // Debug missing data
           if (shopId === '01/2024/0535' && (!brand || !dateStr || cases <= 0)) {
             console.log(`❌ Missing data - Shop: ${shopId}, Brand: "${brand}", Date: "${dateStr}", Cases: ${cases}`);
+          } else if (shopId === '01/2024/1707' && (!brand || !dateStr || cases <= 0)) {
+            console.log(`❌ JHILMIL Missing data - Shop: ${shopId}, Brand: "${brand}", Date: "${dateStr}", Cases: ${cases}`);
           }
         }
       }
     });
     
     console.log('📦 CORRECTED Pending Challans processed:', processedEntries, 'valid entries');
-    console.log('📦 Sample supply keys for shop 01/2024/0535:', Object.keys(recentSupplies).filter(k => k.includes('01/2024/0535')).slice(0, 10));
+    console.log('📦 Sample supply keys for GREATER KAILASH (01/2024/0535):', Object.keys(recentSupplies).filter(k => k.includes('01/2024/0535')).slice(0, 10));
+    console.log('📦 Sample supply keys for Jhilmil Phase-II (01/2024/1707):', Object.keys(recentSupplies).filter(k => k.includes('01/2024/1707')).slice(0, 10));
     console.log('📦 Total supply keys created:', Object.keys(recentSupplies).length);
     
     // Debug: show some sample supply dates
     const sampleSupplies = Object.entries(recentSupplies).slice(0, 5);
     console.log('📦 Sample supplies:', sampleSupplies.map(([key, date]) => `${key}: ${date.toLocaleDateString()}`));
+    
+    // CRITICAL DEBUG: Show if 8 PM products exist for Jhilmil Phase-II
+    const jhilmil8PMKeys = Object.keys(recentSupplies).filter(k => k.includes('01/2024/1707') && k.includes('8 PM'));
+    if (jhilmil8PMKeys.length > 0) {
+      console.log(`🚨 WARNING: Found 8 PM supply keys for Jhilmil Phase-II:`, jhilmil8PMKeys);
+    } else {
+      console.log(`✅ CORRECT: No 8 PM supply keys found for Jhilmil Phase-II`);
+    }
     
     return recentSupplies;
   };
@@ -1085,7 +1205,7 @@ const InventoryDashboard = () => {
     return null;
   };
 
-  // CORRECTED: Enhanced supply chain tracking with CORRECT brand matching and FIXED date handling for DD-MMM-YYYY
+  // CORRECTED: Enhanced supply chain tracking with COMPREHENSIVE DEBUGGING
   const checkSuppliedAfterOutOfStock = (
     shopId: string, 
     brandName: string, 
@@ -1096,12 +1216,18 @@ const InventoryDashboard = () => {
     daysOutOfStock?: number, 
     supplyDate?: Date, 
     isInGracePeriod?: boolean,
-    daysSinceSupply?: number
+    daysSinceSupply?: number,
+    matchedKey?: string
   } => {
     const isGreaterKailash = shopId === '01/2024/0535' || shopId.includes('0535');
+    const isJhilmilPhase = shopId === '01/2024/1707';
     
+    // ENHANCED DEBUG for specific shops
     if (isGreaterKailash) {
       console.log(`🔍 CORRECTED supply check for ${brandName} at shop ${shopId} visited on ${visitDate.toLocaleDateString()} (${visitDate.toISOString()})`);
+    } else if (isJhilmilPhase && (brandName.includes('8 PM BLACK') || brandName.includes('VERVE CRANBERRY'))) {
+      console.log(`\n🚨 DEBUGGING ${brandName} at Jhilmil Phase-II (${shopId}):`);
+      console.log(`📅 Visit Date: ${visitDate.toLocaleDateString()}`);
     } else {
       console.log(`🔍 CORRECTED supply check for ${brandName} at shop ${shopId} visited on ${visitDate.toLocaleDateString()}`);
     }
@@ -1111,6 +1237,24 @@ const InventoryDashboard = () => {
     
     // CORRECTED: Create matching keys based on how supply data is stored
     const possibleKeys = createMultipleBrandKeys(shopId, brandName);
+    
+    // ENHANCED DEBUG: Show all possible keys being checked
+    if (isJhilmilPhase && (brandName.includes('8 PM BLACK') || brandName.includes('VERVE CRANBERRY'))) {
+      console.log(`🔑 Checking keys for ${brandName}:`, possibleKeys);
+      
+      // Show which keys exist in supply data
+      const existingKeys = possibleKeys.filter(key => recentSupplies[key]);
+      console.log(`✅ Found supply keys:`, existingKeys);
+      
+      existingKeys.forEach(key => {
+        const supplyDate = recentSupplies[key];
+        console.log(`📦 ${key}: ${supplyDate.toLocaleDateString()} (after visit: ${supplyDate > visitDate})`);
+      });
+      
+      if (existingKeys.length === 0) {
+        console.log(`❌ NO SUPPLY KEYS FOUND for ${brandName} - should show "In Stock" or "Aging"`);
+      }
+    }
     
     let latestSupplyDate: Date | null = null;
     let matchedKey = '';
@@ -1122,6 +1266,9 @@ const InventoryDashboard = () => {
           console.log(`📦 CORRECTED Found supply for key ${key} on ${supplyDate.toLocaleDateString()} (${supplyDate.toISOString()})`);
           console.log(`🔍 Visit date: ${visitDate.toLocaleDateString()} (${visitDate.toISOString()}), Supply date: ${supplyDate.toLocaleDateString()} (${supplyDate.toISOString()})`);
           console.log(`🔍 Supply after visit? ${supplyDate > visitDate} (${supplyDate.getTime()} > ${visitDate.getTime()})`);
+        } else if (isJhilmilPhase && (brandName.includes('8 PM BLACK') || brandName.includes('VERVE CRANBERRY'))) {
+          console.log(`📦 MATCHED SUPPLY for ${brandName}: ${key} on ${supplyDate.toLocaleDateString()}`);
+          console.log(`🔍 Visit: ${visitDate.toLocaleDateString()}, Supply: ${supplyDate.toLocaleDateString()}, After visit: ${supplyDate > visitDate}`);
         } else {
           console.log(`📦 CORRECTED Found supply for key ${key} on ${supplyDate.toLocaleDateString()}`);
           console.log(`🔍 Visit date: ${visitDate.toLocaleDateString()}, Supply date: ${supplyDate.toLocaleDateString()}`);
@@ -1142,6 +1289,15 @@ const InventoryDashboard = () => {
       // Grace period: 7 days from supply date
       const isInGracePeriod = daysSinceSupply <= 7;
       
+      // CRITICAL DEBUG: Show what supply was matched
+      if (isJhilmilPhase && (brandName.includes('8 PM BLACK') || brandName.includes('VERVE CRANBERRY'))) {
+        console.log(`🎯 FINAL MATCH for ${brandName}: ${matchedKey} on ${latestSupplyDate.toLocaleDateString()}`);
+        console.log(`⏰ Days out: ${daysOutOfStock}, Days since: ${daysSinceSupply}`);
+        if (brandName.includes('8 PM BLACK')) {
+          console.log(`🚨 WARNING: 8 PM BLACK showing as restocked but no supply should exist!`);
+        }
+      }
+      
       console.log(`✅ CORRECTED RESTOCKED: ${brandName} was restocked after ${daysOutOfStock} days. Supply on ${latestSupplyDate.toLocaleDateString()}, ${daysSinceSupply} days ago. Key: ${matchedKey}`);
       
       return { 
@@ -1149,11 +1305,15 @@ const InventoryDashboard = () => {
         daysOutOfStock: daysOutOfStock,
         supplyDate: latestSupplyDate,
         isInGracePeriod: isInGracePeriod,
-        daysSinceSupply: daysSinceSupply
+        daysSinceSupply: daysSinceSupply,
+        matchedKey: matchedKey
       };
     }
     
-    if (isGreaterKailash) {
+    // DEBUG: No supply found
+    if (isJhilmilPhase && (brandName.includes('8 PM BLACK') || brandName.includes('VERVE CRANBERRY'))) {
+      console.log(`❌ NO SUPPLY found after visit for ${brandName} - CORRECT behavior`);
+    } else if (isGreaterKailash) {
       console.log(`❌ No supply found after visit for ${brandName}. Latest supply: ${latestSupplyDate ? `${latestSupplyDate.toLocaleDateString()} (${latestSupplyDate.toISOString()})` : 'None'}`);
     } else {
       console.log(`❌ No supply found after visit for ${brandName}. Latest supply: ${latestSupplyDate ? latestSupplyDate.toLocaleDateString() : 'None'}`);
@@ -1376,8 +1536,8 @@ const InventoryDashboard = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <Package className="w-12 h-12 animate-pulse mx-auto mb-4 text-purple-600" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Loading CORRECTED Dashboard</h2>
-          <p className="text-gray-600">Processing inventory data with CORRECTED column indices...</p>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Loading CORRECTED Dashboard + DEBUG</h2>
+          <p className="text-gray-600">Processing inventory data with CORRECTED column indices + comprehensive debugging...</p>
         </div>
       </div>
     );
@@ -1422,14 +1582,14 @@ const InventoryDashboard = () => {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row justify-between items-center h-auto sm:h-16 py-4 sm:py-0">
             <div className="flex items-center mb-4 sm:mb-0">
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">CORRECTED Inventory Analytics</h1>
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">CORRECTED Inventory Analytics + DEBUG</h1>
               <span className="ml-3 px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
-                ✅ Column Indices CORRECTED
+                ✅ Column Indices CORRECTED + Full Debug
               </span>
             </div>
             <div className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4">
               <span className="text-sm text-gray-500">
-                Monthly Analytics • {inventoryData.summary.totalSKUs} SKUs • CORRECTED Brand Matching
+                Monthly Analytics • {inventoryData.summary.totalSKUs} SKUs • CORRECTED Brand Matching + Debug
               </span>
               <div className="flex space-x-2">
                 <button
@@ -2404,25 +2564,25 @@ const CorrectedStockIntelligenceTab = ({
       <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 p-6 rounded-lg">
         <h3 className="text-lg font-medium text-green-900 mb-4 flex items-center">
           <Eye className="w-5 h-5 mr-2" />
-          ✅ CORRECTED Column Indices - AI Recommendations
+          ✅ CORRECTED Column Indices + COMPREHENSIVE DEBUG - AI Recommendations
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div className="space-y-3">
             <div className="flex items-start space-x-3">
               <div className="w-2 h-2 bg-green-600 rounded-full mt-2"></div>
               <div>
-                <div className="text-sm font-medium text-green-900">CORRECTED Column Mapping</div>
+                <div className="text-sm font-medium text-green-900">ENHANCED DEBUGGING ADDED</div>
                 <div className="text-sm text-green-700">
-                  Brand Column: L (index 11) ✅ CORRECTED from K (index 10)
+                  Comprehensive console logging for Jhilmil Phase-II to identify bugs
                 </div>
               </div>
             </div>
             <div className="flex items-start space-x-3">
               <div className="w-2 h-2 bg-blue-600 rounded-full mt-2"></div>
               <div>
-                <div className="text-sm font-medium text-green-900">CORRECTED Size Column</div>
+                <div className="text-sm font-medium text-green-900">FALSE POSITIVE DETECTION</div>
                 <div className="text-sm text-green-700">
-                  Size Column: M (index 12) ✅ CORRECTED from L (index 11)
+                  Debug will show why 8 PM BLACK 750 incorrectly shows "Restocked"
                 </div>
               </div>
             </div>
@@ -2431,34 +2591,34 @@ const CorrectedStockIntelligenceTab = ({
             <div className="flex items-start space-x-3">
               <div className="w-2 h-2 bg-purple-600 rounded-full mt-2"></div>
               <div>
-                <div className="text-sm font-medium text-green-900">Expected Results</div>
+                <div className="text-sm font-medium text-green-900">QUANTITY VALIDATION</div>
                 <div className="text-sm text-green-700">
-                  GREATER KAILASH -I should now show "Restocked (6d)" for VERVE products supplied on 25-05-2025
+                  Debug will show actual vs expected visit quantities for VERVE products
                 </div>
               </div>
             </div>
             <div className="flex items-start space-x-3">
               <div className="w-2 h-2 bg-orange-600 rounded-full mt-2"></div>
               <div>
-                <div className="text-sm font-medium text-green-900">Accurate Supply Tracking</div>
+                <div className="text-sm font-medium text-green-900">SUPPLY MATCHING AUDIT</div>
                 <div className="text-sm text-green-700">
-                  Brand matching now works correctly with proper column indices
+                  Shows exact supply keys being matched and why
                 </div>
               </div>
             </div>
           </div>
         </div>
         
-        {/* Success Indicators */}
+        {/* Debug Instructions */}
         <div className="mt-6 p-4 bg-white rounded-lg border border-green-200">
-          <h4 className="text-sm font-medium text-green-900 mb-2">✅ CORRECTED ISSUES:</h4>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs text-green-700">
-            <div>• Column L (brand) now correctly read</div>
-            <div>• Column M (size) now correctly read</div>
-            <div>• Brand matching SHOULD work properly</div>
-            <div>• Supply status SHOULD be accurate</div>
-            <div>• "Restocked (Xd)" SHOULD appear</div>
-            <div>• GREATER KAILASH data SHOULD be correct</div>
+          <h4 className="text-sm font-medium text-green-900 mb-2">🔍 DEBUG INSTRUCTIONS:</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-green-700">
+            <div>• Open browser console (F12)</div>
+            <div>• Look for "🚨 DEBUGGING" messages</div>
+            <div>• Check "VISIT DATA DEBUG" entries</div>
+            <div>• Verify "SUPPLY STATUS LOGIC" output</div>
+            <div>• Review "FINAL STATUS ASSIGNMENT"</div>
+            <div>• Check "ALL SUPPLY KEYS" section</div>
           </div>
         </div>
       </div>
