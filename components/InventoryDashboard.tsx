@@ -95,6 +95,8 @@ interface InventoryData {
     daysOutOfStock?: number; // Days between visit and supply
     currentDaysOutOfStock?: number; // Days since visit to today
     supplyDateAfterVisit?: Date;
+    isInGracePeriod?: boolean; // Whether in 7-day grace period
+    advancedSupplyStatus?: string; // Advanced status message
   }>;
   visitCompliance: {
     totalSalesmen: number;
@@ -635,7 +637,7 @@ const InventoryDashboard = () => {
         else if (ageInDays >= 45) ageCategory = 'days45to60';
         else if (ageInDays >= 30) ageCategory = 'days30to45';
 
-        // ENHANCED: Check if supplied after out of stock with enhanced details
+        // ENHANCED: Check if supplied after out of stock with advanced tracking
         const supplyCheckResult = checkSuppliedAfterOutOfStock(
           shopVisit.shopId, 
           brand, 
@@ -646,29 +648,31 @@ const InventoryDashboard = () => {
         const suppliedAfterOutOfStock = supplyCheckResult.wasRestocked;
         const daysOutOfStock = supplyCheckResult.daysOutOfStock;
         const supplyDateAfterVisit = supplyCheckResult.supplyDate;
+        const isInGracePeriod = supplyCheckResult.isInGracePeriod;
 
-        // ENHANCED: Determine proper supply status with detailed messaging
+        // ADVANCED: Get sophisticated supply status with grace period logic
+        const advancedSupplyStatus = getAdvancedSupplyStatus(
+          quantity,
+          shopVisit.visitDate,
+          supplyCheckResult
+        );
+
+        // ENHANCED: Determine base supply status categories for filtering
         let supplyStatus: InventoryItem['supplyStatus'] = 'unknown';
         
-        if (quantity === 0) {
-          // Product is out of stock
-          if (suppliedAfterOutOfStock && daysOutOfStock) {
-            supplyStatus = 'recently_restocked';
-          } else {
-            supplyStatus = 'awaiting_supply';
-          }
-        } else if (ageInDays >= 90) {
-          supplyStatus = 'aging_critical';
-        } else if (ageInDays >= 75) {
-          supplyStatus = 'aging_75_90';
-        } else if (ageInDays >= 60) {
-          supplyStatus = 'aging_60_75';
-        } else if (ageInDays >= 45) {
-          supplyStatus = 'aging_45_60';
-        } else if (ageInDays >= 30) {
-          supplyStatus = 'aging_30_45';
+        if (advancedSupplyStatus.includes('Recently Restocked')) {
+          supplyStatus = 'recently_restocked';
+        } else if (advancedSupplyStatus.includes('Awaiting Supply')) {
+          supplyStatus = 'awaiting_supply';
+        } else if (advancedSupplyStatus.includes('In Stock')) {
+          if (ageInDays >= 90) supplyStatus = 'aging_critical';
+          else if (ageInDays >= 75) supplyStatus = 'aging_75_90';
+          else if (ageInDays >= 60) supplyStatus = 'aging_60_75';
+          else if (ageInDays >= 45) supplyStatus = 'aging_45_60';
+          else if (ageInDays >= 30) supplyStatus = 'aging_30_45';
+          else supplyStatus = 'current';
         } else {
-          supplyStatus = 'current';
+          supplyStatus = 'unknown';
         }
 
         // ENHANCED: Stock status detection
@@ -695,6 +699,8 @@ const InventoryDashboard = () => {
           daysOutOfStock: daysOutOfStock,
           supplyDateAfterVisit: supplyDateAfterVisit,
           currentDaysOutOfStock: isOutOfStock ? calculateDaysCurrentlyOutOfStock(shopVisit.visitDate) : undefined,
+          isInGracePeriod: isInGracePeriod,
+          advancedSupplyStatus: advancedSupplyStatus,
           daysSinceLastSupply: lastSupplyDate ? Math.floor((shopVisit.visitDate.getTime() - lastSupplyDate.getTime()) / (1000 * 60 * 60 * 24)) : undefined,
           supplyStatus
         };
@@ -724,7 +730,8 @@ const InventoryDashboard = () => {
           });
         }
 
-        if (isOutOfStock) {
+        // Track all items that need supply chain attention (out of stock OR recently restocked in grace period)
+        if (isOutOfStock || (suppliedAfterOutOfStock && isInGracePeriod)) {
           const outOfStockItem = {
             sku: brand,
             shopName: shopInventory.shopName,
@@ -735,7 +742,9 @@ const InventoryDashboard = () => {
             suppliedAfterOutOfStock,
             daysOutOfStock: daysOutOfStock, // Days between visit and supply
             currentDaysOutOfStock: calculateDaysCurrentlyOutOfStock(shopVisit.visitDate), // Days since visit to today
-            supplyDateAfterVisit: supplyDateAfterVisit
+            supplyDateAfterVisit: supplyDateAfterVisit,
+            isInGracePeriod: isInGracePeriod,
+            advancedSupplyStatus: advancedSupplyStatus
           };
           
           outOfStockItems.push(outOfStockItem);
@@ -807,7 +816,9 @@ const InventoryDashboard = () => {
     const avgAge = allAgingLocations.length > 0 ? 
       Math.round(allAgingLocations.reduce((sum, item) => sum + item.ageInDays, 0) / allAgingLocations.length) : 0;
     const recentlyRestockedItems = Object.values(shops).reduce((sum, shop) => 
-      sum + Object.values(shop.items).filter(item => item.suppliedAfterOutOfStock).length, 0);
+      sum + Object.values(shop.items).filter(item => 
+        item.suppliedAfterOutOfStock || item.advancedSupplyStatus?.includes('Recently Restocked')
+      ).length, 0);
 
     const salesmenStats = Object.values(salesmenVisits).map((salesman: any) => ({
       name: salesman.name,
@@ -994,16 +1005,17 @@ const InventoryDashboard = () => {
     return null;
   };
 
-  // ENHANCED: Check supplied after out of stock with days calculation
+  // ENHANCED: Advanced supply chain tracking with grace period logic
   const checkSuppliedAfterOutOfStock = (
     shopId: string, 
     brandName: string, 
     visitDate: Date, 
     recentSupplies: Record<string, Date>
-  ): { wasRestocked: boolean, daysOutOfStock?: number, supplyDate?: Date } => {
-    console.log(`🔍 Enhanced check for ${brandName} at shop ${shopId} visited on ${visitDate.toLocaleDateString()}`);
+  ): { wasRestocked: boolean, daysOutOfStock?: number, supplyDate?: Date, isInGracePeriod?: boolean } => {
+    console.log(`🔍 Advanced supply check for ${brandName} at shop ${shopId} visited on ${visitDate.toLocaleDateString()}`);
     
     const possibleKeys = createMultipleBrandKeys(shopId, brandName);
+    const today = new Date();
     
     for (const key of possibleKeys) {
       const supplyDate = recentSupplies[key];
@@ -1013,14 +1025,19 @@ const InventoryDashboard = () => {
         // Check if supply happened AFTER the out-of-stock visit
         if (supplyDate > visitDate) {
           const daysOutOfStock = Math.floor((supplyDate.getTime() - visitDate.getTime()) / (1000 * 60 * 60 * 24));
+          const daysSinceSupply = Math.floor((today.getTime() - supplyDate.getTime()) / (1000 * 60 * 60 * 24));
+          
+          // Grace period: 7 days from supply date
+          const isInGracePeriod = daysSinceSupply <= 7;
           
           // Only count supplies within reasonable timeframe (30 days)
           if (daysOutOfStock <= 30) {
-            console.log(`✅ Product was restocked after ${daysOutOfStock} days out of stock`);
+            console.log(`✅ Product was restocked after ${daysOutOfStock} days out of stock. Grace period: ${isInGracePeriod ? 'Active' : 'Expired'}`);
             return { 
               wasRestocked: true, 
               daysOutOfStock: daysOutOfStock,
-              supplyDate: supplyDate
+              supplyDate: supplyDate,
+              isInGracePeriod: isInGracePeriod
             };
           }
         }
@@ -1029,6 +1046,41 @@ const InventoryDashboard = () => {
     
     console.log(`❌ No supply found after out-of-stock visit for ${brandName}`);
     return { wasRestocked: false };
+  };
+
+  // NEW: Simplified advanced supply status (without next visit checking for now)
+  const getAdvancedSupplyStatus = (
+    quantity: number,
+    visitDate: Date,
+    supplyCheckResult: any
+  ): string => {
+    const today = new Date();
+    
+    if (quantity === 0) {
+      // Product is currently out of stock
+      if (supplyCheckResult.wasRestocked) {
+        const { isInGracePeriod, daysOutOfStock } = supplyCheckResult;
+        
+        if (isInGracePeriod) {
+          // Within 7 days of supply - show as restocked but still out of stock
+          return `Out of Stock - Recently Restocked (was out ${daysOutOfStock} days)`;
+        } else {
+          // Grace period expired - assume supply worked but no visit to confirm
+          return 'In Stock (assumed from supply)';
+        }
+      } else {
+        // No recent supply
+        const daysOutOfStock = Math.floor((today.getTime() - visitDate.getTime()) / (1000 * 60 * 60 * 24));
+        return `Awaiting Supply (out for ${daysOutOfStock} days)`;
+      }
+    } else {
+      // Product has stock - determine if it's from recent restocking
+      if (supplyCheckResult.wasRestocked && supplyCheckResult.isInGracePeriod) {
+        return `In Stock - Recently Restocked (was out ${supplyCheckResult.daysOutOfStock} days)`;
+      } else {
+        return 'In Stock';
+      }
+    }
   };
 
   // NEW: Calculate days currently out of stock (for items still awaiting supply)
@@ -1041,10 +1093,20 @@ const InventoryDashboard = () => {
   // ENHANCED FILTERING & UTILITIES
   // ==========================================
 
-  // ENHANCED: Generate supply status display with detailed messaging
+  // ENHANCED: Generate supply status display with advanced grace period logic
   const getEnhancedSupplyStatusDisplay = (item: any) => {
+    // Use the advanced supply status if available
+    if (item.advancedSupplyStatus) {
+      return item.advancedSupplyStatus;
+    }
+    
+    // Fallback to legacy logic for compatibility
     if (item.suppliedAfterOutOfStock && item.daysOutOfStock) {
-      return `Recently Restocked (was out ${item.daysOutOfStock} days)`;
+      if (item.isInGracePeriod) {
+        return `Out of Stock - Recently Restocked (was out ${item.daysOutOfStock} days)`;
+      } else {
+        return `Recently Restocked (was out ${item.daysOutOfStock} days)`;
+      }
     } else if (item.supplyStatus === 'awaiting_supply' && item.currentDaysOutOfStock) {
       return `Awaiting Supply (out for ${item.currentDaysOutOfStock} days)`;
     } else {
@@ -1199,15 +1261,13 @@ const InventoryDashboard = () => {
       
       else if (activeTab === 'alerts') {
         csvContent += "OUT OF STOCK ANALYSIS\n";
-        csvContent += "SKU,Shop Name,Department,Salesman,Reason,Visit Date,Supply Status,Days Info\n";
+        csvContent += "SKU,Shop Name,Department,Salesman,Reason,Visit Date,Advanced Status\n";
         
         inventoryData.outOfStockItems.forEach(item => {
-          const supplyStatus = item.suppliedAfterOutOfStock ? 'Recently Restocked' : 'Awaiting Supply';
-          const daysInfo = item.suppliedAfterOutOfStock ? 
-            `was out ${item.daysOutOfStock || 'N/A'} days` : 
-            `out for ${item.currentDaysOutOfStock || 'N/A'} days`;
+          const status = item.advancedSupplyStatus || 
+                        (item.suppliedAfterOutOfStock ? 'Recently Restocked' : 'Awaiting Supply');
           
-          csvContent += `"${item.sku}","${item.shopName}","${item.department}","${item.salesman}","${item.reasonNoStock}","${item.visitDate.toLocaleDateString()}","${supplyStatus}","${daysInfo}"\n`;
+          csvContent += `"${item.sku}","${item.shopName}","${item.department}","${item.salesman}","${item.reasonNoStock}","${item.visitDate.toLocaleDateString()}","${status}"\n`;
         });
       }
 
@@ -2100,7 +2160,9 @@ const EnhancedStockIntelligenceTab = ({
             <Truck className="w-8 h-8 text-blue-600" />
             <div className="ml-4">
               <div className="text-2xl font-bold text-blue-600">
-                {filteredOutOfStock.filter((item: any) => item.suppliedAfterOutOfStock).length}
+                {filteredOutOfStock.filter((item: any) => 
+                  item.suppliedAfterOutOfStock || item.advancedSupplyStatus?.includes('Recently Restocked')
+                ).length}
               </div>
               <div className="text-sm text-blue-700">Recently Restocked</div>
             </div>
@@ -2112,7 +2174,9 @@ const EnhancedStockIntelligenceTab = ({
             <Clock className="w-8 h-8 text-yellow-600" />
             <div className="ml-4">
               <div className="text-2xl font-bold text-yellow-600">
-                {filteredOutOfStock.filter((item: any) => !item.suppliedAfterOutOfStock).length}
+                {filteredOutOfStock.filter((item: any) => 
+                  !item.suppliedAfterOutOfStock && !item.advancedSupplyStatus?.includes('Recently Restocked')
+                ).length}
               </div>
               <div className="text-sm text-yellow-700">Awaiting Supply</div>
             </div>
@@ -2124,7 +2188,9 @@ const EnhancedStockIntelligenceTab = ({
             <TrendingUp className="w-8 h-8 text-green-600" />
             <div className="ml-4">
               <div className="text-2xl font-bold text-green-600">
-                {filteredOutOfStock.length > 0 ? Math.round((filteredOutOfStock.filter((item: any) => item.suppliedAfterOutOfStock).length / filteredOutOfStock.length) * 100) : 0}%
+                {filteredOutOfStock.length > 0 ? Math.round((filteredOutOfStock.filter((item: any) => 
+                  item.suppliedAfterOutOfStock || item.advancedSupplyStatus?.includes('Recently Restocked')
+                ).length / filteredOutOfStock.length) * 100) : 0}%
               </div>
               <div className="text-sm text-green-700">Supply Response Rate</div>
             </div>
@@ -2163,17 +2229,16 @@ const EnhancedStockIntelligenceTab = ({
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{item.reasonNoStock}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{item.visitDate.toLocaleDateString('en-GB')}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    {item.suppliedAfterOutOfStock ? (
-                      <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-green-100 text-green-800">
-                        <Truck className="w-3 h-3 mr-1" />
-                        Restocked (was out {item.daysOutOfStock || 'N/A'} days)
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
-                        <AlertTriangle className="w-3 h-3 mr-1" />
-                        Awaiting Supply (out for {item.currentDaysOutOfStock || 'N/A'} days)
-                      </span>
-                    )}
+                    <span className={`inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full ${
+                      item.advancedSupplyStatus?.includes('Recently Restocked') ? 'bg-blue-100 text-blue-800' :
+                      item.advancedSupplyStatus?.includes('Awaiting Supply') ? 'bg-red-100 text-red-800' :
+                      item.advancedSupplyStatus?.includes('In Stock') ? 'bg-green-100 text-green-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {item.advancedSupplyStatus?.includes('Recently Restocked') && <Truck className="w-3 h-3 mr-1" />}
+                      {item.advancedSupplyStatus?.includes('Awaiting Supply') && <AlertTriangle className="w-3 h-3 mr-1" />}
+                      {item.advancedSupplyStatus || 'Unknown Status'}
+                    </span>
                   </td>
                 </tr>
               ))}
