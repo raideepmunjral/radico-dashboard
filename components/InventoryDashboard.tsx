@@ -615,15 +615,22 @@ const InventoryDashboard = () => {
           recentSupplies
         );
 
-        // ENHANCED DEBUG for supply status determination
-        if (shopVisit.shopId === '01/2024/1707' && brand && 
-            (brand.includes('8 PM BLACK') || brand.includes('VERVE CRANBERRY'))) {
-          console.log(`\n🎯 SUPPLY STATUS LOGIC for ${brand}:`);
+        // CRITICAL DEBUG - Force log for Jhilmil Phase-II
+        if (shopVisit.shopId === '01/2024/1707') {
+          console.log(`\n🚨 CRITICAL DEBUG for ${brand} at Jhilmil Phase-II:`);
           console.log(`📦 Was Restocked: ${supplyCheckResult.wasRestocked}`);
           console.log(`📅 Supply Date: ${supplyCheckResult.supplyDate ? supplyCheckResult.supplyDate.toLocaleDateString() : 'None'}`);
           console.log(`⏰ Days Since Supply: ${supplyCheckResult.daysSinceSupply || 'N/A'}`);
           console.log(`🔑 Matched Key: ${(supplyCheckResult as any).matchedKey || 'None'}`);
           console.log(`🔢 Visit Quantity: ${quantity}`);
+          
+          // Show if this should be restocked or not
+          if (brand.includes('8 PM BLACK')) {
+            console.log(`🚨 8 PM BLACK SHOULD NOT BE RESTOCKED - NO SUPPLY EXISTS!`);
+          }
+          if (brand.includes('VERVE')) {
+            console.log(`✅ VERVE should be restocked - supply exists`);
+          }
         }
 
         let lastSupplyDate: Date | undefined;
@@ -1174,13 +1181,24 @@ const InventoryDashboard = () => {
     const sampleSupplies = Object.entries(recentSupplies).slice(0, 5);
     console.log('📦 Sample supplies:', sampleSupplies.map(([key, date]) => `${key}: ${date.toLocaleDateString()}`));
     
+    // CRITICAL DEBUG: Show ALL supply keys for Jhilmil Phase-II
+    const jhilmilAllKeys = Object.keys(recentSupplies).filter(k => k.includes('01/2024/1707'));
+    console.log(`\n🚨 ALL SUPPLY KEYS for Jhilmil Phase-II (${jhilmilAllKeys.length} total):`, jhilmilAllKeys);
+    
     // CRITICAL DEBUG: Show if 8 PM products exist for Jhilmil Phase-II
-    const jhilmil8PMKeys = Object.keys(recentSupplies).filter(k => k.includes('01/2024/1707') && k.includes('8 PM'));
+    const jhilmil8PMKeys = jhilmilAllKeys.filter(k => k.includes('8 PM'));
     if (jhilmil8PMKeys.length > 0) {
       console.log(`🚨 WARNING: Found 8 PM supply keys for Jhilmil Phase-II:`, jhilmil8PMKeys);
+      jhilmil8PMKeys.forEach(key => {
+        console.log(`  📦 ${key}: ${recentSupplies[key].toLocaleDateString()}`);
+      });
     } else {
       console.log(`✅ CORRECT: No 8 PM supply keys found for Jhilmil Phase-II`);
     }
+    
+    // Show VERVE keys
+    const jhilmilVERVEKeys = jhilmilAllKeys.filter(k => k.includes('VERVE'));
+    console.log(`📦 VERVE supply keys for Jhilmil Phase-II (${jhilmilVERVEKeys.length} total):`, jhilmilVERVEKeys.slice(0, 5));
     
     return recentSupplies;
   };
