@@ -34,7 +34,7 @@ interface ShopInventory {
   department: string;
   salesman: string;
   visitDate: Date;
-  items: Record<string, InventoryItem>;
+  items: Record<string, any>;
   totalItems: number;
   inStockCount: number;
   outOfStockCount: number;
@@ -62,42 +62,10 @@ interface InventoryData {
     inStockCount: number;
     outOfStockCount: number;
     outOfStockPercentage: number;
-    agingLocations: Array<{
-      shopName: string;
-      department: string;
-      salesman: string;
-      ageInDays: number;
-      quantity: number;
-      lastSupplyDate?: Date;
-      suppliedAfterOutOfStock?: boolean;
-    }>;
+    agingLocations: Array<any>;
   }>;
-  allAgingLocations: Array<{
-    sku: string;
-    shopName: string;
-    department: string;
-    salesman: string;
-    ageInDays: number;
-    quantity: number;
-    lastSupplyDate?: Date;
-    isEstimatedAge: boolean;
-    supplyStatus: string;
-    visitDate: Date;
-  }>;
-  outOfStockItems: Array<{
-    sku: string;
-    shopName: string;
-    department: string;
-    salesman: string;
-    reasonNoStock: string;
-    visitDate: Date;
-    suppliedAfterOutOfStock?: boolean;
-    daysOutOfStock?: number; // Days between visit and supply
-    currentDaysOutOfStock?: number; // Days since visit to today
-    supplyDateAfterVisit?: Date;
-    isInGracePeriod?: boolean; // Whether in 7-day grace period
-    advancedSupplyStatus?: string; // Advanced status message
-  }>;
+  allAgingLocations: Array<any>;
+  outOfStockItems: Array<any>;
   visitCompliance: {
     totalSalesmen: number;
     activeSalesmen: number;
@@ -718,7 +686,7 @@ const InventoryDashboard = () => {
         if (ageInDays >= 30 && quantity > 0) {
           shopInventory.agingInventoryCount++;
           
-          allAgingLocations.push({
+          const agingLocation = {
             sku: brand,
             shopName: shopInventory.shopName,
             department: shopInventory.department,
@@ -729,7 +697,9 @@ const InventoryDashboard = () => {
             isEstimatedAge,
             supplyStatus,
             visitDate: shopInventory.visitDate
-          });
+          } as any;
+          
+          allAgingLocations.push(agingLocation);
         }
 
         // Track all items that need supply chain attention (out of stock OR recently restocked in grace period)
@@ -747,7 +717,7 @@ const InventoryDashboard = () => {
             supplyDateAfterVisit: supplyDateAfterVisit,
             isInGracePeriod: isInGracePeriod,
             advancedSupplyStatus: advancedSupplyStatus
-          };
+          } as any;
           
           outOfStockItems.push(outOfStockItem);
         }
@@ -767,7 +737,7 @@ const InventoryDashboard = () => {
         else if (isOutOfStock) skuTracker[brand].outOfStockCount++;
 
         if (ageInDays >= 30 && quantity > 0) {
-          skuTracker[brand].agingLocations.push({
+          const agingLocation = {
             shopName: shopInventory.shopName,
             department: shopInventory.department,
             salesman: shopInventory.salesman,
@@ -775,7 +745,9 @@ const InventoryDashboard = () => {
             quantity,
             lastSupplyDate,
             suppliedAfterOutOfStock
-          });
+          } as any;
+          
+          skuTracker[brand].agingLocations.push(agingLocation);
         }
       });
 
@@ -819,7 +791,7 @@ const InventoryDashboard = () => {
       Math.round(allAgingLocations.reduce((sum, item) => sum + item.ageInDays, 0) / allAgingLocations.length) : 0;
     const recentlyRestockedItems = Object.values(shops).reduce((sum, shop) => 
       sum + Object.values(shop.items).filter(item => 
-        item.suppliedAfterOutOfStock || item.advancedSupplyStatus?.includes('Recently Restocked')
+        item.suppliedAfterOutOfStock || (item as any).advancedSupplyStatus?.includes('Recently Restocked')
       ).length, 0);
 
     const salesmenStats = Object.values(salesmenVisits).map((salesman: any) => ({
@@ -1098,19 +1070,19 @@ const InventoryDashboard = () => {
   // ENHANCED: Generate supply status display with advanced grace period logic
   const getEnhancedSupplyStatusDisplay = (item: any) => {
     // Use the advanced supply status if available
-    if (item.advancedSupplyStatus) {
-      return item.advancedSupplyStatus;
+    if ((item as any).advancedSupplyStatus) {
+      return (item as any).advancedSupplyStatus;
     }
     
     // Fallback to legacy logic for compatibility
-    if (item.suppliedAfterOutOfStock && item.daysOutOfStock) {
-      if (item.isInGracePeriod) {
-        return `Out of Stock - Recently Restocked (was out ${item.daysOutOfStock} days)`;
+    if (item.suppliedAfterOutOfStock && (item as any).daysOutOfStock) {
+      if ((item as any).isInGracePeriod) {
+        return `Out of Stock - Recently Restocked (was out ${(item as any).daysOutOfStock} days)`;
       } else {
-        return `Recently Restocked (was out ${item.daysOutOfStock} days)`;
+        return `Recently Restocked (was out ${(item as any).daysOutOfStock} days)`;
       }
-    } else if (item.supplyStatus === 'awaiting_supply' && item.currentDaysOutOfStock) {
-      return `Awaiting Supply (out for ${item.currentDaysOutOfStock} days)`;
+    } else if (item.supplyStatus === 'awaiting_supply' && (item as any).currentDaysOutOfStock) {
+      return `Awaiting Supply (out for ${(item as any).currentDaysOutOfStock} days)`;
     } else {
       // For other statuses, use the standard format
       return item.supplyStatus?.replace(/_/g, ' ') || 'Unknown';
@@ -1120,13 +1092,13 @@ const InventoryDashboard = () => {
   // ENHANCED: Calculate days for display (handles both scenarios)
   const calculateDaysAfterSupply = (item: any) => {
     // For recently restocked items
-    if (item.daysOutOfStock) {
-      return `was out ${item.daysOutOfStock}d`;
+    if ((item as any).daysOutOfStock) {
+      return `was out ${(item as any).daysOutOfStock}d`;
     }
     
     // For items still awaiting supply
-    if (item.currentDaysOutOfStock) {
-      return `out for ${item.currentDaysOutOfStock}d`;
+    if ((item as any).currentDaysOutOfStock) {
+      return `out for ${(item as any).currentDaysOutOfStock}d`;
     }
     
     return 'N/A';
@@ -1266,7 +1238,7 @@ const InventoryDashboard = () => {
         csvContent += "SKU,Shop Name,Department,Salesman,Reason,Visit Date,Advanced Status\n";
         
         inventoryData.outOfStockItems.forEach(item => {
-          const status = item.advancedSupplyStatus || 
+          const status = (item as any).advancedSupplyStatus || 
                         (item.suppliedAfterOutOfStock ? 'Recently Restocked' : 'Awaiting Supply');
           
           csvContent += `"${item.sku}","${item.shopName}","${item.department}","${item.salesman}","${item.reasonNoStock}","${item.visitDate.toLocaleDateString()}","${status}"\n`;
@@ -2163,7 +2135,7 @@ const EnhancedStockIntelligenceTab = ({
             <div className="ml-4">
               <div className="text-2xl font-bold text-blue-600">
                 {filteredOutOfStock.filter((item: any) => 
-                  item.suppliedAfterOutOfStock || item.advancedSupplyStatus?.includes('Recently Restocked')
+                  item.suppliedAfterOutOfStock || (item as any).advancedSupplyStatus?.includes('Recently Restocked')
                 ).length}
               </div>
               <div className="text-sm text-blue-700">Recently Restocked</div>
@@ -2177,7 +2149,7 @@ const EnhancedStockIntelligenceTab = ({
             <div className="ml-4">
               <div className="text-2xl font-bold text-yellow-600">
                 {filteredOutOfStock.filter((item: any) => 
-                  !item.suppliedAfterOutOfStock && !item.advancedSupplyStatus?.includes('Recently Restocked')
+                  !item.suppliedAfterOutOfStock && !(item as any).advancedSupplyStatus?.includes('Recently Restocked')
                 ).length}
               </div>
               <div className="text-sm text-yellow-700">Awaiting Supply</div>
@@ -2191,7 +2163,7 @@ const EnhancedStockIntelligenceTab = ({
             <div className="ml-4">
               <div className="text-2xl font-bold text-green-600">
                 {filteredOutOfStock.length > 0 ? Math.round((filteredOutOfStock.filter((item: any) => 
-                  item.suppliedAfterOutOfStock || item.advancedSupplyStatus?.includes('Recently Restocked')
+                  item.suppliedAfterOutOfStock || (item as any).advancedSupplyStatus?.includes('Recently Restocked')
                 ).length / filteredOutOfStock.length) * 100) : 0}%
               </div>
               <div className="text-sm text-green-700">Supply Response Rate</div>
@@ -2232,14 +2204,14 @@ const EnhancedStockIntelligenceTab = ({
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{item.visitDate.toLocaleDateString('en-GB')}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <span className={`inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full ${
-                      item.advancedSupplyStatus?.includes('Recently Restocked') ? 'bg-blue-100 text-blue-800' :
-                      item.advancedSupplyStatus?.includes('Awaiting Supply') ? 'bg-red-100 text-red-800' :
-                      item.advancedSupplyStatus?.includes('In Stock') ? 'bg-green-100 text-green-800' :
+                      (item as any).advancedSupplyStatus?.includes('Recently Restocked') ? 'bg-blue-100 text-blue-800' :
+                      (item as any).advancedSupplyStatus?.includes('Awaiting Supply') ? 'bg-red-100 text-red-800' :
+                      (item as any).advancedSupplyStatus?.includes('In Stock') ? 'bg-green-100 text-green-800' :
                       'bg-gray-100 text-gray-800'
                     }`}>
-                      {item.advancedSupplyStatus?.includes('Recently Restocked') && <Truck className="w-3 h-3 mr-1" />}
-                      {item.advancedSupplyStatus?.includes('Awaiting Supply') && <AlertTriangle className="w-3 h-3 mr-1" />}
-                      {item.advancedSupplyStatus || 'Unknown Status'}
+                      {(item as any).advancedSupplyStatus?.includes('Recently Restocked') && <Truck className="w-3 h-3 mr-1" />}
+                      {(item as any).advancedSupplyStatus?.includes('Awaiting Supply') && <AlertTriangle className="w-3 h-3 mr-1" />}
+                      {(item as any).advancedSupplyStatus || 'Unknown Status'}
                     </span>
                   </td>
                 </tr>
