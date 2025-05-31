@@ -310,6 +310,8 @@ const InventoryDashboard = () => {
     const rows = visitData.slice(1);
 
     console.log('📋 Headers found:', headers);
+    console.log('📋 First 5 headers:', headers.slice(0, 5));
+    console.log('📋 Headers around INV Brand area:', headers.slice(10, 20));
 
     // ENHANCED: More robust column finding
     const getColumnIndex = (searchTerms: string[]) => {
@@ -332,13 +334,32 @@ const InventoryDashboard = () => {
       department: getColumnIndex(['department']),
       salesman: getColumnIndex(['salesman']),
       checkInDateTime: getColumnIndex(['check in date', 'check_in', 'datetime']),
-      invBrand: getColumnIndex(['inv brand', 'inv_brand', 'brand']),
-      invQuantity: getColumnIndex(['inv quantity', 'inv_quantity', 'quantity']),
+      invBrand: getColumnIndex(['inv brand', 'inv_brand', 'brand', 'tva brand']),
+      invQuantity: getColumnIndex(['inv quantity', 'inv_quantity', 'quantity', 'tva target']),
       reasonNoStock: getColumnIndex(['reason', 'no stock']),
       lsDate: getColumnIndex(['ls date', 'ls_date'])
     };
 
     console.log('📊 Column indices found:', columnIndices);
+
+    // CRITICAL DEBUG: Check what's in the INV Brand column
+    console.log('🔍 DEBUGGING INV BRAND COLUMN:');
+    const invBrandIndex = columnIndices.invBrand;
+    if (invBrandIndex !== -1) {
+      console.log(`INV Brand column index: ${invBrandIndex}, header: "${headers[invBrandIndex]}"`);
+      
+      // Sample the first 20 non-empty values in this column
+      let sampleCount = 0;
+      for (let i = 1; i < Math.min(rows.length, 100) && sampleCount < 20; i++) {
+        const brandValue = rows[i][invBrandIndex];
+        if (brandValue && brandValue.toString().trim()) {
+          console.log(`Row ${i + 1}: "${brandValue}"`);
+          sampleCount++;
+        }
+      }
+    } else {
+      console.error('❌ INV Brand column not found! Available headers:', headers);
+    }
 
     // Validate required columns
     const requiredColumns = ['shopId', 'shopName', 'invBrand', 'invQuantity', 'checkInDateTime'];
@@ -357,8 +378,8 @@ const InventoryDashboard = () => {
       recentSupplies: Object.keys(recentSupplies).length
     });
     
-    // STEP 1: CRITICAL FIX - Shop ID Propagation (learned from AppScript)
-    console.log('🔧 CRITICAL FIX: Propagating Shop IDs to all brand rows...');
+    // STEP 1: CRITICAL DEBUG - Shop ID Propagation (learned from AppScript)
+    console.log('🔧 CRITICAL DEBUG: Starting Shop ID propagation...');
     
     let currentShopId = null;
     let currentShopName = null;
@@ -366,6 +387,17 @@ const InventoryDashboard = () => {
     let currentDepartment = null;
     let currentSalesman = null;
     let propagatedRows = 0;
+    let shopRowsFound = 0;
+    let brandRowsFound = 0;
+    
+    // CRITICAL DEBUG: Log the first 10 rows to understand structure
+    console.log('🔍 DEBUGGING FIRST 10 ROWS:');
+    for (let i = 1; i < Math.min(rows.length, 11); i++) {
+      const row = rows[i];
+      const shopId = row[columnIndices.shopId];
+      const invBrand = row[columnIndices.invBrand];
+      console.log(`Row ${i + 1}: ShopID="${shopId}" | Brand="${invBrand}" | Full row length: ${row.length}`);
+    }
     
     // First pass - propagate Shop IDs to all related product rows (HIERARCHICAL DATA FIX)
     for (let i = 1; i < rows.length; i++) {
@@ -378,6 +410,7 @@ const InventoryDashboard = () => {
         currentCheckInDateTime = row[columnIndices.checkInDateTime];
         currentDepartment = row[columnIndices.department];
         currentSalesman = row[columnIndices.salesman];
+        shopRowsFound++;
         console.log(`📍 New shop context: ${currentShopId} - ${currentShopName}`);
       } 
       // If no Shop ID but has inventory brand data, use the current shop context
@@ -389,11 +422,22 @@ const InventoryDashboard = () => {
         row[columnIndices.department] = currentDepartment;
         row[columnIndices.salesman] = currentSalesman;
         propagatedRows++;
+        brandRowsFound++;
         console.log(`✅ Propagated shop data to brand row: ${row[columnIndices.invBrand]}`);
+      }
+      // Log rows with brand data that already have Shop ID
+      else if (row[columnIndices.shopId] && row[columnIndices.invBrand]) {
+        brandRowsFound++;
+        console.log(`🔄 Existing brand row with Shop ID: ${row[columnIndices.invBrand]}`);
       }
     }
     
-    console.log(`🎉 Shop ID propagation complete: ${propagatedRows} brand rows updated`);
+    console.log(`🎉 Shop ID propagation complete:`, {
+      shopRowsFound,
+      brandRowsFound,
+      propagatedRows,
+      totalRows: rows.length
+    });
 
     // STEP 2: Filter for MONTHLY data (current month) - AFTER propagation
     const today = new Date();
@@ -1183,8 +1227,8 @@ const InventoryDashboard = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <Package className="w-12 h-12 animate-pulse mx-auto mb-4 text-purple-600" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Loading TRULY FIXED Enhanced Inventory Dashboard</h2>
-          <p className="text-gray-600">Processing comprehensive inventory data with Shop ID propagation (AppScript insight)...</p>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Loading DEBUGGING Enhanced Inventory Dashboard</h2>
+          <p className="text-gray-600">Processing with DETAILED column and data debugging...</p>
         </div>
       </div>
     );
