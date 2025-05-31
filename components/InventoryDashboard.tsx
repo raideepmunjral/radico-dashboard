@@ -96,7 +96,7 @@ interface EnhancedInventoryFilters {
 // FIXED INVENTORY DASHBOARD COMPONENT
 // ==========================================
 
-const InventoryDashboard = () => {
+const export default InventoryDashboard; = () => {
   const [inventoryData, setInventoryData] = useState<InventoryData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
