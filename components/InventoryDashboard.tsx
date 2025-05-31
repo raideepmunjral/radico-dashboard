@@ -409,7 +409,10 @@ const InventoryDashboard = () => {
 
     console.log(`🏪 Latest visits found for ${Object.keys(shopLatestVisits).length} unique shops`);
 
-    // STEP 3: FIXED - Collect ALL rows from the latest visits (using date string matching instead of exact timestamp)
+    // STEP 3: TRUE FIX - Collect ALL rows from latest visits using Shop ID + Visit key matching
+    const visitGroups: Record<string, any[]> = {};
+    
+    // First pass: Group ALL rows by Shop ID + Visit datetime (ignoring seconds)
     currentMonthRows.forEach(row => {
       const shopId = row[columnIndices.shopId];
       const checkInDateTime = row[columnIndices.checkInDateTime];
@@ -419,24 +422,41 @@ const InventoryDashboard = () => {
       
       try {
         const visitDate = new Date(checkInDateTime);
-        const latestVisit = shopLatestVisits[shopId];
+        // Create visit key: ShopID_YYYY-MM-DD_HH:MM (ignore seconds to group same visit)
+        const visitKey = `${shopId}_${visitDate.toISOString().split('T')[0]}_${visitDate.getHours().toString().padStart(2, '0')}:${visitDate.getMinutes().toString().padStart(2, '0')}`;
         
-        if (latestVisit) {
-          // FIXED: Use date string comparison instead of exact timestamp
-          const visitDateStr = visitDate.toISOString().split('T')[0] + ' ' + 
-                              visitDate.getHours().toString().padStart(2, '0') + ':' +
-                              visitDate.getMinutes().toString().padStart(2, '0');
-          const latestDateStr = latestVisit.visitDate.toISOString().split('T')[0] + ' ' + 
-                               latestVisit.visitDate.getHours().toString().padStart(2, '0') + ':' +
-                               latestVisit.visitDate.getMinutes().toString().padStart(2, '0');
-          
-          if (visitDateStr === latestDateStr) {
-            latestVisit.rows.push(row);
-            console.log(`✅ Added row for shop ${shopId}, brand: ${invBrand}`);
-          }
+        if (!visitGroups[visitKey]) {
+          visitGroups[visitKey] = [];
         }
+        visitGroups[visitKey].push(row);
+        
+        console.log(`🔄 Grouped row for visit ${visitKey}, brand: ${invBrand}`);
       } catch (error) {
-        // Skip invalid dates
+        console.warn(`Invalid date: ${checkInDateTime}`);
+      }
+    });
+    
+    console.log(`📊 Created ${Object.keys(visitGroups).length} visit groups from ${currentMonthRows.length} rows`);
+    
+    // Second pass: For each shop, get the latest visit and ALL its brand rows
+    Object.entries(visitGroups).forEach(([visitKey, visitRows]) => {
+      const firstRow = visitRows[0];
+      const shopId = firstRow[columnIndices.shopId];
+      const checkInDateTime = firstRow[columnIndices.checkInDateTime];
+      const visitDate = new Date(checkInDateTime);
+      
+      // Check if this is the latest visit for this shop
+      const latestVisit = shopLatestVisits[shopId];
+      if (latestVisit && visitDate.getTime() === latestVisit.visitDate.getTime()) {
+        // Add ALL brand rows from this visit
+        latestVisit.rows = visitRows;
+        console.log(`✅ Added ${visitRows.length} brand rows for shop ${shopId} (visit: ${visitKey})`);
+        
+        // Log all brands for this visit
+        visitRows.forEach((row, index) => {
+          const brand = row[columnIndices.invBrand];
+          console.log(`   Brand ${index + 1}: ${brand}`);
+        });
       }
     });
 
