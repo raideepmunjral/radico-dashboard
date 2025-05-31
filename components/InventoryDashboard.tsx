@@ -1731,7 +1731,7 @@ const FixedStockIntelligenceTab = ({
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {data.skuPerformance.filter((sku: any) => sku.outOfStockPercentage >= 30).map((sku: any, index: number) => (
+              {data.skuPerformance.filter((sku: any) => sku.outOfStockPercentage >= 30).map((sku: any) => (
                 <tr key={sku.name} className={sku.outOfStockPercentage >= 50 ? 'bg-red-50' : 'bg-yellow-50'}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
@@ -1829,8 +1829,7 @@ const FixedStockIntelligenceTab = ({
   );
 };
 
-export default InventoryDashboard;
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+export default InventoryDashboard; className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tracked Shops</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">In Stock</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Out of Stock</th>
@@ -2293,3 +2292,4 @@ const VisitComplianceTab = ({ data }: { data: InventoryData }) => (
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
+              <th
