@@ -459,6 +459,24 @@ const InventoryDashboard = () => {
     });
 
     console.log(`🏪 Latest visits found for ${Object.keys(shopLatestVisits).length} unique shops`);
+    
+    // Debug: Show the shops we found, especially GREATER KAILASH
+    const shopNames = Object.values(shopLatestVisits).map(shop => `${shop.shopId}: ${shop.shopName}`);
+    console.log(`🏪 Shop list preview:`, shopNames.slice(0, 5));
+    
+    const greaterKailashShop = Object.values(shopLatestVisits).find(shop => 
+      shop.shopId === '01/2024/0535' || shop.shopName?.includes('GREATER KAILASH')
+    );
+    if (greaterKailashShop) {
+      console.log(`🏪 FOUND GREATER KAILASH SHOP:`, {
+        shopId: greaterKailashShop.shopId,
+        shopName: greaterKailashShop.shopName,
+        visitDate: greaterKailashShop.visitDate.toLocaleDateString(),
+        salesman: greaterKailashShop.salesman
+      });
+    } else {
+      console.log(`🏪 ❌ GREATER KAILASH SHOP NOT FOUND in latest visits`);
+    }
 
     const shopLatestVisitRows: Record<string, any[]> = {};
     
@@ -600,20 +618,22 @@ const InventoryDashboard = () => {
         else if (ageInDays >= 45) ageCategory = 'days45to60';
         else if (ageInDays >= 30) ageCategory = 'days30to45';
 
-        // FIXED: Enhanced supply status with correct logic
+        // FIXED: Enhanced supply status with CORRECT logic and DEBUGGING
         const advancedSupplyStatus = getAdvancedSupplyStatus(
           quantity,
           shopVisit.visitDate,
           supplyCheckResult
         );
 
-        // Determine base supply status
+        // Determine base supply status with DEBUGGING
         let supplyStatus: InventoryItem['supplyStatus'] = 'unknown';
         
         if (supplyCheckResult.wasRestocked) {
           supplyStatus = 'recently_restocked';
+          console.log(`🎯 Setting supply status to 'recently_restocked' for ${brand} at shop ${shopVisit.shopId}`);
         } else if (quantity === 0) {
           supplyStatus = 'awaiting_supply';
+          console.log(`🎯 Setting supply status to 'awaiting_supply' for ${brand} at shop ${shopVisit.shopId}`);
         } else {
           if (ageInDays >= 90) supplyStatus = 'aging_critical';
           else if (ageInDays >= 75) supplyStatus = 'aging_75_90';
@@ -621,6 +641,7 @@ const InventoryDashboard = () => {
           else if (ageInDays >= 45) supplyStatus = 'aging_45_60';
           else if (ageInDays >= 30) supplyStatus = 'aging_30_45';
           else supplyStatus = 'current';
+          console.log(`🎯 Setting supply status to '${supplyStatus}' for ${brand} at shop ${shopVisit.shopId} (age: ${ageInDays} days)`);
         }
 
         // Stock status detection
@@ -774,9 +795,15 @@ const InventoryDashboard = () => {
     const avgAge = allAgingLocations.length > 0 ? 
       Math.round(allAgingLocations.reduce((sum, item) => sum + item.ageInDays, 0) / allAgingLocations.length) : 0;
     const recentlyRestockedItems = Object.values(shops).reduce((sum, shop) => 
-      sum + Object.values(shop.items).filter(item => 
-        item.suppliedAfterOutOfStock || (item as any).advancedSupplyStatus?.includes('Restocked')
-      ).length, 0);
+      sum + Object.values(shop.items).filter(item => {
+        const isRestocked = item.suppliedAfterOutOfStock || (item as any).advancedSupplyStatus?.includes('Restocked');
+        if (isRestocked) {
+          console.log(`🎯 Found restocked item: ${item.brand} at shop ${shop.shopName} (${shop.shopId})`);
+        }
+        return isRestocked;
+      }).length, 0);
+    
+    console.log(`🎯 Total recently restocked items calculated: ${recentlyRestockedItems}`);
 
     const salesmenStats = Object.values(salesmenVisits).map((salesman: any) => ({
       name: salesman.name,
@@ -832,15 +859,21 @@ const InventoryDashboard = () => {
     if (!dateStr) return null;
     
     try {
+      console.log(`🔧 Parsing date: "${dateStr}"`);
+      
       // Handle DD-MMM-YYYY HH:MM format (from visit sheet: "13-May-2025 15:43")
       if (dateStr.includes('-') && (dateStr.includes('Jan') || dateStr.includes('Feb') || dateStr.includes('Mar') || 
           dateStr.includes('Apr') || dateStr.includes('May') || dateStr.includes('Jun') || 
           dateStr.includes('Jul') || dateStr.includes('Aug') || dateStr.includes('Sep') || 
           dateStr.includes('Oct') || dateStr.includes('Nov') || dateStr.includes('Dec'))) {
+        console.log(`🔧 Detected DD-MMM-YYYY format: "${dateStr}"`);
         // JavaScript can parse this format directly
         const parsedDate = new Date(dateStr);
         if (!isNaN(parsedDate.getTime())) {
+          console.log(`✅ Successfully parsed: "${dateStr}" -> ${parsedDate.toLocaleDateString()}`);
           return parsedDate;
+        } else {
+          console.log(`❌ Failed to parse DD-MMM-YYYY: "${dateStr}"`);
         }
       }
       
@@ -851,10 +884,14 @@ const InventoryDashboard = () => {
           // Check if it's DD-MM-YYYY or YYYY-MM-DD
           if (dateParts[0].length === 4) {
             // YYYY-MM-DD format
-            return new Date(dateStr);
+            const parsedDate = new Date(dateStr);
+            console.log(`✅ Successfully parsed YYYY-MM-DD: "${dateStr}" -> ${parsedDate.toLocaleDateString()}`);
+            return parsedDate;
           } else {
             // DD-MM-YYYY format
-            return new Date(`${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`);
+            const parsedDate = new Date(`${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`);
+            console.log(`✅ Successfully parsed DD-MM-YYYY: "${dateStr}" -> ${parsedDate.toLocaleDateString()}`);
+            return parsedDate;
           }
         }
       }
@@ -864,14 +901,23 @@ const InventoryDashboard = () => {
         const dateParts = dateStr.split('/');
         if (dateParts.length === 3) {
           // Assume DD/MM/YYYY format
-          return new Date(`${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`);
+          const parsedDate = new Date(`${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`);
+          console.log(`✅ Successfully parsed DD/MM/YYYY: "${dateStr}" -> ${parsedDate.toLocaleDateString()}`);
+          return parsedDate;
         }
       }
       
       // Try direct parsing as fallback
       const parsedDate = new Date(dateStr);
-      return isNaN(parsedDate.getTime()) ? null : parsedDate;
-    } catch {
+      if (!isNaN(parsedDate.getTime())) {
+        console.log(`✅ Successfully parsed with fallback: "${dateStr}" -> ${parsedDate.toLocaleDateString()}`);
+        return parsedDate;
+      } else {
+        console.log(`❌ All parsing methods failed for: "${dateStr}"`);
+        return null;
+      }
+    } catch (error) {
+      console.log(`❌ Exception parsing date "${dateStr}":`, error);
       return null;
     }
   };
@@ -989,7 +1035,13 @@ const InventoryDashboard = () => {
     });
     
     console.log('📦 Recent supplies processed:', processedEntries, 'valid entries');
-    console.log('📦 Sample supply keys for shop 01/2024/0535:', Object.keys(recentSupplies).filter(k => k.includes('01/2024/0535')).slice(0, 5));
+    console.log('📦 Sample supply keys for shop 01/2024/0535:', Object.keys(recentSupplies).filter(k => k.includes('01/2024/0535')).slice(0, 10));
+    console.log('📦 Total supply keys created:', Object.keys(recentSupplies).length);
+    
+    // Debug: show some sample supply dates
+    const sampleSupplies = Object.entries(recentSupplies).slice(0, 5);
+    console.log('📦 Sample supplies:', sampleSupplies.map(([key, date]) => `${key}: ${date.toLocaleDateString()}`));
+    
     return recentSupplies;
   };
 
