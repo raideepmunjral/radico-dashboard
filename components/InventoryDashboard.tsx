@@ -697,13 +697,15 @@ const InventoryDashboard = () => {
           isEstimatedAge,
           suppliedAfterOutOfStock,
           daysSinceLastSupply: lastSupplyDate ? Math.floor((shopVisit.visitDate.getTime() - lastSupplyDate.getTime()) / (1000 * 60 * 60 * 24)) : undefined,
-          daysOutOfStock,
-          supplyDateAfterVisit,
-          currentDaysOutOfStock: isOutOfStock ? calculateDaysCurrentlyOutOfStock(shopVisit.visitDate) : undefined,
-          isInGracePeriod,
-          advancedSupplyStatus,
           supplyStatus
         };
+
+        // Add enhanced properties after creation to avoid TypeScript conflicts
+        (inventoryItem as any).daysOutOfStock = daysOutOfStock;
+        (inventoryItem as any).supplyDateAfterVisit = supplyDateAfterVisit;
+        (inventoryItem as any).currentDaysOutOfStock = isOutOfStock ? calculateDaysCurrentlyOutOfStock(shopVisit.visitDate) : undefined;
+        (inventoryItem as any).isInGracePeriod = isInGracePeriod;
+        (inventoryItem as any).advancedSupplyStatus = advancedSupplyStatus;
 
         shopInventory.items[brand] = inventoryItem;
         shopInventory.totalItems++;
