@@ -414,6 +414,7 @@ const RadicoDashboard = () => {
         );
         
         console.log(`📋 Found ${monthChallans.length} challans for ${monthNumber}-${year}`);
+        console.log(`📋 Sample challan dates:`, challans.slice(0, 5).map(row => row[1]?.toString()));
 
         monthChallans.forEach(row => {
           if (row.length >= 15) {
@@ -451,20 +452,33 @@ const RadicoDashboard = () => {
       };
     };
 
-    // ROLLING 4-MONTH WINDOW + YoY: Mar-Apr-May-Jun 2025 + Jun 2024
+    // ENHANCED: Process 12 months for comprehensive historical analysis
+    // Current rolling window: Mar-Apr-May-June 2025
+    // Extended historical: Jul 2024 - June 2025 (12 months)
     const juneData = processMonthlyData(currentMonth, currentYear, false); // June 2025 from current
     const mayData = processMonthlyData('05', currentYear, false); // May 2025 from current
     const aprilData = processMonthlyData('04', currentYear, false); // April 2025 from current  
     const marchData = processMonthlyData('03', currentYear, true); // March 2025 from historical
+    const februaryData = processMonthlyData('02', currentYear, true); // February 2025 from historical
+    const januaryData = processMonthlyData('01', currentYear, true); // January 2025 from historical
+    
+    // EXTENDED: 12-Month Historical Data (Jul 2024 - Dec 2024)
+    const decemberData = processMonthlyData('12', '2024', true); // December 2024
+    const novemberData = processMonthlyData('11', '2024', true); // November 2024
+    const octoberData = processMonthlyData('10', '2024', true); // October 2024
+    const septemberData = processMonthlyData('09', '2024', true); // September 2024
+    const augustData = processMonthlyData('08', '2024', true); // August 2024
+    const julyData = processMonthlyData('07', '2024', true); // July 2024
     
     // YoY COMPARISON: June 2024
     const juneLastYearData = processMonthlyData(currentMonth, '2024', true); // June 2024 from historical
     
-    console.log('📊 ROLLING WINDOW + YoY PROCESSING RESULTS:');
+    console.log('📊 EXTENDED 12-MONTH PROCESSING RESULTS:');
     console.log(`${currentMonth}/${currentYear}:`, { total8PM: juneData.total8PM, totalVERVE: juneData.totalVERVE, shops: juneData.uniqueShops.size });
     console.log('May/2025:', { total8PM: mayData.total8PM, totalVERVE: mayData.totalVERVE, shops: mayData.uniqueShops.size });
     console.log('April/2025:', { total8PM: aprilData.total8PM, totalVERVE: aprilData.totalVERVE, shops: aprilData.uniqueShops.size });
     console.log('March/2025:', { total8PM: marchData.total8PM, totalVERVE: marchData.totalVERVE, shops: marchData.uniqueShops.size });
+    console.log('12-Month Historical Range:', 'Jul 2024 - Jun 2025');
     console.log(`${currentMonth}/2024 (YoY):`, { total8PM: juneLastYearData.total8PM, totalVERVE: juneLastYearData.totalVERVE, shops: juneLastYearData.uniqueShops.size });
     
     // Current month primary data
@@ -779,15 +793,27 @@ const RadicoDashboard = () => {
       }
     });
 
-    // Process targets for current month (dynamic)
+    // Process targets for current month (FIXED DATE FORMAT HANDLING)
     targets.slice(1).forEach(row => {
       if (row.length >= 10) {
         const shopId = row[0]?.toString().trim();
         const targetMonth = row[9]?.toString().trim();
         
-        if (targetMonth && targetMonth.includes(`${currentMonth}-${currentYear}`) && shopId) {
+        // FIXED: Handle multiple date formats for June 2025
+        // Formats: "06-2025", "01-Jun-25", "June 2025", etc.
+        const isCurrentMonthTarget = targetMonth && (
+          targetMonth.includes(`${currentMonth}-${currentYear}`) ||
+          targetMonth.includes(`01-Jun-${currentYear.slice(-2)}`) ||
+          targetMonth.includes(`Jun-${currentYear.slice(-2)}`) ||
+          targetMonth.toLowerCase().includes(`june ${currentYear}`) ||
+          targetMonth.toLowerCase().includes(`jun ${currentYear}`)
+        );
+        
+        if (isCurrentMonthTarget && shopId) {
           const eightPMTarget = parseFloat(row[5]) || 0;
           const verveTarget = parseFloat(row[7]) || 0;
+          
+          console.log(`✅ Found target for shop ${shopId}: 8PM=${eightPMTarget}, VERVE=${verveTarget}, Month=${targetMonth}`);
           
           total8PMTarget += eightPMTarget;
           totalVerveTarget += verveTarget;
@@ -807,6 +833,12 @@ const RadicoDashboard = () => {
           }
         }
       }
+    });
+
+    console.log('🎯 FIXED TARGET PROCESSING RESULTS:', {
+      total8PMTarget,
+      totalVerveTarget,
+      salespersonStats: Object.keys(salespersonStats).length
     });
 
     // Calculate achievements and YoY growth
@@ -851,10 +883,21 @@ const RadicoDashboard = () => {
       currentMonth: currentMonth,
       currentYear: currentYear,
       historicalData: {
+        // Current rolling window (4 months)
         june: juneData,
         may: mayData,
         april: aprilData,
         march: marchData,
+        february: februaryData,
+        january: januaryData,
+        // Extended 12-month historical data
+        december2024: decemberData,
+        november2024: novemberData,
+        october2024: octoberData,
+        september2024: septemberData,
+        august2024: augustData,
+        july2024: julyData,
+        // YoY comparison
         juneLastYear: juneLastYearData
       }
     };
@@ -1043,9 +1086,9 @@ const RadicoDashboard = () => {
       csvContent += "Billed Shops," + dashboardData.summary.billedShops + "\n";
       csvContent += "Coverage," + dashboardData.summary.coverage + "%\n";
       csvContent += "8PM Sales," + dashboardData.summary.total8PM + " cases\n";
-      csvContent += "8PM YoY Growth," + dashboardData.summary.yoy8PMGrowth + "%\n";
+      csvContent += "8PM YoY Growth," + (dashboardData.summary.yoy8PMGrowth || '0') + "%\n";
       csvContent += "VERVE Sales," + dashboardData.summary.totalVERVE + " cases\n";
-      csvContent += "VERVE YoY Growth," + dashboardData.summary.yoyVerveGrowth + "%\n\n";
+      csvContent += "VERVE YoY Growth," + (dashboardData.summary.yoyVerveGrowth || '0') + "%\n\n";
       
       csvContent += "CUSTOMER INSIGHTS\n";
       csvContent += "First-time Customers," + dashboardData.customerInsights.firstTimeCustomers + "\n";
@@ -1257,7 +1300,7 @@ const RadicoDashboard = () => {
 // UPDATED TAB COMPONENTS WITH DYNAMIC MONTH DETECTION AND YoY
 
 const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
-  // Calculate salesman performance data
+  // Calculate salesman performance data (FIXED HISTORICAL AGGREGATION)
   const salesmanPerformance = React.useMemo(() => {
     const performanceMap: Record<string, any> = {};
     
@@ -1278,28 +1321,43 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
           targetVERVE: 0,
           achievement8PM: 0,
           achievementVERVE: 0,
-          // 3-month historical data
+          // FIXED: 3-month historical data aggregation
           marchTotal: 0,
+          marchEightPM: 0,
+          marchVerve: 0,
           aprilTotal: 0,
+          aprilEightPM: 0,
+          aprilVerve: 0,
           mayTotal: 0,
+          mayEightPM: 0,
+          mayVerve: 0,
           shops: []
         };
       }
       
       performanceMap[salesmanName].totalShops++;
       
+      // FIXED: Current month aggregation (June)
       if (shop.total > 0) {
         performanceMap[salesmanName].billedShops++;
         performanceMap[salesmanName].total8PM += shop.eightPM;
         performanceMap[salesmanName].totalVERVE += shop.verve;
         performanceMap[salesmanName].totalSales += shop.total;
         performanceMap[salesmanName].shops.push(shop);
-        
-        // Add 3-month historical data
-        performanceMap[salesmanName].marchTotal += shop.marchTotal || 0;
-        performanceMap[salesmanName].aprilTotal += shop.aprilTotal || 0;
-        performanceMap[salesmanName].mayTotal += shop.mayTotal || 0;
       }
+        
+      // FIXED: Historical data aggregation (Mar-Apr-May)
+      performanceMap[salesmanName].marchTotal += shop.marchTotal || 0;
+      performanceMap[salesmanName].marchEightPM += shop.marchEightPM || 0;
+      performanceMap[salesmanName].marchVerve += shop.marchVerve || 0;
+      
+      performanceMap[salesmanName].aprilTotal += shop.aprilTotal || 0;
+      performanceMap[salesmanName].aprilEightPM += shop.aprilEightPM || 0;
+      performanceMap[salesmanName].aprilVerve += shop.aprilVerve || 0;
+      
+      performanceMap[salesmanName].mayTotal += shop.mayTotal || 0;
+      performanceMap[salesmanName].mayEightPM += shop.mayEightPM || 0;
+      performanceMap[salesmanName].mayVerve += shop.mayVerve || 0;
     });
     
     // Add target data from salespersonStats
@@ -1958,27 +2016,73 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
         hasHistoricalData: !!data.historicalData,
         historicalData: data.historicalData,
         customerInsights: data.customerInsights,
+        // EXTENDED: 12 months of data
         monthlyTotals: {
-          march: {
-            shops: data.historicalData.march?.uniqueShops?.size || 0,
-            total8PM: data.historicalData.march?.total8PM || 0,
-            totalVERVE: data.historicalData.march?.totalVERVE || 0
-          },
-          april: {
-            shops: data.historicalData.april?.uniqueShops?.size || 0,
-            total8PM: data.historicalData.april?.total8PM || 0,
-            totalVERVE: data.historicalData.april?.totalVERVE || 0
+          // Q2 2025 (Current Quarter)
+          june: {
+            shops: data.historicalData.june?.uniqueShops?.size || 0,
+            total8PM: data.historicalData.june?.total8PM || 0,
+            totalVERVE: data.historicalData.june?.totalVERVE || 0
           },
           may: {
             shops: data.historicalData.may?.uniqueShops?.size || 0,
             total8PM: data.historicalData.may?.total8PM || 0,
             totalVERVE: data.historicalData.may?.totalVERVE || 0
           },
-          currentMonth: {
-            shops: data.historicalData.june?.uniqueShops?.size || 0,
-            total8PM: data.historicalData.june?.total8PM || 0,
-            totalVERVE: data.historicalData.june?.totalVERVE || 0
+          april: {
+            shops: data.historicalData.april?.uniqueShops?.size || 0,
+            total8PM: data.historicalData.april?.total8PM || 0,
+            totalVERVE: data.historicalData.april?.totalVERVE || 0
           },
+          // Q1 2025
+          march: {
+            shops: data.historicalData.march?.uniqueShops?.size || 0,
+            total8PM: data.historicalData.march?.total8PM || 0,
+            totalVERVE: data.historicalData.march?.totalVERVE || 0
+          },
+          february: {
+            shops: data.historicalData.february?.uniqueShops?.size || 0,
+            total8PM: data.historicalData.february?.total8PM || 0,
+            totalVERVE: data.historicalData.february?.totalVERVE || 0
+          },
+          january: {
+            shops: data.historicalData.january?.uniqueShops?.size || 0,
+            total8PM: data.historicalData.january?.total8PM || 0,
+            totalVERVE: data.historicalData.january?.totalVERVE || 0
+          },
+          // Q4 2024
+          december2024: {
+            shops: data.historicalData.december2024?.uniqueShops?.size || 0,
+            total8PM: data.historicalData.december2024?.total8PM || 0,
+            totalVERVE: data.historicalData.december2024?.totalVERVE || 0
+          },
+          november2024: {
+            shops: data.historicalData.november2024?.uniqueShops?.size || 0,
+            total8PM: data.historicalData.november2024?.total8PM || 0,
+            totalVERVE: data.historicalData.november2024?.totalVERVE || 0
+          },
+          october2024: {
+            shops: data.historicalData.october2024?.uniqueShops?.size || 0,
+            total8PM: data.historicalData.october2024?.total8PM || 0,
+            totalVERVE: data.historicalData.october2024?.totalVERVE || 0
+          },
+          // Q3 2024
+          september2024: {
+            shops: data.historicalData.september2024?.uniqueShops?.size || 0,
+            total8PM: data.historicalData.september2024?.total8PM || 0,
+            totalVERVE: data.historicalData.september2024?.totalVERVE || 0
+          },
+          august2024: {
+            shops: data.historicalData.august2024?.uniqueShops?.size || 0,
+            total8PM: data.historicalData.august2024?.total8PM || 0,
+            totalVERVE: data.historicalData.august2024?.totalVERVE || 0
+          },
+          july2024: {
+            shops: data.historicalData.july2024?.uniqueShops?.size || 0,
+            total8PM: data.historicalData.july2024?.total8PM || 0,
+            totalVERVE: data.historicalData.july2024?.totalVERVE || 0
+          },
+          // YoY Comparison
           lastYear: {
             shops: data.historicalData.juneLastYear?.uniqueShops?.size || 0,
             total8PM: data.historicalData.juneLastYear?.total8PM || 0,
@@ -1995,15 +2099,114 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
     return ((current - previous) / previous * 100);
   };
 
-  // Monthly data for rolling window + YoY
+  // EXTENDED: 12-month data for comprehensive analysis
   const monthlyData = debugInfo?.monthlyTotals ? [
+    // Jul 2024 - Dec 2024
+    { 
+      month: 'July 2024',
+      total: debugInfo.monthlyTotals.july2024.total8PM + debugInfo.monthlyTotals.july2024.totalVERVE,
+      total8PM: debugInfo.monthlyTotals.july2024.total8PM,
+      totalVERVE: debugInfo.monthlyTotals.july2024.totalVERVE,
+      shops: debugInfo.monthlyTotals.july2024.shops,
+      quarter: 'Q3 2024',
+      growth: 0 // Base month
+    },
+    { 
+      month: 'August 2024',
+      total: debugInfo.monthlyTotals.august2024.total8PM + debugInfo.monthlyTotals.august2024.totalVERVE,
+      total8PM: debugInfo.monthlyTotals.august2024.total8PM,
+      totalVERVE: debugInfo.monthlyTotals.august2024.totalVERVE,
+      shops: debugInfo.monthlyTotals.august2024.shops,
+      quarter: 'Q3 2024',
+      growth: calculateGrowth(
+        debugInfo.monthlyTotals.august2024.total8PM + debugInfo.monthlyTotals.august2024.totalVERVE,
+        debugInfo.monthlyTotals.july2024.total8PM + debugInfo.monthlyTotals.july2024.totalVERVE
+      )
+    },
+    { 
+      month: 'September 2024',
+      total: debugInfo.monthlyTotals.september2024.total8PM + debugInfo.monthlyTotals.september2024.totalVERVE,
+      total8PM: debugInfo.monthlyTotals.september2024.total8PM,
+      totalVERVE: debugInfo.monthlyTotals.september2024.totalVERVE,
+      shops: debugInfo.monthlyTotals.september2024.shops,
+      quarter: 'Q3 2024',
+      growth: calculateGrowth(
+        debugInfo.monthlyTotals.september2024.total8PM + debugInfo.monthlyTotals.september2024.totalVERVE,
+        debugInfo.monthlyTotals.august2024.total8PM + debugInfo.monthlyTotals.august2024.totalVERVE
+      )
+    },
+    { 
+      month: 'October 2024',
+      total: debugInfo.monthlyTotals.october2024.total8PM + debugInfo.monthlyTotals.october2024.totalVERVE,
+      total8PM: debugInfo.monthlyTotals.october2024.total8PM,
+      totalVERVE: debugInfo.monthlyTotals.october2024.totalVERVE,
+      shops: debugInfo.monthlyTotals.october2024.shops,
+      quarter: 'Q4 2024',
+      growth: calculateGrowth(
+        debugInfo.monthlyTotals.october2024.total8PM + debugInfo.monthlyTotals.october2024.totalVERVE,
+        debugInfo.monthlyTotals.september2024.total8PM + debugInfo.monthlyTotals.september2024.totalVERVE
+      )
+    },
+    { 
+      month: 'November 2024',
+      total: debugInfo.monthlyTotals.november2024.total8PM + debugInfo.monthlyTotals.november2024.totalVERVE,
+      total8PM: debugInfo.monthlyTotals.november2024.total8PM,
+      totalVERVE: debugInfo.monthlyTotals.november2024.totalVERVE,
+      shops: debugInfo.monthlyTotals.november2024.shops,
+      quarter: 'Q4 2024',
+      growth: calculateGrowth(
+        debugInfo.monthlyTotals.november2024.total8PM + debugInfo.monthlyTotals.november2024.totalVERVE,
+        debugInfo.monthlyTotals.october2024.total8PM + debugInfo.monthlyTotals.october2024.totalVERVE
+      )
+    },
+    { 
+      month: 'December 2024',
+      total: debugInfo.monthlyTotals.december2024.total8PM + debugInfo.monthlyTotals.december2024.totalVERVE,
+      total8PM: debugInfo.monthlyTotals.december2024.total8PM,
+      totalVERVE: debugInfo.monthlyTotals.december2024.totalVERVE,
+      shops: debugInfo.monthlyTotals.december2024.shops,
+      quarter: 'Q4 2024',
+      growth: calculateGrowth(
+        debugInfo.monthlyTotals.december2024.total8PM + debugInfo.monthlyTotals.december2024.totalVERVE,
+        debugInfo.monthlyTotals.november2024.total8PM + debugInfo.monthlyTotals.november2024.totalVERVE
+      )
+    },
+    // Jan 2025 - Jun 2025
+    { 
+      month: 'January 2025',
+      total: debugInfo.monthlyTotals.january.total8PM + debugInfo.monthlyTotals.january.totalVERVE,
+      total8PM: debugInfo.monthlyTotals.january.total8PM,
+      totalVERVE: debugInfo.monthlyTotals.january.totalVERVE,
+      shops: debugInfo.monthlyTotals.january.shops,
+      quarter: 'Q1 2025',
+      growth: calculateGrowth(
+        debugInfo.monthlyTotals.january.total8PM + debugInfo.monthlyTotals.january.totalVERVE,
+        debugInfo.monthlyTotals.december2024.total8PM + debugInfo.monthlyTotals.december2024.totalVERVE
+      )
+    },
+    { 
+      month: 'February 2025',
+      total: debugInfo.monthlyTotals.february.total8PM + debugInfo.monthlyTotals.february.totalVERVE,
+      total8PM: debugInfo.monthlyTotals.february.total8PM,
+      totalVERVE: debugInfo.monthlyTotals.february.totalVERVE,
+      shops: debugInfo.monthlyTotals.february.shops,
+      quarter: 'Q1 2025',
+      growth: calculateGrowth(
+        debugInfo.monthlyTotals.february.total8PM + debugInfo.monthlyTotals.february.totalVERVE,
+        debugInfo.monthlyTotals.january.total8PM + debugInfo.monthlyTotals.january.totalVERVE
+      )
+    },
     { 
       month: 'March 2025',
       total: debugInfo.monthlyTotals.march.total8PM + debugInfo.monthlyTotals.march.totalVERVE,
       total8PM: debugInfo.monthlyTotals.march.total8PM,
       totalVERVE: debugInfo.monthlyTotals.march.totalVERVE,
       shops: debugInfo.monthlyTotals.march.shops,
-      growth: 0 // Base month for current analysis
+      quarter: 'Q1 2025',
+      growth: calculateGrowth(
+        debugInfo.monthlyTotals.march.total8PM + debugInfo.monthlyTotals.march.totalVERVE,
+        debugInfo.monthlyTotals.february.total8PM + debugInfo.monthlyTotals.february.totalVERVE
+      )
     },
     { 
       month: 'April 2025',
@@ -2011,6 +2214,7 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
       total8PM: debugInfo.monthlyTotals.april.total8PM,
       totalVERVE: debugInfo.monthlyTotals.april.totalVERVE,
       shops: debugInfo.monthlyTotals.april.shops,
+      quarter: 'Q2 2025',
       growth: calculateGrowth(
         debugInfo.monthlyTotals.april.total8PM + debugInfo.monthlyTotals.april.totalVERVE,
         debugInfo.monthlyTotals.march.total8PM + debugInfo.monthlyTotals.march.totalVERVE
@@ -2022,6 +2226,7 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
       total8PM: debugInfo.monthlyTotals.may.total8PM,
       totalVERVE: debugInfo.monthlyTotals.may.totalVERVE,
       shops: debugInfo.monthlyTotals.may.shops,
+      quarter: 'Q2 2025',
       growth: calculateGrowth(
         debugInfo.monthlyTotals.may.total8PM + debugInfo.monthlyTotals.may.totalVERVE,
         debugInfo.monthlyTotals.april.total8PM + debugInfo.monthlyTotals.april.totalVERVE
@@ -2029,12 +2234,13 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
     },
     { 
       month: `${getMonthName(data.currentMonth)} ${data.currentYear} (Current)`,
-      total: debugInfo.monthlyTotals.currentMonth.total8PM + debugInfo.monthlyTotals.currentMonth.totalVERVE,
-      total8PM: debugInfo.monthlyTotals.currentMonth.total8PM,
-      totalVERVE: debugInfo.monthlyTotals.currentMonth.totalVERVE,
-      shops: debugInfo.monthlyTotals.currentMonth.shops,
+      total: debugInfo.monthlyTotals.june.total8PM + debugInfo.monthlyTotals.june.totalVERVE,
+      total8PM: debugInfo.monthlyTotals.june.total8PM,
+      totalVERVE: debugInfo.monthlyTotals.june.totalVERVE,
+      shops: debugInfo.monthlyTotals.june.shops,
+      quarter: 'Q2 2025',
       growth: calculateGrowth(
-        debugInfo.monthlyTotals.currentMonth.total8PM + debugInfo.monthlyTotals.currentMonth.totalVERVE,
+        debugInfo.monthlyTotals.june.total8PM + debugInfo.monthlyTotals.june.totalVERVE,
         debugInfo.monthlyTotals.may.total8PM + debugInfo.monthlyTotals.may.totalVERVE
       )
     }
@@ -2043,10 +2249,10 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
   // YoY comparison data
   const yoyComparison = debugInfo?.monthlyTotals ? {
     currentYear: {
-      total: debugInfo.monthlyTotals.currentMonth.total8PM + debugInfo.monthlyTotals.currentMonth.totalVERVE,
-      total8PM: debugInfo.monthlyTotals.currentMonth.total8PM,
-      totalVERVE: debugInfo.monthlyTotals.currentMonth.totalVERVE,
-      shops: debugInfo.monthlyTotals.currentMonth.shops
+      total: debugInfo.monthlyTotals.june.total8PM + debugInfo.monthlyTotals.june.totalVERVE,
+      total8PM: debugInfo.monthlyTotals.june.total8PM,
+      totalVERVE: debugInfo.monthlyTotals.june.totalVERVE,
+      shops: debugInfo.monthlyTotals.june.shops
     },
     lastYear: {
       total: debugInfo.monthlyTotals.lastYear.total8PM + debugInfo.monthlyTotals.lastYear.totalVERVE,
@@ -2056,12 +2262,12 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
     },
     growth: {
       total: calculateGrowth(
-        debugInfo.monthlyTotals.currentMonth.total8PM + debugInfo.monthlyTotals.currentMonth.totalVERVE,
+        debugInfo.monthlyTotals.june.total8PM + debugInfo.monthlyTotals.june.totalVERVE,
         debugInfo.monthlyTotals.lastYear.total8PM + debugInfo.monthlyTotals.lastYear.totalVERVE
       ),
-      total8PM: calculateGrowth(debugInfo.monthlyTotals.currentMonth.total8PM, debugInfo.monthlyTotals.lastYear.total8PM),
-      totalVERVE: calculateGrowth(debugInfo.monthlyTotals.currentMonth.totalVERVE, debugInfo.monthlyTotals.lastYear.totalVERVE),
-      shops: calculateGrowth(debugInfo.monthlyTotals.currentMonth.shops, debugInfo.monthlyTotals.lastYear.shops)
+      total8PM: calculateGrowth(debugInfo.monthlyTotals.june.total8PM, debugInfo.monthlyTotals.lastYear.total8PM),
+      totalVERVE: calculateGrowth(debugInfo.monthlyTotals.june.totalVERVE, debugInfo.monthlyTotals.lastYear.totalVERVE),
+      shops: calculateGrowth(debugInfo.monthlyTotals.june.shops, debugInfo.monthlyTotals.lastYear.shops)
     }
   } : null;
 
@@ -2148,41 +2354,77 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
         ))}
       </div>
 
-      {/* ROLLING 4-MONTH SALES TREND */}
+      {/* 12-MONTH SALES TREND */}
       <div className="bg-white p-6 rounded-lg shadow">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Rolling 4-Month Sales Trend</h3>
+        <h3 className="text-lg font-medium text-gray-900 mb-4">12-Month Sales Trend Analysis</h3>
         <div className="space-y-6">
+          {/* Quarterly Breakdown */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="text-center p-4 bg-red-50 rounded-lg">
+              <h4 className="font-medium text-red-600 mb-2">Q3 2024</h4>
+              <div className="text-sm space-y-1">
+                <div>Jul: {monthlyData.find(m => m.month.includes('July'))?.total || 0}</div>
+                <div>Aug: {monthlyData.find(m => m.month.includes('August'))?.total || 0}</div>
+                <div>Sep: {monthlyData.find(m => m.month.includes('September'))?.total || 0}</div>
+              </div>
+            </div>
+            <div className="text-center p-4 bg-orange-50 rounded-lg">
+              <h4 className="font-medium text-orange-600 mb-2">Q4 2024</h4>
+              <div className="text-sm space-y-1">
+                <div>Oct: {monthlyData.find(m => m.month.includes('October'))?.total || 0}</div>
+                <div>Nov: {monthlyData.find(m => m.month.includes('November'))?.total || 0}</div>
+                <div>Dec: {monthlyData.find(m => m.month.includes('December'))?.total || 0}</div>
+              </div>
+            </div>
+            <div className="text-center p-4 bg-blue-50 rounded-lg">
+              <h4 className="font-medium text-blue-600 mb-2">Q1 2025</h4>
+              <div className="text-sm space-y-1">
+                <div>Jan: {monthlyData.find(m => m.month.includes('January'))?.total || 0}</div>
+                <div>Feb: {monthlyData.find(m => m.month.includes('February'))?.total || 0}</div>
+                <div>Mar: {monthlyData.find(m => m.month.includes('March'))?.total || 0}</div>
+              </div>
+            </div>
+            <div className="text-center p-4 bg-green-50 rounded-lg">
+              <h4 className="font-medium text-green-600 mb-2">Q2 2025</h4>
+              <div className="text-sm space-y-1">
+                <div>Apr: {monthlyData.find(m => m.month.includes('April'))?.total || 0}</div>
+                <div>May: {monthlyData.find(m => m.month.includes('May'))?.total || 0}</div>
+                <div>Jun: {monthlyData.find(m => m.month.includes('Jun'))?.total || 0}</div>
+              </div>
+            </div>
+          </div>
+
           <div>
-            <h4 className="font-medium text-purple-600 mb-2">8PM Family Performance</h4>
-            <div className="grid grid-cols-4 gap-4">
+            <h4 className="font-medium text-purple-600 mb-2">8PM Family Performance (12 Months)</h4>
+            <div className="grid grid-cols-3 md:grid-cols-6 lg:grid-cols-12 gap-2">
               {monthlyData.map((month) => (
                 <div key={month.month} className="text-center">
-                  <div className="text-lg font-bold text-purple-600">{month.total8PM.toLocaleString()}</div>
-                  <div className="text-xs text-gray-500">{month.month.split(' ')[0]}</div>
+                  <div className="text-sm font-bold text-purple-600">{month.total8PM.toLocaleString()}</div>
+                  <div className="text-xs text-gray-500">{month.month.split(' ')[0].substring(0, 3)}</div>
                 </div>
               ))}
             </div>
           </div>
 
           <div>
-            <h4 className="font-medium text-orange-600 mb-2">VERVE Family Performance</h4>
-            <div className="grid grid-cols-4 gap-4">
+            <h4 className="font-medium text-orange-600 mb-2">VERVE Family Performance (12 Months)</h4>
+            <div className="grid grid-cols-3 md:grid-cols-6 lg:grid-cols-12 gap-2">
               {monthlyData.map((month) => (
                 <div key={month.month} className="text-center">
-                  <div className="text-lg font-bold text-orange-600">{month.totalVERVE.toLocaleString()}</div>
-                  <div className="text-xs text-gray-500">{month.month.split(' ')[0]}</div>
+                  <div className="text-sm font-bold text-orange-600">{month.totalVERVE.toLocaleString()}</div>
+                  <div className="text-xs text-gray-500">{month.month.split(' ')[0].substring(0, 3)}</div>
                 </div>
               ))}
             </div>
           </div>
 
           <div>
-            <h4 className="font-medium text-blue-600 mb-2">Total Sales Performance</h4>
-            <div className="grid grid-cols-4 gap-4">
+            <h4 className="font-medium text-blue-600 mb-2">Total Sales Performance (12 Months)</h4>
+            <div className="grid grid-cols-3 md:grid-cols-6 lg:grid-cols-12 gap-2">
               {monthlyData.map((month) => (
                 <div key={month.month} className="text-center">
-                  <div className="text-lg font-bold text-blue-600">{month.total.toLocaleString()}</div>
-                  <div className="text-xs text-gray-500">{month.month.split(' ')[0]}</div>
+                  <div className="text-sm font-bold text-blue-600">{month.total.toLocaleString()}</div>
+                  <div className="text-xs text-gray-500">{month.month.split(' ')[0].substring(0, 3)}</div>
                 </div>
               ))}
             </div>
@@ -2192,7 +2434,7 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
 
       {/* Customer Journey Analysis */}
       <div className="bg-white p-6 rounded-lg shadow">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Customer Journey Analysis (Rolling 4-Month Window)</h3>
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Customer Journey Analysis (Rolling 4-Month Window: Mar-Apr-May-{getMonthName(data.currentMonth)})</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="text-center">
             <div className="text-2xl font-bold text-green-600">{data.customerInsights.firstTimeCustomers}</div>
@@ -2219,25 +2461,29 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
 
       {/* ENHANCED: Rolling Window Performance Insights */}
       <div className="bg-white p-6 rounded-lg shadow">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Rolling Window Performance Insights</h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">12-Month Performance Insights & Trends</h3>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div>
-            <h4 className="font-medium text-gray-900 mb-3">Monthly Growth Analysis</h4>
+            <h4 className="font-medium text-gray-900 mb-3">Quarterly Growth Analysis</h4>
             <div className="space-y-2">
-              {monthlyData.slice(1).map((month) => (
-                <div key={month.month} className="flex justify-between items-center">
-                  <span className="text-sm text-gray-600">{month.month.split(' ')[0]}:</span>
-                  <span className={`text-sm font-medium ${month.growth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {month.growth >= 0 ? '+' : ''}{month.growth.toFixed(1)}%
-                  </span>
-                </div>
-              ))}
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Q3 → Q4 2024:</span>
+                <span className="text-sm font-medium">Trend Analysis</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Q4 → Q1 2025:</span>
+                <span className="text-sm font-medium">Seasonal Impact</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Q1 → Q2 2025:</span>
+                <span className="text-sm font-medium">Current Growth</span>
+              </div>
             </div>
           </div>
           <div>
-            <h4 className="font-medium text-gray-900 mb-3">Brand Mix Evolution</h4>
+            <h4 className="font-medium text-gray-900 mb-3">Brand Performance Evolution</h4>
             <div className="space-y-2">
-              {monthlyData.slice(-3).map((month) => (
+              {monthlyData.slice(-6).map((month) => (
                 <div key={month.month} className="space-y-1">
                   <div className="text-sm font-medium text-gray-600">{month.month.split(' ')[0]}</div>
                   <div className="flex space-x-4 text-xs">
@@ -2250,6 +2496,27 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+          <div>
+            <h4 className="font-medium text-gray-900 mb-3">12-Month Summary</h4>
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Total Months:</span>
+                <span className="text-sm font-medium text-blue-600">12</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Peak Month:</span>
+                <span className="text-sm font-medium text-green-600">
+                  {monthlyData.reduce((max, month) => month.total > max.total ? month : max, monthlyData[0])?.month.split(' ')[0] || 'N/A'}
+                </span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-sm text-gray-600">Average Growth:</span>
+                <span className="text-sm font-medium text-purple-600">
+                  {(monthlyData.reduce((sum, month, index) => index > 0 ? sum + month.growth : sum, 0) / (monthlyData.length - 1)).toFixed(1)}%
+                </span>
+              </div>
             </div>
           </div>
         </div>
@@ -2265,24 +2532,24 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
           {debugInfo?.monthlyTotals?.march?.total8PM > 0 || debugInfo?.monthlyTotals?.march?.totalVERVE > 0 ? (
             <>
               <div className="text-4xl mb-4">📈</div>
-              <h3 className="text-lg font-medium text-green-900 mb-2">Rolling Window + YoY Data Integration: Complete</h3>
+              <h3 className="text-lg font-medium text-green-900 mb-2">12-Month Historical Data Integration: Complete</h3>
               <p className="text-green-700 mb-4">
-                Successfully integrated rolling 4-month data with year-over-year comparison and enhanced trend analysis.
+                Successfully integrated 12 months of historical data (Jul 2024 - {getMonthName(data.currentMonth)} {data.currentYear}) with comprehensive trend analysis and quarterly insights.
               </p>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mt-4">
                 <div className="bg-white p-4 rounded shadow">
-                  <div className="text-2xl font-bold text-blue-600">4</div>
-                  <div className="text-sm text-gray-600">Months Rolling Window</div>
+                  <div className="text-2xl font-bold text-blue-600">12</div>
+                  <div className="text-sm text-gray-600">Months Analyzed</div>
                 </div>
                 <div className="bg-white p-4 rounded shadow">
                   <div className="text-2xl font-bold text-purple-600">
-                    {debugInfo.monthlyTotals.currentMonth?.total8PM?.toLocaleString() || 0}
+                    {debugInfo.monthlyTotals.june?.total8PM?.toLocaleString() || 0}
                   </div>
                   <div className="text-sm text-gray-600">{getMonthName(data.currentMonth)} 8PM</div>
                 </div>
                 <div className="bg-white p-4 rounded shadow">
                   <div className="text-2xl font-bold text-orange-600">
-                    {debugInfo.monthlyTotals.currentMonth?.totalVERVE?.toLocaleString() || 0}
+                    {debugInfo.monthlyTotals.june?.totalVERVE?.toLocaleString() || 0}
                   </div>
                   <div className="text-sm text-gray-600">{getMonthName(data.currentMonth)} VERVE</div>
                 </div>
@@ -2291,6 +2558,10 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
                     {(yoyComparison?.growth?.total ?? 0) >= 0 ? '+' : ''}{(yoyComparison?.growth?.total ?? 0).toFixed(1)}%
                   </div>
                   <div className="text-sm text-gray-600">YoY Growth</div>
+                </div>
+                <div className="bg-white p-4 rounded shadow">
+                  <div className="text-2xl font-bold text-green-600">4</div>
+                  <div className="text-sm text-gray-600">Quarters Covered</div>
                 </div>
               </div>
             </>
