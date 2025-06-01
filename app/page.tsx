@@ -987,7 +987,7 @@ const RadicoDashboard = () => {
       doc.text('Radico Khaitan Advanced Analytics Report', 20, 20);
       doc.setFontSize(12);
       doc.text(`Generated: ${new Date().toLocaleString()}`, 20, 30);
-      doc.text(`Report Period: ${getMonthName(currentMonth)} ${currentYear}`, 20, 40);
+      doc.text(`Report Period: ${getShortMonthName(currentMonth)} ${currentYear}`, 20, 40);
       
       doc.setFontSize(16);
       doc.text('Executive Summary', 20, 60);
@@ -998,10 +998,10 @@ const RadicoDashboard = () => {
         ['Coverage', `${dashboardData.summary.coverage}%`],
         ['8PM Sales', `${dashboardData.summary.total8PM} cases`],
         ['8PM Achievement', `${dashboardData.summary.eightPmAchievement}%`],
-        ['8PM YoY Growth', `${dashboardData.summary.yoy8PMGrowth}%`],
+        ['8PM YoY Growth', `${dashboardData.summary.yoy8PMGrowth || '0'}%`],
         ['VERVE Sales', `${dashboardData.summary.totalVERVE} cases`],
         ['VERVE Achievement', `${dashboardData.summary.verveAchievement}%`],
-        ['VERVE YoY Growth', `${dashboardData.summary.yoyVerveGrowth}%`],
+        ['VERVE YoY Growth', `${dashboardData.summary.yoyVerveGrowth || '0'}%`],
         ['Total Sales', `${dashboardData.summary.totalSales} cases`]
       ];
 
@@ -1126,7 +1126,7 @@ const RadicoDashboard = () => {
             <div className="flex items-center mb-4 sm:mb-0">
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Radico Khaitan Analytics Dashboard</h1>
               <span className="ml-3 px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
-                Live Data - {getMonthName(currentMonth)} {currentYear}
+                Live Data - {getShortMonthName(currentMonth)} {currentYear}
               </span>
               {dashboardData?.summary.yoy8PMGrowth && (
                 <span className={`ml-2 px-3 py-1 text-xs font-medium rounded-full ${
@@ -1134,7 +1134,7 @@ const RadicoDashboard = () => {
                     ? 'bg-green-100 text-green-800' 
                     : 'bg-red-100 text-red-800'
                 }`}>
-                  YoY: {dashboardData.summary.yoy8PMGrowth >= '0' ? '+' : ''}{dashboardData.summary.yoy8PMGrowth}%
+                  YoY: {parseFloat(dashboardData.summary.yoy8PMGrowth) >= 0 ? '+' : ''}{dashboardData.summary.yoy8PMGrowth}%
                 </span>
               )}
             </div>
@@ -2081,32 +2081,32 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
               <div className="text-2xl font-bold text-blue-600">{yoyComparison.currentYear.total.toLocaleString()}</div>
               <div className="text-sm text-gray-500">{getMonthName(data.currentMonth)} {data.currentYear}</div>
               <div className="text-xs text-gray-400">vs {yoyComparison.lastYear.total.toLocaleString()} last year</div>
-              <div className={`text-sm font-medium ${yoyComparison.growth.total >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {yoyComparison.growth.total >= 0 ? '+' : ''}{yoyComparison.growth.total.toFixed(1)}% YoY
+              <div className={`text-sm font-medium ${yoyComparison?.growth?.total >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {(yoyComparison?.growth?.total ?? 0) >= 0 ? '+' : ''}{(yoyComparison?.growth?.total ?? 0).toFixed(1)}% YoY
               </div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-purple-600">{yoyComparison.currentYear.total8PM.toLocaleString()}</div>
               <div className="text-sm text-gray-500">8PM {data.currentYear}</div>
               <div className="text-xs text-gray-400">vs {yoyComparison.lastYear.total8PM.toLocaleString()} last year</div>
-              <div className={`text-sm font-medium ${yoyComparison.growth.total8PM >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {yoyComparison.growth.total8PM >= 0 ? '+' : ''}{yoyComparison.growth.total8PM.toFixed(1)}% YoY
+              <div className={`text-sm font-medium ${yoyComparison?.growth?.total8PM >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {(yoyComparison?.growth?.total8PM ?? 0) >= 0 ? '+' : ''}{(yoyComparison?.growth?.total8PM ?? 0).toFixed(1)}% YoY
               </div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-orange-600">{yoyComparison.currentYear.totalVERVE.toLocaleString()}</div>
               <div className="text-sm text-gray-500">VERVE {data.currentYear}</div>
               <div className="text-xs text-gray-400">vs {yoyComparison.lastYear.totalVERVE.toLocaleString()} last year</div>
-              <div className={`text-sm font-medium ${yoyComparison.growth.totalVERVE >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {yoyComparison.growth.totalVERVE >= 0 ? '+' : ''}{yoyComparison.growth.totalVERVE.toFixed(1)}% YoY
+              <div className={`text-sm font-medium ${yoyComparison?.growth?.totalVERVE >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {(yoyComparison?.growth?.totalVERVE ?? 0) >= 0 ? '+' : ''}{(yoyComparison?.growth?.totalVERVE ?? 0).toFixed(1)}% YoY
               </div>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-green-600">{yoyComparison.currentYear.shops}</div>
               <div className="text-sm text-gray-500">Active Shops {data.currentYear}</div>
               <div className="text-xs text-gray-400">vs {yoyComparison.lastYear.shops} last year</div>
-              <div className={`text-sm font-medium ${yoyComparison.growth.shops >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                {yoyComparison.growth.shops >= 0 ? '+' : ''}{yoyComparison.growth.shops.toFixed(1)}% YoY
+              <div className={`text-sm font-medium ${yoyComparison?.growth?.shops >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {(yoyComparison?.growth?.shops ?? 0) >= 0 ? '+' : ''}{(yoyComparison?.growth?.shops ?? 0).toFixed(1)}% YoY
               </div>
             </div>
           </div>
@@ -2287,8 +2287,8 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
                   <div className="text-sm text-gray-600">{getMonthName(data.currentMonth)} VERVE</div>
                 </div>
                 <div className="bg-white p-4 rounded shadow">
-                  <div className={`text-2xl font-bold ${yoyComparison?.growth.total >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                    {yoyComparison?.growth.total >= 0 ? '+' : ''}{yoyComparison?.growth.total.toFixed(1) || 0}%
+                  <div className={`text-2xl font-bold ${(yoyComparison?.growth?.total ?? 0) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {(yoyComparison?.growth?.total ?? 0) >= 0 ? '+' : ''}{(yoyComparison?.growth?.total ?? 0).toFixed(1)}%
                   </div>
                   <div className="text-sm text-gray-600">YoY Growth</div>
                 </div>
@@ -2588,7 +2588,7 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
               <div className="flex justify-between text-sm">
                 <span>vs Last Year ({getMonthName(data.currentMonth)} 2024)</span>
                 <span className={`font-medium ${parseFloat(data.summary.yoy8PMGrowth || '0') >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {parseFloat(data.summary.yoy8PMGrowth || '0') >= 0 ? '+' : ''}{data.summary.yoy8PMGrowth}%
+                  {parseFloat(data.summary.yoy8PMGrowth || '0') >= 0 ? '+' : ''}{data.summary.yoy8PMGrowth || '0'}%
                 </span>
               </div>
               <div className="text-xs text-gray-500 mt-1">
@@ -2628,7 +2628,7 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
               <div className="flex justify-between text-sm">
                 <span>vs Last Year ({getMonthName(data.currentMonth)} 2024)</span>
                 <span className={`font-medium ${parseFloat(data.summary.yoyVerveGrowth || '0') >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {parseFloat(data.summary.yoyVerveGrowth || '0') >= 0 ? '+' : ''}{data.summary.yoyVerveGrowth}%
+                  {parseFloat(data.summary.yoyVerveGrowth || '0') >= 0 ? '+' : ''}{data.summary.yoyVerveGrowth || '0'}%
                 </span>
               </div>
               <div className="text-xs text-gray-500 mt-1">
