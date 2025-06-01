@@ -114,7 +114,7 @@ const InventoryDashboard = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(50);
 
-  // CONFIGURATION
+  // CONFIGURATION - UPDATED WITH CORRECT SHEET IDS
   const SHEETS_CONFIG = {
     visitSheetId: process.env.NEXT_PUBLIC_VISIT_SHEET_ID || '1XG4c_Lrpk-YglTq3G3ZY9Qjt7wSnUq0UZWDSYT61eWE',
     historicalSheetId: process.env.NEXT_PUBLIC_HISTORICAL_SHEET_ID || '1yXzEYHJeHlETrEmU4TZ9F2_qv4OE10N4DPdYX0Iqfx0',
@@ -123,15 +123,15 @@ const InventoryDashboard = () => {
   };
 
   // ==========================================
-  // FIXED BRAND NORMALIZATION SYSTEM
+  // CORRECTED BRAND NORMALIZATION SYSTEM
   // ==========================================
 
-  // COMPREHENSIVE BRAND MAPPING DICTIONARY
+  // COMPREHENSIVE BRAND MAPPING DICTIONARY - CORRECTED
   const BRAND_MAPPING = {
     // 8 PM BRAND FAMILY
     '8 PM BLACK': '8 PM PREMIUM BLACK BLENDED WHISKY',
     
-    // VERVE BRAND FAMILY - EXACT NAMES FROM SUPPLY SHEET
+    // VERVE BRAND FAMILY - CORRECTED WITH EXACT NAMES FROM SUPPLY SHEET
     'VERVE LEMON LUSH': 'M2M VERVE LEMON LUSH SUP FL VODKA',
     'VERVE GRAIN': 'M2M VERVE SUPERIOR GRAIN VODKA',
     'VERVE CRANBERRY': 'M2M VERVE CRANBERRY TEASE SP FL VODKA',
@@ -172,26 +172,33 @@ const InventoryDashboard = () => {
     return { family: normalizedName, size: extractedSize, normalizedName };
   };
 
-  // FIXED: Priority-based exact size matching
-  const createPriorityBrandKeys = (shopId: string, brandName: string, size?: string): string[] => {
+  const createBrandMatchingKey = (shopId: string, brandName: string): string => {
+    const brandInfo = normalizeBrandInfo(brandName);
+    return `${shopId}_${brandInfo.normalizedName}_${brandInfo.size}`;
+  };
+
+  // ENHANCED: Create multiple possible keys for better matching
+  const createMultipleBrandKeys = (shopId: string, brandName: string, size?: string): string[] => {
     const brandInfo = normalizeBrandInfo(brandName);
     const actualSize = size || brandInfo.size;
     
-    // PRIORITY 1: Exact brand + exact size (most specific)
-    const exactKey = `${shopId}_${brandInfo.normalizedName}_${actualSize}`;
+    const keys = [
+      `${shopId}_${brandInfo.normalizedName}_${actualSize}`,
+      `${shopId}_${brandInfo.family}_${actualSize}`,
+      `${shopId}_${brandInfo.normalizedName}`,
+      `${shopId}_${brandName.toUpperCase()}_${actualSize}`,
+      `${shopId}_${brandName.toUpperCase()}`,
+    ];
     
-    // PRIORITY 2: Alternative exact matches
-    const alternativeExact = `${shopId}_${brandInfo.family}_${actualSize}`;
+    // Add fallback keys for partial matching
+    const baseKey = `${shopId}_${brandInfo.normalizedName}`;
+    keys.push(baseKey);
     
-    // PRIORITY 3: Original brand name + size
-    const originalExact = `${shopId}_${brandName.toUpperCase()}_${actualSize}`;
-    
-    // Return in priority order - NO GENERIC FALLBACKS
-    return [exactKey, alternativeExact, originalExact];
+    return [...new Set(keys)]; // Remove duplicates
   };
 
   // ==========================================
-  // DATA FETCHING FUNCTIONS
+  // ENHANCED DATA FETCHING FUNCTIONS
   // ==========================================
 
   const fetchInventoryData = async () => {
@@ -203,6 +210,8 @@ const InventoryDashboard = () => {
         throw new Error('Google API key not configured');
       }
 
+      console.log('🔄 Fetching CORRECTED inventory data...');
+
       const [visitData, historicalData, masterData] = await Promise.all([
         fetchVisitSheetData(),
         fetchHistoricalSheetData(),
@@ -213,7 +222,7 @@ const InventoryDashboard = () => {
       setInventoryData(processedData);
       
     } catch (error: any) {
-      console.error('Error fetching inventory data:', error);
+      console.error('❌ Error fetching inventory data:', error);
       setError(error.message);
     } finally {
       setLoading(false);
@@ -231,9 +240,10 @@ const InventoryDashboard = () => {
       }
       
       const result = await response.json();
+      console.log('✅ Visit data fetched:', result.values?.length || 0, 'rows');
       return result.values || [];
     } catch (error) {
-      console.error('Error fetching visit data:', error);
+      console.error('❌ Error fetching visit data:', error);
       return [];
     }
   };
@@ -250,6 +260,7 @@ const InventoryDashboard = () => {
           
           if (response.ok) {
             const result = await response.json();
+            console.log(`✅ Historical data fetched from ${sheetName}:`, result.values?.length || 0, 'rows');
             return result.values || [];
           }
         } catch (err) {
@@ -257,9 +268,10 @@ const InventoryDashboard = () => {
         }
       }
       
+      console.warn('❌ No accessible historical sheet found');
       return [];
     } catch (error) {
-      console.warn('Error fetching historical data:', error);
+      console.warn('❌ Error fetching historical data:', error);
       return [];
     }
   };
@@ -271,22 +283,26 @@ const InventoryDashboard = () => {
       );
       
       if (!response.ok) {
+        console.warn('Pending Challans sheet not accessible');
         return [];
       }
       
       const result = await response.json();
+      console.log('✅ Pending Challans data fetched:', result.values?.length || 0, 'rows');
       return result.values || [];
     } catch (error) {
-      console.warn('Error fetching pending challans:', error);
+      console.warn('❌ Error fetching pending challans:', error);
       return [];
     }
   };
 
   // ==========================================
-  // FIXED DATA PROCESSING LOGIC
+  // CORRECTED DATA PROCESSING LOGIC
   // ==========================================
 
   const processEnhancedInventoryData = (visitData: any[][], historicalData: any[][], pendingChallans: any[][]): InventoryData => {
+    console.log('🔧 Processing CORRECTED inventory data with FIXED column indices...');
+    
     if (visitData.length === 0) {
       throw new Error('No visit data found');
     }
@@ -294,15 +310,19 @@ const InventoryDashboard = () => {
     const headers = visitData[0];
     const rows = visitData.slice(1);
 
+    console.log('📋 Headers found:', headers);
+
     const getColumnIndex = (searchTerms: string[]) => {
       for (const term of searchTerms) {
         const index = headers.findIndex(header => 
           header && header.toString().toLowerCase().includes(term.toLowerCase())
         );
         if (index !== -1) {
+          console.log(`✅ Found column "${term}" at index ${index}: "${headers[index]}"`);
           return index;
         }
       }
+      console.warn(`❌ Column not found for terms:`, searchTerms);
       return -1;
     };
 
@@ -318,6 +338,8 @@ const InventoryDashboard = () => {
       lsDate: getColumnIndex(['ls date', 'ls_date'])
     };
 
+    console.log('📊 Column indices found:', columnIndices);
+
     const requiredColumns = ['shopId', 'shopName', 'invBrand', 'invQuantity', 'checkInDateTime'];
     for (const col of requiredColumns) {
       if (columnIndices[col as keyof typeof columnIndices] === -1) {
@@ -325,11 +347,18 @@ const InventoryDashboard = () => {
       }
     }
 
-    // Process supply data with FIXED column mapping
+    // Process CORRECTED supply data with FIXED column mapping
     const supplyHistory = processHistoricalSupplyData(historicalData);
     const recentSupplies = processPendingChallans(pendingChallans);
     
+    console.log('📊 Supply data processed:', {
+      historicalEntries: Object.keys(supplyHistory).length,
+      recentSupplies: Object.keys(recentSupplies).length
+    });
+    
     // STEP 1: REVERSE HIERARCHICAL PROCESSING
+    console.log('🔧 Processing with reverse hierarchical logic...');
+    
     const shopInfoRows: Array<{index: number, row: any[]}> = [];
     for (let i = 1; i < rows.length; i++) {
       const row = rows[i];
@@ -337,6 +366,8 @@ const InventoryDashboard = () => {
         shopInfoRows.push({ index: i, row });
       }
     }
+    
+    console.log(`🏪 Found ${shopInfoRows.length} shop info rows`);
     
     let propagatedRows = 0;
     
@@ -366,13 +397,17 @@ const InventoryDashboard = () => {
         }
       }
     });
+    
+    console.log(`🎉 Propagation complete: ${propagatedRows} brand rows updated`);
 
-    // STEP 2: Filter for MONTHLY data
+    // STEP 2: Filter for MONTHLY data with ENHANCED debugging for DD-MMM-YYYY format
     const today = new Date();
     const currentMonth = today.getMonth();
     const currentYear = today.getFullYear();
     const lastMonth = new Date(currentYear, currentMonth - 1, 1);
     const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
+
+    console.log(`📅 Current date: ${today.toLocaleDateString()}, Month: ${currentMonth}, Year: ${currentYear}`);
 
     const currentMonthRows = rows.filter(row => {
       const dateStr = row[columnIndices.checkInDateTime];
@@ -382,13 +417,23 @@ const InventoryDashboard = () => {
         const rowDate = parseDate(dateStr);
         if (!rowDate) return false;
         
-        return rowDate.getMonth() === currentMonth && rowDate.getFullYear() === currentYear;
+        const isCurrentMonth = rowDate.getMonth() === currentMonth && rowDate.getFullYear() === currentYear;
+        
+        // Debug first few dates and any GREATER KAILASH entries
+        if (rows.indexOf(row) < 3 || row[columnIndices.shopName]?.includes('GREATER KAILASH')) {
+          console.log(`📅 Date parsing: "${dateStr}" -> ${rowDate.toLocaleDateString()} (Current month: ${isCurrentMonth}) Shop: ${row[columnIndices.shopName]}`);
+        }
+        
+        return isCurrentMonth;
       } catch (error) {
+        console.warn(`Failed to parse date: ${dateStr}`, error);
         return false;
       }
     });
 
-    // STEP 3: Find latest visits for each shop
+    console.log(`📅 Current month visits: ${currentMonthRows.length} out of ${rows.length} total rows`);
+
+    // STEP 3: Find latest visits for each shop with ENHANCED debugging for GREATER KAILASH
     const shopLatestVisits: Record<string, any> = {};
     
     currentMonthRows.forEach(row => {
@@ -411,17 +456,43 @@ const InventoryDashboard = () => {
             visitDate,
             rows: []
           };
+          
+          // Debug specific shop - GREATER KAILASH
+          if (shopId === '01/2024/0535' || shopName?.includes('GREATER KAILASH')) {
+            console.log(`🏪 Shop ${shopId} (${shopName}) visit date: "${checkInDateTime}" -> ${visitDate.toLocaleDateString()}`);
+          }
         }
       } catch (error) {
-        // Skip invalid dates
+        console.warn(`Invalid date format for shop ${shopId}: ${checkInDateTime}`, error);
       }
     });
+
+    console.log(`🏪 Latest visits found for ${Object.keys(shopLatestVisits).length} unique shops`);
+    
+    // Debug: Show the shops we found, especially GREATER KAILASH
+    const shopNames = Object.values(shopLatestVisits).map(shop => `${shop.shopId}: ${shop.shopName}`);
+    console.log(`🏪 Shop list preview:`, shopNames.slice(0, 5));
+    
+    const greaterKailashShop = Object.values(shopLatestVisits).find(shop => 
+      shop.shopId === '01/2024/0535' || shop.shopName?.includes('GREATER KAILASH')
+    );
+    if (greaterKailashShop) {
+      console.log(`🏪 FOUND GREATER KAILASH SHOP:`, {
+        shopId: greaterKailashShop.shopId,
+        shopName: greaterKailashShop.shopName,
+        visitDate: greaterKailashShop.visitDate.toLocaleDateString(),
+        salesman: greaterKailashShop.salesman
+      });
+    } else {
+      console.log(`🏪 ❌ GREATER KAILASH SHOP NOT FOUND in latest visits`);
+    }
 
     const shopLatestVisitRows: Record<string, any[]> = {};
     
     currentMonthRows.forEach(row => {
       const shopId = row[columnIndices.shopId];
       const checkInDateTime = row[columnIndices.checkInDateTime];
+      const invBrand = row[columnIndices.invBrand];
       
       if (!shopId || !checkInDateTime) return;
       
@@ -442,12 +513,13 @@ const InventoryDashboard = () => {
       }
     });
 
-    // STEP 4: Process inventory for each shop with FIXED SUPPLY STATUS LOGIC
+    // STEP 4: Process inventory for each shop with CORRECTED SUPPLY STATUS LOGIC
     const shops: Record<string, ShopInventory> = {};
     const skuTracker: Record<string, any> = {};
     const allAgingLocations: Array<any> = [];
     const outOfStockItems: Array<any> = [];
     const salesmenVisits: Record<string, any> = {};
+    const processedSKUs = new Set<string>();
 
     let monthlyVisitCount = 0;
     let yesterdayVisitCount = 0;
@@ -492,22 +564,74 @@ const InventoryDashboard = () => {
       }
 
       const visitRows = shopLatestVisitRows[shopVisit.shopId] || [];
+      console.log(`🔧 Processing ${visitRows.length} rows for shop ${shopVisit.shopId}`);
       
-      visitRows.forEach((row: any[]) => {
+      // ENHANCED DEBUG for Jhilmil Phase-II
+      if (shopVisit.shopId === '01/2024/1707') {
+        console.log(`\n🏪 DEBUGGING Jhilmil Phase-II (${shopVisit.shopId}):`);
+        console.log(`📅 Visit Date: ${shopVisit.visitDate.toLocaleDateString()}`);
+        console.log(`👤 Salesman: ${shopVisit.salesman}`);
+        console.log(`📊 Total rows to process: ${visitRows.length}`);
+      }
+      
+      visitRows.forEach((row: any[], rowIndex: number) => {
         const brand = row[columnIndices.invBrand]?.toString().trim();
         const quantity = parseFloat(row[columnIndices.invQuantity]) || 0;
         const reasonNoStock = row[columnIndices.reasonNoStock]?.toString().trim() || '';
         const lsDate = row[columnIndices.lsDate];
 
+        // COMPREHENSIVE DEBUG for specific products at Jhilmil Phase-II
+        if (shopVisit.shopId === '01/2024/1707' && brand && 
+            (brand.includes('8 PM BLACK') || brand.includes('VERVE CRANBERRY'))) {
+          
+          console.log(`\n🔍 VISIT DATA DEBUG for ${brand} (Row ${rowIndex}):`);
+          console.log(`📊 Raw quantity cell [${columnIndices.invQuantity}]: "${row[columnIndices.invQuantity]}"`);
+          console.log(`🔢 Parsed quantity: ${quantity}`);
+          console.log(`📝 Reason no stock: "${reasonNoStock}"`);
+          console.log(`📍 Column indices: invBrand=${columnIndices.invBrand}, invQuantity=${columnIndices.invQuantity}`);
+          console.log(`🔎 Brand cell [${columnIndices.invBrand}]: "${row[columnIndices.invBrand]}"`);
+          console.log(`📋 Full row data:`, row);
+          
+          // Validate expected vs actual
+          if (brand.includes('8 PM BLACK 750')) {
+            console.log(`✅ EXPECTED: 8 PM BLACK 750 should have quantity = 120`);
+            console.log(`🎯 ACTUAL: quantity = ${quantity} ${quantity === 120 ? '✅' : '❌'}`);
+          }
+          if (brand.includes('VERVE CRANBERRY')) {
+            console.log(`✅ EXPECTED: VERVE CRANBERRY should have quantity = 0`);
+            console.log(`🎯 ACTUAL: quantity = ${quantity} ${quantity === 0 ? '✅' : '❌'}`);
+          }
+        }
+
         if (!brand) return;
         
-        // FIXED: Get supply date with PRIORITY-BASED exact size matching
+        processedSKUs.add(brand);
+        
+        // CORRECTED: Get supply date with CORRECT brand mapping and ENHANCED DEBUGGING
         const supplyCheckResult = checkSuppliedAfterOutOfStock(
           shopVisit.shopId, 
           brand, 
           shopVisit.visitDate, 
           recentSupplies
         );
+
+        // CRITICAL DEBUG - Force log for Jhilmil Phase-II
+        if (shopVisit.shopId === '01/2024/1707') {
+          console.log(`\n🚨 CRITICAL DEBUG for ${brand} at Jhilmil Phase-II:`);
+          console.log(`📦 Was Restocked: ${supplyCheckResult.wasRestocked}`);
+          console.log(`📅 Supply Date: ${supplyCheckResult.supplyDate ? supplyCheckResult.supplyDate.toLocaleDateString() : 'None'}`);
+          console.log(`⏰ Days Since Supply: ${supplyCheckResult.daysSinceSupply || 'N/A'}`);
+          console.log(`🔑 Matched Key: ${(supplyCheckResult as any).matchedKey || 'None'}`);
+          console.log(`🔢 Visit Quantity: ${quantity}`);
+          
+          // Show if this should be restocked or not
+          if (brand.includes('8 PM BLACK')) {
+            console.log(`🚨 8 PM BLACK SHOULD NOT BE RESTOCKED - NO SUPPLY EXISTS!`);
+          }
+          if (brand.includes('VERVE')) {
+            console.log(`✅ VERVE should be restocked - supply exists`);
+          }
+        }
 
         let lastSupplyDate: Date | undefined;
         let isEstimatedAge = true;
@@ -552,20 +676,22 @@ const InventoryDashboard = () => {
         else if (ageInDays >= 45) ageCategory = 'days45to60';
         else if (ageInDays >= 30) ageCategory = 'days30to45';
 
-        // FIXED: Enhanced supply status with CORRECT logic
+        // CORRECTED: Enhanced supply status with CORRECT logic and DEBUGGING
         const advancedSupplyStatus = getAdvancedSupplyStatus(
           quantity,
           shopVisit.visitDate,
           supplyCheckResult
         );
 
-        // Determine base supply status
+        // Determine base supply status with ENHANCED DEBUGGING
         let supplyStatus: InventoryItem['supplyStatus'] = 'unknown';
         
         if (supplyCheckResult.wasRestocked) {
           supplyStatus = 'recently_restocked';
+          console.log(`🎯 Setting supply status to 'recently_restocked' for ${brand} at shop ${shopVisit.shopId}`);
         } else if (quantity === 0) {
           supplyStatus = 'awaiting_supply';
+          console.log(`🎯 Setting supply status to 'awaiting_supply' for ${brand} at shop ${shopVisit.shopId}`);
         } else {
           if (ageInDays >= 90) supplyStatus = 'aging_critical';
           else if (ageInDays >= 75) supplyStatus = 'aging_75_90';
@@ -573,6 +699,29 @@ const InventoryDashboard = () => {
           else if (ageInDays >= 45) supplyStatus = 'aging_45_60';
           else if (ageInDays >= 30) supplyStatus = 'aging_30_45';
           else supplyStatus = 'current';
+          console.log(`🎯 Setting supply status to '${supplyStatus}' for ${brand} at shop ${shopVisit.shopId} (age: ${ageInDays} days)`);
+        }
+        
+        // CRITICAL DEBUG for Jhilmil Phase-II status assignment
+        if (shopVisit.shopId === '01/2024/1707' && brand && 
+            (brand.includes('8 PM BLACK') || brand.includes('VERVE CRANBERRY'))) {
+          console.log(`\n🚨 FINAL STATUS ASSIGNMENT for ${brand}:`);
+          console.log(`📊 Visit Quantity: ${quantity}`);
+          console.log(`📦 Was Restocked: ${supplyCheckResult.wasRestocked}`);
+          console.log(`🎯 Final Supply Status: ${supplyStatus}`);
+          console.log(`🔮 Advanced Status: ${getAdvancedSupplyStatus(quantity, shopVisit.visitDate, supplyCheckResult)}`);
+          
+          // Validation checks
+          if (brand.includes('8 PM BLACK 750')) {
+            const expected = quantity > 0 && !supplyCheckResult.wasRestocked ? 'current' : 'ERROR';
+            console.log(`✅ EXPECTED STATUS: ${expected} (had stock, no supply)`);
+            console.log(`❌ ACTUAL STATUS: ${supplyStatus} ${supplyStatus === expected ? '✅' : '❌ BUG!'}`);
+          }
+          if (brand.includes('VERVE CRANBERRY 180')) {
+            const expected = quantity === 0 && supplyCheckResult.wasRestocked ? 'recently_restocked' : 'ERROR';
+            console.log(`✅ EXPECTED STATUS: ${expected} (no stock, got supply)`);
+            console.log(`❌ ACTUAL STATUS: ${supplyStatus} ${supplyStatus === expected ? '✅' : '❌ BUG!'}`);
+          }
         }
 
         // Stock status detection
@@ -688,7 +837,7 @@ const InventoryDashboard = () => {
       shops[shopVisit.shopId] = shopInventory;
     });
 
-    // Calculate last month visits
+    // Calculate last month visits with ENHANCED date parsing
     rows.forEach(row => {
       const dateStr = row[columnIndices.checkInDateTime];
       if (!dateStr) return;
@@ -726,9 +875,15 @@ const InventoryDashboard = () => {
     const avgAge = allAgingLocations.length > 0 ? 
       Math.round(allAgingLocations.reduce((sum, item) => sum + item.ageInDays, 0) / allAgingLocations.length) : 0;
     const recentlyRestockedItems = Object.values(shops).reduce((sum, shop) => 
-      sum + Object.values(shop.items).filter(item => 
-        item.suppliedAfterOutOfStock || (item as any).advancedSupplyStatus?.includes('Restocked')
-      ).length, 0);
+      sum + Object.values(shop.items).filter(item => {
+        const isRestocked = item.suppliedAfterOutOfStock || (item as any).advancedSupplyStatus?.includes('Restocked');
+        if (isRestocked) {
+          console.log(`🎯 Found restocked item: ${item.brand} at shop ${shop.shopName} (${shop.shopId})`);
+        }
+        return isRestocked;
+      }).length, 0);
+    
+    console.log(`🎯 Total recently restocked items calculated: ${recentlyRestockedItems}`);
 
     const salesmenStats = Object.values(salesmenVisits).map((salesman: any) => ({
       name: salesman.name,
@@ -737,6 +892,51 @@ const InventoryDashboard = () => {
       yesterdayVisits: salesman.yesterdayVisits,
       lastMonthVisits: salesman.lastMonthVisits
     })).sort((a, b) => b.monthlyVisits - a.monthlyVisits);
+
+    console.log('🎉 CORRECTED inventory processing complete:', {
+      totalShops,
+      totalSKUs,
+      totalOutOfStock,
+      totalAging,
+      recentlyRestockedItems,
+      processedSKUs: processedSKUs.size,
+      outOfStockItemsCollected: outOfStockItems.length,
+      agingLocationsCollected: allAgingLocations.length
+    });
+
+    // COMPREHENSIVE DEBUG: Show all supply keys for Jhilmil Phase-II
+    console.log(`\n📦 ALL SUPPLY KEYS for Jhilmil Phase-II (01/2024/1707):`);
+    const shop1707Keys = Object.keys(recentSupplies).filter(k => k.includes('01/2024/1707'));
+    if (shop1707Keys.length > 0) {
+      shop1707Keys.forEach(key => {
+        console.log(`  ✅ ${key}: ${recentSupplies[key].toLocaleDateString()}`);
+      });
+    } else {
+      console.log(`  ❌ NO SUPPLY KEYS FOUND for shop 01/2024/1707`);
+    }
+
+    // VALIDATION: Expected vs Actual Results
+    console.log(`\n🔍 EXPECTED RESULTS for Jhilmil Phase-II (01/2024/1707):`);
+    console.log(`  📊 8 PM BLACK 750: Should show "In Stock (aging)" - NO supply should be found`);
+    console.log(`  📊 VERVE CRANBERRY 180: Should show "Restocked (Xd)" - visit qty should be 0`);
+    console.log(`  📊 VERVE CRANBERRY 375: Should show "Restocked (Xd)" - visit qty should be 0`);
+    
+    // Show what we actually found for Jhilmil Phase-II
+    const jhilmilShop = shops['01/2024/1707'];
+    if (jhilmilShop) {
+      console.log(`\n🎯 ACTUAL RESULTS for Jhilmil Phase-II:`);
+      Object.entries(jhilmilShop.items).forEach(([itemBrand, item]: [string, any]) => {
+        if (itemBrand.includes('8 PM BLACK') || itemBrand.includes('VERVE CRANBERRY')) {
+          const status = getAdvancedSupplyStatus(item.quantity, jhilmilShop.visitDate, {
+            wasRestocked: item.suppliedAfterOutOfStock,
+            daysSinceSupply: item.daysSinceSupply
+          });
+          console.log(`  📊 ${itemBrand}: quantity=${item.quantity}, status="${status}"`);
+        }
+      });
+    } else {
+      console.log(`  ❌ Jhilmil Phase-II shop not found in processed data`);
+    }
 
     return {
       summary: {
@@ -766,21 +966,28 @@ const InventoryDashboard = () => {
   };
 
   // ==========================================
-  // FIXED SUPPLY DATA PROCESSING FUNCTIONS
+  // CORRECTED SUPPLY DATA PROCESSING FUNCTIONS
   // ==========================================
 
   const parseDate = (dateStr: string): Date | null => {
     if (!dateStr) return null;
     
     try {
+      console.log(`🔧 Parsing date: "${dateStr}"`);
+      
       // Handle DD-MMM-YYYY HH:MM format (from visit sheet: "13-May-2025 15:43")
       if (dateStr.includes('-') && (dateStr.includes('Jan') || dateStr.includes('Feb') || dateStr.includes('Mar') || 
           dateStr.includes('Apr') || dateStr.includes('May') || dateStr.includes('Jun') || 
           dateStr.includes('Jul') || dateStr.includes('Aug') || dateStr.includes('Sep') || 
           dateStr.includes('Oct') || dateStr.includes('Nov') || dateStr.includes('Dec'))) {
+        console.log(`🔧 Detected DD-MMM-YYYY format: "${dateStr}"`);
+        // JavaScript can parse this format directly
         const parsedDate = new Date(dateStr);
         if (!isNaN(parsedDate.getTime())) {
+          console.log(`✅ Successfully parsed: "${dateStr}" -> ${parsedDate.toLocaleDateString()}`);
           return parsedDate;
+        } else {
+          console.log(`❌ Failed to parse DD-MMM-YYYY: "${dateStr}"`);
         }
       }
       
@@ -792,10 +999,12 @@ const InventoryDashboard = () => {
           if (dateParts[0].length === 4) {
             // YYYY-MM-DD format
             const parsedDate = new Date(dateStr);
+            console.log(`✅ Successfully parsed YYYY-MM-DD: "${dateStr}" -> ${parsedDate.toLocaleDateString()}`);
             return parsedDate;
           } else {
             // DD-MM-YYYY format
             const parsedDate = new Date(`${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`);
+            console.log(`✅ Successfully parsed DD-MM-YYYY: "${dateStr}" -> ${parsedDate.toLocaleDateString()}`);
             return parsedDate;
           }
         }
@@ -807,6 +1016,7 @@ const InventoryDashboard = () => {
         if (dateParts.length === 3) {
           // Assume DD/MM/YYYY format
           const parsedDate = new Date(`${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`);
+          console.log(`✅ Successfully parsed DD/MM/YYYY: "${dateStr}" -> ${parsedDate.toLocaleDateString()}`);
           return parsedDate;
         }
       }
@@ -814,11 +1024,14 @@ const InventoryDashboard = () => {
       // Try direct parsing as fallback
       const parsedDate = new Date(dateStr);
       if (!isNaN(parsedDate.getTime())) {
+        console.log(`✅ Successfully parsed with fallback: "${dateStr}" -> ${parsedDate.toLocaleDateString()}`);
         return parsedDate;
       } else {
+        console.log(`❌ All parsing methods failed for: "${dateStr}"`);
         return null;
       }
     } catch (error) {
+      console.log(`❌ Exception parsing date "${dateStr}":`, error);
       return null;
     }
   };
@@ -839,12 +1052,13 @@ const InventoryDashboard = () => {
     const casesIndex = headers.findIndex(h => h?.toLowerCase().includes('cases'));
     
     if (shopIdIndex === -1 || (brandShortIndex === -1 && brandIndex === -1) || dateIndex === -1) {
+      console.warn('⚠️ Historical data columns not found');
       return supplyHistory;
     }
     
     let processedEntries = 0;
     
-    rows.forEach((row) => {
+    rows.forEach((row, index) => {
       if (row.length > Math.max(shopIdIndex, brandShortIndex !== -1 ? brandShortIndex : brandIndex, dateIndex)) {
         const shopId = row[shopIdIndex]?.toString().trim();
         const brand = row[brandShortIndex !== -1 ? brandShortIndex : brandIndex]?.toString().trim();
@@ -855,7 +1069,7 @@ const InventoryDashboard = () => {
         if (shopId && brand && dateStr && cases > 0) {
           const date = parseDate(dateStr);
           if (date && !isNaN(date.getTime())) {
-            const possibleKeys = createPriorityBrandKeys(shopId, brand, size);
+            const possibleKeys = createMultipleBrandKeys(shopId, brand, size);
             possibleKeys.forEach(key => {
               if (!supplyHistory[key] || date > supplyHistory[key]) {
                 supplyHistory[key] = date;
@@ -867,10 +1081,11 @@ const InventoryDashboard = () => {
       }
     });
     
+    console.log('📊 Historical supply data processed:', processedEntries, 'valid entries');
     return supplyHistory;
   };
 
-  // FIXED PENDING CHALLANS PROCESSING WITH CORRECTED COLUMN INDICES
+  // CORRECTED PENDING CHALLANS PROCESSING WITH FIXED COLUMN INDICES
   const processPendingChallans = (pendingChallans: any[][]) => {
     const recentSupplies: Record<string, Date> = {};
     
@@ -879,30 +1094,41 @@ const InventoryDashboard = () => {
     const headers = pendingChallans[0];
     const rows = pendingChallans.slice(1);
     
-    // CORRECTED: Based on actual CSV structure
-    const challansDateIndex = 1;  // Column B (challandate)
-    const shopIdIndex = 8;        // Column I (Shop_Id)
-    const shopNameIndex = 9;      // Column J (shop_name)
-    const brandIndex = 11;        // Column L (brand) - CORRECTED FROM 10 to 11
-    const sizeIndex = 12;         // Column M (size) - CORRECTED FROM 11 to 12
-    const packIndex = 13;         // Column N (pack)
-    const casesIndex = 14;        // Column O (cases)
+    // CORRECTED: Based on actual CSV structure from user's sheet
+    const challansDateIndex = 1;  // Column B (challandate) ✅ CORRECT
+    const shopIdIndex = 8;        // Column I (Shop_Id) ✅ CORRECT
+    const shopNameIndex = 9;      // Column J (shop_name) ✅ CORRECT
+    const brandIndex = 11;        // Column L (brand) ✅ CORRECTED FROM 10 to 11
+    const sizeIndex = 12;         // Column M (size) ✅ CORRECTED FROM 11 to 12
+    const packIndex = 13;         // Column N (pack) ✅ NEW
+    const casesIndex = 14;        // Column O (cases) ✅ CORRECT
+    
+    console.log('📊 Using CORRECTED column indices for Pending Challans:');
+    console.log(`Date: ${challansDateIndex} (B), Shop: ${shopIdIndex} (I), Brand: ${brandIndex} (L), Size: ${sizeIndex} (M), Cases: ${casesIndex} (O)`);
     
     let processedEntries = 0;
     
-    rows.forEach((row) => {
+    rows.forEach((row, index) => {
       if (row.length > Math.max(shopIdIndex, brandIndex, challansDateIndex, casesIndex)) {
         const shopId = row[shopIdIndex]?.toString().trim();
-        const brand = row[brandIndex]?.toString().trim();
-        const size = row[sizeIndex]?.toString().trim() || '';
+        const brand = row[brandIndex]?.toString().trim();      // Now reading Column L ✅
+        const size = row[sizeIndex]?.toString().trim() || '';  // Now reading Column M ✅
+        const pack = row[packIndex]?.toString().trim() || '';  // Column N
         const dateStr = row[challansDateIndex]?.toString().trim();
         const cases = parseFloat(row[casesIndex]) || 0;
+        
+        // Debug for Jhilmil Phase-II and GREATER KAILASH
+        if (shopId === '01/2024/0535') {
+          console.log(`📦 CORRECTED Row ${index}: Shop=${shopId}, Brand="${brand}", Size="${size}", Date="${dateStr}", Cases=${cases}`);
+        } else if (shopId === '01/2024/1707') {
+          console.log(`📦 JHILMIL Row ${index}: Shop=${shopId}, Brand="${brand}", Size="${size}", Date="${dateStr}", Cases=${cases}`);
+        }
         
         if (shopId && brand && dateStr && cases > 0) {
           const date = parseDate(dateStr);
           if (date && !isNaN(date.getTime())) {
-            // FIXED: Create matching keys for supply data with priority-based exact matching
-            const possibleKeys = createPriorityBrandKeys(shopId, brand, size);
+            // CORRECTED: Create matching keys for supply data
+            const possibleKeys = createMultipleBrandKeys(shopId, brand, size);
             possibleKeys.forEach(key => {
               if (!recentSupplies[key] || date > recentSupplies[key]) {
                 recentSupplies[key] = date;
@@ -910,10 +1136,69 @@ const InventoryDashboard = () => {
             });
             
             processedEntries++;
+            
+            // Debug logging for GREATER KAILASH and Jhilmil Phase-II shops
+            if (shopId === '01/2024/0535') {
+              console.log(`📦 CORRECTED Supply added for shop ${shopId}: ${brand} (${size}) on "${dateStr}" -> ${date.toLocaleDateString()}`, {
+                possibleKeys,
+                date: date.toLocaleDateString(),
+                rawDate: dateStr,
+                parsedDate: date
+              });
+            } else if (shopId === '01/2024/1707') {
+              console.log(`📦 JHILMIL Supply added for shop ${shopId}: ${brand} (${size}) on "${dateStr}" -> ${date.toLocaleDateString()}`, {
+                possibleKeys,
+                date: date.toLocaleDateString(),
+                rawDate: dateStr,
+                parsedDate: date
+              });
+            }
+          } else {
+            // Debug failed date parsing
+            if (shopId === '01/2024/0535') {
+              console.log(`❌ Failed to parse date for shop ${shopId}: "${dateStr}"`);
+            } else if (shopId === '01/2024/1707') {
+              console.log(`❌ JHILMIL Failed to parse date for shop ${shopId}: "${dateStr}"`);
+            }
+          }
+        } else {
+          // Debug missing data
+          if (shopId === '01/2024/0535' && (!brand || !dateStr || cases <= 0)) {
+            console.log(`❌ Missing data - Shop: ${shopId}, Brand: "${brand}", Date: "${dateStr}", Cases: ${cases}`);
+          } else if (shopId === '01/2024/1707' && (!brand || !dateStr || cases <= 0)) {
+            console.log(`❌ JHILMIL Missing data - Shop: ${shopId}, Brand: "${brand}", Date: "${dateStr}", Cases: ${cases}`);
           }
         }
       }
     });
+    
+    console.log('📦 CORRECTED Pending Challans processed:', processedEntries, 'valid entries');
+    console.log('📦 Sample supply keys for GREATER KAILASH (01/2024/0535):', Object.keys(recentSupplies).filter(k => k.includes('01/2024/0535')).slice(0, 10));
+    console.log('📦 Sample supply keys for Jhilmil Phase-II (01/2024/1707):', Object.keys(recentSupplies).filter(k => k.includes('01/2024/1707')).slice(0, 10));
+    console.log('📦 Total supply keys created:', Object.keys(recentSupplies).length);
+    
+    // Debug: show some sample supply dates
+    const sampleSupplies = Object.entries(recentSupplies).slice(0, 5);
+    console.log('📦 Sample supplies:', sampleSupplies.map(([key, date]) => `${key}: ${date.toLocaleDateString()}`));
+    
+    // CRITICAL DEBUG: Show ALL supply keys for Jhilmil Phase-II
+    const jhilmilAllKeys = Object.keys(recentSupplies).filter(k => k.includes('01/2024/1707'));
+    console.log(`\n🚨 ALL SUPPLY KEYS for Jhilmil Phase-II (${jhilmilAllKeys.length} total):`, jhilmilAllKeys);
+    
+    // CRITICAL DEBUG: Show if 8 PM products exist for Jhilmil Phase-II
+    const jhilmil8PMKeys = jhilmilAllKeys.filter(k => k.includes('8 PM'));
+    if (jhilmil8PMKeys.length > 0) {
+      console.log(`🚨 WARNING: Found 8 PM supply keys for Jhilmil Phase-II:`, jhilmil8PMKeys);
+      jhilmil8PMKeys.forEach(key => {
+        console.log(`  📦 ${key}: ${recentSupplies[key].toLocaleDateString()}`);
+      });
+    } else {
+      console.log(`✅ CORRECT: No 8 PM supply keys found for Jhilmil Phase-II`);
+    }
+    
+    // Show VERVE keys
+    const jhilmilVERVEKeys = jhilmilAllKeys.filter(k => k.includes('VERVE'));
+    console.log(`📦 VERVE supply keys for Jhilmil Phase-II (${jhilmilVERVEKeys.length} total):`, jhilmilVERVEKeys.slice(0, 5));
     
     return recentSupplies;
   };
@@ -929,14 +1214,16 @@ const InventoryDashboard = () => {
     
     for (const key of possibleKeys) {
       if (supplyHistory[key]) {
+        console.log(`✅ Supply found for ${brandName} with key: ${key}`);
         return supplyHistory[key];
       }
     }
     
+    console.log(`❌ No supply found for ${brandName} at shop ${shopId}`);
     return null;
   };
 
-  // FIXED: Enhanced supply chain tracking with PRIORITY-BASED exact size matching
+  // CORRECTED: Enhanced supply chain tracking with COMPREHENSIVE DEBUGGING
   const checkSuppliedAfterOutOfStock = (
     shopId: string, 
     brandName: string, 
@@ -950,31 +1237,86 @@ const InventoryDashboard = () => {
     daysSinceSupply?: number,
     matchedKey?: string
   } => {
-    const today = new Date();
+    const isGreaterKailash = shopId === '01/2024/0535' || shopId.includes('0535');
+    const isJhilmilPhase = shopId === '01/2024/1707';
     
-    // FIXED: Use priority-based exact size matching
-    const possibleKeys = createPriorityBrandKeys(shopId, brandName);
+    // ENHANCED DEBUG for specific shops
+    if (isGreaterKailash) {
+      console.log(`🔍 CORRECTED supply check for ${brandName} at shop ${shopId} visited on ${visitDate.toLocaleDateString()} (${visitDate.toISOString()})`);
+    } else if (isJhilmilPhase && (brandName.includes('8 PM BLACK') || brandName.includes('VERVE CRANBERRY'))) {
+      console.log(`\n🚨 DEBUGGING ${brandName} at Jhilmil Phase-II (${shopId}):`);
+      console.log(`📅 Visit Date: ${visitDate.toLocaleDateString()}`);
+    } else {
+      console.log(`🔍 CORRECTED supply check for ${brandName} at shop ${shopId} visited on ${visitDate.toLocaleDateString()}`);
+    }
+    
+    const today = new Date();
+    const brandInfo = normalizeBrandInfo(brandName);
+    
+    // CORRECTED: Create matching keys based on how supply data is stored
+    const possibleKeys = createMultipleBrandKeys(shopId, brandName);
+    
+    // ENHANCED DEBUG: Show all possible keys being checked
+    if (isJhilmilPhase && (brandName.includes('8 PM BLACK') || brandName.includes('VERVE CRANBERRY'))) {
+      console.log(`🔑 Checking keys for ${brandName}:`, possibleKeys);
+      
+      // Show which keys exist in supply data
+      const existingKeys = possibleKeys.filter(key => recentSupplies[key]);
+      console.log(`✅ Found supply keys:`, existingKeys);
+      
+      existingKeys.forEach(key => {
+        const supplyDate = recentSupplies[key];
+        console.log(`📦 ${key}: ${supplyDate.toLocaleDateString()} (after visit: ${supplyDate > visitDate})`);
+      });
+      
+      if (existingKeys.length === 0) {
+        console.log(`❌ NO SUPPLY KEYS FOUND for ${brandName} - should show "In Stock" or "Aging"`);
+      }
+    }
     
     let latestSupplyDate: Date | null = null;
     let matchedKey = '';
     
-    // Check keys in priority order - EXACT SIZE MATCHES ONLY
     for (const key of possibleKeys) {
       const supplyDate = recentSupplies[key];
-      if (supplyDate && supplyDate > visitDate) {
-        // Found exact match - use this and stop
-        latestSupplyDate = supplyDate;
-        matchedKey = key;
-        break; // STOP on first exact match - no more checking
+      if (supplyDate) {
+        if (isGreaterKailash) {
+          console.log(`📦 CORRECTED Found supply for key ${key} on ${supplyDate.toLocaleDateString()} (${supplyDate.toISOString()})`);
+          console.log(`🔍 Visit date: ${visitDate.toLocaleDateString()} (${visitDate.toISOString()}), Supply date: ${supplyDate.toLocaleDateString()} (${supplyDate.toISOString()})`);
+          console.log(`🔍 Supply after visit? ${supplyDate > visitDate} (${supplyDate.getTime()} > ${visitDate.getTime()})`);
+        } else if (isJhilmilPhase && (brandName.includes('8 PM BLACK') || brandName.includes('VERVE CRANBERRY'))) {
+          console.log(`📦 MATCHED SUPPLY for ${brandName}: ${key} on ${supplyDate.toLocaleDateString()}`);
+          console.log(`🔍 Visit: ${visitDate.toLocaleDateString()}, Supply: ${supplyDate.toLocaleDateString()}, After visit: ${supplyDate > visitDate}`);
+        } else {
+          console.log(`📦 CORRECTED Found supply for key ${key} on ${supplyDate.toLocaleDateString()}`);
+          console.log(`🔍 Visit date: ${visitDate.toLocaleDateString()}, Supply date: ${supplyDate.toLocaleDateString()}`);
+          console.log(`🔍 Supply after visit? ${supplyDate > visitDate}`);
+        }
+        
+        if (!latestSupplyDate || supplyDate > latestSupplyDate) {
+          latestSupplyDate = supplyDate;
+          matchedKey = key;
+        }
       }
     }
     
-    if (latestSupplyDate) {
+    if (latestSupplyDate && latestSupplyDate > visitDate) {
       const daysOutOfStock = Math.floor((latestSupplyDate.getTime() - visitDate.getTime()) / (1000 * 60 * 60 * 24));
       const daysSinceSupply = Math.floor((today.getTime() - latestSupplyDate.getTime()) / (1000 * 60 * 60 * 24));
       
       // Grace period: 7 days from supply date
       const isInGracePeriod = daysSinceSupply <= 7;
+      
+      // CRITICAL DEBUG: Show what supply was matched
+      if (isJhilmilPhase && (brandName.includes('8 PM BLACK') || brandName.includes('VERVE CRANBERRY'))) {
+        console.log(`🎯 FINAL MATCH for ${brandName}: ${matchedKey} on ${latestSupplyDate.toLocaleDateString()}`);
+        console.log(`⏰ Days out: ${daysOutOfStock}, Days since: ${daysSinceSupply}`);
+        if (brandName.includes('8 PM BLACK')) {
+          console.log(`🚨 WARNING: 8 PM BLACK showing as restocked but no supply should exist!`);
+        }
+      }
+      
+      console.log(`✅ CORRECTED RESTOCKED: ${brandName} was restocked after ${daysOutOfStock} days. Supply on ${latestSupplyDate.toLocaleDateString()}, ${daysSinceSupply} days ago. Key: ${matchedKey}`);
       
       return { 
         wasRestocked: true, 
@@ -986,10 +1328,18 @@ const InventoryDashboard = () => {
       };
     }
     
+    // DEBUG: No supply found
+    if (isJhilmilPhase && (brandName.includes('8 PM BLACK') || brandName.includes('VERVE CRANBERRY'))) {
+      console.log(`❌ NO SUPPLY found after visit for ${brandName} - CORRECT behavior`);
+    } else if (isGreaterKailash) {
+      console.log(`❌ No supply found after visit for ${brandName}. Latest supply: ${latestSupplyDate ? `${latestSupplyDate.toLocaleDateString()} (${latestSupplyDate.toISOString()})` : 'None'}`);
+    } else {
+      console.log(`❌ No supply found after visit for ${brandName}. Latest supply: ${latestSupplyDate ? latestSupplyDate.toLocaleDateString() : 'None'}`);
+    }
     return { wasRestocked: false };
   };
 
-  // FIXED: Advanced supply status with proper "Restocked (Xd)" format
+  // CORRECTED: Advanced supply status with proper "Restocked (Xd)" format
   const getAdvancedSupplyStatus = (
     quantity: number,
     visitDate: Date,
@@ -1023,10 +1373,10 @@ const InventoryDashboard = () => {
   };
 
   // ==========================================
-  // FILTERING & UTILITIES
+  // ENHANCED FILTERING & UTILITIES
   // ==========================================
 
-  // Generate supply status display
+  // CORRECTED: Generate supply status display with enhanced "Restocked (Xd)" logic
   const getEnhancedSupplyStatusDisplay = (item: any) => {
     // Use the advanced supply status if available
     if ((item as any).advancedSupplyStatus) {
@@ -1127,7 +1477,7 @@ const InventoryDashboard = () => {
       const doc = new jsPDF();
       
       doc.setFontSize(20);
-      doc.text('Fixed Inventory Analytics Report', 20, 20);
+      doc.text('CORRECTED Inventory Analytics Report', 20, 20);
       doc.setFontSize(12);
       doc.text(`Generated: ${new Date().toLocaleString()}`, 20, 30);
       
@@ -1147,7 +1497,7 @@ const InventoryDashboard = () => {
         theme: 'grid'
       });
 
-      doc.save(`Fixed_Inventory_Report_${new Date().toISOString().split('T')[0]}.pdf`);
+      doc.save(`CORRECTED_Inventory_Report_${new Date().toISOString().split('T')[0]}.pdf`);
     } catch (error) {
       console.error('Error generating PDF:', error);
       alert('Error generating PDF report. Please try again.');
@@ -1159,11 +1509,11 @@ const InventoryDashboard = () => {
 
     try {
       let csvContent = "data:text/csv;charset=utf-8,";
-      csvContent += "Fixed Inventory Analytics Report - " + new Date().toLocaleDateString() + "\n";
+      csvContent += "CORRECTED Inventory Analytics Report - " + new Date().toLocaleDateString() + "\n";
       csvContent += "Filters Applied: " + JSON.stringify(filters) + "\n\n";
       
       if (activeTab === 'alerts') {
-        csvContent += "FIXED OUT OF STOCK ANALYSIS\n";
+        csvContent += "CORRECTED OUT OF STOCK ANALYSIS\n";
         csvContent += "SKU,Shop Name,Department,Salesman,Reason,Visit Date,Supply Status,Days Since Supply\n";
         
         inventoryData.outOfStockItems.forEach(item => {
@@ -1177,7 +1527,7 @@ const InventoryDashboard = () => {
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement("a");
       link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `Fixed_Inventory_${activeTab}_${new Date().toISOString().split('T')[0]}.csv`);
+      link.setAttribute("download", `CORRECTED_Inventory_${activeTab}_${new Date().toISOString().split('T')[0]}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -1204,8 +1554,8 @@ const InventoryDashboard = () => {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <Package className="w-12 h-12 animate-pulse mx-auto mb-4 text-purple-600" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Loading Fixed Dashboard</h2>
-          <p className="text-gray-600">Processing inventory data with fixed size-specific matching...</p>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Loading CORRECTED Dashboard + DEBUG</h2>
+          <p className="text-gray-600">Processing inventory data with CORRECTED column indices + comprehensive debugging...</p>
         </div>
       </div>
     );
@@ -1245,19 +1595,19 @@ const InventoryDashboard = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
+      {/* CORRECTED Header */}
       <header className="bg-white shadow-sm border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row justify-between items-center h-auto sm:h-16 py-4 sm:py-0">
             <div className="flex items-center mb-4 sm:mb-0">
-              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Fixed Inventory Analytics</h1>
+              <h1 className="text-xl sm:text-2xl font-bold text-gray-900">CORRECTED Inventory Analytics + DEBUG</h1>
               <span className="ml-3 px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
-                ✅ Size-Specific Matching Fixed
+                ✅ Column Indices CORRECTED + Full Debug
               </span>
             </div>
             <div className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4">
               <span className="text-sm text-gray-500">
-                Monthly Analytics • {inventoryData.summary.totalSKUs} SKUs • Fixed Brand Matching
+                Monthly Analytics • {inventoryData.summary.totalSKUs} SKUs • CORRECTED Brand Matching + Debug
               </span>
               <div className="flex space-x-2">
                 <button
@@ -1296,7 +1646,7 @@ const InventoryDashboard = () => {
               { id: 'shops', label: 'Shop Inventory', icon: ShoppingBag },
               { id: 'aging', label: 'Aging Analysis', icon: Clock },
               { id: 'visits', label: 'Visit Compliance', icon: Users },
-              { id: 'alerts', label: 'Fixed Stock Intelligence', icon: AlertTriangle }
+              { id: 'alerts', label: 'CORRECTED Stock Intelligence', icon: AlertTriangle }
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -1317,9 +1667,9 @@ const InventoryDashboard = () => {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-        {activeTab === 'overview' && <InventoryOverviewTab data={inventoryData} />}
+        {activeTab === 'overview' && <EnhancedInventoryOverviewTab data={inventoryData} />}
         {activeTab === 'shops' && (
-          <ShopInventoryTab 
+          <EnhancedShopInventoryTab 
             data={inventoryData} 
             filteredShops={getFilteredShops()}
             filters={filters}
@@ -1332,7 +1682,7 @@ const InventoryDashboard = () => {
           />
         )}
         {activeTab === 'aging' && (
-          <AgingAnalysisTab 
+          <EnhancedAgingAnalysisTab 
             data={inventoryData} 
             filters={filters}
             setFilters={setFilters}
@@ -1346,9 +1696,9 @@ const InventoryDashboard = () => {
             itemsPerPage={itemsPerPage}
           />
         )}
-        {activeTab === 'visits' && <VisitComplianceTab data={inventoryData} />}
+        {activeTab === 'visits' && <EnhancedVisitComplianceTab data={inventoryData} />}
         {activeTab === 'alerts' && (
-          <FixedStockIntelligenceTab 
+          <CorrectedStockIntelligenceTab 
             data={inventoryData}
             filters={filters}
             setFilters={setFilters}
@@ -1371,11 +1721,11 @@ const InventoryDashboard = () => {
 // TAB COMPONENTS
 // ==========================================
 
-const InventoryOverviewTab = ({ data }: { data: InventoryData }) => (
+const EnhancedInventoryOverviewTab = ({ data }: { data: InventoryData }) => (
   <div className="space-y-6">
     <div className="text-center">
-      <h2 className="text-2xl font-bold text-gray-900 mb-2">Fixed Inventory Overview</h2>
-      <p className="text-gray-600">Real-time inventory status with fixed size-specific matching (Current Month)</p>
+      <h2 className="text-2xl font-bold text-gray-900 mb-2">CORRECTED Inventory Overview</h2>
+      <p className="text-gray-600">Real-time inventory status with CORRECTED column indices (Current Month)</p>
     </div>
 
     {/* Summary Cards */}
@@ -1435,7 +1785,7 @@ const InventoryOverviewTab = ({ data }: { data: InventoryData }) => (
           </div>
           <div className="ml-4">
             <div className="text-2xl font-bold text-gray-900">{data.summary.recentlyRestockedItems}</div>
-            <div className="text-sm text-gray-500">Fixed Restocked Count</div>
+            <div className="text-sm text-gray-500">CORRECTED Restocked Count</div>
           </div>
         </div>
       </div>
@@ -1445,391 +1795,13 @@ const InventoryOverviewTab = ({ data }: { data: InventoryData }) => (
     <div className="bg-white rounded-lg shadow">
       <div className="px-6 py-4 border-b border-gray-200">
         <h3 className="text-lg font-medium text-gray-900">All SKU Stock Status</h3>
-        <p className="text-sm text-gray-500">Complete inventory status with fixed supply tracking</p>
+        <p className="text-sm text-gray-500">Complete inventory status with CORRECTED supply tracking</p>
       </div>
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rank</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Salesman</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Monthly Visits</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unique Shops</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Yesterday Visits</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Month Visits</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {data.visitCompliance.salesmenStats.map((salesman, index) => (
-              <tr key={salesman.name} className={index < 3 ? 'bg-green-50' : ''}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                  {index + 1}
-                  {index < 3 && <span className="ml-2">🏆</span>}
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{salesman.name}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">{salesman.monthlyVisits}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{salesman.uniqueShops}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-purple-600">{salesman.yesterdayVisits}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600">{salesman.lastMonthVisits}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-);
-
-const FixedStockIntelligenceTab = ({ 
-  data, 
-  filters, 
-  setFilters, 
-  getFilteredItems, 
-  getEnhancedSupplyStatusDisplay,
-  departments, 
-  salesmen, 
-  brands,
-  currentPage,
-  setCurrentPage,
-  itemsPerPage
-}: any) => {
-  // Add pagination for out-of-stock items
-  const filteredOutOfStock = getFilteredItems(data.outOfStockItems);
-  const totalPages = Math.ceil(filteredOutOfStock.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentItems = filteredOutOfStock.slice(startIndex, endIndex);
-
-  return (
-    <div className="space-y-6">
-      <div className="text-center">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Fixed Stock Intelligence & Supply Chain Analysis</h2>
-        <p className="text-gray-600">Advanced out-of-stock analysis with fixed size-specific matching</p>
-      </div>
-
-      {/* Enhanced Filter Controls */}
-      <div className="bg-white p-4 rounded-lg shadow">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          <select
-            value={filters.department}
-            onChange={(e) => {
-              setFilters({ ...filters, department: e.target.value });
-              setCurrentPage(1);
-            }}
-            className="border border-gray-300 rounded-lg px-3 py-2"
-          >
-            <option value="">All Departments</option>
-            {departments.map((dept: string) => (
-              <option key={dept} value={dept}>{dept}</option>
-            ))}
-          </select>
-
-          <select
-            value={filters.salesman}
-            onChange={(e) => {
-              setFilters({ ...filters, salesman: e.target.value });
-              setCurrentPage(1);
-            }}
-            className="border border-gray-300 rounded-lg px-3 py-2"
-          >
-            <option value="">All Salesmen</option>
-            {salesmen.map((salesman: string) => (
-              <option key={salesman} value={salesman}>{salesman}</option>
-            ))}
-          </select>
-
-          <select
-            value={filters.brand}
-            onChange={(e) => {
-              setFilters({ ...filters, brand: e.target.value });
-              setCurrentPage(1);
-            }}
-            className="border border-gray-300 rounded-lg px-3 py-2"
-          >
-            <option value="">All Brands</option>
-            {brands.map((brand: string) => (
-              <option key={brand} value={brand}>{brand}</option>
-            ))}
-          </select>
-
-          <input
-            type="text"
-            placeholder="Search..."
-            value={filters.searchText}
-            onChange={(e) => {
-              setFilters({ ...filters, searchText: e.target.value });
-              setCurrentPage(1);
-            }}
-            className="border border-gray-300 rounded-lg px-3 py-2"
-          />
-
-          <button
-            onClick={() => {
-              setFilters({ ...filters, department: '', salesman: '', brand: '', searchText: '' });
-              setCurrentPage(1);
-            }}
-            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center justify-center space-x-2"
-          >
-            <X className="w-4 h-4" />
-            <span>Clear</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Alert Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-red-50 border border-red-200 p-6 rounded-lg">
-          <div className="flex items-center">
-            <AlertTriangle className="w-8 h-8 text-red-600" />
-            <div className="ml-4">
-              <div className="text-2xl font-bold text-red-600">{filteredOutOfStock.length}</div>
-              <div className="text-sm text-red-700">Out of Stock Items</div>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-blue-50 border border-blue-200 p-6 rounded-lg">
-          <div className="flex items-center">
-            <Truck className="w-8 h-8 text-blue-600" />
-            <div className="ml-4">
-              <div className="text-2xl font-bold text-blue-600">
-                {filteredOutOfStock.filter((item: any) => 
-                  item.suppliedAfterOutOfStock || (item as any).advancedSupplyStatus?.includes('Restocked')
-                ).length}
-              </div>
-              <div className="text-sm text-blue-700">Fixed Restocked Count</div>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-yellow-50 border border-yellow-200 p-6 rounded-lg">
-          <div className="flex items-center">
-            <Clock className="w-8 h-8 text-yellow-600" />
-            <div className="ml-4">
-              <div className="text-2xl font-bold text-yellow-600">
-                {filteredOutOfStock.filter((item: any) => 
-                  !item.suppliedAfterOutOfStock && !(item as any).advancedSupplyStatus?.includes('Restocked')
-                ).length}
-              </div>
-              <div className="text-sm text-yellow-700">Still Awaiting Supply</div>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-green-50 border border-green-200 p-6 rounded-lg">
-          <div className="flex items-center">
-            <TrendingUp className="w-8 h-8 text-green-600" />
-            <div className="ml-4">
-              <div className="text-2xl font-bold text-green-600">
-                {filteredOutOfStock.length > 0 ? Math.round((filteredOutOfStock.filter((item: any) => 
-                  item.suppliedAfterOutOfStock || (item as any).advancedSupplyStatus?.includes('Restocked')
-                ).length / filteredOutOfStock.length) * 100) : 0}%
-              </div>
-              <div className="text-sm text-green-700">Fixed Response Rate</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Enhanced Out of Stock Analysis with Pagination */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">Fixed Out of Stock Intelligence</h3>
-          <p className="text-sm text-gray-500">
-            Complete out-of-stock analysis with fixed size-specific matching. Showing {startIndex + 1}-{Math.min(endIndex, filteredOutOfStock.length)} of {filteredOutOfStock.length} items
-          </p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">SKU</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shop</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Salesman</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Visit Date</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fixed Supply Status</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {currentItems.map((item: any, index: number) => (
-                <tr key={`${item.shopName}-${item.sku}-${index}`} className={
-                  (item as any).advancedSupplyStatus?.includes('Restocked') ? 'bg-green-50' : 
-                  item.suppliedAfterOutOfStock ? 'bg-blue-50' : ''
-                }>
-                  <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{item.sku}</td>
-                  <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{item.shopName}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.department}</td>
-                  <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{item.salesman}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{item.reasonNoStock}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{item.visitDate.toLocaleDateString('en-GB')}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <span className={`inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full ${
-                      (item as any).advancedSupplyStatus?.includes('Restocked') ? 'bg-green-100 text-green-800' :
-                      (item as any).advancedSupplyStatus?.includes('Awaiting Supply') ? 'bg-red-100 text-red-800' :
-                      (item as any).advancedSupplyStatus?.includes('In Stock') ? 'bg-blue-100 text-blue-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {(item as any).advancedSupplyStatus?.includes('Restocked') && <Truck className="w-3 h-3 mr-1" />}
-                      {(item as any).advancedSupplyStatus?.includes('Awaiting Supply') && <AlertTriangle className="w-3 h-3 mr-1" />}
-                      {(item as any).advancedSupplyStatus || 'Unknown Status'}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Enhanced Pagination */}
-        <div className="px-6 py-3 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center">
-          <div className="text-sm text-gray-700 mb-2 sm:mb-0">
-            Showing {startIndex + 1} to {Math.min(endIndex, filteredOutOfStock.length)} of {filteredOutOfStock.length} out-of-stock items
-          </div>
-          <div className="flex space-x-2">
-            <button
-              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-              disabled={currentPage === 1}
-              className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <span className="px-3 py-1 text-sm text-gray-700">
-              Page {currentPage} of {totalPages}
-            </span>
-            <button
-              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-              disabled={currentPage === totalPages}
-              className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Critical SKUs Analysis */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900 flex items-center">
-            <AlertTriangle className="w-5 h-5 text-red-600 mr-2" />
-            Critical SKUs (High Out-of-Stock Rate)
-          </h3>
-          <p className="text-sm text-gray-500">Products with 30%+ out-of-stock rate requiring immediate attention</p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Priority</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Out of Stock Rate</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Affected Shops</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Fixed Restocked</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action Required</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {data.skuPerformance.filter((sku: any) => sku.outOfStockPercentage >= 30).map((sku: any) => (
-                <tr key={sku.name} className={sku.outOfStockPercentage >= 50 ? 'bg-red-50' : 'bg-yellow-50'}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      sku.outOfStockPercentage >= 50 ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {sku.outOfStockPercentage >= 50 ? '🚨 CRITICAL' : '⚠️ HIGH'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{sku.name}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      sku.outOfStockPercentage >= 50 ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
-                    }`}>
-                      {sku.outOfStockPercentage}%
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{sku.outOfStockCount}/{sku.trackedShops}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600">
-                    {sku.agingLocations.filter((loc: any) => loc.suppliedAfterOutOfStock).length}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-900">
-                    <div className="flex items-center space-x-2">
-                      <Truck className="w-4 h-4 text-blue-600" />
-                      <span>Immediate Replenishment</span>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Enhanced Recommendations */}
-      <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 p-6 rounded-lg">
-        <h3 className="text-lg font-medium text-green-900 mb-4 flex items-center">
-          <Eye className="w-5 h-5 mr-2" />
-          ✅ Fixed Size-Specific Matching - AI Recommendations
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-3">
-            <div className="flex items-start space-x-3">
-              <div className="w-2 h-2 bg-green-600 rounded-full mt-2"></div>
-              <div>
-                <div className="text-sm font-medium text-green-900">SIZE-SPECIFIC ACCURACY</div>
-                <div className="text-sm text-green-700">
-                  Each product size now matches only its exact supply record
-                </div>
-              </div>
-            </div>
-            <div className="flex items-start space-x-3">
-              <div className="w-2 h-2 bg-blue-600 rounded-full mt-2"></div>
-              <div>
-                <div className="text-sm font-medium text-green-900">FALSE POSITIVE ELIMINATION</div>
-                <div className="text-sm text-green-700">
-                  Fixed cross-contamination between different sizes
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="space-y-3">
-            <div className="flex items-start space-x-3">
-              <div className="w-2 h-2 bg-purple-600 rounded-full mt-2"></div>
-              <div>
-                <div className="text-sm font-medium text-green-900">PRIORITY-BASED MATCHING</div>
-                <div className="text-sm text-green-700">
-                  Exact size matches take priority over generic fallbacks
-                </div>
-              </div>
-            </div>
-            <div className="flex items-start space-x-3">
-              <div className="w-2 h-2 bg-orange-600 rounded-full mt-2"></div>
-              <div>
-                <div className="text-sm font-medium text-green-900">CLEAN STATUS DISPLAY</div>
-                <div className="text-sm text-green-700">
-                  Accurate "Restocked (Xd)" and "Awaiting Supply" indicators
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        {/* Success Message */}
-        <div className="mt-6 p-4 bg-white rounded-lg border border-green-200">
-          <h4 className="text-sm font-medium text-green-900 mb-2">🎯 BUG FIXED SUCCESSFULLY:</h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-green-700">
-            <div>• VERVE CRANBERRY 750: Only shows restocked when 750ml supplied</div>
-            <div>• VERVE CRANBERRY 375: Shows "Awaiting Supply" when not supplied</div>
-            <div>• VERVE CRANBERRY 180: Shows "Awaiting Supply" when not supplied</div>
-            <div>• All sizes now have independent, accurate status tracking</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default InventoryDashboard; className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tracked Shops</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">In Stock</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Out of Stock</th>
@@ -1838,7 +1810,7 @@ export default InventoryDashboard; className="px-6 py-3 text-left text-xs font-m
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {data.skuPerformance.slice(0, 20).map((sku) => (
+            {data.skuPerformance.slice(0, 20).map((sku, index) => (
               <tr key={sku.name}>
                 <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{sku.name}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{sku.trackedShops}</td>
@@ -1863,7 +1835,7 @@ export default InventoryDashboard; className="px-6 py-3 text-left text-xs font-m
   </div>
 );
 
-const ShopInventoryTab = ({ 
+const EnhancedShopInventoryTab = ({ 
   data, 
   filteredShops, 
   filters, 
@@ -1936,7 +1908,7 @@ const ShopInventoryTab = ({
     <div className="bg-white rounded-lg shadow">
       <div className="px-6 py-4 border-b border-gray-200">
         <h3 className="text-lg font-medium text-gray-900">Shop Inventory Status</h3>
-        <p className="text-sm text-gray-500">Showing {filteredShops.length} shops with fixed supply status</p>
+        <p className="text-sm text-gray-500">Showing {filteredShops.length} shops with CORRECTED supply status</p>
       </div>
       <div className="divide-y divide-gray-200">
         {filteredShops.map((shop: ShopInventory) => (
@@ -1967,7 +1939,7 @@ const ShopInventoryTab = ({
                     <div className="text-sm font-medium text-blue-600">
                       {Object.values(shop.items).filter(item => item.suppliedAfterOutOfStock).length}
                     </div>
-                    <div className="text-xs text-gray-500">Fixed Restocked</div>
+                    <div className="text-xs text-gray-500">CORRECTED Restocked</div>
                   </div>
                 </div>
               </div>
@@ -1993,7 +1965,7 @@ const ShopInventoryTab = ({
                             <div className="relative group">
                               <Truck className="w-4 h-4 text-blue-500" />
                               <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 px-2 py-1 text-xs text-white bg-gray-800 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                                Fixed Restocked
+                                CORRECTED Restocked
                               </div>
                             </div>
                           )}
@@ -2036,7 +2008,7 @@ const ShopInventoryTab = ({
   </div>
 );
 
-const AgingAnalysisTab = ({ 
+const EnhancedAgingAnalysisTab = ({ 
   data, 
   filters, 
   setFilters, 
@@ -2059,7 +2031,7 @@ const AgingAnalysisTab = ({
     <div className="space-y-6">
       <div className="text-center">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Aging Inventory Analysis</h2>
-        <p className="text-gray-600">All aging products (30+ days) with fixed status logic</p>
+        <p className="text-gray-600">All aging products (30+ days) with CORRECTED status logic</p>
       </div>
 
       {/* Filter Controls */}
@@ -2165,7 +2137,7 @@ const AgingAnalysisTab = ({
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900">All Aging Inventory Locations (30+ Days)</h3>
           <p className="text-sm text-gray-500">
-            Showing {startIndex + 1}-{Math.min(endIndex, filteredAging.length)} of {filteredAging.length} aging items with fixed status
+            Showing {startIndex + 1}-{Math.min(endIndex, filteredAging.length)} of {filteredAging.length} aging items with CORRECTED status
           </p>
         </div>
         <div className="overflow-x-auto">
@@ -2255,11 +2227,11 @@ const AgingAnalysisTab = ({
   );
 };
 
-const VisitComplianceTab = ({ data }: { data: InventoryData }) => (
+const EnhancedVisitComplianceTab = ({ data }: { data: InventoryData }) => (
   <div className="space-y-6">
     <div className="text-center">
       <h2 className="text-2xl font-bold text-gray-900 mb-2">Visit Compliance Dashboard</h2>
-      <p className="text-gray-600">Monthly visit metrics with fixed data processing</p>
+      <p className="text-gray-600">Monthly visit metrics with CORRECTED data processing</p>
     </div>
 
     {/* Visit Summary */}
@@ -2286,10 +2258,390 @@ const VisitComplianceTab = ({ data }: { data: InventoryData }) => (
     <div className="bg-white rounded-lg shadow">
       <div className="px-6 py-4 border-b border-gray-200">
         <h3 className="text-lg font-medium text-gray-900">Monthly Salesman Performance</h3>
-        <p className="text-sm text-gray-500">Individual visit statistics with fixed processing (Current Month)</p>
+        <p className="text-sm text-gray-500">Individual visit statistics with CORRECTED processing (Current Month)</p>
       </div>
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
-              <th
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rank</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Salesman</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Monthly Visits</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unique Shops</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Yesterday Visits</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Month Visits</th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {data.visitCompliance.salesmenStats.map((salesman, index) => (
+              <tr key={salesman.name} className={index < 3 ? 'bg-green-50' : ''}>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  {index + 1}
+                  {index < 3 && <span className="ml-2">🏆</span>}
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{salesman.name}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">{salesman.monthlyVisits}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{salesman.uniqueShops}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-purple-600">{salesman.yesterdayVisits}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600">{salesman.lastMonthVisits}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+);
+
+const CorrectedStockIntelligenceTab = ({ 
+  data, 
+  filters, 
+  setFilters, 
+  getFilteredItems, 
+  getEnhancedSupplyStatusDisplay,
+  departments, 
+  salesmen, 
+  brands,
+  currentPage,
+  setCurrentPage,
+  itemsPerPage
+}: any) => {
+  // CORRECTED: Add pagination for out-of-stock items
+  const filteredOutOfStock = getFilteredItems(data.outOfStockItems);
+  const totalPages = Math.ceil(filteredOutOfStock.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentItems = filteredOutOfStock.slice(startIndex, endIndex);
+
+  return (
+    <div className="space-y-6">
+      <div className="text-center">
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">CORRECTED Stock Intelligence & Supply Chain Analysis</h2>
+        <p className="text-gray-600">Advanced out-of-stock analysis with CORRECTED column indices</p>
+      </div>
+
+      {/* CORRECTED: Enhanced Filter Controls with proper state management */}
+      <div className="bg-white p-4 rounded-lg shadow">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+          <select
+            value={filters.department}
+            onChange={(e) => {
+              setFilters({ ...filters, department: e.target.value });
+              setCurrentPage(1); // Reset pagination when filter changes
+            }}
+            className="border border-gray-300 rounded-lg px-3 py-2"
+          >
+            <option value="">All Departments</option>
+            {departments.map((dept: string) => (
+              <option key={dept} value={dept}>{dept}</option>
+            ))}
+          </select>
+
+          <select
+            value={filters.salesman}
+            onChange={(e) => {
+              setFilters({ ...filters, salesman: e.target.value });
+              setCurrentPage(1);
+            }}
+            className="border border-gray-300 rounded-lg px-3 py-2"
+          >
+            <option value="">All Salesmen</option>
+            {salesmen.map((salesman: string) => (
+              <option key={salesman} value={salesman}>{salesman}</option>
+            ))}
+          </select>
+
+          <select
+            value={filters.brand}
+            onChange={(e) => {
+              setFilters({ ...filters, brand: e.target.value });
+              setCurrentPage(1);
+            }}
+            className="border border-gray-300 rounded-lg px-3 py-2"
+          >
+            <option value="">All Brands</option>
+            {brands.map((brand: string) => (
+              <option key={brand} value={brand}>{brand}</option>
+            ))}
+          </select>
+
+          <input
+            type="text"
+            placeholder="Search..."
+            value={filters.searchText}
+            onChange={(e) => {
+              setFilters({ ...filters, searchText: e.target.value });
+              setCurrentPage(1);
+            }}
+            className="border border-gray-300 rounded-lg px-3 py-2"
+          />
+
+          <button
+            onClick={() => {
+              setFilters({ ...filters, department: '', salesman: '', brand: '', searchText: '' });
+              setCurrentPage(1);
+            }}
+            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center justify-center space-x-2"
+          >
+            <X className="w-4 h-4" />
+            <span>Clear</span>
+          </button>
+        </div>
+      </div>
+
+      {/* CORRECTED: Alert Summary with corrected calculations */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="bg-red-50 border border-red-200 p-6 rounded-lg">
+          <div className="flex items-center">
+            <AlertTriangle className="w-8 h-8 text-red-600" />
+            <div className="ml-4">
+              <div className="text-2xl font-bold text-red-600">{filteredOutOfStock.length}</div>
+              <div className="text-sm text-red-700">Out of Stock Items</div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-blue-50 border border-blue-200 p-6 rounded-lg">
+          <div className="flex items-center">
+            <Truck className="w-8 h-8 text-blue-600" />
+            <div className="ml-4">
+              <div className="text-2xl font-bold text-blue-600">
+                {filteredOutOfStock.filter((item: any) => 
+                  item.suppliedAfterOutOfStock || (item as any).advancedSupplyStatus?.includes('Restocked')
+                ).length}
+              </div>
+              <div className="text-sm text-blue-700">CORRECTED Restocked Count</div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-yellow-50 border border-yellow-200 p-6 rounded-lg">
+          <div className="flex items-center">
+            <Clock className="w-8 h-8 text-yellow-600" />
+            <div className="ml-4">
+              <div className="text-2xl font-bold text-yellow-600">
+                {filteredOutOfStock.filter((item: any) => 
+                  !item.suppliedAfterOutOfStock && !(item as any).advancedSupplyStatus?.includes('Restocked')
+                ).length}
+              </div>
+              <div className="text-sm text-yellow-700">Still Awaiting Supply</div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-green-50 border border-green-200 p-6 rounded-lg">
+          <div className="flex items-center">
+            <TrendingUp className="w-8 h-8 text-green-600" />
+            <div className="ml-4">
+              <div className="text-2xl font-bold text-green-600">
+                {filteredOutOfStock.length > 0 ? Math.round((filteredOutOfStock.filter((item: any) => 
+                  item.suppliedAfterOutOfStock || (item as any).advancedSupplyStatus?.includes('Restocked')
+                ).length / filteredOutOfStock.length) * 100) : 0}%
+              </div>
+              <div className="text-sm text-green-700">CORRECTED Response Rate</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* CORRECTED: Enhanced Out of Stock Analysis with Pagination */}
+      <div className="bg-white rounded-lg shadow">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-medium text-gray-900">CORRECTED Out of Stock Intelligence</h3>
+          <p className="text-sm text-gray-500">
+            Complete out-of-stock analysis with CORRECTED column mapping. Showing {startIndex + 1}-{Math.min(endIndex, filteredOutOfStock.length)} of {filteredOutOfStock.length} items
+          </p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">SKU</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shop</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Salesman</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Visit Date</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">CORRECTED Supply Status</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {currentItems.map((item: any, index: number) => (
+                <tr key={`${item.shopName}-${item.sku}-${index}`} className={
+                  (item as any).advancedSupplyStatus?.includes('Restocked') ? 'bg-green-50' : 
+                  item.suppliedAfterOutOfStock ? 'bg-blue-50' : ''
+                }>
+                  <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{item.sku}</td>
+                  <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{item.shopName}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.department}</td>
+                  <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{item.salesman}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{item.reasonNoStock}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{item.visitDate.toLocaleDateString('en-GB')}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <span className={`inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full ${
+                      (item as any).advancedSupplyStatus?.includes('Restocked') ? 'bg-green-100 text-green-800' :
+                      (item as any).advancedSupplyStatus?.includes('Awaiting Supply') ? 'bg-red-100 text-red-800' :
+                      (item as any).advancedSupplyStatus?.includes('In Stock') ? 'bg-blue-100 text-blue-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {(item as any).advancedSupplyStatus?.includes('Restocked') && <Truck className="w-3 h-3 mr-1" />}
+                      {(item as any).advancedSupplyStatus?.includes('Awaiting Supply') && <AlertTriangle className="w-3 h-3 mr-1" />}
+                      {(item as any).advancedSupplyStatus || 'Unknown Status'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* CORRECTED: Enhanced Pagination for Stock Intelligence */}
+        <div className="px-6 py-3 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center">
+          <div className="text-sm text-gray-700 mb-2 sm:mb-0">
+            Showing {startIndex + 1} to {Math.min(endIndex, filteredOutOfStock.length)} of {filteredOutOfStock.length} out-of-stock items
+          </div>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="px-3 py-1 text-sm text-gray-700">
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* CORRECTED: Critical SKUs Analysis */}
+      <div className="bg-white rounded-lg shadow">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-medium text-gray-900 flex items-center">
+            <AlertTriangle className="w-5 h-5 text-red-600 mr-2" />
+            Critical SKUs (High Out-of-Stock Rate)
+          </h3>
+          <p className="text-sm text-gray-500">Products with 30%+ out-of-stock rate requiring immediate attention</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Priority</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Out of Stock Rate</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Affected Shops</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">CORRECTED Restocked</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action Required</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {data.skuPerformance.filter((sku: any) => sku.outOfStockPercentage >= 30).map((sku: any, index: number) => (
+                <tr key={sku.name} className={sku.outOfStockPercentage >= 50 ? 'bg-red-50' : 'bg-yellow-50'}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      sku.outOfStockPercentage >= 50 ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {sku.outOfStockPercentage >= 50 ? '🚨 CRITICAL' : '⚠️ HIGH'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{sku.name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      sku.outOfStockPercentage >= 50 ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
+                    }`}>
+                      {sku.outOfStockPercentage}%
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{sku.outOfStockCount}/{sku.trackedShops}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600">
+                    {sku.agingLocations.filter((loc: any) => loc.suppliedAfterOutOfStock).length}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-900">
+                    <div className="flex items-center space-x-2">
+                      <Truck className="w-4 h-4 text-blue-600" />
+                      <span>Immediate Replenishment</span>
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* CORRECTED: Enhanced Recommendations */}
+      <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 p-6 rounded-lg">
+        <h3 className="text-lg font-medium text-green-900 mb-4 flex items-center">
+          <Eye className="w-5 h-5 mr-2" />
+          ✅ CORRECTED Column Indices + COMPREHENSIVE DEBUG - AI Recommendations
+        </h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="space-y-3">
+            <div className="flex items-start space-x-3">
+              <div className="w-2 h-2 bg-green-600 rounded-full mt-2"></div>
+              <div>
+                <div className="text-sm font-medium text-green-900">ENHANCED DEBUGGING ADDED</div>
+                <div className="text-sm text-green-700">
+                  Comprehensive console logging for Jhilmil Phase-II to identify bugs
+                </div>
+              </div>
+            </div>
+            <div className="flex items-start space-x-3">
+              <div className="w-2 h-2 bg-blue-600 rounded-full mt-2"></div>
+              <div>
+                <div className="text-sm font-medium text-green-900">FALSE POSITIVE DETECTION</div>
+                <div className="text-sm text-green-700">
+                  Debug will show why 8 PM BLACK 750 incorrectly shows "Restocked"
+                </div>
+              </div>
+            </div>
+          </div>
+          <div className="space-y-3">
+            <div className="flex items-start space-x-3">
+              <div className="w-2 h-2 bg-purple-600 rounded-full mt-2"></div>
+              <div>
+                <div className="text-sm font-medium text-green-900">QUANTITY VALIDATION</div>
+                <div className="text-sm text-green-700">
+                  Debug will show actual vs expected visit quantities for VERVE products
+                </div>
+              </div>
+            </div>
+            <div className="flex items-start space-x-3">
+              <div className="w-2 h-2 bg-orange-600 rounded-full mt-2"></div>
+              <div>
+                <div className="text-sm font-medium text-green-900">SUPPLY MATCHING AUDIT</div>
+                <div className="text-sm text-green-700">
+                  Shows exact supply keys being matched and why
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Debug Instructions */}
+        <div className="mt-6 p-4 bg-white rounded-lg border border-green-200">
+          <h4 className="text-sm font-medium text-green-900 mb-2">🔍 DEBUG INSTRUCTIONS:</h4>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-green-700">
+            <div>• Open browser console (F12)</div>
+            <div>• Look for "🚨 DEBUGGING" messages</div>
+            <div>• Check "VISIT DATA DEBUG" entries</div>
+            <div>• Verify "SUPPLY STATUS LOGIC" output</div>
+            <div>• Review "FINAL STATUS ASSIGNMENT"</div>
+            <div>• Check "ALL SUPPLY KEYS" section</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default InventoryDashboard;
