@@ -1756,18 +1756,7 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
                         {trend === 'improving' ? '📈 Growing' : trend === 'declining' ? '📉 Declining' : '➡️ Stable'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">
-                      <button
-                        onClick={() => {
-                          setSelectedSalesman(salesman);
-                          setShowSalesmanModal(true);
-                        }}
-                        className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
-                        title="Click to see 3-month breakdown"
-                      >
-                        {avg3Month}
-                      </button>
-                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">{avg3Month}</td>
                   </tr>
                 );
               })}
