@@ -108,6 +108,17 @@ interface FilterState {
 // PART 2: CONFIGURATION & CONSTANTS
 // ==========================================
 
+// Helper function for month names (used throughout the component)
+const getMonthName = (monthNum: string) => {
+  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  return months[parseInt(monthNum) - 1] || 'Unknown';
+};
+
+const getShortMonthName = (monthNum: string) => {
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return months[parseInt(monthNum) - 1] || 'Unknown';
+};
+
 const RadicoDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
@@ -871,15 +882,10 @@ const RadicoDashboard = () => {
 
   // Enhanced SKU Modal Component
   const EnhancedSKUModal = ({ shop, onClose }: { shop: ShopData, onClose: () => void }) => {
-    const [activeMonth, setActiveMonth] = useState(getMonthName(currentMonth));
-    
-    const getMonthName = (monthNum: string) => {
-      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-      return months[parseInt(monthNum) - 1] || 'Unknown';
-    };
+    const [activeMonth, setActiveMonth] = useState(getShortMonthName(currentMonth));
     
     const getSKUDataForMonth = (month: string) => {
-      if (month === getMonthName(currentMonth)) {
+      if (month === getShortMonthName(currentMonth)) {
         return shop.skuBreakdown || [];
       }
       return [];
@@ -896,7 +902,7 @@ const RadicoDashboard = () => {
           </div>
 
           <div className="flex border-b">
-            {['March', 'April', 'May', getMonthName(currentMonth)].map((month) => (
+            {['March', 'April', 'May', getShortMonthName(currentMonth)].map((month) => (
               <button
                 key={month}
                 onClick={() => setActiveMonth(month)}
@@ -915,7 +921,7 @@ const RadicoDashboard = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <div className="text-center bg-blue-50 p-4 rounded-lg">
                 <div className="text-2xl font-bold text-blue-600">
-                  {activeMonth === getMonthName(currentMonth) ? shop.juneTotal || shop.total :
+                  {activeMonth === getShortMonthName(currentMonth) ? shop.juneTotal || shop.total :
                    activeMonth === 'May' ? shop.mayTotal || 0 :
                    activeMonth === 'April' ? shop.aprilTotal || 0 :
                    shop.marchTotal || 0}
@@ -924,7 +930,7 @@ const RadicoDashboard = () => {
               </div>
               <div className="text-center bg-purple-50 p-4 rounded-lg">
                 <div className="text-2xl font-bold text-purple-600">
-                  {activeMonth === getMonthName(currentMonth) ? shop.juneEightPM || shop.eightPM :
+                  {activeMonth === getShortMonthName(currentMonth) ? shop.juneEightPM || shop.eightPM :
                    activeMonth === 'May' ? shop.mayEightPM || 0 :
                    activeMonth === 'April' ? shop.aprilEightPM || 0 :
                    shop.marchEightPM || 0}
@@ -933,7 +939,7 @@ const RadicoDashboard = () => {
               </div>
               <div className="text-center bg-orange-50 p-4 rounded-lg">
                 <div className="text-2xl font-bold text-orange-600">
-                  {activeMonth === getMonthName(currentMonth) ? shop.juneVerve || shop.verve :
+                  {activeMonth === getShortMonthName(currentMonth) ? shop.juneVerve || shop.verve :
                    activeMonth === 'May' ? shop.mayVerve || 0 :
                    activeMonth === 'April' ? shop.aprilVerve || 0 :
                    shop.marchVerve || 0}
@@ -1006,7 +1012,7 @@ const RadicoDashboard = () => {
         theme: 'grid'
       });
 
-      doc.save(`Radico_Enhanced_Analytics_${getMonthName(currentMonth)}_${currentYear}.pdf`);
+      doc.save(`Radico_Enhanced_Analytics_${getShortMonthName(currentMonth)}_${currentYear}.pdf`);
     } catch (error) {
       console.error('Error generating PDF:', error);
       alert('Error generating PDF report. Please try again.');
@@ -1021,7 +1027,7 @@ const RadicoDashboard = () => {
       
       let csvContent = "data:text/csv;charset=utf-8,";
       csvContent += `Radico Enhanced Shop Analysis Report - Rolling 4-Month Comparison - ${new Date().toLocaleDateString()}\n`;
-      csvContent += `Report Period: Mar-Apr-May-${getMonthName(currentMonth)} ${currentYear}\n`;
+      csvContent += `Report Period: Mar-Apr-May-${getShortMonthName(currentMonth)} ${currentYear}\n`;
       
       if (filters.department || filters.salesman || filters.searchText) {
         csvContent += "APPLIED FILTERS: ";
@@ -1047,8 +1053,8 @@ const RadicoDashboard = () => {
       csvContent += "Consistent Performers," + dashboardData.customerInsights.consistentPerformers + "\n";
       csvContent += "Declining Performers," + dashboardData.customerInsights.decliningPerformers + "\n\n";
       
-      csvContent += `ROLLING WINDOW SHOP COMPARISON (Mar-Apr-May-${getMonthName(currentMonth)} ${currentYear})\n`;
-      csvContent += `Shop Name,Department,Salesman,Mar Cases,Apr Cases,May Cases,${getMonthName(currentMonth)} Cases,8PM Cases,VERVE Cases,Growth %,YoY Growth %,Monthly Trend\n`;
+      csvContent += `ROLLING WINDOW SHOP COMPARISON (Mar-Apr-May-${getShortMonthName(currentMonth)} ${currentYear})\n`;
+      csvContent += `Shop Name,Department,Salesman,Mar Cases,Apr Cases,May Cases,${getShortMonthName(currentMonth)} Cases,8PM Cases,VERVE Cases,Growth %,YoY Growth %,Monthly Trend\n`;
       
       filteredShops.forEach(shop => {
         csvContent += `"${shop.shopName}","${shop.department}","${shop.salesman}",${shop.marchTotal || 0},${shop.aprilTotal || 0},${shop.mayTotal || 0},${shop.juneTotal || shop.total},${shop.eightPM},${shop.verve},${shop.growthPercent?.toFixed(1) || 0}%,${shop.yoyGrowthPercent?.toFixed(1) || 0}%,"${shop.monthlyTrend || 'stable'}"\n`;
@@ -1057,7 +1063,7 @@ const RadicoDashboard = () => {
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement("a");
       link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `Radico_Enhanced_Analysis_${getMonthName(currentMonth)}_${currentYear}.csv`);
+      link.setAttribute("download", `Radico_Enhanced_Analysis_${getShortMonthName(currentMonth)}_${currentYear}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -1065,14 +1071,6 @@ const RadicoDashboard = () => {
       console.error('Error exporting to Excel:', error);
       alert('Error exporting data. Please try again.');
     }
-  };
-
-  const getMonthName = (monthNum: string) => {
-    const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
-    ];
-    return months[parseInt(monthNum) - 1] || 'Unknown';
   };
 
   React.useEffect(() => {
@@ -1259,14 +1257,6 @@ const RadicoDashboard = () => {
 // UPDATED TAB COMPONENTS WITH DYNAMIC MONTH DETECTION AND YoY
 
 const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
-  const getMonthName = (monthNum: string) => {
-    const months = [
-      'January', 'February', 'March', 'April', 'May', 'June',
-      'July', 'August', 'September', 'October', 'November', 'December'
-    ];
-    return months[parseInt(monthNum) - 1] || 'Unknown';
-  };
-
   // Calculate salesman performance data
   const salesmanPerformance = React.useMemo(() => {
     const performanceMap: Record<string, any> = {};
@@ -1655,11 +1645,6 @@ const AdvancedAnalyticsTab = ({
   setFilters: (filters: FilterState) => void,
   getFilteredShops: (shops: ShopData[]) => ShopData[]
 }) => {
-  const getMonthName = (monthNum: string) => {
-    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-    return months[parseInt(monthNum) - 1] || 'Unknown';
-  };
-
   const filteredShops = getFilteredShops(data.allShopsComparison);
   const totalPages = Math.ceil(filteredShops.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -1966,11 +1951,6 @@ const AdvancedAnalyticsTab = ({
 // ENHANCED: Historical Analysis Tab Component (UPDATED TO 12 MONTHS WITH YoY)
 const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
   const [debugInfo, setDebugInfo] = React.useState<any>(null);
-
-  const getMonthName = (monthNum: string) => {
-    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-    return months[parseInt(monthNum) - 1] || 'Unknown';
-  };
 
   useEffect(() => {
     if (data.historicalData) {
@@ -2330,11 +2310,6 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
 };
 
 const DepartmentTab = ({ data }: { data: DashboardData }) => {
-  const getMonthName = (monthNum: string) => {
-    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-    return months[parseInt(monthNum) - 1] || 'Unknown';
-  };
-
   return (
     <div className="space-y-6">
       {/* Department Performance Overview */}
@@ -2549,11 +2524,6 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
 };
 
 const OverviewTab = ({ data }: { data: DashboardData }) => {
-  const getMonthName = (monthNum: string) => {
-    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-    return months[parseInt(monthNum) - 1] || 'Unknown';
-  };
-
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -2799,11 +2769,6 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
 
 // ENHANCED: Top Shops Tab (UPDATED TO ROLLING 4 MONTHS WITH YoY)
 const TopShopsTab = ({ data }: { data: DashboardData }) => {
-  const getMonthName = (monthNum: string) => {
-    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-    return months[parseInt(monthNum) - 1] || 'Unknown';
-  };
-
   return (
     <div className="bg-white rounded-lg shadow">
       <div className="px-6 py-4 border-b border-gray-200">
