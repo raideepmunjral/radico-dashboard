@@ -1300,6 +1300,10 @@ const RadicoDashboard = () => {
 // UPDATED TAB COMPONENTS WITH DYNAMIC MONTH DETECTION AND YoY
 
 const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
+  // State for salesman breakdown modal
+  const [showSalesmanModal, setShowSalesmanModal] = useState(false);
+  const [selectedSalesman, setSelectedSalesman] = useState<any>(null);
+
   // Calculate salesman performance data (FIXED HISTORICAL AGGREGATION)
   const salesmanPerformance = React.useMemo(() => {
     const performanceMap: Record<string, any> = {};
@@ -1380,6 +1384,153 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
   }, [data]);
 
   const sortedSalesmen = salesmanPerformance.sort((a: any, b: any) => b.totalSales - a.totalSales);
+
+  // Enhanced Salesman Breakdown Modal Component
+  const SalesmanBreakdownModal = ({ salesman, onClose }: { salesman: any, onClose: () => void }) => {
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg max-w-4xl w-full max-h-[80vh] overflow-hidden">
+          <div className="flex justify-between items-center p-6 border-b">
+            <h3 className="text-lg font-semibold">3-Month Performance Breakdown - {salesman.name}</h3>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+
+          <div className="p-6 overflow-y-auto">
+            {/* Summary Cards */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+              <div className="text-center bg-blue-50 p-4 rounded-lg">
+                <div className="text-2xl font-bold text-blue-600">
+                  {(salesman.marchTotal + salesman.aprilTotal + salesman.mayTotal).toLocaleString()}
+                </div>
+                <div className="text-sm text-gray-500">Total Cases (3 Months)</div>
+              </div>
+              <div className="text-center bg-purple-50 p-4 rounded-lg">
+                <div className="text-2xl font-bold text-purple-600">
+                  {(salesman.marchEightPM + salesman.aprilEightPM + salesman.mayEightPM).toLocaleString()}
+                </div>
+                <div className="text-sm text-gray-500">Total 8PM Cases</div>
+              </div>
+              <div className="text-center bg-orange-50 p-4 rounded-lg">
+                <div className="text-2xl font-bold text-orange-600">
+                  {(salesman.marchVerve + salesman.aprilVerve + salesman.mayVerve).toLocaleString()}
+                </div>
+                <div className="text-sm text-gray-500">Total VERVE Cases</div>
+              </div>
+              <div className="text-center bg-green-50 p-4 rounded-lg">
+                <div className="text-2xl font-bold text-green-600">
+                  {((salesman.marchTotal + salesman.aprilTotal + salesman.mayTotal) / 3).toFixed(0)}
+                </div>
+                <div className="text-sm text-gray-500">Monthly Average</div>
+              </div>
+            </div>
+
+            {/* Monthly Breakdown Table */}
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Month</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Cases</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">8PM Cases</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">8PM %</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">VERVE Cases</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">VERVE %</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Growth</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {[
+                    { month: 'March 2025', total: salesman.marchTotal, eightPM: salesman.marchEightPM, verve: salesman.marchVerve, isBase: true },
+                    { month: 'April 2025', total: salesman.aprilTotal, eightPM: salesman.aprilEightPM, verve: salesman.aprilVerve, 
+                      growth: salesman.marchTotal > 0 ? (((salesman.aprilTotal - salesman.marchTotal) / salesman.marchTotal) * 100) : 0 },
+                    { month: 'May 2025', total: salesman.mayTotal, eightPM: salesman.mayEightPM, verve: salesman.mayVerve,
+                      growth: salesman.aprilTotal > 0 ? (((salesman.mayTotal - salesman.aprilTotal) / salesman.aprilTotal) * 100) : 0 }
+                  ].map((monthData, index) => (
+                    <tr key={monthData.month} className={index === 2 ? 'bg-blue-50' : ''}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{monthData.month}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-blue-600">{monthData.total.toLocaleString()}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-purple-600">{monthData.eightPM.toLocaleString()}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-purple-600">
+                        {monthData.total > 0 ? ((monthData.eightPM / monthData.total) * 100).toFixed(1) : 0}%
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-orange-600">{monthData.verve.toLocaleString()}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600">
+                        {monthData.total > 0 ? ((monthData.verve / monthData.total) * 100).toFixed(1) : 0}%
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        {monthData.isBase ? (
+                          <span className="text-gray-500">Base Month</span>
+                        ) : (
+                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                            monthData.growth >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                          }`}>
+                            {monthData.growth >= 0 ? '+' : ''}{monthData.growth.toFixed(1)}%
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Brand Performance Chart */}
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="bg-purple-50 p-4 rounded-lg">
+                <h4 className="font-medium text-purple-600 mb-3">8PM Performance Trend</h4>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">March:</span>
+                    <span className="font-medium">{salesman.marchEightPM.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">April:</span>
+                    <span className="font-medium">{salesman.aprilEightPM.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">May:</span>
+                    <span className="font-medium">{salesman.mayEightPM.toLocaleString()}</span>
+                  </div>
+                  <div className="pt-2 border-t">
+                    <div className="flex justify-between items-center font-bold">
+                      <span>Average:</span>
+                      <span>{((salesman.marchEightPM + salesman.aprilEightPM + salesman.mayEightPM) / 3).toFixed(0)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-orange-50 p-4 rounded-lg">
+                <h4 className="font-medium text-orange-600 mb-3">VERVE Performance Trend</h4>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">March:</span>
+                    <span className="font-medium">{salesman.marchVerve.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">April:</span>
+                    <span className="font-medium">{salesman.aprilVerve.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">May:</span>
+                    <span className="font-medium">{salesman.mayVerve.toLocaleString()}</span>
+                  </div>
+                  <div className="pt-2 border-t">
+                    <div className="flex justify-between items-center font-bold">
+                      <span>Average:</span>
+                      <span>{((salesman.marchVerve + salesman.aprilVerve + salesman.mayVerve) / 3).toFixed(0)}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -1537,18 +1688,18 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
       <div className="bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900">3-Month Performance Trend (Mar-Apr-May {data.currentYear})</h3>
-          <p className="text-sm text-gray-500">Historical performance comparison for 8PM and VERVE by salesman</p>
+          <p className="text-sm text-gray-500">Historical performance comparison for 8PM and VERVE by salesman. <span className="text-blue-600 font-medium">Click on cases numbers to see 8PM/VERVE breakdown.</span></p>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salesman</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">March Total</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">April Total</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">May Total</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-blue-500 uppercase tracking-wider cursor-pointer">March Total 📊</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-blue-500 uppercase tracking-wider cursor-pointer">April Total 📊</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-blue-500 uppercase tracking-wider cursor-pointer">May Total 📊</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trend</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">3-Month Avg</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-blue-500 uppercase tracking-wider cursor-pointer">3-Month Avg 📊</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -1560,9 +1711,42 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
                 return (
                   <tr key={salesman.name}>
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">{salesman.name}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{salesman.marchTotal.toLocaleString()}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{salesman.aprilTotal.toLocaleString()}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{salesman.mayTotal.toLocaleString()}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <button
+                        onClick={() => {
+                          setSelectedSalesman(salesman);
+                          setShowSalesmanModal(true);
+                        }}
+                        className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                        title="Click to see 8PM and VERVE breakdown"
+                      >
+                        {salesman.marchTotal.toLocaleString()}
+                      </button>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <button
+                        onClick={() => {
+                          setSelectedSalesman(salesman);
+                          setShowSalesmanModal(true);
+                        }}
+                        className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                        title="Click to see 8PM and VERVE breakdown"
+                      >
+                        {salesman.aprilTotal.toLocaleString()}
+                      </button>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <button
+                        onClick={() => {
+                          setSelectedSalesman(salesman);
+                          setShowSalesmanModal(true);
+                        }}
+                        className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                        title="Click to see 8PM and VERVE breakdown"
+                      >
+                        {salesman.mayTotal.toLocaleString()}
+                      </button>
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                         trend === 'improving' ? 'bg-green-100 text-green-800' :
@@ -1572,7 +1756,18 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
                         {trend === 'improving' ? '📈 Growing' : trend === 'declining' ? '📉 Declining' : '➡️ Stable'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">{avg3Month}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">
+                      <button
+                        onClick={() => {
+                          setSelectedSalesman(salesman);
+                          setShowSalesmanModal(true);
+                        }}
+                        className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                        title="Click to see 3-month breakdown"
+                      >
+                        {avg3Month}
+                      </button>
+                    </td>
                   </tr>
                 );
               })}
@@ -1680,6 +1875,17 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
           </div>
         </div>
       </div>
+      
+      {/* Salesman Breakdown Modal */}
+      {showSalesmanModal && selectedSalesman && (
+        <SalesmanBreakdownModal 
+          salesman={selectedSalesman} 
+          onClose={() => {
+            setShowSalesmanModal(false);
+            setSelectedSalesman(null);
+          }} 
+        />
+      )}
     </div>
   );
 };
