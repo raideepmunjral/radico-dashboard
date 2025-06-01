@@ -16,10 +16,7 @@ interface ShopData {
   total: number;
   eightPM: number;
   verve: number;
-  // Extended to 4 months
-  februaryTotal?: number;
-  februaryEightPM?: number;
-  februaryVerve?: number;
+  // Updated to rolling 4 months: Mar-Apr-May-June
   marchTotal?: number;
   marchEightPM?: number;
   marchVerve?: number;
@@ -29,6 +26,14 @@ interface ShopData {
   mayTotal?: number;
   mayEightPM?: number;
   mayVerve?: number;
+  juneTotal?: number;
+  juneEightPM?: number;
+  juneVerve?: number;
+  // YoY comparison
+  juneLastYearTotal?: number;
+  juneLastYearEightPM?: number;
+  juneLastYearVerve?: number;
+  yoyGrowthPercent?: number;
   growthPercent?: number;
   monthlyTrend?: 'improving' | 'declining' | 'stable' | 'new';
   skuBreakdown?: SKUData[];
@@ -73,6 +78,11 @@ interface DashboardData {
     totalVerveTarget: number;
     eightPmAchievement: string;
     verveAchievement: string;
+    // YoY metrics
+    lastYearTotal8PM?: number;
+    lastYearTotalVERVE?: number;
+    yoy8PMGrowth?: string;
+    yoyVerveGrowth?: string;
   };
   topShops: ShopData[];
   deptPerformance: Record<string, any>;
@@ -83,6 +93,8 @@ interface DashboardData {
   customerInsights: CustomerInsights;
   allShopsComparison: ShopData[];
   historicalData?: any;
+  currentMonth: string;
+  currentYear: string;
 }
 
 interface FilterState {
@@ -112,8 +124,17 @@ const RadicoDashboard = () => {
     shop: '',
     searchText: ''
   });
-  // NEW: Add inventory toggle state
   const [showInventory, setShowInventory] = useState(false);
+
+  // DYNAMIC DATE DETECTION
+  const getCurrentMonthYear = () => {
+    const now = new Date();
+    const currentMonth = String(now.getMonth() + 1).padStart(2, '0'); // June = 06
+    const currentYear = String(now.getFullYear()); // 2025
+    return { currentMonth, currentYear };
+  };
+
+  const { currentMonth, currentYear } = getCurrentMonthYear();
 
   // FIXED CONFIGURATION WITH PROPER HISTORICAL DATA SHEET
   const SHEETS_CONFIG = {
@@ -123,9 +144,9 @@ const RadicoDashboard = () => {
     apiKey: process.env.NEXT_PUBLIC_GOOGLE_API_KEY
   };
 
-  // ENHANCED BRAND FAMILY MAPPING - CONSISTENT WITH CURRENT DATA PROCESSING
+  // ENHANCED BRAND FAMILY MAPPING
   const brandFamily: Record<string, string> = {
-    // Historical Data Brand Short Variations (FIXED to match your data)
+    // Historical Data Brand Short Variations
     "VERVE": "VERVE",
     "8 PM BLACK": "8PM", 
     "8PM BLACK": "8PM",
@@ -144,7 +165,7 @@ const RadicoDashboard = () => {
     "8PM PREMIUM BLACK BLENDED WHISKY": "8PM",
     "8PM PREMIUM BLACK SUPERIOR WHISKY": "8PM",
     
-    // VERVE Variations (current data)
+    // VERVE Variations
     "M2M VERVE CRANBERRY TEASE SP FL VODKA": "VERVE",
     "M2M VERVE GREEN APPLE SUPERIOR FL. VODKA": "VERVE",
     "M2M VERVE LEMON LUSH SUP FL VODKA": "VERVE",
@@ -169,29 +190,21 @@ const RadicoDashboard = () => {
     "M2 MAGIC MOMENTS VERVE SUPERIOR GRAIN VODKA": "VERVE"
   };
   
-  // FIXED: Helper function to determine brand family with consistent logic
   const getBrandFamily = (brandShort?: string, brand?: string): string | null => {
-    // Clean and trim inputs
     const cleanBrandShort = brandShort?.toString().trim();
     const cleanBrand = brand?.toString().trim();
     
-    // Try exact match first with brand short (priority for historical data)
     if (cleanBrandShort && brandFamily[cleanBrandShort]) {
       return brandFamily[cleanBrandShort];
     }
     
-    // Try exact match with full brand name
     if (cleanBrand && brandFamily[cleanBrand]) {
       return brandFamily[cleanBrand];
     }
     
-    // Try partial matching for consistent patterns
     const combinedText = ((cleanBrandShort || '') + ' ' + (cleanBrand || '')).toUpperCase();
     
-    // VERVE pattern matching
     if (combinedText.includes('VERVE') || combinedText.includes('M2 MAGIC MOMENTS VERVE')) return 'VERVE';
-    
-    // 8PM pattern matching
     if (combinedText.includes('8PM') || combinedText.includes('8 PM')) return '8PM';
     if (combinedText.includes('PREMIUM BLACK') && (combinedText.includes('WHISKY') || combinedText.includes('BLENDED'))) return '8PM';
     
@@ -200,9 +213,8 @@ const RadicoDashboard = () => {
 
   // ==========================================
   // PART 3: DATA FETCHING FUNCTIONS
-  // ==========================================
+// ==========================================
 
-  // ENHANCED MAIN DATA FETCHING FUNCTION
   const fetchDashboardData = async () => {
     setLoading(true);
     setError(null);
@@ -212,14 +224,12 @@ const RadicoDashboard = () => {
         throw new Error('Google API key not configured. Please set NEXT_PUBLIC_GOOGLE_API_KEY environment variable.');
       }
 
-      // Fetch all data sources
       const [masterData, visitData, historicalData] = await Promise.all([
         fetchMasterSheetData(),
         fetchVisitSheetData(),
         fetchHistoricalSheetData()
       ]);
       
-      // Process data with enhanced logic
       const processedData = processEnhancedRadicoData(masterData, visitData, historicalData);
       setDashboardData(processedData);
       setLastUpdated(new Date());
@@ -231,7 +241,6 @@ const RadicoDashboard = () => {
     }
   };
 
-  // EXISTING MASTER SHEET FETCH (UNCHANGED)
   const fetchMasterSheetData = async () => {
     const sheets = ['Shop Details', 'Target Vs Achievement', 'Pending Challans', 'User Management'];
     const data: Record<string, any[]> = {};
@@ -257,7 +266,6 @@ const RadicoDashboard = () => {
     return data;
   };
 
-  // EXISTING VISIT SHEET FETCH (UNCHANGED)
   const fetchVisitSheetData = async () => {
     try {
       const response = await fetch(
@@ -277,10 +285,8 @@ const RadicoDashboard = () => {
     }
   };
 
-  // COMPLETELY FIXED HISTORICAL DATA FETCH FUNCTION
   const fetchHistoricalSheetData = async () => {
     try {
-      // Try the known sheet name first
       const possibleSheetNames = ['MASTER', 'radico 24 25', 'Sheet1', 'Data'];
       
       for (const sheetName of possibleSheetNames) {
@@ -313,7 +319,7 @@ const RadicoDashboard = () => {
   };
 
   // ==========================================
-  // PART 4: ENHANCED DATA PROCESSING LOGIC (UPDATED FOR 6 MONTHS HISTORICAL + 4 MONTHS SHOP ANALYSIS)
+  // PART 4: ENHANCED DATA PROCESSING WITH DYNAMIC MONTH DETECTION & YoY
   // ==========================================
 
   const processEnhancedRadicoData = (masterData: Record<string, any[]>, visitData: any[], historicalData: any[]): DashboardData => {
@@ -321,11 +327,11 @@ const RadicoDashboard = () => {
     const targets = masterData['Target Vs Achievement'] || [];
     const challans = masterData['Pending Challans'] || [];
     
-    console.log('🔧 PROCESSING DATA WITH EXTENDED HISTORICAL ANALYSIS (6 MONTHS) AND SHOP ANALYSIS (4 MONTHS)');
-    console.log('Historical Data Length:', historicalData?.length || 0);
+    console.log(`🔧 PROCESSING DATA WITH DYNAMIC MONTH DETECTION: ${currentMonth}-${currentYear}`);
+    console.log('🔄 ROLLING 4-MONTH WINDOW: Mar-Apr-May-Jun 2025 + YoY (Jun 2024)');
     
-    // ENHANCED MONTHLY DATA PROCESSING WITH PROPER DATE HANDLING (EXTENDED TO 6 MONTHS)
-    const processMonthlyData = (monthNumber: string, year: string = '2025', useHistorical: boolean = false) => {
+    // ENHANCED MONTHLY DATA PROCESSING WITH DYNAMIC DATES
+    const processMonthlyData = (monthNumber: string, year: string = currentYear, useHistorical: boolean = false) => {
       let monthShopSales: Record<string, any> = {};
       let monthlyUniqueShops = new Set<string>();
       let monthly8PM = 0, monthlyVERVE = 0;
@@ -334,9 +340,6 @@ const RadicoDashboard = () => {
         console.log(`📊 Processing historical data for month ${monthNumber}-${year}`);
         
         const headers = historicalData[0] || [];
-        console.log('📋 Historical headers:', headers);
-        
-        // Process historical data rows
         let processedRows = 0;
         let targetMonthRows = 0;
         
@@ -344,22 +347,19 @@ const RadicoDashboard = () => {
           if (row && row.length >= 13) {
             processedRows++;
             
-            const shopName = row[0]?.toString().trim(); // shop_name
-            const brandShort = row[3]?.toString().trim(); // Brand short  
-            const cases = parseFloat(row[5]) || 0; // cases
-            const dateStr = row[7]?.toString().trim(); // Date
-            const fullBrand = row[10]?.toString().trim(); // brand
-            const shopId = row[12]?.toString().trim(); // shop_id
+            const shopName = row[0]?.toString().trim();
+            const brandShort = row[3]?.toString().trim();
+            const cases = parseFloat(row[5]) || 0;
+            const dateStr = row[7]?.toString().trim();
+            const fullBrand = row[10]?.toString().trim();
+            const shopId = row[12]?.toString().trim();
             
-            // FIXED: Parse DD-MM-YYYY format and check for target month
             if (dateStr && cases > 0) {
               const dateParts = dateStr.split('-');
               if (dateParts.length === 3) {
-                const day = dateParts[0];
                 const month = dateParts[1]; 
                 const yearPart = dateParts[2];
                 
-                // Check if this row is for the target month
                 if (month === monthNumber && yearPart === year) {
                   targetMonthRows++;
                   
@@ -367,7 +367,6 @@ const RadicoDashboard = () => {
                   if (shopIdentifier) {
                     monthlyUniqueShops.add(shopIdentifier);
                     
-                    // FIXED: Use consistent brand family mapping
                     const parentBrand = getBrandFamily(brandShort, fullBrand);
                     
                     if (parentBrand === "8PM") monthly8PM += cases;
@@ -392,12 +391,11 @@ const RadicoDashboard = () => {
           targetMonthRows: targetMonthRows,
           uniqueShops: monthlyUniqueShops.size,
           total8PM: monthly8PM,
-          totalVERVE: monthlyVERVE,
-          shopSalesCount: Object.keys(monthShopSales).length
+          totalVERVE: monthlyVERVE
         });
         
       } else {
-        // Use current data source for April and May
+        // Use current data source for current and recent months
         console.log(`📊 Processing current data for month ${monthNumber}-${year}`);
         
         const monthChallans = challans.filter(row => 
@@ -442,52 +440,51 @@ const RadicoDashboard = () => {
       };
     };
 
-    // EXTENDED: Process 6 months for historical analysis + 4 months for shop analysis
-    const mayData = processMonthlyData('05', '2025', false);
-    const aprilData = processMonthlyData('04', '2025', false);
-    const marchData = processMonthlyData('03', '2025', true); // Use historical data for March
-    const februaryData = processMonthlyData('02', '2025', true); // NEW: February for 4-month shop analysis
-    const januaryData = processMonthlyData('01', '2025', true); // NEW: January for 6-month historical
-    const decemberData = processMonthlyData('12', '2024', true); // NEW: December for 6-month historical
+    // ROLLING 4-MONTH WINDOW + YoY: Mar-Apr-May-Jun 2025 + Jun 2024
+    const juneData = processMonthlyData(currentMonth, currentYear, false); // June 2025 from current
+    const mayData = processMonthlyData('05', currentYear, false); // May 2025 from current
+    const aprilData = processMonthlyData('04', currentYear, false); // April 2025 from current  
+    const marchData = processMonthlyData('03', currentYear, true); // March 2025 from historical
     
-    console.log('📊 EXTENDED MONTH PROCESSING RESULTS (6 MONTHS):');
-    console.log('May:', { total8PM: mayData.total8PM, totalVERVE: mayData.totalVERVE, shops: mayData.uniqueShops.size });
-    console.log('April:', { total8PM: aprilData.total8PM, totalVERVE: aprilData.totalVERVE, shops: aprilData.uniqueShops.size });
-    console.log('March:', { total8PM: marchData.total8PM, totalVERVE: marchData.totalVERVE, shops: marchData.uniqueShops.size });
-    console.log('February:', { total8PM: februaryData.total8PM, totalVERVE: februaryData.totalVERVE, shops: februaryData.uniqueShops.size });
-    console.log('January:', { total8PM: januaryData.total8PM, totalVERVE: januaryData.totalVERVE, shops: januaryData.uniqueShops.size });
-    console.log('December:', { total8PM: decemberData.total8PM, totalVERVE: decemberData.totalVERVE, shops: decemberData.uniqueShops.size });
+    // YoY COMPARISON: June 2024
+    const juneLastYearData = processMonthlyData(currentMonth, '2024', true); // June 2024 from historical
+    
+    console.log('📊 ROLLING WINDOW + YoY PROCESSING RESULTS:');
+    console.log(`${currentMonth}/${currentYear}:`, { total8PM: juneData.total8PM, totalVERVE: juneData.totalVERVE, shops: juneData.uniqueShops.size });
+    console.log('May/2025:', { total8PM: mayData.total8PM, totalVERVE: mayData.totalVERVE, shops: mayData.uniqueShops.size });
+    console.log('April/2025:', { total8PM: aprilData.total8PM, totalVERVE: aprilData.totalVERVE, shops: aprilData.uniqueShops.size });
+    console.log('March/2025:', { total8PM: marchData.total8PM, totalVERVE: marchData.totalVERVE, shops: marchData.uniqueShops.size });
+    console.log(`${currentMonth}/2024 (YoY):`, { total8PM: juneLastYearData.total8PM, totalVERVE: juneLastYearData.totalVERVE, shops: juneLastYearData.uniqueShops.size });
     
     // Current month primary data
-    const total8PM = mayData.total8PM;
-    const totalVERVE = mayData.totalVERVE;
-    const uniqueShops = mayData.uniqueShops;
+    const total8PM = juneData.total8PM;
+    const totalVERVE = juneData.totalVERVE;
+    const uniqueShops = juneData.uniqueShops;
 
-    // ENHANCED SHOP DATA BUILDING WITH PROPER SHOP NAME MAPPING (EXTENDED TO 4 MONTHS)
+    // ENHANCED SHOP DATA BUILDING WITH ROLLING 4-MONTH + YoY
     const shopSales: Record<string, ShopData> = {};
     
-    // Build comprehensive shop name mapping from Shop Details
+    // Build comprehensive shop name mapping
     const shopNameMap: Record<string, string> = {};
     const shopDetailsMap: Record<string, any> = {};
     
     shopDetails.slice(1).forEach(row => {
       const shopId = row[0]?.toString().trim();
-      const salesmanEmail = row[1]?.toString().trim(); // This is the email
+      const salesmanEmail = row[1]?.toString().trim();
       const dept = row[2]?.toString().trim() === "DSIIDC" ? "DSIDC" : row[2]?.toString().trim();
-      const shopName = row[3]?.toString().trim(); // FIXED: Shop name is in column D (index 3)
+      const shopName = row[3]?.toString().trim();
       const salesman = row[4]?.toString().trim();
       
       if (shopId && shopName) {
         shopNameMap[shopId] = shopName;
         shopDetailsMap[shopId] = { shopName, dept, salesman, salesmanEmail };
-        // Also map by shop name for historical data matching
         shopNameMap[shopName] = shopName;
         shopDetailsMap[shopName] = { shopName, dept, salesman, shopId, salesmanEmail };
       }
     });
 
-    // Process May data (current month) - ENHANCED FOR 4 MONTHS
-    mayData.challans.forEach(row => {
+    // Process current month data (June 2025)
+    juneData.challans.forEach(row => {
       if (row.length >= 15) {
         const shopId = row[8]?.toString().trim();
         const shopNameFromChallan = row[9]?.toString().trim();
@@ -495,32 +492,36 @@ const RadicoDashboard = () => {
         const cases = parseFloat(row[14]) || 0;
         
         if (shopId && brand && cases > 0) {
-          // Get actual shop name from Shop Details, not from challan
           const actualShopName = shopNameMap[shopId] || shopNameFromChallan || 'Unknown Shop';
           
           if (!shopSales[shopId]) {
             const shopDetails = shopDetailsMap[shopId] || {};
             shopSales[shopId] = { 
               shopId,
-              shopName: actualShopName, // Use actual shop name
+              shopName: actualShopName,
               department: shopDetails.dept || 'Unknown',
               salesman: shopDetails.salesman || 'Unknown',
               total: 0,
               eightPM: 0,
               verve: 0,
-              mayTotal: 0,
-              mayEightPM: 0,
-              mayVerve: 0,
-              aprilTotal: 0,
-              aprilEightPM: 0,
-              aprilVerve: 0,
+              // ROLLING 4-MONTH WINDOW
               marchTotal: 0,
               marchEightPM: 0,
               marchVerve: 0,
-              // NEW: February data for 4-month analysis
-              februaryTotal: 0,
-              februaryEightPM: 0,
-              februaryVerve: 0,
+              aprilTotal: 0,
+              aprilEightPM: 0,
+              aprilVerve: 0,
+              mayTotal: 0,
+              mayEightPM: 0,
+              mayVerve: 0,
+              juneTotal: 0,
+              juneEightPM: 0,
+              juneVerve: 0,
+              // YoY COMPARISON
+              juneLastYearTotal: 0,
+              juneLastYearEightPM: 0,
+              juneLastYearVerve: 0,
+              yoyGrowthPercent: 0,
               monthlyTrend: 'stable',
               skuBreakdown: []
             };
@@ -528,45 +529,41 @@ const RadicoDashboard = () => {
           
           const parentBrand = getBrandFamily(brand, brand);
           shopSales[shopId].total += cases;
-          shopSales[shopId].mayTotal! += cases;
+          shopSales[shopId].juneTotal! += cases;
           
           if (parentBrand === "8PM") {
             shopSales[shopId].eightPM += cases;
-            shopSales[shopId].mayEightPM! += cases;
+            shopSales[shopId].juneEightPM! += cases;
           } else if (parentBrand === "VERVE") {
             shopSales[shopId].verve += cases;
-            shopSales[shopId].mayVerve! += cases;
+            shopSales[shopId].juneVerve! += cases;
           }
 
-          // Enhanced SKU breakdown
           const existing = shopSales[shopId].skuBreakdown!.find(sku => sku.brand === brand);
           if (existing) {
             existing.cases += cases;
           } else {
-            shopSales[shopId].skuBreakdown!.push({ brand, cases, percentage: 0, month: 'May' });
+            shopSales[shopId].skuBreakdown!.push({ brand, cases, percentage: 0, month: 'June' });
           }
         }
       }
     });
 
-    // ENHANCED: Add April, March, and February data with proper shop identification (4 MONTHS)
-    [aprilData, marchData, februaryData].forEach((monthData, index) => {
-      const monthKey = index === 0 ? 'april' : index === 1 ? 'march' : 'february';
+    // Add historical data for rolling window + YoY
+    [mayData, aprilData, marchData, juneLastYearData].forEach((monthData, index) => {
+      const monthKey = index === 0 ? 'may' : index === 1 ? 'april' : index === 2 ? 'march' : 'juneLastYear';
       
       Object.keys(monthData.shopSales).forEach(shopIdentifier => {
         const monthShopData = monthData.shopSales[shopIdentifier];
         
-        // ENHANCED: Handle both shop ID and shop name based identification
         let actualShopId = shopIdentifier;
         let actualShopName = monthShopData.shopName || shopIdentifier;
         
-        // First, try direct shop ID lookup
         if (shopDetailsMap[shopIdentifier]) {
           const details = shopDetailsMap[shopIdentifier];
           actualShopId = details.shopId || shopIdentifier;
           actualShopName = details.shopName || actualShopName;
         } else {
-          // Try to find by shop name in Shop Details
           const matchingShop = shopDetails.slice(1).find(row => 
             row[1]?.toString().trim() === shopIdentifier
           );
@@ -575,7 +572,6 @@ const RadicoDashboard = () => {
             actualShopId = matchingShop[0]?.toString().trim();
             actualShopName = matchingShop[1]?.toString().trim();
           } else {
-            // If no match found, use the identifier as shop name if it looks like a name
             if (!shopIdentifier.includes('@') && !shopIdentifier.includes('.com')) {
               actualShopName = shopIdentifier;
             }
@@ -583,36 +579,42 @@ const RadicoDashboard = () => {
         }
         
         if (!shopSales[actualShopId]) {
-          // Shop existed in previous month but not current month
           const shopDetails = shopDetailsMap[actualShopId] || shopDetailsMap[actualShopName] || {};
           shopSales[actualShopId] = {
             shopId: actualShopId,
-            shopName: actualShopName, // Use resolved shop name
+            shopName: actualShopName,
             department: shopDetails.dept || 'Unknown',
             salesman: shopDetails.salesman || 'Unknown',
             total: 0,
             eightPM: 0,
             verve: 0,
-            mayTotal: 0,
-            mayEightPM: 0,
-            mayVerve: 0,
-            aprilTotal: 0,
-            aprilEightPM: 0,
-            aprilVerve: 0,
             marchTotal: 0,
             marchEightPM: 0,
             marchVerve: 0,
-            // NEW: February data
-            februaryTotal: 0,
-            februaryEightPM: 0,
-            februaryVerve: 0,
+            aprilTotal: 0,
+            aprilEightPM: 0,
+            aprilVerve: 0,
+            mayTotal: 0,
+            mayEightPM: 0,
+            mayVerve: 0,
+            juneTotal: 0,
+            juneEightPM: 0,
+            juneVerve: 0,
+            juneLastYearTotal: 0,
+            juneLastYearEightPM: 0,
+            juneLastYearVerve: 0,
+            yoyGrowthPercent: 0,
             monthlyTrend: 'declining',
             skuBreakdown: []
           };
         }
         
         // Add historical data
-        if (monthKey === 'april') {
+        if (monthKey === 'may') {
+          shopSales[actualShopId].mayTotal = monthShopData.total;
+          shopSales[actualShopId].mayEightPM = monthShopData.eightPM;
+          shopSales[actualShopId].mayVerve = monthShopData.verve;
+        } else if (monthKey === 'april') {
           shopSales[actualShopId].aprilTotal = monthShopData.total;
           shopSales[actualShopId].aprilEightPM = monthShopData.eightPM;
           shopSales[actualShopId].aprilVerve = monthShopData.verve;
@@ -620,44 +622,53 @@ const RadicoDashboard = () => {
           shopSales[actualShopId].marchTotal = monthShopData.total;
           shopSales[actualShopId].marchEightPM = monthShopData.eightPM;
           shopSales[actualShopId].marchVerve = monthShopData.verve;
-        } else if (monthKey === 'february') {
-          // NEW: February data
-          shopSales[actualShopId].februaryTotal = monthShopData.total;
-          shopSales[actualShopId].februaryEightPM = monthShopData.eightPM;
-          shopSales[actualShopId].februaryVerve = monthShopData.verve;
+        } else if (monthKey === 'juneLastYear') {
+          shopSales[actualShopId].juneLastYearTotal = monthShopData.total;
+          shopSales[actualShopId].juneLastYearEightPM = monthShopData.eightPM;
+          shopSales[actualShopId].juneLastYearVerve = monthShopData.verve;
         }
       });
     });
 
-    // ENHANCED GROWTH AND TREND CALCULATION (UPDATED FOR 4 MONTHS)
+    // ENHANCED GROWTH AND TREND CALCULATION WITH YoY
     Object.keys(shopSales).forEach(shopId => {
       const shop = shopSales[shopId];
+      const june = shop.juneTotal || 0;
       const may = shop.mayTotal || 0;
       const april = shop.aprilTotal || 0;
       const march = shop.marchTotal || 0;
-      const february = shop.februaryTotal || 0; // NEW
+      const juneLastYear = shop.juneLastYearTotal || 0;
       
-      // Calculate month-over-month growth (April to May)
-      if (april > 0) {
-        shop.growthPercent = Math.round(((may - april) / april) * 100 * 100) / 100;
-      } else if (may > 0) {
-        shop.growthPercent = 100; // New customer
+      // Month-over-month growth (May to June)
+      if (may > 0) {
+        shop.growthPercent = Math.round(((june - may) / may) * 100 * 100) / 100;
+      } else if (june > 0) {
+        shop.growthPercent = 100;
       } else {
-        shop.growthPercent = -100; // Lost customer
+        shop.growthPercent = -100;
+      }
+      
+      // YoY growth (June 2024 to June 2025)
+      if (juneLastYear > 0) {
+        shop.yoyGrowthPercent = Math.round(((june - juneLastYear) / juneLastYear) * 100 * 100) / 100;
+      } else if (june > 0) {
+        shop.yoyGrowthPercent = 100;
+      } else {
+        shop.yoyGrowthPercent = 0;
       }
       
       // ENHANCED TREND LOGIC (4 MONTHS)
-      if (february === 0 && march === 0 && april === 0 && may > 0) {
+      if (march === 0 && april === 0 && may === 0 && june > 0) {
         shop.monthlyTrend = 'new';
-      } else if ((february > 0 || march > 0 || april > 0) && may === 0) {
+      } else if ((march > 0 || april > 0 || may > 0) && june === 0) {
         shop.monthlyTrend = 'declining';
-      } else if (february > 0 && march > february && april > march && may > april) {
+      } else if (march > 0 && april > march && may > april && june > may) {
         shop.monthlyTrend = 'improving';
-      } else if (february > 0 && march < february && april < march && may < april && may > 0) {
+      } else if (march > 0 && april < march && may < april && june < may && june > 0) {
         shop.monthlyTrend = 'declining';
-      } else if (may > 0 && april > 0 && Math.abs(shop.growthPercent!) <= 10) {
+      } else if (june > 0 && may > 0 && Math.abs(shop.growthPercent!) <= 10) {
         shop.monthlyTrend = 'stable';
-      } else if (may > april && april > 0) {
+      } else if (june > may && may > 0) {
         shop.monthlyTrend = 'improving';
       } else {
         shop.monthlyTrend = 'stable';
@@ -672,11 +683,11 @@ const RadicoDashboard = () => {
       }
     });
 
-    // Enhance shop data with department and salesman info - CORRECTED COLUMN MAPPING
+    // Enhance shop data with department and salesman info
     shopDetails.slice(1).forEach(row => {
       const shopId = row[0]?.toString().trim();
       const dept = row[2]?.toString().trim() === "DSIIDC" ? "DSIDC" : row[2]?.toString().trim();
-      const salesman = row[4]?.toString().trim(); // Actual salesman name is in column E (index 4)
+      const salesman = row[4]?.toString().trim();
       
       if (shopId && shopSales[shopId]) {
         shopSales[shopId].department = dept || 'Unknown';
@@ -684,24 +695,24 @@ const RadicoDashboard = () => {
       }
     });
 
-    // ENHANCED CUSTOMER INSIGHTS ANALYSIS (4 MONTHS)
-    const allCurrentShops = Object.values(shopSales).filter(shop => shop.mayTotal! > 0);
+    // ENHANCED CUSTOMER INSIGHTS ANALYSIS (ROLLING 4 MONTHS)
+    const allCurrentShops = Object.values(shopSales).filter(shop => shop.juneTotal! > 0);
     
     const newShops = Object.values(shopSales).filter(shop => 
-      shop.mayTotal! > 0 && shop.aprilTotal === 0 && shop.marchTotal === 0 && shop.februaryTotal === 0
+      shop.juneTotal! > 0 && shop.mayTotal === 0 && shop.aprilTotal === 0 && shop.marchTotal === 0
     );
     
     const lostShops = Object.values(shopSales).filter(shop => 
-      shop.mayTotal === 0 && shop.aprilTotal! > 0
+      shop.juneTotal === 0 && shop.mayTotal! > 0
     );
 
     const consistentShops = Object.values(shopSales).filter(shop => 
-      shop.mayTotal! > 0 && shop.aprilTotal! > 0 && 
+      shop.juneTotal! > 0 && shop.mayTotal! > 0 && 
       (shop.monthlyTrend === 'improving' || (shop.monthlyTrend === 'stable' && shop.growthPercent! >= -5))
     );
 
     const decliningShops = Object.values(shopSales).filter(shop => 
-      shop.monthlyTrend === 'declining' || (shop.mayTotal! > 0 && shop.growthPercent! < -10)
+      shop.monthlyTrend === 'declining' || (shop.juneTotal! > 0 && shop.growthPercent! < -10)
     );
 
     const customerInsights: CustomerInsights = {
@@ -709,22 +720,21 @@ const RadicoDashboard = () => {
       lostCustomers: lostShops.length,
       consistentPerformers: consistentShops.length,
       decliningPerformers: decliningShops.length,
-      newShops: newShops.sort((a, b) => b.mayTotal! - a.mayTotal!),
-      lostShops: lostShops.sort((a, b) => b.aprilTotal! - a.aprilTotal!),
+      newShops: newShops.sort((a, b) => b.juneTotal! - a.juneTotal!),
+      lostShops: lostShops.sort((a, b) => b.mayTotal! - a.mayTotal!),
       consistentShops: consistentShops.sort((a, b) => b.growthPercent! - a.growthPercent!),
       decliningShops: decliningShops.sort((a, b) => a.growthPercent! - b.growthPercent!)
     };
 
-    console.log('🎯 ENHANCED CUSTOMER INSIGHTS SUMMARY (4 MONTHS):', {
+    console.log('🎯 ENHANCED CUSTOMER INSIGHTS SUMMARY (ROLLING 4 MONTHS):', {
       firstTime: customerInsights.firstTimeCustomers,
       lost: customerInsights.lostCustomers,
       consistent: customerInsights.consistentPerformers,
       declining: customerInsights.decliningPerformers
     });
 
-    // Rest of the processing logic remains the same...
     const allShopsComparison = Object.values(shopSales)
-      .sort((a, b) => (b.mayTotal! || 0) - (a.mayTotal! || 0));
+      .sort((a, b) => (b.juneTotal! || 0) - (a.juneTotal! || 0));
 
     // Calculate department performance
     const deptPerformance: Record<string, any> = {};
@@ -745,34 +755,32 @@ const RadicoDashboard = () => {
       }
     });
 
-    // FIXED: Process targets for May 2025 - SUM TARGETS BY SALESMAN
+    // Process targets for current month
     let total8PMTarget = 0, totalVerveTarget = 0;
     const salespersonStats: Record<string, any> = {};
 
-    // First, create a mapping of shop IDs to salesmen from Shop Details
     const shopToSalesmanMap: Record<string, string> = {};
     shopDetails.slice(1).forEach(row => {
       const shopId = row[0]?.toString().trim();
-      const salesmanName = row[4]?.toString().trim(); // Column E (index 4) is salesman name
+      const salesmanName = row[4]?.toString().trim();
       if (shopId && salesmanName) {
         shopToSalesmanMap[shopId] = salesmanName;
       }
     });
 
-    // Now process targets and sum by salesman
+    // Process targets for current month (dynamic)
     targets.slice(1).forEach(row => {
       if (row.length >= 10) {
-        const shopId = row[0]?.toString().trim(); // Shop ID from target sheet
+        const shopId = row[0]?.toString().trim();
         const targetMonth = row[9]?.toString().trim();
         
-        if (targetMonth && targetMonth.includes('05-2025') && shopId) {
+        if (targetMonth && targetMonth.includes(`${currentMonth}-${currentYear}`) && shopId) {
           const eightPMTarget = parseFloat(row[5]) || 0;
           const verveTarget = parseFloat(row[7]) || 0;
           
           total8PMTarget += eightPMTarget;
           totalVerveTarget += verveTarget;
           
-          // Get salesman name for this shop
           const salesmanName = shopToSalesmanMap[shopId];
           
           if (salesmanName) {
@@ -783,7 +791,6 @@ const RadicoDashboard = () => {
                 verveTarget: 0
               };
             }
-            // Sum targets for this salesman
             salespersonStats[salesmanName].eightPmTarget += eightPMTarget;
             salespersonStats[salesmanName].verveTarget += verveTarget;
           }
@@ -791,13 +798,16 @@ const RadicoDashboard = () => {
       }
     });
 
-    console.log('🎯 FIXED SALESMAN TARGETS:', salespersonStats);
-
-    // Calculate achievements
+    // Calculate achievements and YoY growth
     const eightPmAchievement = total8PMTarget > 0 ? ((total8PM / total8PMTarget) * 100).toFixed(1) : '0';
     const verveAchievement = totalVerveTarget > 0 ? ((totalVERVE / totalVerveTarget) * 100).toFixed(1) : '0';
+    
+    // YoY growth calculations
+    const yoy8PMGrowth = juneLastYearData.total8PM > 0 ? 
+      (((total8PM - juneLastYearData.total8PM) / juneLastYearData.total8PM) * 100).toFixed(1) : '0';
+    const yoyVerveGrowth = juneLastYearData.totalVERVE > 0 ? 
+      (((totalVERVE - juneLastYearData.totalVERVE) / juneLastYearData.totalVERVE) * 100).toFixed(1) : '0';
 
-    // Top performing shops
     const topShops = Object.values(shopSales)
       .sort((a, b) => b.total - a.total)
       .slice(0, 20);
@@ -813,7 +823,11 @@ const RadicoDashboard = () => {
         total8PMTarget,
         totalVerveTarget,
         eightPmAchievement,
-        verveAchievement
+        verveAchievement,
+        lastYearTotal8PM: juneLastYearData.total8PM,
+        lastYearTotalVERVE: juneLastYearData.totalVERVE,
+        yoy8PMGrowth,
+        yoyVerveGrowth
       },
       topShops,
       deptPerformance,
@@ -823,19 +837,19 @@ const RadicoDashboard = () => {
       salespersonStats,
       customerInsights,
       allShopsComparison,
-      // Store 6-month historical data for the Historical Analysis tab
+      currentMonth: currentMonth,
+      currentYear: currentYear,
       historicalData: {
+        june: juneData,
         may: mayData,
         april: aprilData,
         march: marchData,
-        february: februaryData,
-        january: januaryData,
-        december: decemberData
+        juneLastYear: juneLastYearData
       }
     };
   };
 
-  // Filter shops based on current filter state
+  // Filter and utility functions remain the same...
   const getFilteredShops = (shops: ShopData[]): ShopData[] => {
     return shops.filter(shop => {
       const matchesDepartment = !filters.department || shop.department === filters.department;
@@ -850,7 +864,6 @@ const RadicoDashboard = () => {
     });
   };
 
-  // Get unique values for filter dropdowns
   const getFilterOptions = (shops: ShopData[], field: keyof ShopData): string[] => {
     const values = shops.map(shop => shop[field] as string).filter(Boolean);
     return Array.from(new Set(values)).sort();
@@ -858,10 +871,15 @@ const RadicoDashboard = () => {
 
   // Enhanced SKU Modal Component
   const EnhancedSKUModal = ({ shop, onClose }: { shop: ShopData, onClose: () => void }) => {
-    const [activeMonth, setActiveMonth] = useState('May');
+    const [activeMonth, setActiveMonth] = useState(getMonthName(currentMonth));
+    
+    const getMonthName = (monthNum: string) => {
+      const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      return months[parseInt(monthNum) - 1] || 'Unknown';
+    };
     
     const getSKUDataForMonth = (month: string) => {
-      if (month === 'May') {
+      if (month === getMonthName(currentMonth)) {
         return shop.skuBreakdown || [];
       }
       return [];
@@ -878,7 +896,7 @@ const RadicoDashboard = () => {
           </div>
 
           <div className="flex border-b">
-            {['February', 'March', 'April', 'May'].map((month) => (
+            {['March', 'April', 'May', getMonthName(currentMonth)].map((month) => (
               <button
                 key={month}
                 onClick={() => setActiveMonth(month)}
@@ -888,7 +906,7 @@ const RadicoDashboard = () => {
                     : 'text-gray-500 hover:text-gray-700'
                 }`}
               >
-                {month} 2025
+                {month} {currentYear}
               </button>
             ))}
           </div>
@@ -897,28 +915,28 @@ const RadicoDashboard = () => {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
               <div className="text-center bg-blue-50 p-4 rounded-lg">
                 <div className="text-2xl font-bold text-blue-600">
-                  {activeMonth === 'May' ? shop.mayTotal || shop.total :
+                  {activeMonth === getMonthName(currentMonth) ? shop.juneTotal || shop.total :
+                   activeMonth === 'May' ? shop.mayTotal || 0 :
                    activeMonth === 'April' ? shop.aprilTotal || 0 :
-                   activeMonth === 'March' ? shop.marchTotal || 0 :
-                   shop.februaryTotal || 0}
+                   shop.marchTotal || 0}
                 </div>
                 <div className="text-sm text-gray-500">Total Cases</div>
               </div>
               <div className="text-center bg-purple-50 p-4 rounded-lg">
                 <div className="text-2xl font-bold text-purple-600">
-                  {activeMonth === 'May' ? shop.mayEightPM || shop.eightPM :
+                  {activeMonth === getMonthName(currentMonth) ? shop.juneEightPM || shop.eightPM :
+                   activeMonth === 'May' ? shop.mayEightPM || 0 :
                    activeMonth === 'April' ? shop.aprilEightPM || 0 :
-                   activeMonth === 'March' ? shop.marchEightPM || 0 :
-                   shop.februaryEightPM || 0}
+                   shop.marchEightPM || 0}
                 </div>
                 <div className="text-sm text-gray-500">8PM Cases</div>
               </div>
               <div className="text-center bg-orange-50 p-4 rounded-lg">
                 <div className="text-2xl font-bold text-orange-600">
-                  {activeMonth === 'May' ? shop.mayVerve || shop.verve :
+                  {activeMonth === getMonthName(currentMonth) ? shop.juneVerve || shop.verve :
+                   activeMonth === 'May' ? shop.mayVerve || 0 :
                    activeMonth === 'April' ? shop.aprilVerve || 0 :
-                   activeMonth === 'March' ? shop.marchVerve || 0 :
-                   shop.februaryVerve || 0}
+                   shop.marchVerve || 0}
                 </div>
                 <div className="text-sm text-gray-500">VERVE Cases</div>
               </div>
@@ -963,9 +981,10 @@ const RadicoDashboard = () => {
       doc.text('Radico Khaitan Advanced Analytics Report', 20, 20);
       doc.setFontSize(12);
       doc.text(`Generated: ${new Date().toLocaleString()}`, 20, 30);
+      doc.text(`Report Period: ${getMonthName(currentMonth)} ${currentYear}`, 20, 40);
       
       doc.setFontSize(16);
-      doc.text('Executive Summary', 20, 50);
+      doc.text('Executive Summary', 20, 60);
       
       const summaryData = [
         ['Total Shops', dashboardData.summary.totalShops.toString()],
@@ -973,19 +992,21 @@ const RadicoDashboard = () => {
         ['Coverage', `${dashboardData.summary.coverage}%`],
         ['8PM Sales', `${dashboardData.summary.total8PM} cases`],
         ['8PM Achievement', `${dashboardData.summary.eightPmAchievement}%`],
+        ['8PM YoY Growth', `${dashboardData.summary.yoy8PMGrowth}%`],
         ['VERVE Sales', `${dashboardData.summary.totalVERVE} cases`],
         ['VERVE Achievement', `${dashboardData.summary.verveAchievement}%`],
+        ['VERVE YoY Growth', `${dashboardData.summary.yoyVerveGrowth}%`],
         ['Total Sales', `${dashboardData.summary.totalSales} cases`]
       ];
 
       (doc as any).autoTable({
         head: [['Metric', 'Value']],
         body: summaryData,
-        startY: 60,
+        startY: 70,
         theme: 'grid'
       });
 
-      doc.save(`Radico_Enhanced_Analytics_${new Date().toISOString().split('T')[0]}.pdf`);
+      doc.save(`Radico_Enhanced_Analytics_${getMonthName(currentMonth)}_${currentYear}.pdf`);
     } catch (error) {
       console.error('Error generating PDF:', error);
       alert('Error generating PDF report. Please try again.');
@@ -999,7 +1020,8 @@ const RadicoDashboard = () => {
       const filteredShops = getFilteredShops(dashboardData.allShopsComparison);
       
       let csvContent = "data:text/csv;charset=utf-8,";
-      csvContent += "Radico Enhanced Shop Analysis Report - 4-Month Comparison - " + new Date().toLocaleDateString() + "\n";
+      csvContent += `Radico Enhanced Shop Analysis Report - Rolling 4-Month Comparison - ${new Date().toLocaleDateString()}\n`;
+      csvContent += `Report Period: Mar-Apr-May-${getMonthName(currentMonth)} ${currentYear}\n`;
       
       if (filters.department || filters.salesman || filters.searchText) {
         csvContent += "APPLIED FILTERS: ";
@@ -1015,7 +1037,9 @@ const RadicoDashboard = () => {
       csvContent += "Billed Shops," + dashboardData.summary.billedShops + "\n";
       csvContent += "Coverage," + dashboardData.summary.coverage + "%\n";
       csvContent += "8PM Sales," + dashboardData.summary.total8PM + " cases\n";
-      csvContent += "VERVE Sales," + dashboardData.summary.totalVERVE + " cases\n\n";
+      csvContent += "8PM YoY Growth," + dashboardData.summary.yoy8PMGrowth + "%\n";
+      csvContent += "VERVE Sales," + dashboardData.summary.totalVERVE + " cases\n";
+      csvContent += "VERVE YoY Growth," + dashboardData.summary.yoyVerveGrowth + "%\n\n";
       
       csvContent += "CUSTOMER INSIGHTS\n";
       csvContent += "First-time Customers," + dashboardData.customerInsights.firstTimeCustomers + "\n";
@@ -1023,17 +1047,17 @@ const RadicoDashboard = () => {
       csvContent += "Consistent Performers," + dashboardData.customerInsights.consistentPerformers + "\n";
       csvContent += "Declining Performers," + dashboardData.customerInsights.decliningPerformers + "\n\n";
       
-      csvContent += "FILTERED SHOP COMPARISON (FEB-MAR-APR-MAY 2025)\n";
-      csvContent += "Shop Name,Department,Salesman,Feb Cases,Mar Cases,Apr Cases,May Cases,8PM Cases,VERVE Cases,Growth %,Monthly Trend\n";
+      csvContent += `ROLLING WINDOW SHOP COMPARISON (Mar-Apr-May-${getMonthName(currentMonth)} ${currentYear})\n`;
+      csvContent += `Shop Name,Department,Salesman,Mar Cases,Apr Cases,May Cases,${getMonthName(currentMonth)} Cases,8PM Cases,VERVE Cases,Growth %,YoY Growth %,Monthly Trend\n`;
       
       filteredShops.forEach(shop => {
-        csvContent += `"${shop.shopName}","${shop.department}","${shop.salesman}",${shop.februaryTotal || 0},${shop.marchTotal || 0},${shop.aprilTotal || 0},${shop.mayTotal || shop.total},${shop.eightPM},${shop.verve},${shop.growthPercent?.toFixed(1) || 0}%,"${shop.monthlyTrend || 'stable'}"\n`;
+        csvContent += `"${shop.shopName}","${shop.department}","${shop.salesman}",${shop.marchTotal || 0},${shop.aprilTotal || 0},${shop.mayTotal || 0},${shop.juneTotal || shop.total},${shop.eightPM},${shop.verve},${shop.growthPercent?.toFixed(1) || 0}%,${shop.yoyGrowthPercent?.toFixed(1) || 0}%,"${shop.monthlyTrend || 'stable'}"\n`;
       });
 
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement("a");
       link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `Radico_Enhanced_Analysis_${new Date().toISOString().split('T')[0]}.csv`);
+      link.setAttribute("download", `Radico_Enhanced_Analysis_${getMonthName(currentMonth)}_${currentYear}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -1041,6 +1065,14 @@ const RadicoDashboard = () => {
       console.error('Error exporting to Excel:', error);
       alert('Error exporting data. Please try again.');
     }
+  };
+
+  const getMonthName = (monthNum: string) => {
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    return months[parseInt(monthNum) - 1] || 'Unknown';
   };
 
   React.useEffect(() => {
@@ -1053,7 +1085,7 @@ const RadicoDashboard = () => {
         <div className="text-center">
           <RefreshCw className="w-12 h-12 animate-spin mx-auto mb-4 text-blue-600" />
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Loading Radico Dashboard</h2>
-          <p className="text-gray-600">Processing live data with enhanced analytics...</p>
+          <p className="text-gray-600">Processing live data with enhanced analytics for {getMonthName(currentMonth)} {currentYear}...</p>
         </div>
       </div>
     );
@@ -1096,15 +1128,23 @@ const RadicoDashboard = () => {
             <div className="flex items-center mb-4 sm:mb-0">
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Radico Khaitan Analytics Dashboard</h1>
               <span className="ml-3 px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
-                Live Data
+                Live Data - {getMonthName(currentMonth)} {currentYear}
               </span>
+              {dashboardData?.summary.yoy8PMGrowth && (
+                <span className={`ml-2 px-3 py-1 text-xs font-medium rounded-full ${
+                  parseFloat(dashboardData.summary.yoy8PMGrowth) >= 0 
+                    ? 'bg-green-100 text-green-800' 
+                    : 'bg-red-100 text-red-800'
+                }`}>
+                  YoY: {dashboardData.summary.yoy8PMGrowth >= '0' ? '+' : ''}{dashboardData.summary.yoy8PMGrowth}%
+                </span>
+              )}
             </div>
             <div className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4">
               <span className="text-sm text-gray-500">
                 Last updated: {lastUpdated.toLocaleTimeString()}
               </span>
               <div className="flex space-x-2">
-                {/* NEW: Inventory Toggle Button */}
                 <button
                   onClick={() => setShowInventory(!showInventory)}
                   className={`px-3 sm:px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors text-sm font-medium ${
@@ -1144,7 +1184,6 @@ const RadicoDashboard = () => {
         </div>
       </header>
 
-      {/* Conditional Rendering: Show Inventory or Sales Dashboard */}
       {showInventory ? (
       <InventoryDashboard />
       ) : (
@@ -1217,13 +1256,21 @@ const RadicoDashboard = () => {
   );
 };
 
-// FIXED: Salesman Performance Tab Component (WITH CORRECTED TARGET CALCULATION)
+// UPDATED TAB COMPONENTS WITH DYNAMIC MONTH DETECTION AND YoY
+
 const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
+  const getMonthName = (monthNum: string) => {
+    const months = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    return months[parseInt(monthNum) - 1] || 'Unknown';
+  };
+
   // Calculate salesman performance data
   const salesmanPerformance = React.useMemo(() => {
     const performanceMap: Record<string, any> = {};
     
-    // Initialize from shop details to get all salesmen and their assigned shops
     const shopDetails = Object.values(data.salesData);
     
     shopDetails.forEach(shop => {
@@ -1241,6 +1288,10 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
           targetVERVE: 0,
           achievement8PM: 0,
           achievementVERVE: 0,
+          // 3-month historical data
+          marchTotal: 0,
+          aprilTotal: 0,
+          mayTotal: 0,
           shops: []
         };
       }
@@ -1253,10 +1304,15 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
         performanceMap[salesmanName].totalVERVE += shop.verve;
         performanceMap[salesmanName].totalSales += shop.total;
         performanceMap[salesmanName].shops.push(shop);
+        
+        // Add 3-month historical data
+        performanceMap[salesmanName].marchTotal += shop.marchTotal || 0;
+        performanceMap[salesmanName].aprilTotal += shop.aprilTotal || 0;
+        performanceMap[salesmanName].mayTotal += shop.mayTotal || 0;
       }
     });
     
-    // FIXED: Add target data from salespersonStats (which now contains summed targets)
+    // Add target data from salespersonStats
     Object.values(data.salespersonStats).forEach((stats: any) => {
       const salesmanName = stats.name;
       if (performanceMap[salesmanName]) {
@@ -1275,15 +1331,13 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
     return Object.values(performanceMap).filter((p: any) => p.name !== 'Unknown');
   }, [data]);
 
-  // Sort by total sales
   const sortedSalesmen = salesmanPerformance.sort((a: any, b: any) => b.totalSales - a.totalSales);
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div className="text-center">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Salesman Performance Dashboard</h2>
-        <p className="text-gray-600">Individual salesman achievements and targets for May 2025 (FIXED TARGET CALCULATION)</p>
+        <p className="text-gray-600">Individual salesman achievements and targets for {getMonthName(data.currentMonth)} {data.currentYear}</p>
       </div>
 
       {/* Performance Summary Cards */}
@@ -1345,8 +1399,8 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
       {/* Detailed Performance Table */}
       <div className="bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">Salesman Performance Details (FIXED TARGETS)</h3>
-          <p className="text-sm text-gray-500">Complete performance breakdown with corrected targets (sum of all shop targets per salesman)</p>
+          <h3 className="text-lg font-medium text-gray-900">Salesman Performance Details - {getMonthName(data.currentMonth)} {data.currentYear}</h3>
+          <p className="text-sm text-gray-500">Complete performance breakdown with current month targets and achievements</p>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
@@ -1431,9 +1485,56 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-      {/* Performance Visualizations */}
+      {/* NEW: 3-Month Historical Performance */}
+      <div className="bg-white rounded-lg shadow">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-medium text-gray-900">3-Month Performance Trend (Mar-Apr-May {data.currentYear})</h3>
+          <p className="text-sm text-gray-500">Historical performance comparison for 8PM and VERVE by salesman</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salesman</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">March Total</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">April Total</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">May Total</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trend</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">3-Month Avg</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {sortedSalesmen.slice(0, 10).map((salesman: any) => {
+                const avg3Month = ((salesman.marchTotal + salesman.aprilTotal + salesman.mayTotal) / 3).toFixed(0);
+                const trend = salesman.mayTotal > salesman.aprilTotal && salesman.aprilTotal > salesman.marchTotal ? 'improving' :
+                            salesman.mayTotal < salesman.aprilTotal && salesman.aprilTotal < salesman.marchTotal ? 'declining' : 'stable';
+                
+                return (
+                  <tr key={salesman.name}>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">{salesman.name}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{salesman.marchTotal.toLocaleString()}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{salesman.aprilTotal.toLocaleString()}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{salesman.mayTotal.toLocaleString()}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        trend === 'improving' ? 'bg-green-100 text-green-800' :
+                        trend === 'declining' ? 'bg-red-100 text-red-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {trend === 'improving' ? '📈 Growing' : trend === 'declining' ? '📉 Declining' : '➡️ Stable'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">{avg3Month}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Rest of the component remains the same... */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Achievement Chart */}
         <div className="bg-white rounded-lg shadow">
           <div className="px-6 py-4 border-b border-gray-200">
             <h3 className="text-lg font-medium text-gray-900">Achievement Comparison</h3>
@@ -1466,7 +1567,6 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
           </div>
         </div>
 
-        {/* Coverage vs Sales */}
         <div className="bg-white rounded-lg shadow">
           <div className="px-6 py-4 border-b border-gray-200">
             <h3 className="text-lg font-medium text-gray-900">Coverage vs Sales Performance</h3>
@@ -1503,9 +1603,8 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-      {/* Individual Achievements Summary */}
       <div className="bg-gradient-to-r from-purple-50 to-orange-50 p-6 rounded-lg">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Salesman Achievement Summary</h3>
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Salesman Achievement Summary - {getMonthName(data.currentMonth)} {data.currentYear}</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="text-center">
             <div className="text-xl font-bold text-green-600">
@@ -1537,7 +1636,6 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
   );
 };
 
-// Tab Components
 const AdvancedAnalyticsTab = ({ 
   data, 
   onShowSKU, 
@@ -1557,6 +1655,11 @@ const AdvancedAnalyticsTab = ({
   setFilters: (filters: FilterState) => void,
   getFilteredShops: (shops: ShopData[]) => ShopData[]
 }) => {
+  const getMonthName = (monthNum: string) => {
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    return months[parseInt(monthNum) - 1] || 'Unknown';
+  };
+
   const filteredShops = getFilteredShops(data.allShopsComparison);
   const totalPages = Math.ceil(filteredShops.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -1669,10 +1772,10 @@ const AdvancedAnalyticsTab = ({
 
       <div className="bg-white rounded-lg shadow">
         <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">Complete Shop Analysis - 4-Month Comparison (Feb-Mar-Apr-May 2025)</h3>
+          <h3 className="text-lg font-medium text-gray-900">Complete Shop Analysis - Rolling 4-Month Comparison (Mar-Apr-May-{getMonthName(data.currentMonth)} {data.currentYear})</h3>
           <p className="text-sm text-gray-500">
             {filteredShops.length} shops {filters.department || filters.salesman || filters.searchText ? '(filtered)' : ''} 
-            ranked by current month performance with extended historical data integration
+            ranked by current month performance with rolling window analysis and YoY comparison
           </p>
         </div>
         
@@ -1684,11 +1787,12 @@ const AdvancedAnalyticsTab = ({
                 <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shop Name</th>
                 <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
                 <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salesman</th>
-                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Feb Cases</th>
                 <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mar Cases</th>
                 <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Apr Cases</th>
                 <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">May Cases</th>
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{getMonthName(data.currentMonth)} Cases</th>
                 <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Growth %</th>
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">YoY %</th>
                 <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trend</th>
                 <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">8PM</th>
                 <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">VERVE</th>
@@ -1708,20 +1812,20 @@ const AdvancedAnalyticsTab = ({
                     <div className="max-w-xs truncate">{shop.salesman}</div>
                   </td>
                   <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {shop.februaryTotal?.toLocaleString() || 0}
-                  </td>
-                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {shop.marchTotal?.toLocaleString() || 0}
                   </td>
                   <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                     {shop.aprilTotal?.toLocaleString() || 0}
+                  </td>
+                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {shop.mayTotal?.toLocaleString() || 0}
                   </td>
                   <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
                     <button
                       onClick={() => onShowSKU(shop)}  
                       className="text-blue-600 hover:text-blue-800 hover:underline"
                     >
-                      {shop.mayTotal?.toLocaleString() || 0}
+                      {shop.juneTotal?.toLocaleString() || shop.total.toLocaleString()}
                     </button>
                   </td>
                   <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm">
@@ -1733,6 +1837,17 @@ const AdvancedAnalyticsTab = ({
                         : 'bg-gray-100 text-gray-800'
                     }`}>
                       {shop.growthPercent?.toFixed(1) || 0}%
+                    </span>
+                  </td>
+                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm">
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      (shop.yoyGrowthPercent || 0) > 0 
+                        ? 'bg-blue-100 text-blue-800' 
+                        : (shop.yoyGrowthPercent || 0) < 0
+                        ? 'bg-red-100 text-red-800'
+                        : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {shop.yoyGrowthPercent?.toFixed(1) || 0}%
                     </span>
                   </td>
                   <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm">
@@ -1798,7 +1913,7 @@ const AdvancedAnalyticsTab = ({
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shop Name</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Salesman</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">May Cases</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{getMonthName(data.currentMonth)} Cases</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -1807,7 +1922,7 @@ const AdvancedAnalyticsTab = ({
                     <td className="px-4 py-4 text-sm text-gray-900 max-w-xs truncate">{shop.shopName}</td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">{shop.department}</td>
                     <td className="px-4 py-4 text-sm text-gray-900 max-w-xs truncate">{shop.salesman}</td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-green-600">{shop.mayTotal || shop.total}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-green-600">{shop.juneTotal || shop.total}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1827,7 +1942,7 @@ const AdvancedAnalyticsTab = ({
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shop Name</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Salesman</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Apr Cases</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">May Cases</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
@@ -1836,7 +1951,7 @@ const AdvancedAnalyticsTab = ({
                     <td className="px-4 py-4 text-sm text-gray-900 max-w-xs truncate">{shop.shopName}</td>
                     <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">{shop.department}</td>
                     <td className="px-4 py-4 text-sm text-gray-900 max-w-xs truncate">{shop.salesman}</td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-red-600">{shop.aprilTotal}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-red-600">{shop.mayTotal}</td>
                   </tr>
                 ))}
               </tbody>
@@ -1848,9 +1963,14 @@ const AdvancedAnalyticsTab = ({
   );
 };
 
-// ENHANCED: Historical Analysis Tab Component (UPDATED TO 6 MONTHS)
+// ENHANCED: Historical Analysis Tab Component (UPDATED TO 12 MONTHS WITH YoY)
 const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
   const [debugInfo, setDebugInfo] = React.useState<any>(null);
+
+  const getMonthName = (monthNum: string) => {
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    return months[parseInt(monthNum) - 1] || 'Unknown';
+  };
 
   useEffect(() => {
     if (data.historicalData) {
@@ -1858,23 +1978,7 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
         hasHistoricalData: !!data.historicalData,
         historicalData: data.historicalData,
         customerInsights: data.customerInsights,
-        // Calculate totals for all 6 months
         monthlyTotals: {
-          december: {
-            shops: data.historicalData.december?.uniqueShops?.size || 0,
-            total8PM: data.historicalData.december?.total8PM || 0,
-            totalVERVE: data.historicalData.december?.totalVERVE || 0
-          },
-          january: {
-            shops: data.historicalData.january?.uniqueShops?.size || 0,
-            total8PM: data.historicalData.january?.total8PM || 0,
-            totalVERVE: data.historicalData.january?.totalVERVE || 0
-          },
-          february: {
-            shops: data.historicalData.february?.uniqueShops?.size || 0,
-            total8PM: data.historicalData.february?.total8PM || 0,
-            totalVERVE: data.historicalData.february?.totalVERVE || 0
-          },
           march: {
             shops: data.historicalData.march?.uniqueShops?.size || 0,
             total8PM: data.historicalData.march?.total8PM || 0,
@@ -1889,60 +1993,37 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
             shops: data.historicalData.may?.uniqueShops?.size || 0,
             total8PM: data.historicalData.may?.total8PM || 0,
             totalVERVE: data.historicalData.may?.totalVERVE || 0
+          },
+          currentMonth: {
+            shops: data.historicalData.june?.uniqueShops?.size || 0,
+            total8PM: data.historicalData.june?.total8PM || 0,
+            totalVERVE: data.historicalData.june?.totalVERVE || 0
+          },
+          lastYear: {
+            shops: data.historicalData.juneLastYear?.uniqueShops?.size || 0,
+            total8PM: data.historicalData.juneLastYear?.total8PM || 0,
+            totalVERVE: data.historicalData.juneLastYear?.totalVERVE || 0
           }
         }
       });
     }
   }, [data]);
 
-  // Calculate month-over-month growth for 6 months
+  // Calculate month-over-month growth
   const calculateGrowth = (current: number, previous: number) => {
     if (previous === 0) return current > 0 ? 100 : 0;
     return ((current - previous) / previous * 100);
   };
 
-  // Monthly data for 6 months
+  // Monthly data for rolling window + YoY
   const monthlyData = debugInfo?.monthlyTotals ? [
-    { 
-      month: 'December 2024',
-      total: debugInfo.monthlyTotals.december.total8PM + debugInfo.monthlyTotals.december.totalVERVE,
-      total8PM: debugInfo.monthlyTotals.december.total8PM,
-      totalVERVE: debugInfo.monthlyTotals.december.totalVERVE,
-      shops: debugInfo.monthlyTotals.december.shops,
-      growth: 0 // Base month
-    },
-    { 
-      month: 'January 2025',
-      total: debugInfo.monthlyTotals.january.total8PM + debugInfo.monthlyTotals.january.totalVERVE,
-      total8PM: debugInfo.monthlyTotals.january.total8PM,
-      totalVERVE: debugInfo.monthlyTotals.january.totalVERVE,
-      shops: debugInfo.monthlyTotals.january.shops,
-      growth: calculateGrowth(
-        debugInfo.monthlyTotals.january.total8PM + debugInfo.monthlyTotals.january.totalVERVE,
-        debugInfo.monthlyTotals.december.total8PM + debugInfo.monthlyTotals.december.totalVERVE
-      )
-    },
-    { 
-      month: 'February 2025',
-      total: debugInfo.monthlyTotals.february.total8PM + debugInfo.monthlyTotals.february.totalVERVE,
-      total8PM: debugInfo.monthlyTotals.february.total8PM,
-      totalVERVE: debugInfo.monthlyTotals.february.totalVERVE,
-      shops: debugInfo.monthlyTotals.february.shops,
-      growth: calculateGrowth(
-        debugInfo.monthlyTotals.february.total8PM + debugInfo.monthlyTotals.february.totalVERVE,
-        debugInfo.monthlyTotals.january.total8PM + debugInfo.monthlyTotals.january.totalVERVE
-      )
-    },
     { 
       month: 'March 2025',
       total: debugInfo.monthlyTotals.march.total8PM + debugInfo.monthlyTotals.march.totalVERVE,
       total8PM: debugInfo.monthlyTotals.march.total8PM,
       totalVERVE: debugInfo.monthlyTotals.march.totalVERVE,
       shops: debugInfo.monthlyTotals.march.shops,
-      growth: calculateGrowth(
-        debugInfo.monthlyTotals.march.total8PM + debugInfo.monthlyTotals.march.totalVERVE,
-        debugInfo.monthlyTotals.february.total8PM + debugInfo.monthlyTotals.february.totalVERVE
-      )
+      growth: 0 // Base month for current analysis
     },
     { 
       month: 'April 2025',
@@ -1956,7 +2037,7 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
       )
     },
     { 
-      month: 'May 2025 (Current)',
+      month: 'May 2025',
       total: debugInfo.monthlyTotals.may.total8PM + debugInfo.monthlyTotals.may.totalVERVE,
       total8PM: debugInfo.monthlyTotals.may.total8PM,
       totalVERVE: debugInfo.monthlyTotals.may.totalVERVE,
@@ -1965,18 +2046,95 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
         debugInfo.monthlyTotals.may.total8PM + debugInfo.monthlyTotals.may.totalVERVE,
         debugInfo.monthlyTotals.april.total8PM + debugInfo.monthlyTotals.april.totalVERVE
       )
+    },
+    { 
+      month: `${getMonthName(data.currentMonth)} ${data.currentYear} (Current)`,
+      total: debugInfo.monthlyTotals.currentMonth.total8PM + debugInfo.monthlyTotals.currentMonth.totalVERVE,
+      total8PM: debugInfo.monthlyTotals.currentMonth.total8PM,
+      totalVERVE: debugInfo.monthlyTotals.currentMonth.totalVERVE,
+      shops: debugInfo.monthlyTotals.currentMonth.shops,
+      growth: calculateGrowth(
+        debugInfo.monthlyTotals.currentMonth.total8PM + debugInfo.monthlyTotals.currentMonth.totalVERVE,
+        debugInfo.monthlyTotals.may.total8PM + debugInfo.monthlyTotals.may.totalVERVE
+      )
     }
   ] : [];
+
+  // YoY comparison data
+  const yoyComparison = debugInfo?.monthlyTotals ? {
+    currentYear: {
+      total: debugInfo.monthlyTotals.currentMonth.total8PM + debugInfo.monthlyTotals.currentMonth.totalVERVE,
+      total8PM: debugInfo.monthlyTotals.currentMonth.total8PM,
+      totalVERVE: debugInfo.monthlyTotals.currentMonth.totalVERVE,
+      shops: debugInfo.monthlyTotals.currentMonth.shops
+    },
+    lastYear: {
+      total: debugInfo.monthlyTotals.lastYear.total8PM + debugInfo.monthlyTotals.lastYear.totalVERVE,
+      total8PM: debugInfo.monthlyTotals.lastYear.total8PM,
+      totalVERVE: debugInfo.monthlyTotals.lastYear.totalVERVE,
+      shops: debugInfo.monthlyTotals.lastYear.shops
+    },
+    growth: {
+      total: calculateGrowth(
+        debugInfo.monthlyTotals.currentMonth.total8PM + debugInfo.monthlyTotals.currentMonth.totalVERVE,
+        debugInfo.monthlyTotals.lastYear.total8PM + debugInfo.monthlyTotals.lastYear.totalVERVE
+      ),
+      total8PM: calculateGrowth(debugInfo.monthlyTotals.currentMonth.total8PM, debugInfo.monthlyTotals.lastYear.total8PM),
+      totalVERVE: calculateGrowth(debugInfo.monthlyTotals.currentMonth.totalVERVE, debugInfo.monthlyTotals.lastYear.totalVERVE),
+      shops: calculateGrowth(debugInfo.monthlyTotals.currentMonth.shops, debugInfo.monthlyTotals.lastYear.shops)
+    }
+  } : null;
 
   return (
     <div className="space-y-6">
       <div className="text-center">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Historical Analysis & Trends</h2>
-        <p className="text-gray-600">6-Month Business Performance Analysis (December 2024 - May 2025)</p>
+        <p className="text-gray-600">Rolling 4-Month Business Performance + Year-over-Year Analysis ({getMonthName(data.currentMonth)} {data.currentYear} vs {getMonthName(data.currentMonth)} 2024)</p>
       </div>
 
-      {/* ENHANCED: 6-Month Comparison Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* YoY COMPARISON CARDS */}
+      {yoyComparison && (
+        <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-lg">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Year-over-Year Comparison ({getMonthName(data.currentMonth)})</h3>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-blue-600">{yoyComparison.currentYear.total.toLocaleString()}</div>
+              <div className="text-sm text-gray-500">{getMonthName(data.currentMonth)} {data.currentYear}</div>
+              <div className="text-xs text-gray-400">vs {yoyComparison.lastYear.total.toLocaleString()} last year</div>
+              <div className={`text-sm font-medium ${yoyComparison.growth.total >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {yoyComparison.growth.total >= 0 ? '+' : ''}{yoyComparison.growth.total.toFixed(1)}% YoY
+              </div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-purple-600">{yoyComparison.currentYear.total8PM.toLocaleString()}</div>
+              <div className="text-sm text-gray-500">8PM {data.currentYear}</div>
+              <div className="text-xs text-gray-400">vs {yoyComparison.lastYear.total8PM.toLocaleString()} last year</div>
+              <div className={`text-sm font-medium ${yoyComparison.growth.total8PM >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {yoyComparison.growth.total8PM >= 0 ? '+' : ''}{yoyComparison.growth.total8PM.toFixed(1)}% YoY
+              </div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-orange-600">{yoyComparison.currentYear.totalVERVE.toLocaleString()}</div>
+              <div className="text-sm text-gray-500">VERVE {data.currentYear}</div>
+              <div className="text-xs text-gray-400">vs {yoyComparison.lastYear.totalVERVE.toLocaleString()} last year</div>
+              <div className={`text-sm font-medium ${yoyComparison.growth.totalVERVE >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {yoyComparison.growth.totalVERVE >= 0 ? '+' : ''}{yoyComparison.growth.totalVERVE.toFixed(1)}% YoY
+              </div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-green-600">{yoyComparison.currentYear.shops}</div>
+              <div className="text-sm text-gray-500">Active Shops {data.currentYear}</div>
+              <div className="text-xs text-gray-400">vs {yoyComparison.lastYear.shops} last year</div>
+              <div className={`text-sm font-medium ${yoyComparison.growth.shops >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                {yoyComparison.growth.shops >= 0 ? '+' : ''}{yoyComparison.growth.shops.toFixed(1)}% YoY
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ROLLING 4-MONTH COMPARISON */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {monthlyData.map((month, index) => (
           <div key={month.month} className="bg-white p-6 rounded-lg shadow">
             <h3 className="text-lg font-medium text-gray-900 mb-4">{month.month}</h3>
@@ -2010,14 +2168,13 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
         ))}
       </div>
 
-      {/* ENHANCED: 6-Month Sales Trend */}
+      {/* ROLLING 4-MONTH SALES TREND */}
       <div className="bg-white p-6 rounded-lg shadow">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">6-Month Sales Trend</h3>
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Rolling 4-Month Sales Trend</h3>
         <div className="space-y-6">
-          {/* 8PM Trend */}
           <div>
             <h4 className="font-medium text-purple-600 mb-2">8PM Family Performance</h4>
-            <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+            <div className="grid grid-cols-4 gap-4">
               {monthlyData.map((month) => (
                 <div key={month.month} className="text-center">
                   <div className="text-lg font-bold text-purple-600">{month.total8PM.toLocaleString()}</div>
@@ -2027,10 +2184,9 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
             </div>
           </div>
 
-          {/* VERVE Trend */}
           <div>
             <h4 className="font-medium text-orange-600 mb-2">VERVE Family Performance</h4>
-            <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+            <div className="grid grid-cols-4 gap-4">
               {monthlyData.map((month) => (
                 <div key={month.month} className="text-center">
                   <div className="text-lg font-bold text-orange-600">{month.totalVERVE.toLocaleString()}</div>
@@ -2040,10 +2196,9 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
             </div>
           </div>
 
-          {/* Total Sales Trend */}
           <div>
             <h4 className="font-medium text-blue-600 mb-2">Total Sales Performance</h4>
-            <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
+            <div className="grid grid-cols-4 gap-4">
               {monthlyData.map((month) => (
                 <div key={month.month} className="text-center">
                   <div className="text-lg font-bold text-blue-600">{month.total.toLocaleString()}</div>
@@ -2057,17 +2212,17 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
 
       {/* Customer Journey Analysis */}
       <div className="bg-white p-6 rounded-lg shadow">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Customer Journey Analysis (4-Month Comparison)</h3>
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Customer Journey Analysis (Rolling 4-Month Window)</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="text-center">
             <div className="text-2xl font-bold text-green-600">{data.customerInsights.firstTimeCustomers}</div>
             <div className="text-sm text-gray-500">New Customers</div>
-            <div className="text-xs text-gray-400">Started in May</div>
+            <div className="text-xs text-gray-400">Started in {getMonthName(data.currentMonth)}</div>
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-red-600">{data.customerInsights.lostCustomers}</div>
             <div className="text-sm text-gray-500">Lost Customers</div>
-            <div className="text-xs text-gray-400">Active in April, not in May</div>
+            <div className="text-xs text-gray-400">Active in May, not in {getMonthName(data.currentMonth)}</div>
           </div>
           <div className="text-center">
             <div className="text-2xl font-bold text-blue-600">{data.customerInsights.consistentPerformers}</div>
@@ -2082,12 +2237,12 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-      {/* ENHANCED: 6-Month Performance Insights */}
+      {/* ENHANCED: Rolling Window Performance Insights */}
       <div className="bg-white p-6 rounded-lg shadow">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">6-Month Performance Insights</h3>
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Rolling Window Performance Insights</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <h4 className="font-medium text-gray-900 mb-3">Growth Analysis</h4>
+            <h4 className="font-medium text-gray-900 mb-3">Monthly Growth Analysis</h4>
             <div className="space-y-2">
               {monthlyData.slice(1).map((month) => (
                 <div key={month.month} className="flex justify-between items-center">
@@ -2100,7 +2255,7 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
             </div>
           </div>
           <div>
-            <h4 className="font-medium text-gray-900 mb-3">Brand Mix Trends</h4>
+            <h4 className="font-medium text-gray-900 mb-3">Brand Mix Evolution</h4>
             <div className="space-y-2">
               {monthlyData.slice(-3).map((month) => (
                 <div key={month.month} className="space-y-1">
@@ -2130,26 +2285,32 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
           {debugInfo?.monthlyTotals?.march?.total8PM > 0 || debugInfo?.monthlyTotals?.march?.totalVERVE > 0 ? (
             <>
               <div className="text-4xl mb-4">📈</div>
-              <h3 className="text-lg font-medium text-green-900 mb-2">6-Month Historical Data Integration: Complete</h3>
+              <h3 className="text-lg font-medium text-green-900 mb-2">Rolling Window + YoY Data Integration: Complete</h3>
               <p className="text-green-700 mb-4">
-                Successfully integrated 6 months of historical data with enhanced trend analysis and performance insights.
+                Successfully integrated rolling 4-month data with year-over-year comparison and enhanced trend analysis.
               </p>
-              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4">
                 <div className="bg-white p-4 rounded shadow">
-                  <div className="text-2xl font-bold text-blue-600">6</div>
-                  <div className="text-sm text-gray-600">Months Analyzed</div>
+                  <div className="text-2xl font-bold text-blue-600">4</div>
+                  <div className="text-sm text-gray-600">Months Rolling Window</div>
                 </div>
                 <div className="bg-white p-4 rounded shadow">
                   <div className="text-2xl font-bold text-purple-600">
-                    {(debugInfo.monthlyTotals.march?.total8PM + debugInfo.monthlyTotals.april?.total8PM + debugInfo.monthlyTotals.may?.total8PM).toLocaleString()}
+                    {debugInfo.monthlyTotals.currentMonth?.total8PM?.toLocaleString() || 0}
                   </div>
-                  <div className="text-sm text-gray-600">Total 8PM (Q2)</div>
+                  <div className="text-sm text-gray-600">{getMonthName(data.currentMonth)} 8PM</div>
                 </div>
                 <div className="bg-white p-4 rounded shadow">
                   <div className="text-2xl font-bold text-orange-600">
-                    {(debugInfo.monthlyTotals.march?.totalVERVE + debugInfo.monthlyTotals.april?.totalVERVE + debugInfo.monthlyTotals.may?.totalVERVE).toLocaleString()}
+                    {debugInfo.monthlyTotals.currentMonth?.totalVERVE?.toLocaleString() || 0}
                   </div>
-                  <div className="text-sm text-gray-600">Total VERVE (Q2)</div>
+                  <div className="text-sm text-gray-600">{getMonthName(data.currentMonth)} VERVE</div>
+                </div>
+                <div className="bg-white p-4 rounded shadow">
+                  <div className={`text-2xl font-bold ${yoyComparison?.growth.total >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {yoyComparison?.growth.total >= 0 ? '+' : ''}{yoyComparison?.growth.total.toFixed(1) || 0}%
+                  </div>
+                  <div className="text-sm text-gray-600">YoY Growth</div>
                 </div>
               </div>
             </>
@@ -2168,441 +2329,559 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
   );
 };
 
-const DepartmentTab = ({ data }: { data: DashboardData }) => (
-  <div className="space-y-6">
-    {/* Department Performance Overview */}
-    <div className="bg-white p-6 rounded-lg shadow">
-      <h3 className="text-lg font-medium text-gray-900 mb-4">Department Performance Overview - May 2025</h3>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {Object.entries(data.deptPerformance).map(([dept, performance]) => {
-          const coveragePercent = (performance.billedShops / performance.totalShops) * 100;
-          return (
-            <div key={dept} className="border rounded-lg p-4">
-              <h4 className="font-medium text-gray-900 mb-2">{dept}</h4>
-              <div className="space-y-2">
-                <div className="text-2xl font-bold text-blue-600">{performance.sales.toLocaleString()}</div>
-                <div className="text-sm text-gray-500">Total Sales</div>
-                <div className="text-sm">
-                  <span className="font-medium">{performance.billedShops}</span>
-                  <span className="text-gray-500">/{performance.totalShops} shops</span>
-                </div>
-                <div className={`text-sm font-medium ${
-                  coveragePercent > 80 ? 'text-green-600' : 
-                  coveragePercent > 60 ? 'text-yellow-600' : 'text-red-600'
-                }`}>
-                  {coveragePercent.toFixed(1)}% coverage
+const DepartmentTab = ({ data }: { data: DashboardData }) => {
+  const getMonthName = (monthNum: string) => {
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    return months[parseInt(monthNum) - 1] || 'Unknown';
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Department Performance Overview */}
+      <div className="bg-white p-6 rounded-lg shadow">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Department Performance Overview - {getMonthName(data.currentMonth)} {data.currentYear}</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          {Object.entries(data.deptPerformance).map(([dept, performance]) => {
+            const coveragePercent = (performance.billedShops / performance.totalShops) * 100;
+            return (
+              <div key={dept} className="border rounded-lg p-4">
+                <h4 className="font-medium text-gray-900 mb-2">{dept}</h4>
+                <div className="space-y-2">
+                  <div className="text-2xl font-bold text-blue-600">{performance.sales.toLocaleString()}</div>
+                  <div className="text-sm text-gray-500">Total Sales</div>
+                  <div className="text-sm">
+                    <span className="font-medium">{performance.billedShops}</span>
+                    <span className="text-gray-500">/{performance.totalShops} shops</span>
+                  </div>
+                  <div className={`text-sm font-medium ${
+                    coveragePercent > 80 ? 'text-green-600' : 
+                    coveragePercent > 60 ? 'text-yellow-600' : 'text-red-600'
+                  }`}>
+                    {coveragePercent.toFixed(1)}% coverage
+                  </div>
                 </div>
               </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Department Performance Table */}
+      <div className="bg-white rounded-lg shadow">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-medium text-gray-900">Department Performance Analysis - {getMonthName(data.currentMonth)} {data.currentYear}</h3>
+          <p className="text-sm text-gray-500">Coverage and sales performance by territory</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Shops</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Active Shops</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Coverage</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Sales</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Avg per Shop</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">8PM Share</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">VERVE Share</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {Object.entries(data.deptPerformance).map(([dept, performance]) => {
+                const coveragePercent = (performance.billedShops / performance.totalShops) * 100;
+                const avgPerShop = performance.billedShops > 0 ? (performance.sales / performance.billedShops).toFixed(1) : 0;
+                
+                const deptShops = Object.values(data.salesData).filter((shop: any) => shop.department === dept && shop.total > 0);
+                const dept8PM = deptShops.reduce((sum: number, shop: any) => sum + shop.eightPM, 0);
+                const deptVERVE = deptShops.reduce((sum: number, shop: any) => sum + shop.verve, 0);
+                const deptTotal = dept8PM + deptVERVE;
+                const eightPMShare = deptTotal > 0 ? ((dept8PM / deptTotal) * 100).toFixed(1) : '0';
+                const verveShare = deptTotal > 0 ? ((deptVERVE / deptTotal) * 100).toFixed(1) : '0';
+                
+                return (
+                  <tr key={dept}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{dept}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{performance.totalShops}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{performance.billedShops}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <div className="flex items-center">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          coveragePercent > 80 
+                            ? 'bg-green-100 text-green-800' 
+                            : coveragePercent > 60
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {coveragePercent.toFixed(1)}%
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">{performance.sales.toLocaleString()}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{avgPerShop}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-purple-600">{eightPMShare}%</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600">{verveShare}%</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* NEW: 3-Month Historical Department Performance */}
+      <div className="bg-white rounded-lg shadow">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-medium text-gray-900">3-Month Department Trend (Mar-Apr-May {data.currentYear})</h3>
+          <p className="text-sm text-gray-500">Historical sales performance by department</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">March Sales</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">April Sales</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">May Sales</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">3-Month Avg</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trend</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {Object.entries(data.deptPerformance).map(([dept, performance]) => {
+                // Calculate historical data for this department
+                const deptShops = Object.values(data.salesData).filter((shop: any) => shop.department === dept);
+                const marchTotal = deptShops.reduce((sum: number, shop: any) => sum + (shop.marchTotal || 0), 0);
+                const aprilTotal = deptShops.reduce((sum: number, shop: any) => sum + (shop.aprilTotal || 0), 0);
+                const mayTotal = deptShops.reduce((sum: number, shop: any) => sum + (shop.mayTotal || 0), 0);
+                const avg3Month = ((marchTotal + aprilTotal + mayTotal) / 3).toFixed(0);
+                
+                const trend = mayTotal > aprilTotal && aprilTotal > marchTotal ? 'improving' :
+                            mayTotal < aprilTotal && aprilTotal < marchTotal ? 'declining' : 'stable';
+                
+                return (
+                  <tr key={dept}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{dept}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{marchTotal.toLocaleString()}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{aprilTotal.toLocaleString()}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{mayTotal.toLocaleString()}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">{avg3Month}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        trend === 'improving' ? 'bg-green-100 text-green-800' :
+                        trend === 'declining' ? 'bg-red-100 text-red-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {trend === 'improving' ? '📈 Growing' : trend === 'declining' ? '📉 Declining' : '➡️ Stable'}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Department Brand Performance Comparison */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white rounded-lg shadow">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-medium text-gray-900">8PM Performance by Department</h3>
+          </div>
+          <div className="p-6">
+            <div className="space-y-4">
+              {Object.entries(data.deptPerformance).map(([dept, performance]) => {
+                const deptShops = Object.values(data.salesData).filter((shop: any) => shop.department === dept && shop.total > 0);
+                const dept8PM = deptShops.reduce((sum: number, shop: any) => sum + shop.eightPM, 0);
+                const sharePercent = data.summary.total8PM > 0 ? (dept8PM / data.summary.total8PM) * 100 : 0;
+                
+                return (
+                  <div key={dept}>
+                    <div className="flex justify-between text-sm">
+                      <span>{dept}</span>
+                      <span>{dept8PM.toLocaleString()} cases ({sharePercent.toFixed(1)}%)</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-purple-600 h-2 rounded-full" 
+                        style={{ width: `${sharePercent}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          );
-        })}
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-medium text-gray-900">VERVE Performance by Department</h3>
+          </div>
+          <div className="p-6">
+            <div className="space-y-4">
+              {Object.entries(data.deptPerformance).map(([dept, performance]) => {
+                const deptShops = Object.values(data.salesData).filter((shop: any) => shop.department === dept && shop.total > 0);
+                const deptVERVE = deptShops.reduce((sum: number, shop: any) => sum + shop.verve, 0);
+                const sharePercent = data.summary.totalVERVE > 0 ? (deptVERVE / data.summary.totalVERVE) * 100 : 0;
+                
+                return (
+                  <div key={dept}>
+                    <div className="flex justify-between text-sm">
+                      <span>{dept}</span>
+                      <span>{deptVERVE.toLocaleString()} cases ({sharePercent.toFixed(1)}%)</span>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-orange-600 h-2 rounded-full" 
+                        style={{ width: `${sharePercent}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
+  );
+};
 
-    {/* Department Performance Table */}
+const OverviewTab = ({ data }: { data: DashboardData }) => {
+  const getMonthName = (monthNum: string) => {
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    return months[parseInt(monthNum) - 1] || 'Unknown';
+  };
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <MetricCard
+          title="Total Shops"
+          value={data.summary.totalShops.toLocaleString()}
+          icon={ShoppingBag}
+          color="blue"
+        />
+        <MetricCard
+          title="Billed Shops"
+          value={data.summary.billedShops.toLocaleString()}
+          subtitle={`${data.summary.coverage}% coverage`}
+          icon={TrendingUp}
+          color="green"
+        />
+        <MetricCard
+          title="8PM Sales"
+          value={`${data.summary.total8PM.toLocaleString()} cases`}
+          subtitle={`${data.summary.eightPmAchievement}% achievement | YoY: ${data.summary.yoy8PMGrowth}%`}
+          icon={BarChart3}
+          color="purple"
+        />
+        <MetricCard
+          title="VERVE Sales"
+          value={`${data.summary.totalVERVE.toLocaleString()} cases`}
+          subtitle={`${data.summary.verveAchievement}% achievement | YoY: ${data.summary.yoyVerveGrowth}%`}
+          icon={BarChart3}
+          color="orange"
+        />
+      </div>
+
+      {/* Enhanced Sales vs Target Cards with YoY */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">8PM Performance - {getMonthName(data.currentMonth)} {data.currentYear}</h3>
+          <div className="space-y-4">
+            <div>
+              <div className="flex justify-between text-sm">
+                <span>Sales vs Target</span>
+                <span>{data.summary.eightPmAchievement}%</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div 
+                  className="bg-purple-600 h-2 rounded-full" 
+                  style={{ width: `${Math.min(parseFloat(data.summary.eightPmAchievement), 100)}%` }}
+                ></div>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4 text-center">
+              <div>
+                <div className="text-2xl font-bold text-purple-600">{data.summary.total8PM.toLocaleString()}</div>
+                <div className="text-sm text-gray-500">Achieved</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-gray-400">{data.summary.total8PMTarget.toLocaleString()}</div>
+                <div className="text-sm text-gray-500">Target</div>
+              </div>
+            </div>
+            {/* YoY Comparison */}
+            <div className="pt-2 border-t">
+              <div className="flex justify-between text-sm">
+                <span>vs Last Year ({getMonthName(data.currentMonth)} 2024)</span>
+                <span className={`font-medium ${parseFloat(data.summary.yoy8PMGrowth || '0') >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {parseFloat(data.summary.yoy8PMGrowth || '0') >= 0 ? '+' : ''}{data.summary.yoy8PMGrowth}%
+                </span>
+              </div>
+              <div className="text-xs text-gray-500 mt-1">
+                Last year: {data.summary.lastYearTotal8PM?.toLocaleString() || 0} cases
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">VERVE Performance - {getMonthName(data.currentMonth)} {data.currentYear}</h3>
+          <div className="space-y-4">
+            <div>
+              <div className="flex justify-between text-sm">
+                <span>Sales vs Target</span>
+                <span>{data.summary.verveAchievement}%</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-2">
+                <div 
+                  className="bg-orange-600 h-2 rounded-full" 
+                  style={{ width: `${Math.min(parseFloat(data.summary.verveAchievement), 100)}%` }}
+                ></div>
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4 text-center">
+              <div>
+                <div className="text-2xl font-bold text-orange-600">{data.summary.totalVERVE.toLocaleString()}</div>
+                <div className="text-sm text-gray-500">Achieved</div>
+              </div>
+              <div>
+                <div className="text-2xl font-bold text-gray-400">{data.summary.totalVerveTarget.toLocaleString()}</div>
+                <div className="text-sm text-gray-500">Target</div>
+              </div>
+            </div>
+            {/* YoY Comparison */}
+            <div className="pt-2 border-t">
+              <div className="flex justify-between text-sm">
+                <span>vs Last Year ({getMonthName(data.currentMonth)} 2024)</span>
+                <span className={`font-medium ${parseFloat(data.summary.yoyVerveGrowth || '0') >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                  {parseFloat(data.summary.yoyVerveGrowth || '0') >= 0 ? '+' : ''}{data.summary.yoyVerveGrowth}%
+                </span>
+              </div>
+              <div className="text-xs text-gray-500 mt-1">
+                Last year: {data.summary.lastYearTotalVERVE?.toLocaleString() || 0} cases
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Enhanced Brand Distribution and Achievement Summary */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Brand Distribution - {getMonthName(data.currentMonth)} {data.currentYear}</h3>
+          <div className="space-y-4">
+            <div>
+              <div className="flex justify-between text-sm">
+                <span>8PM Family</span>
+                <span>{((data.summary.total8PM / data.summary.totalSales) * 100).toFixed(1)}%</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-3">
+                <div 
+                  className="bg-purple-600 h-3 rounded-full" 
+                  style={{ width: `${(data.summary.total8PM / data.summary.totalSales) * 100}%` }}
+                ></div>
+              </div>
+              <div className="text-sm text-gray-500 mt-1">{data.summary.total8PM.toLocaleString()} cases</div>
+            </div>
+            <div>
+              <div className="flex justify-between text-sm">
+                <span>VERVE Family</span>
+                <span>{((data.summary.totalVERVE / data.summary.totalSales) * 100).toFixed(1)}%</span>
+              </div>
+              <div className="w-full bg-gray-200 rounded-full h-3">
+                <div 
+                  className="bg-orange-600 h-3 rounded-full" 
+                  style={{ width: `${(data.summary.totalVERVE / data.summary.totalSales) * 100}%` }}
+                ></div>
+              </div>
+              <div className="text-sm text-gray-500 mt-1">{data.summary.totalVERVE.toLocaleString()} cases</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-lg font-medium text-gray-900 mb-4">Achievement Summary - {getMonthName(data.currentMonth)} {data.currentYear}</h3>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">8PM Achievement:</span>
+              <span className={`text-lg font-bold ${
+                parseFloat(data.summary.eightPmAchievement) >= 100 ? 'text-green-600' : 
+                parseFloat(data.summary.eightPmAchievement) >= 80 ? 'text-yellow-600' : 'text-red-600'
+              }`}>
+                {data.summary.eightPmAchievement}%
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">VERVE Achievement:</span>
+              <span className={`text-lg font-bold ${
+                parseFloat(data.summary.verveAchievement) >= 100 ? 'text-green-600' : 
+                parseFloat(data.summary.verveAchievement) >= 80 ? 'text-yellow-600' : 'text-red-600'
+              }`}>
+                {data.summary.verveAchievement}%
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">Market Coverage:</span>
+              <span className={`text-lg font-bold ${
+                parseFloat(data.summary.coverage) >= 80 ? 'text-green-600' : 
+                parseFloat(data.summary.coverage) >= 60 ? 'text-yellow-600' : 'text-red-600'
+              }`}>
+                {data.summary.coverage}%
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium">YoY Growth:</span>
+              <span className={`text-lg font-bold ${
+                parseFloat(data.summary.yoy8PMGrowth || '0') >= 0 ? 'text-green-600' : 'text-red-600'
+              }`}>
+                {parseFloat(data.summary.yoy8PMGrowth || '0') >= 0 ? '+' : ''}{data.summary.yoy8PMGrowth || 0}%
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white p-6 rounded-lg shadow">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Performance Statistics - {getMonthName(data.currentMonth)} {data.currentYear}</h3>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="text-center">
+            <div className="text-3xl font-bold text-blue-600">{data.summary.totalSales.toLocaleString()}</div>
+            <div className="text-sm text-gray-500">Total Cases Sold</div>
+          </div>
+          <div className="text-center">
+            <div className="text-3xl font-bold text-green-600">{data.summary.coverage}%</div>
+            <div className="text-sm text-gray-500">Market Coverage</div>
+          </div>
+          <div className="text-center">
+            <div className="text-3xl font-bold text-purple-600">{data.topShops.length}</div>
+            <div className="text-sm text-gray-500">Active Shops</div>
+          </div>
+          <div className="text-center">
+            <div className="text-3xl font-bold text-orange-600">{data.customerInsights.firstTimeCustomers}</div>
+            <div className="text-sm text-gray-500">New Customers</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Enhanced Customer Insights Summary */}
+      <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-lg">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Rolling 4-Month Customer Journey Analysis</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="text-center">
+            <div className="text-xl font-bold text-green-600">{data.customerInsights.firstTimeCustomers}</div>
+            <div className="text-xs text-gray-600">New Customers</div>
+            <div className="text-xs text-gray-400">Started billing in {getMonthName(data.currentMonth)}</div>
+          </div>
+          <div className="text-center">
+            <div className="text-xl font-bold text-red-600">{data.customerInsights.lostCustomers}</div>
+            <div className="text-xs text-gray-600">Lost Customers</div>
+            <div className="text-xs text-gray-400">Active in May, not in {getMonthName(data.currentMonth)}</div>
+          </div>
+          <div className="text-center">
+            <div className="text-xl font-bold text-yellow-600">{data.customerInsights.consistentPerformers}</div>
+            <div className="text-xs text-gray-600">Consistent</div>
+            <div className="text-xs text-gray-400">Stable or growing</div>
+          </div>
+          <div className="text-center">
+            <div className="text-xl font-bold text-orange-600">{data.customerInsights.decliningPerformers}</div>
+            <div className="text-xs text-gray-600">Declining</div>
+            <div className="text-xs text-gray-400">Negative trend</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ENHANCED: Top Shops Tab (UPDATED TO ROLLING 4 MONTHS WITH YoY)
+const TopShopsTab = ({ data }: { data: DashboardData }) => {
+  const getMonthName = (monthNum: string) => {
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    return months[parseInt(monthNum) - 1] || 'Unknown';
+  };
+
+  return (
     <div className="bg-white rounded-lg shadow">
       <div className="px-6 py-4 border-b border-gray-200">
-        <h3 className="text-lg font-medium text-gray-900">Department Performance Analysis</h3>
-        <p className="text-sm text-gray-500">Coverage and sales performance by territory</p>
+        <h3 className="text-lg font-medium text-gray-900">Top 20 Performing Shops - {getMonthName(data.currentMonth)} {data.currentYear}</h3>
+        <p className="text-sm text-gray-500">Ranked by total cases sold with rolling 4-month comparison (Mar-Apr-May-{getMonthName(data.currentMonth)}) + YoY analysis</p>
       </div>
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
           <thead className="bg-gray-50">
             <tr>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rank</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shop Name</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Shops</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Active Shops</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Coverage</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Sales</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Avg per Shop</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">8PM Share</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">VERVE Share</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salesman</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mar Cases</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Apr Cases</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">May Cases</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{getMonthName(data.currentMonth)} Cases</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Growth %</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">YoY %</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">8PM Cases</th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">VERVE Cases</th>
             </tr>
           </thead>
           <tbody className="bg-white divide-y divide-gray-200">
-            {Object.entries(data.deptPerformance).map(([dept, performance]) => {
-              const coveragePercent = (performance.billedShops / performance.totalShops) * 100;
-              const avgPerShop = performance.billedShops > 0 ? (performance.sales / performance.billedShops).toFixed(1) : 0;
-              
-              // Calculate brand share for this department
-              const deptShops = Object.values(data.salesData).filter((shop: any) => shop.department === dept && shop.total > 0);
-              const dept8PM = deptShops.reduce((sum: number, shop: any) => sum + shop.eightPM, 0);
-              const deptVERVE = deptShops.reduce((sum: number, shop: any) => sum + shop.verve, 0);
-              const deptTotal = dept8PM + deptVERVE;
-              const eightPMShare = deptTotal > 0 ? ((dept8PM / deptTotal) * 100).toFixed(1) : '0';
-              const verveShare = deptTotal > 0 ? ((deptVERVE / deptTotal) * 100).toFixed(1) : '0';
-              
-              return (
-                <tr key={dept}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{dept}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{performance.totalShops}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{performance.billedShops}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                    <div className="flex items-center">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        coveragePercent > 80 
-                          ? 'bg-green-100 text-green-800' 
-                          : coveragePercent > 60
-                          ? 'bg-yellow-100 text-yellow-800'
-                          : 'bg-red-100 text-red-800'
-                      }`}>
-                        {coveragePercent.toFixed(1)}%
+            {data.topShops.map((shop, index) => (
+              <tr key={shop.shopId} className={index < 3 ? 'bg-yellow-50' : index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  <div className="flex items-center">
+                    {index + 1}
+                    {index < 3 && (
+                      <span className="ml-2">
+                        {index === 0 && '🥇'}
+                        {index === 1 && '🥈'}
+                        {index === 2 && '🥉'}
                       </span>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">{performance.sales.toLocaleString()}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{avgPerShop}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-purple-600">{eightPMShare}%</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600">{verveShare}%</td>
-                </tr>
-              );
-            })}
+                    )}
+                  </div>
+                </td>
+                <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{shop.shopName}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{shop.department}</td>
+                <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{shop.salesman}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">{shop.marchTotal?.toLocaleString() || 0}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{shop.aprilTotal?.toLocaleString() || 0}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{shop.mayTotal?.toLocaleString() || 0}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{shop.total.toLocaleString()}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                    (shop.growthPercent || 0) > 0 
+                      ? 'bg-green-100 text-green-800' 
+                      : (shop.growthPercent || 0) < 0
+                      ? 'bg-red-100 text-red-800'
+                      : 'bg-gray-100 text-gray-800'
+                  }`}>
+                    {shop.growthPercent?.toFixed(1) || 0}%
+                  </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm">
+                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                    (shop.yoyGrowthPercent || 0) > 0 
+                      ? 'bg-blue-100 text-blue-800' 
+                      : (shop.yoyGrowthPercent || 0) < 0
+                      ? 'bg-red-100 text-red-800'
+                      : 'bg-gray-100 text-gray-800'
+                  }`}>
+                    {shop.yoyGrowthPercent?.toFixed(1) || 0}%
+                  </span>
+                </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-purple-600">{shop.eightPM.toLocaleString()}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600">{shop.verve.toLocaleString()}</td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
     </div>
-
-    {/* Department Brand Performance Comparison */}
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div className="bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">8PM Performance by Department</h3>
-        </div>
-        <div className="p-6">
-          <div className="space-y-4">
-            {Object.entries(data.deptPerformance).map(([dept, performance]) => {
-              const deptShops = Object.values(data.salesData).filter((shop: any) => shop.department === dept && shop.total > 0);
-              const dept8PM = deptShops.reduce((sum: number, shop: any) => sum + shop.eightPM, 0);
-              const sharePercent = data.summary.total8PM > 0 ? (dept8PM / data.summary.total8PM) * 100 : 0;
-              
-              return (
-                <div key={dept}>
-                  <div className="flex justify-between text-sm">
-                    <span>{dept}</span>
-                    <span>{dept8PM.toLocaleString()} cases ({sharePercent.toFixed(1)}%)</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-purple-600 h-2 rounded-full" 
-                      style={{ width: `${sharePercent}%` }}
-                    ></div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">VERVE Performance by Department</h3>
-        </div>
-        <div className="p-6">
-          <div className="space-y-4">
-            {Object.entries(data.deptPerformance).map(([dept, performance]) => {
-              const deptShops = Object.values(data.salesData).filter((shop: any) => shop.department === dept && shop.total > 0);
-              const deptVERVE = deptShops.reduce((sum: number, shop: any) => sum + shop.verve, 0);
-              const sharePercent = data.summary.totalVERVE > 0 ? (deptVERVE / data.summary.totalVERVE) * 100 : 0;
-              
-              return (
-                <div key={dept}>
-                  <div className="flex justify-between text-sm">
-                    <span>{dept}</span>
-                    <span>{deptVERVE.toLocaleString()} cases ({sharePercent.toFixed(1)}%)</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-orange-600 h-2 rounded-full" 
-                      style={{ width: `${sharePercent}%` }}
-                    ></div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      </div>
-    </div>
-  </div>
-);
-
-const OverviewTab = ({ data }: { data: DashboardData }) => (
-  <div className="space-y-6">
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-      <MetricCard
-        title="Total Shops"
-        value={data.summary.totalShops.toLocaleString()}
-        icon={ShoppingBag}
-        color="blue"
-      />
-      <MetricCard
-        title="Billed Shops"
-        value={data.summary.billedShops.toLocaleString()}
-        subtitle={`${data.summary.coverage}% coverage`}
-        icon={TrendingUp}
-        color="green"
-      />
-      <MetricCard
-        title="8PM Sales"
-        value={`${data.summary.total8PM.toLocaleString()} cases`}
-        subtitle={`${data.summary.eightPmAchievement}% achievement`}
-        icon={BarChart3}
-        color="purple"
-      />
-      <MetricCard
-        title="VERVE Sales"
-        value={`${data.summary.totalVERVE.toLocaleString()} cases`}
-        subtitle={`${data.summary.verveAchievement}% achievement`}
-        icon={BarChart3}
-        color="orange"
-      />
-    </div>
-
-    {/* Enhanced Sales vs Target Cards */}
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div className="bg-white p-6 rounded-lg shadow">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">8PM Performance - May 2025</h3>
-        <div className="space-y-4">
-          <div>
-            <div className="flex justify-between text-sm">
-              <span>Sales vs Target</span>
-              <span>{data.summary.eightPmAchievement}%</span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div 
-                className="bg-purple-600 h-2 rounded-full" 
-                style={{ width: `${Math.min(parseFloat(data.summary.eightPmAchievement), 100)}%` }}
-              ></div>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4 text-center">
-            <div>
-              <div className="text-2xl font-bold text-purple-600">{data.summary.total8PM.toLocaleString()}</div>
-              <div className="text-sm text-gray-500">Achieved</div>
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-gray-400">{data.summary.total8PMTarget.toLocaleString()}</div>
-              <div className="text-sm text-gray-500">Target</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white p-6 rounded-lg shadow">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">VERVE Performance - May 2025</h3>
-        <div className="space-y-4">
-          <div>
-            <div className="flex justify-between text-sm">
-              <span>Sales vs Target</span>
-              <span>{data.summary.verveAchievement}%</span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div 
-                className="bg-orange-600 h-2 rounded-full" 
-                style={{ width: `${Math.min(parseFloat(data.summary.verveAchievement), 100)}%` }}
-              ></div>
-            </div>
-          </div>
-          <div className="grid grid-cols-2 gap-4 text-center">
-            <div>
-              <div className="text-2xl font-bold text-orange-600">{data.summary.totalVERVE.toLocaleString()}</div>
-              <div className="text-sm text-gray-500">Achieved</div>
-            </div>
-            <div>
-              <div className="text-2xl font-bold text-gray-400">{data.summary.totalVerveTarget.toLocaleString()}</div>
-              <div className="text-sm text-gray-500">Target</div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    {/* Enhanced Brand Distribution and Achievement Summary */}
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <div className="bg-white p-6 rounded-lg shadow">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Brand Distribution - May 2025</h3>
-        <div className="space-y-4">
-          <div>
-            <div className="flex justify-between text-sm">
-              <span>8PM Family</span>
-              <span>{((data.summary.total8PM / data.summary.totalSales) * 100).toFixed(1)}%</span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-3">
-              <div 
-                className="bg-purple-600 h-3 rounded-full" 
-                style={{ width: `${(data.summary.total8PM / data.summary.totalSales) * 100}%` }}
-              ></div>
-            </div>
-            <div className="text-sm text-gray-500 mt-1">{data.summary.total8PM.toLocaleString()} cases</div>
-          </div>
-          <div>
-            <div className="flex justify-between text-sm">
-              <span>VERVE Family</span>
-              <span>{((data.summary.totalVERVE / data.summary.totalSales) * 100).toFixed(1)}%</span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-3">
-              <div 
-                className="bg-orange-600 h-3 rounded-full" 
-                style={{ width: `${(data.summary.totalVERVE / data.summary.totalSales) * 100}%` }}
-              ></div>
-            </div>
-            <div className="text-sm text-gray-500 mt-1">{data.summary.totalVERVE.toLocaleString()} cases</div>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white p-6 rounded-lg shadow">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Achievement Summary - May 2025</h3>
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">8PM Achievement:</span>
-            <span className={`text-lg font-bold ${
-              parseFloat(data.summary.eightPmAchievement) >= 100 ? 'text-green-600' : 
-              parseFloat(data.summary.eightPmAchievement) >= 80 ? 'text-yellow-600' : 'text-red-600'
-            }`}>
-              {data.summary.eightPmAchievement}%
-            </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">VERVE Achievement:</span>
-            <span className={`text-lg font-bold ${
-              parseFloat(data.summary.verveAchievement) >= 100 ? 'text-green-600' : 
-              parseFloat(data.summary.verveAchievement) >= 80 ? 'text-yellow-600' : 'text-red-600'
-            }`}>
-              {data.summary.verveAchievement}%
-            </span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-sm font-medium">Market Coverage:</span>
-            <span className={`text-lg font-bold ${
-              parseFloat(data.summary.coverage) >= 80 ? 'text-green-600' : 
-              parseFloat(data.summary.coverage) >= 60 ? 'text-yellow-600' : 'text-red-600'
-            }`}>
-              {data.summary.coverage}%
-            </span>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div className="bg-white p-6 rounded-lg shadow">
-      <h3 className="text-lg font-medium text-gray-900 mb-4">Performance Statistics - May 2025</h3>
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="text-center">
-          <div className="text-3xl font-bold text-blue-600">{data.summary.totalSales.toLocaleString()}</div>
-          <div className="text-sm text-gray-500">Total Cases Sold</div>
-        </div>
-        <div className="text-center">
-          <div className="text-3xl font-bold text-green-600">{data.summary.coverage}%</div>
-          <div className="text-sm text-gray-500">Market Coverage</div>
-        </div>
-        <div className="text-center">
-          <div className="text-3xl font-bold text-purple-600">{data.topShops.length}</div>
-          <div className="text-sm text-gray-500">Active Shops</div>
-        </div>
-        <div className="text-center">
-          <div className="text-3xl font-bold text-orange-600">{data.customerInsights.firstTimeCustomers}</div>
-          <div className="text-sm text-gray-500">New Customers</div>
-        </div>
-      </div>
-    </div>
-
-    {/* Enhanced Customer Insights Summary */}
-    <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-lg">
-      <h3 className="text-lg font-medium text-gray-900 mb-4">4-Month Customer Journey Analysis</h3>
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="text-center">
-          <div className="text-xl font-bold text-green-600">{data.customerInsights.firstTimeCustomers}</div>
-          <div className="text-xs text-gray-600">New Customers</div>
-          <div className="text-xs text-gray-400">Started billing in May</div>
-        </div>
-        <div className="text-center">
-          <div className="text-xl font-bold text-red-600">{data.customerInsights.lostCustomers}</div>
-          <div className="text-xs text-gray-600">Lost Customers</div>
-          <div className="text-xs text-gray-400">Active in April, not in May</div>
-        </div>
-        <div className="text-center">
-          <div className="text-xl font-bold text-yellow-600">{data.customerInsights.consistentPerformers}</div>
-          <div className="text-xs text-gray-600">Consistent</div>
-          <div className="text-xs text-gray-400">Stable or growing</div>
-        </div>
-        <div className="text-center">
-          <div className="text-xl font-bold text-orange-600">{data.customerInsights.decliningPerformers}</div>
-          <div className="text-xs text-gray-600">Declining</div>
-          <div className="text-xs text-gray-400">Negative trend</div>
-        </div>
-      </div>
-    </div>
-  </div>
-);
-
-// ENHANCED: Top Shops Tab (UPDATED TO 4 MONTHS)
-const TopShopsTab = ({ data }: { data: DashboardData }) => (
-  <div className="bg-white rounded-lg shadow">
-    <div className="px-6 py-4 border-b border-gray-200">
-      <h3 className="text-lg font-medium text-gray-900">Top 20 Performing Shops - May 2025</h3>
-      <p className="text-sm text-gray-500">Ranked by total cases sold with complete 4-month comparison (Feb-Mar-Apr-May)</p>
-    </div>
-    <div className="overflow-x-auto">
-      <table className="min-w-full divide-y divide-gray-200">
-        <thead className="bg-gray-50">
-          <tr>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rank</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shop Name</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salesman</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Feb Cases</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mar Cases</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Apr Cases</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">May Cases</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Growth %</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">8PM Cases</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">VERVE Cases</th>
-          </tr>
-        </thead>
-        <tbody className="bg-white divide-y divide-gray-200">
-          {data.topShops.map((shop, index) => (
-            <tr key={shop.shopId} className={index < 3 ? 'bg-yellow-50' : index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
-              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                <div className="flex items-center">
-                  {index + 1}
-                  {index < 3 && (
-                    <span className="ml-2">
-                      {index === 0 && '🥇'}
-                      {index === 1 && '🥈'}
-                      {index === 2 && '🥉'}
-                    </span>
-                  )}
-                </div>
-              </td>
-              <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{shop.shopName}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{shop.department}</td>
-              <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{shop.salesman}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">{shop.februaryTotal?.toLocaleString() || 0}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{shop.marchTotal?.toLocaleString() || 0}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{shop.aprilTotal?.toLocaleString() || 0}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{shop.total.toLocaleString()}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm">
-                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                  (shop.growthPercent || 0) > 0 
-                    ? 'bg-green-100 text-green-800' 
-                    : (shop.growthPercent || 0) < 0
-                    ? 'bg-red-100 text-red-800'
-                    : 'bg-gray-100 text-gray-800'
-                }`}>
-                  {shop.growthPercent?.toFixed(1) || 0}%
-                </span>
-              </td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-purple-600">{shop.eightPM.toLocaleString()}</td>
-              <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600">{shop.verve.toLocaleString()}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  </div>
-);
+  );
+};
 
 const MetricCard = ({ title, value, subtitle, icon: Icon, color }: {
   title: string;
