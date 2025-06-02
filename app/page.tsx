@@ -1505,6 +1505,7 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
 
   // NEW: Function to handle case breakdown click
   const handleCaseBreakdownClick = (salesmanName: string, month: string, monthName: string, total: number, eightPM: number, verve: number) => {
+    console.log('Breakdown clicked:', { salesmanName, month, monthName, total, eightPM, verve });
     setSelectedSalesmanBreakdown({
       salesmanName,
       month,
@@ -1517,7 +1518,7 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
   };
 
   // NEW: Salesman Breakdown Modal Component
-  const SalesmanBreakdownModal = () => {
+  const SalesmanBreakdownModal = ({ onClose }: { onClose: () => void }) => {
     if (!selectedSalesmanBreakdown) return null;
 
     return (
@@ -1528,7 +1529,7 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
               {selectedSalesmanBreakdown.salesmanName} - {selectedSalesmanBreakdown.monthName} 2025 Breakdown
             </h3>
             <button 
-              onClick={() => setShowSalesmanBreakdown(false)} 
+              onClick={onClose} 
               className="text-gray-400 hover:text-gray-600"
             >
               <X className="w-6 h-6" />
@@ -1602,7 +1603,7 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
 
             <div className="mt-6 flex justify-end">
               <button
-                onClick={() => setShowSalesmanBreakdown(false)}
+                onClick={onClose}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
                 Close
@@ -1795,45 +1796,57 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">{salesman.name}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       <button
-                        onClick={() => handleCaseBreakdownClick(
-                          salesman.name, 
-                          'march', 
-                          'March', 
-                          salesman.marchTotal, 
-                          salesman.marchEightPM, 
-                          salesman.marchVerve
-                        )}
-                        className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                        onClick={() => {
+                          console.log('March clicked for:', salesman.name);
+                          handleCaseBreakdownClick(
+                            salesman.name, 
+                            'march', 
+                            'March', 
+                            salesman.marchTotal, 
+                            salesman.marchEightPM, 
+                            salesman.marchVerve
+                          );
+                        }}
+                        className="text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer"
+                        style={{ textDecoration: 'none' }}
                       >
                         {salesman.marchTotal.toLocaleString()}
                       </button>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       <button
-                        onClick={() => handleCaseBreakdownClick(
-                          salesman.name, 
-                          'april', 
-                          'April', 
-                          salesman.aprilTotal, 
-                          salesman.aprilEightPM, 
-                          salesman.aprilVerve
-                        )}
-                        className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                        onClick={() => {
+                          console.log('April clicked for:', salesman.name);
+                          handleCaseBreakdownClick(
+                            salesman.name, 
+                            'april', 
+                            'April', 
+                            salesman.aprilTotal, 
+                            salesman.aprilEightPM, 
+                            salesman.aprilVerve
+                          );
+                        }}
+                        className="text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer"
+                        style={{ textDecoration: 'none' }}
                       >
                         {salesman.aprilTotal.toLocaleString()}
                       </button>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       <button
-                        onClick={() => handleCaseBreakdownClick(
-                          salesman.name, 
-                          'may', 
-                          'May', 
-                          salesman.mayTotal, 
-                          salesman.mayEightPM, 
-                          salesman.mayVerve
-                        )}
-                        className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                        onClick={() => {
+                          console.log('May clicked for:', salesman.name);
+                          handleCaseBreakdownClick(
+                            salesman.name, 
+                            'may', 
+                            'May', 
+                            salesman.mayTotal, 
+                            salesman.mayEightPM, 
+                            salesman.mayVerve
+                          );
+                        }}
+                        className="text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer"
+                        style={{ textDecoration: 'none' }}
                       >
                         {salesman.mayTotal.toLocaleString()}
                       </button>
