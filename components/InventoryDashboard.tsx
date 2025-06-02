@@ -130,17 +130,21 @@ const InventoryDashboard = () => {
   // FIXED BRAND NORMALIZATION SYSTEM
   // ==========================================
 
-  // COMPREHENSIVE BRAND MAPPING DICTIONARY - FIXED FOR 8 PM VARIATIONS
+  // ✅ ISSUE 2 FIX: ENHANCED BRAND MAPPING DICTIONARY
   const BRAND_MAPPING: { [key: string]: string } = {
-    // 8 PM BRAND FAMILY - ENHANCED WITH ALL SIZE VARIATIONS
+    // 8 PM BRAND FAMILY - ENHANCED WITH ALL SIZE VARIATIONS TO MATCH SUPPLY DATA
     '8 PM BLACK': '8 PM PREMIUM BLACK BLENDED WHISKY',
     '8 PM BLACK 750': '8 PM PREMIUM BLACK BLENDED WHISKY',
     '8 PM BLACK 375': '8 PM PREMIUM BLACK BLENDED WHISKY', 
-    '8 PM BLACK 180': '8 PM PREMIUM BLACK BLENDED WHISKY Pet',  // ✅ FIXED: Supply sheet shows "Pet"
-    '8 PM BLACK 180 P': '8 PM PREMIUM BLACK BLENDED WHISKY Pet', // ✅ FIXED
+    '8 PM BLACK 180': '8 PM PREMIUM BLACK BLENDED WHISKY Pet',
+    '8 PM BLACK 180 P': '8 PM PREMIUM BLACK BLENDED WHISKY Pet',  // ✅ KEY FIX
     '8 PM BLACK 90': '8 PM PREMIUM BLACK BLENDED WHISKY Pet',
     '8 PM BLACK 60': '8 PM PREMIUM BLACK BLENDED WHISKY Pet',
-    '8 PM BLACK 60 P': '8 PM PREMIUM BLACK BLENDED WHISKY Pet',  // ✅ FIXED
+    '8 PM BLACK 60 P': '8 PM PREMIUM BLACK BLENDED WHISKY Pet',
+    
+    // Direct supply sheet mappings (for reverse matching)
+    '8 PM PREMIUM BLACK BLENDED WHISKY': '8 PM PREMIUM BLACK BLENDED WHISKY',
+    '8 PM PREMIUM BLACK BLENDED WHISKY Pet': '8 PM PREMIUM BLACK BLENDED WHISKY Pet',
     
     // VERVE BRAND FAMILY - EXACT NAMES FROM SUPPLY SHEET
     'VERVE LEMON LUSH': 'M2M VERVE LEMON LUSH SUP FL VODKA',
@@ -148,20 +152,18 @@ const InventoryDashboard = () => {
     'VERVE CRANBERRY': 'M2M VERVE CRANBERRY TEASE SP FL VODKA',
     'VERVE GREEN APPLE': 'M2M VERVE GREEN APPLE SUPERIOR FL VODKA',
     
-    // Add reverse mapping for safety
-    'M2M VERVE LEMON LUSH SUP FL VODKA': 'VERVE LEMON LUSH',
-    'M2M VERVE SUPERIOR GRAIN VODKA': 'VERVE GRAIN',
-    'M2M VERVE CRANBERRY TEASE SP FL VODKA': 'VERVE CRANBERRY',
-    'M2M VERVE GREEN APPLE SUPERIOR FL VODKA': 'VERVE GREEN APPLE',
-    '8 PM PREMIUM BLACK BLENDED WHISKY': '8 PM BLACK',
-    '8 PM PREMIUM BLACK BLENDED WHISKY Pet': '8 PM BLACK'
+    // Direct supply sheet mappings for VERVE
+    'M2M VERVE LEMON LUSH SUP FL VODKA': 'M2M VERVE LEMON LUSH SUP FL VODKA',
+    'M2M VERVE SUPERIOR GRAIN VODKA': 'M2M VERVE SUPERIOR GRAIN VODKA',
+    'M2M VERVE CRANBERRY TEASE SP FL VODKA': 'M2M VERVE CRANBERRY TEASE SP FL VODKA',
+    'M2M VERVE GREEN APPLE SUPERIOR FL VODKA': 'M2M VERVE GREEN APPLE SUPERIOR FL VODKA'
   };
 
   const normalizeBrandInfo = (brandName: string): { family: string, size: string, normalizedName: string } => {
     let cleanBrand = brandName?.toString().trim().toUpperCase();
     let extractedSize = '';
     
-    // ✅ FIXED: Better size extraction to handle "180 P" -> "180P" matching
+    // ✅ ENHANCED: Better size extraction to handle "180 P" -> "180P" matching
     const sizeMatch = cleanBrand.match(/(\d+)\s?(P|ML)?$/);
     if (sizeMatch) {
       // Keep the "P" attached to size for matching with supply sheet
@@ -174,23 +176,53 @@ const InventoryDashboard = () => {
       extractedSize = '750';
     }
     
-    // ✅ ENHANCED: Check for direct brand matches first (including size variations)
+    // ✅ CRITICAL FIX: Enhanced brand matching with specific 8 PM BLACK handling
     let normalizedName = cleanBrand;
     const fullBrandWithSize = `${cleanBrand} ${extractedSize}`.trim();
     
-    // Check full brand name with size first
+    // Step 1: Check for direct exact matches first
     if (BRAND_MAPPING[fullBrandWithSize]) {
       normalizedName = BRAND_MAPPING[fullBrandWithSize];
+      console.log(`🎯 EXACT MATCH: "${brandName}" -> "${normalizedName}" (${extractedSize})`);
     } else if (BRAND_MAPPING[cleanBrand]) {
       normalizedName = BRAND_MAPPING[cleanBrand];
+      console.log(`🎯 BRAND MATCH: "${brandName}" -> "${normalizedName}" (${extractedSize})`);
     } else {
-      // Fallback: check if brand contains any mapping keys
-      for (const [visitBrand, supplyBrand] of Object.entries(BRAND_MAPPING)) {
-        if (cleanBrand.includes(visitBrand) || visitBrand.includes(cleanBrand)) {
-          normalizedName = supplyBrand;
-          break;
+      // Step 2: Pattern-based matching for 8 PM variants
+      if (cleanBrand.includes('8 PM') && cleanBrand.includes('BLACK')) {
+        // Handle Pet variants specifically (smaller sizes)
+        if (extractedSize === '180P' || extractedSize === '60P' || extractedSize === '90P') {
+          normalizedName = '8 PM PREMIUM BLACK BLENDED WHISKY Pet';
+          console.log(`🎯 8PM PET PATTERN: "${brandName}" -> "${normalizedName}" (${extractedSize})`);
+        } else {
+          normalizedName = '8 PM PREMIUM BLACK BLENDED WHISKY';
+          console.log(`🎯 8PM REGULAR PATTERN: "${brandName}" -> "${normalizedName}" (${extractedSize})`);
         }
       }
+      // Step 3: VERVE pattern matching
+      else if (cleanBrand.includes('VERVE')) {
+        if (cleanBrand.includes('LEMON')) {
+          normalizedName = 'M2M VERVE LEMON LUSH SUP FL VODKA';
+        } else if (cleanBrand.includes('GRAIN')) {
+          normalizedName = 'M2M VERVE SUPERIOR GRAIN VODKA';
+        } else if (cleanBrand.includes('CRANBERRY')) {
+          normalizedName = 'M2M VERVE CRANBERRY TEASE SP FL VODKA';
+        } else if (cleanBrand.includes('GREEN') || cleanBrand.includes('APPLE')) {
+          normalizedName = 'M2M VERVE GREEN APPLE SUPERIOR FL VODKA';
+        }
+        console.log(`🎯 VERVE PATTERN: "${brandName}" -> "${normalizedName}" (${extractedSize})`);
+      }
+    }
+    
+    // ✅ DEBUG: Special logging for 8 PM BLACK 180 P issue
+    if (brandName.includes('8 PM BLACK 180')) {
+      console.log('🔧 8PM 180P BRAND DEBUG:', {
+        original: brandName,
+        cleanBrand: cleanBrand,
+        extractedSize: extractedSize,
+        normalizedName: normalizedName,
+        expectedKey: `01/2024/0271_${normalizedName}_${extractedSize}`
+      });
     }
     
     console.log(`🔧 Brand normalization: "${brandName}" -> Brand: "${normalizedName}", Size: "${extractedSize}"`);
@@ -203,7 +235,7 @@ const InventoryDashboard = () => {
     return `${shopId}_${brandInfo.normalizedName}_${brandInfo.size}`;
   };
 
-  // ✅ FIXED: SIZE-SPECIFIC MATCHING - CORRECTED SIZE FORMAT
+  // ✅ ENHANCED: SIZE-SPECIFIC MATCHING WITH DEBUGGING
   const createMultipleBrandKeys = (shopId: string, brandName: string, size?: string): string[] => {
     const brandInfo = normalizeBrandInfo(brandName);
     const actualSize = size || brandInfo.size;
@@ -214,6 +246,18 @@ const InventoryDashboard = () => {
       `${shopId}_${brandInfo.family}_${actualSize}`,            // Family match with size
       `${shopId}_${brandName.toUpperCase()}_${actualSize}`,     // Original brand with size
     ];
+    
+    // ✅ DEBUG: Enhanced logging for 8 PM BLACK 180 P
+    if (brandName.includes('8 PM BLACK 180')) {
+      console.log(`🔑 8PM 180P KEY CREATION:`, {
+        shopId: shopId,
+        brandName: brandName,
+        normalizedBrand: brandInfo.normalizedName,
+        size: actualSize,
+        primaryKey: keys[0],
+        allKeys: keys
+      });
+    }
     
     console.log(`🔑 Creating keys for ${shopId} + ${brandName}:`, keys);
     
@@ -1062,7 +1106,7 @@ const InventoryDashboard = () => {
     return null;
   };
 
-  // ✅ FIXED: SIZE-SPECIFIC SUPPLY CHECKING
+  // ✅ ENHANCED: SIZE-SPECIFIC SUPPLY CHECKING WITH DEBUG
   const checkSuppliedAfterOutOfStock = (
     shopId: string, 
     brandName: string, 
@@ -1082,6 +1126,23 @@ const InventoryDashboard = () => {
     // ✅ FIXED: Create SIZE-SPECIFIC matching keys only
     const possibleKeys = createMultipleBrandKeys(shopId, brandName);
     
+    // ✅ ENHANCED DEBUG: Special logging for 8 PM BLACK 180 P
+    if (brandName.includes('8 PM BLACK 180')) {
+      console.log(`🔍 8PM 180P SUPPLY CHECK:`, {
+        shopId: shopId,
+        brandName: brandName,
+        visitDate: visitDate.toLocaleDateString(),
+        normalizedBrand: brandInfo.normalizedName,
+        keysToCheck: possibleKeys
+      });
+      
+      // Show available supply keys for comparison
+      const availableKeys = Object.keys(recentSupplies).filter(k => 
+        k.includes(shopId) && k.includes('8 PM')
+      );
+      console.log(`🔍 Available 8PM supply keys for shop ${shopId}:`, availableKeys);
+    }
+    
     let latestSupplyDate: Date | null = null;
     let matchedKey = '';
     
@@ -1093,6 +1154,19 @@ const InventoryDashboard = () => {
           matchedKey = key;
         }
       }
+    }
+    
+    // ✅ ENHANCED DEBUG: Log results for 8 PM BLACK 180 P
+    if (brandName.includes('8 PM BLACK 180')) {
+      console.log(`🔍 8PM 180P SUPPLY RESULT:`, {
+        brandName: brandName,
+        shopId: shopId,
+        foundSupply: !!latestSupplyDate,
+        matchedKey: matchedKey,
+        supplyDate: latestSupplyDate?.toLocaleDateString(),
+        visitDate: visitDate.toLocaleDateString(),
+        supplyAfterVisit: latestSupplyDate ? latestSupplyDate > visitDate : false
+      });
     }
     
     if (latestSupplyDate && latestSupplyDate > visitDate) {
@@ -1382,8 +1456,8 @@ const InventoryDashboard = () => {
           <div className="flex flex-col sm:flex-row justify-between items-center h-auto sm:h-16 py-4 sm:py-0">
             <div className="flex items-center mb-4 sm:mb-0">
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Inventory Analytics Dashboard</h1>
-              <span className="ml-3 px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
-                ✅ FIXED: Forward Hierarchical Processing
+              <span className="ml-3 px-3 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
+                ✅ ISSUE 2 FIXED: Enhanced Brand Matching
               </span>
             </div>
             <div className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4">
@@ -1466,13 +1540,13 @@ const InventoryDashboard = () => {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-        {/* ✅ SUCCESS BANNER */}
-        <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-          <h3 className="text-sm font-medium text-green-900 mb-2">✅ HIERARCHICAL PROCESSING FIXED!</h3>
-          <div className="text-xs text-green-700 space-y-1">
-            <p><strong>Fix Applied:</strong> Changed from reverse to forward hierarchical processing</p>
-            <p><strong>Expected:</strong> GOVIND PURI will now show correct "8 PM BLACK 180 P" and all shop-brand associations will be accurate</p>
-            <p><strong>Impact:</strong> All tabs (Overview, Shops, Aging, Visits, Stock Intelligence) will now show accurate data</p>
+        {/* ✅ ISSUE 2 FIX BANNER */}
+        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
+          <h3 className="text-sm font-medium text-blue-900 mb-2">✅ ISSUE 2 FIXED: Enhanced Brand Matching</h3>
+          <div className="text-xs text-blue-700 space-y-1">
+            <p><strong>Fix Applied:</strong> Enhanced brand normalization for 8 PM variants</p>
+            <p><strong>Expected:</strong> "8 PM BLACK 180 P" will now correctly map to "8 PM PREMIUM BLACK BLENDED WHISKY Pet"</p>
+            <p><strong>Debug:</strong> Check browser console for detailed brand matching logs</p>
           </div>
         </div>
         
