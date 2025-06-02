@@ -1505,7 +1505,8 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
 
   // NEW: Function to handle case breakdown click
   const handleCaseBreakdownClick = (salesmanName: string, month: string, monthName: string, total: number, eightPM: number, verve: number) => {
-    console.log('Breakdown clicked:', { salesmanName, month, monthName, total, eightPM, verve });
+    console.log('🔥 BREAKDOWN CLICKED:', { salesmanName, month, monthName, total, eightPM, verve });
+    console.log('🔥 Setting state...');
     setSelectedSalesmanBreakdown({
       salesmanName,
       month,
@@ -1515,6 +1516,7 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
       verve
     });
     setShowSalesmanBreakdown(true);
+    console.log('🔥 State set, modal should show');
   };
 
   // NEW: Salesman Breakdown Modal Component
@@ -1617,6 +1619,13 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
 
   return (
     <div className="space-y-6">
+      {/* DEBUG: Show modal state */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="bg-yellow-100 p-2 text-xs">
+          DEBUG: showSalesmanBreakdown={String(showSalesmanBreakdown)}, selectedData={selectedSalesmanBreakdown?.salesmanName || 'null'}
+        </div>
+      )}
+      
       <div className="text-center">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Salesman Performance Dashboard</h2>
         <p className="text-gray-600">Individual salesman achievements and targets for {getMonthName(data.currentMonth)} {data.currentYear}</p>
