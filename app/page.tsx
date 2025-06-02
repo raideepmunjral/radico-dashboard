@@ -38,6 +38,10 @@ interface ShopData {
   monthlyTrend?: 'improving' | 'declining' | 'stable' | 'new';
   skuBreakdown?: SKUData[];
   historicalData?: MonthlyData[];
+  // NEW: 3-month averages
+  threeMonthAvgTotal?: number;
+  threeMonthAvg8PM?: number;
+  threeMonthAvgVERVE?: number;
 }
 
 interface SKUData {
@@ -104,6 +108,15 @@ interface FilterState {
   searchText: string;
 }
 
+// NEW: Enhanced Filter State for Top Shops
+interface TopShopsFilterState {
+  department: string;
+  salesman: string;
+  searchText: string;
+  minCases: string;
+  performanceTrend: string;
+}
+
 // ==========================================
 // PART 2: CONFIGURATION & CONSTANTS
 // ==========================================
@@ -136,6 +149,17 @@ const RadicoDashboard = () => {
     searchText: ''
   });
   const [showInventory, setShowInventory] = useState(false);
+
+  // NEW: Top Shops specific state
+  const [topShopsCurrentPage, setTopShopsCurrentPage] = useState(1);
+  const [topShopsItemsPerPage] = useState(25);
+  const [topShopsFilters, setTopShopsFilters] = useState<TopShopsFilterState>({
+    department: '',
+    salesman: '',
+    searchText: '',
+    minCases: '',
+    performanceTrend: ''
+  });
 
   // DYNAMIC DATE DETECTION
   const getCurrentMonthYear = () => {
@@ -548,7 +572,11 @@ const RadicoDashboard = () => {
               juneLastYearVerve: 0,
               yoyGrowthPercent: 0,
               monthlyTrend: 'stable',
-              skuBreakdown: []
+              skuBreakdown: [],
+              // NEW: 3-month averages
+              threeMonthAvgTotal: 0,
+              threeMonthAvg8PM: 0,
+              threeMonthAvgVERVE: 0
             };
           }
           
@@ -630,7 +658,10 @@ const RadicoDashboard = () => {
             juneLastYearVerve: 0,
             yoyGrowthPercent: 0,
             monthlyTrend: 'declining',
-            skuBreakdown: []
+            skuBreakdown: [],
+            threeMonthAvgTotal: 0,
+            threeMonthAvg8PM: 0,
+            threeMonthAvgVERVE: 0
           };
         }
         
@@ -655,7 +686,7 @@ const RadicoDashboard = () => {
       });
     });
 
-    // ENHANCED GROWTH AND TREND CALCULATION WITH YoY
+    // ENHANCED GROWTH AND TREND CALCULATION WITH YoY + 3-MONTH AVERAGES
     Object.keys(shopSales).forEach(shopId => {
       const shop = shopSales[shopId];
       const june = shop.juneTotal || 0;
@@ -663,6 +694,11 @@ const RadicoDashboard = () => {
       const april = shop.aprilTotal || 0;
       const march = shop.marchTotal || 0;
       const juneLastYear = shop.juneLastYearTotal || 0;
+      
+      // NEW: Calculate 3-month averages (Mar-Apr-May only)
+      shop.threeMonthAvgTotal = (march + april + may) / 3;
+      shop.threeMonthAvg8PM = ((shop.marchEightPM || 0) + (shop.aprilEightPM || 0) + (shop.mayEightPM || 0)) / 3;
+      shop.threeMonthAvgVERVE = ((shop.marchVerve || 0) + (shop.aprilVerve || 0) + (shop.mayVerve || 0)) / 3;
       
       // Month-over-month growth (May to June)
       if (may > 0) {
@@ -758,8 +794,9 @@ const RadicoDashboard = () => {
       declining: customerInsights.decliningPerformers
     });
 
+    // NEW: Sort allShopsComparison by 3-month average (Mar-Apr-May)
     const allShopsComparison = Object.values(shopSales)
-      .sort((a, b) => (b.juneTotal! || 0) - (a.juneTotal! || 0));
+      .sort((a, b) => (b.threeMonthAvgTotal! || 0) - (a.threeMonthAvgTotal! || 0));
 
     // Calculate department performance
     const deptPerformance: Record<string, any> = {};
@@ -851,8 +888,9 @@ const RadicoDashboard = () => {
     const yoyVerveGrowth = juneLastYearData.totalVERVE > 0 ? 
       (((totalVERVE - juneLastYearData.totalVERVE) / juneLastYearData.totalVERVE) * 100).toFixed(1) : '0';
 
+    // NEW: Sort topShops by 3-month average instead of current month
     const topShops = Object.values(shopSales)
-      .sort((a, b) => b.total - a.total)
+      .sort((a, b) => (b.threeMonthAvgTotal! || 0) - (a.threeMonthAvgTotal! || 0))
       .slice(0, 20);
 
     return {
@@ -918,9 +956,73 @@ const RadicoDashboard = () => {
     });
   };
 
+  // NEW: Filtered shops function for Top Shops tab
+  const getFilteredTopShops = (shops: ShopData[]): ShopData[] => {
+    return shops.filter(shop => {
+      const matchesDepartment = !topShopsFilters.department || shop.department === topShopsFilters.department;
+      const matchesSalesman = !topShopsFilters.salesman || shop.salesman === topShopsFilters.salesman;
+      const matchesSearch = !topShopsFilters.searchText || 
+        shop.shopName.toLowerCase().includes(topShopsFilters.searchText.toLowerCase()) ||
+        shop.department.toLowerCase().includes(topShopsFilters.searchText.toLowerCase()) ||
+        shop.salesman.toLowerCase().includes(topShopsFilters.searchText.toLowerCase());
+      const matchesMinCases = !topShopsFilters.minCases || (shop.threeMonthAvgTotal! >= parseFloat(topShopsFilters.minCases));
+      const matchesTrend = !topShopsFilters.performanceTrend || shop.monthlyTrend === topShopsFilters.performanceTrend;
+      
+      return matchesDepartment && matchesSalesman && matchesSearch && matchesMinCases && matchesTrend;
+    });
+  };
+
   const getFilterOptions = (shops: ShopData[], field: keyof ShopData): string[] => {
     const values = shops.map(shop => shop[field] as string).filter(Boolean);
     return Array.from(new Set(values)).sort();
+  };
+
+  // NEW: CSV Export function for Top Shops
+  const exportTopShopsToCSV = async () => {
+    if (!dashboardData) return;
+
+    try {
+      const filteredShops = getFilteredTopShops(dashboardData.allShopsComparison);
+      
+      let csvContent = "data:text/csv;charset=utf-8,";
+      csvContent += `Radico Top Shops Detailed Analysis Report - ${new Date().toLocaleDateString()}\n`;
+      csvContent += `Report Period: Mar-Apr-May-${getShortMonthName(currentMonth)} ${currentYear}\n`;
+      csvContent += `Sorted by: 3-Month Average Performance (Mar-Apr-May)\n`;
+      
+      if (topShopsFilters.department || topShopsFilters.salesman || topShopsFilters.searchText || topShopsFilters.minCases || topShopsFilters.performanceTrend) {
+        csvContent += "APPLIED FILTERS: ";
+        if (topShopsFilters.department) csvContent += `Department: ${topShopsFilters.department}, `;
+        if (topShopsFilters.salesman) csvContent += `Salesman: ${topShopsFilters.salesman}, `;
+        if (topShopsFilters.searchText) csvContent += `Search: ${topShopsFilters.searchText}, `;
+        if (topShopsFilters.minCases) csvContent += `Min Cases: ${topShopsFilters.minCases}, `;
+        if (topShopsFilters.performanceTrend) csvContent += `Trend: ${topShopsFilters.performanceTrend}`;
+        csvContent += "\n";
+      }
+      csvContent += "\n";
+      
+      csvContent += "EXECUTIVE SUMMARY\n";
+      csvContent += "Total Shops," + dashboardData.summary.totalShops + "\n";
+      csvContent += "Filtered Shops," + filteredShops.length + "\n";
+      csvContent += "Top 3-Month Avg," + (filteredShops[0]?.threeMonthAvgTotal?.toFixed(1) || 0) + " cases\n\n";
+      
+      csvContent += `DETAILED SHOP ANALYSIS (Mar-Apr-May-${getShortMonthName(currentMonth)} ${currentYear})\n`;
+      csvContent += `Rank,Shop Name,Department,Salesman,Mar Total,Mar 8PM,Mar VERVE,Apr Total,Apr 8PM,Apr VERVE,May Total,May 8PM,May VERVE,${getShortMonthName(currentMonth)} Total,${getShortMonthName(currentMonth)} 8PM,${getShortMonthName(currentMonth)} VERVE,3M Avg Total,3M Avg 8PM,3M Avg VERVE,Growth %,YoY Growth %,Monthly Trend\n`;
+      
+      filteredShops.forEach((shop, index) => {
+        csvContent += `${index + 1},"${shop.shopName}","${shop.department}","${shop.salesman}",${shop.marchTotal || 0},${shop.marchEightPM || 0},${shop.marchVerve || 0},${shop.aprilTotal || 0},${shop.aprilEightPM || 0},${shop.aprilVerve || 0},${shop.mayTotal || 0},${shop.mayEightPM || 0},${shop.mayVerve || 0},${shop.juneTotal || shop.total},${shop.juneEightPM || shop.eightPM},${shop.juneVerve || shop.verve},${shop.threeMonthAvgTotal?.toFixed(1) || 0},${shop.threeMonthAvg8PM?.toFixed(1) || 0},${shop.threeMonthAvgVERVE?.toFixed(1) || 0},${shop.growthPercent?.toFixed(1) || 0}%,${shop.yoyGrowthPercent?.toFixed(1) || 0}%,"${shop.monthlyTrend || 'stable'}"\n`;
+      });
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `Radico_Top_Shops_Detailed_Analysis_${getShortMonthName(currentMonth)}_${currentYear}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Error exporting Top Shops CSV:', error);
+      alert('Error exporting data. Please try again.');
+    }
   };
 
   // Enhanced SKU Modal Component
@@ -1261,7 +1363,16 @@ const RadicoDashboard = () => {
             {dashboardData && (
               <>
                 {activeTab === 'overview' && <OverviewTab data={dashboardData} />}
-                {activeTab === 'shops' && <TopShopsTab data={dashboardData} />}
+                {activeTab === 'shops' && <TopShopsTab 
+                  data={dashboardData}
+                  currentPage={topShopsCurrentPage}
+                  setCurrentPage={setTopShopsCurrentPage}
+                  itemsPerPage={topShopsItemsPerPage}
+                  filters={topShopsFilters}
+                  setFilters={setTopShopsFilters}
+                  getFilteredShops={getFilteredTopShops}
+                  exportCSV={exportTopShopsToCSV}
+                />}
                 {activeTab === 'department' && <DepartmentTab data={dashboardData} />}
                 {activeTab === 'salesman' && <SalesmanPerformanceTab data={dashboardData} />}
                 {activeTab === 'analytics' && <AdvancedAnalyticsTab 
@@ -3038,82 +3149,436 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
   );
 };
 
-// ENHANCED: Top Shops Tab (UPDATED TO ROLLING 4 MONTHS WITH YoY)
-const TopShopsTab = ({ data }: { data: DashboardData }) => {
+// NEW: ENHANCED Top Shops Tab Component with Detailed Brand Breakdown
+const TopShopsTab = ({ 
+  data, 
+  currentPage, 
+  setCurrentPage, 
+  itemsPerPage,
+  filters,
+  setFilters,
+  getFilteredShops,
+  exportCSV
+}: { 
+  data: DashboardData,
+  currentPage: number,
+  setCurrentPage: (page: number) => void,
+  itemsPerPage: number,
+  filters: TopShopsFilterState,
+  setFilters: (filters: TopShopsFilterState) => void,
+  getFilteredShops: (shops: ShopData[]) => ShopData[],
+  exportCSV: () => void
+}) => {
+  const filteredShops = getFilteredShops(data.allShopsComparison);
+  const totalPages = Math.ceil(filteredShops.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentShops = filteredShops.slice(startIndex, endIndex);
+
+  const departments = [...new Set(data.allShopsComparison.map(shop => shop.department))].sort();
+  const salesmen = [...new Set(data.allShopsComparison.map(shop => shop.salesman))].sort();
+
   return (
-    <div className="bg-white rounded-lg shadow">
-      <div className="px-6 py-4 border-b border-gray-200">
-        <h3 className="text-lg font-medium text-gray-900">Top 20 Performing Shops - {getMonthName(data.currentMonth)} {data.currentYear}</h3>
-        <p className="text-sm text-gray-500">Ranked by total cases sold with rolling 4-month comparison (Mar-Apr-May-{getMonthName(data.currentMonth)}) + YoY analysis</p>
+    <div className="space-y-6">
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Total Shops Analyzed</h3>
+          <div className="text-2xl font-bold text-blue-600">{filteredShops.length}</div>
+          <div className="text-sm text-gray-500">
+            {filters.department || filters.salesman || filters.searchText || filters.minCases || filters.performanceTrend ? 
+              `Filtered from ${data.allShopsComparison.length}` : 
+              'All shops included'}
+          </div>
+        </div>
+        
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Top 3-Month Avg</h3>
+          <div className="text-2xl font-bold text-green-600">
+            {filteredShops[0]?.threeMonthAvgTotal?.toFixed(1) || 0}
+          </div>
+          <div className="text-sm text-gray-500">Cases (Mar-Apr-May)</div>
+        </div>
+        
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Average 8PM Performance</h3>
+          <div className="text-2xl font-bold text-purple-600">
+            {(filteredShops.reduce((sum, shop) => sum + (shop.threeMonthAvg8PM || 0), 0) / Math.max(filteredShops.length, 1)).toFixed(1)}
+          </div>
+          <div className="text-sm text-gray-500">3-Month Avg Cases</div>
+        </div>
+        
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Average VERVE Performance</h3>
+          <div className="text-2xl font-bold text-orange-600">
+            {(filteredShops.reduce((sum, shop) => sum + (shop.threeMonthAvgVERVE || 0), 0) / Math.max(filteredShops.length, 1)).toFixed(1)}
+          </div>
+          <div className="text-sm text-gray-500">3-Month Avg Cases</div>
+        </div>
       </div>
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rank</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shop Name</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salesman</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mar Cases</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Apr Cases</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">May Cases</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{getMonthName(data.currentMonth)} Cases</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Growth %</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">YoY %</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">8PM Cases</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">VERVE Cases</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {data.topShops.map((shop, index) => (
-              <tr key={shop.shopId} className={index < 3 ? 'bg-yellow-50' : index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                  <div className="flex items-center">
-                    {index + 1}
-                    {index < 3 && (
-                      <span className="ml-2">
-                        {index === 0 && '🥇'}
-                        {index === 1 && '🥈'}
-                        {index === 2 && '🥉'}
-                      </span>
-                    )}
-                  </div>
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{shop.shopName}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{shop.department}</td>
-                <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{shop.salesman}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">{shop.marchTotal?.toLocaleString() || 0}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{shop.aprilTotal?.toLocaleString() || 0}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{shop.mayTotal?.toLocaleString() || 0}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">{shop.total.toLocaleString()}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm">
-                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                    (shop.growthPercent || 0) > 0 
-                      ? 'bg-green-100 text-green-800' 
-                      : (shop.growthPercent || 0) < 0
-                      ? 'bg-red-100 text-red-800'
-                      : 'bg-gray-100 text-gray-800'
-                  }`}>
-                    {shop.growthPercent?.toFixed(1) || 0}%
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm">
-                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                    (shop.yoyGrowthPercent || 0) > 0 
-                      ? 'bg-blue-100 text-blue-800' 
-                      : (shop.yoyGrowthPercent || 0) < 0
-                      ? 'bg-red-100 text-red-800'
-                      : 'bg-gray-100 text-gray-800'
-                  }`}>
-                    {shop.yoyGrowthPercent?.toFixed(1) || 0}%
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-purple-600">{shop.eightPM.toLocaleString()}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600">{shop.verve.toLocaleString()}</td>
-              </tr>
+
+      {/* Enhanced Filters */}
+      <div className="bg-white p-4 rounded-lg shadow">
+        <div className="flex flex-wrap gap-4 items-center">
+          <div className="flex items-center space-x-2">
+            <Search className="w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search shops, departments, salesmen..."
+              value={filters.searchText}
+              onChange={(e) => setFilters({ ...filters, searchText: e.target.value })}
+              className="border border-gray-300 rounded-lg px-3 py-2 w-64"
+            />
+          </div>
+          
+          <select
+            value={filters.department}
+            onChange={(e) => setFilters({ ...filters, department: e.target.value })}
+            className="border border-gray-300 rounded-lg px-3 py-2"
+          >
+            <option value="">All Departments</option>
+            {departments.map(dept => (
+              <option key={dept} value={dept}>{dept}</option>
             ))}
-          </tbody>
-        </table>
+          </select>
+
+          <select
+            value={filters.salesman}
+            onChange={(e) => setFilters({ ...filters, salesman: e.target.value })}
+            className="border border-gray-300 rounded-lg px-3 py-2"
+          >
+            <option value="">All Salesmen</option>
+            {salesmen.map(salesman => (
+              <option key={salesman} value={salesman}>{salesman}</option>
+            ))}
+          </select>
+
+          <input
+            type="number"
+            placeholder="Min 3M Avg Cases"
+            value={filters.minCases}
+            onChange={(e) => setFilters({ ...filters, minCases: e.target.value })}
+            className="border border-gray-300 rounded-lg px-3 py-2 w-40"
+          />
+
+          <select
+            value={filters.performanceTrend}
+            onChange={(e) => setFilters({ ...filters, performanceTrend: e.target.value })}
+            className="border border-gray-300 rounded-lg px-3 py-2"
+          >
+            <option value="">All Trends</option>
+            <option value="improving">📈 Improving</option>
+            <option value="stable">➡️ Stable</option>
+            <option value="declining">📉 Declining</option>
+            <option value="new">✨ New</option>
+          </select>
+
+          <button
+            onClick={() => setFilters({ department: '', salesman: '', searchText: '', minCases: '', performanceTrend: '' })}
+            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center space-x-2"
+          >
+            <X className="w-4 h-4" />
+            <span>Clear</span>
+          </button>
+
+          <button
+            onClick={exportCSV}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center space-x-2"
+          >
+            <Download className="w-4 h-4" />
+            <span>Export CSV</span>
+          </button>
+
+          <div className="text-sm text-gray-500">
+            Showing {filteredShops.length} shops
+          </div>
+        </div>
+      </div>
+
+      {/* Enhanced Top Shops Table with Detailed Brand Breakdown */}
+      <div className="bg-white rounded-lg shadow">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-medium text-gray-900">
+            Detailed Shop Performance Analysis - Ranked by 3-Month Average (Mar-Apr-May {data.currentYear})
+          </h3>
+          <p className="text-sm text-gray-500">
+            Complete brand breakdown for each month with 3-month averages and growth trends. 
+            Sorted by highest 3-month average performance (Mar-Apr-May only).
+          </p>
+        </div>
+        
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                {/* Sticky columns */}
+                <th className="sticky left-0 z-10 bg-gray-50 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r">
+                  Rank
+                </th>
+                <th className="sticky left-12 z-10 bg-gray-50 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r min-w-48">
+                  Shop Name
+                </th>
+                <th className="sticky left-60 z-10 bg-gray-50 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r">
+                  Department
+                </th>
+                
+                {/* March columns */}
+                <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-blue-50 border-l border-r">
+                  Mar Total
+                </th>
+                <th className="px-3 py-3 text-center text-xs font-medium text-purple-500 uppercase tracking-wider bg-blue-50">
+                  Mar 8PM
+                </th>
+                <th className="px-3 py-3 text-center text-xs font-medium text-orange-500 uppercase tracking-wider bg-blue-50 border-r">
+                  Mar VERVE
+                </th>
+                
+                {/* April columns */}
+                <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-green-50 border-l border-r">
+                  Apr Total
+                </th>
+                <th className="px-3 py-3 text-center text-xs font-medium text-purple-500 uppercase tracking-wider bg-green-50">
+                  Apr 8PM
+                </th>
+                <th className="px-3 py-3 text-center text-xs font-medium text-orange-500 uppercase tracking-wider bg-green-50 border-r">
+                  Apr VERVE
+                </th>
+                
+                {/* May columns */}
+                <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-yellow-50 border-l border-r">
+                  May Total
+                </th>
+                <th className="px-3 py-3 text-center text-xs font-medium text-purple-500 uppercase tracking-wider bg-yellow-50">
+                  May 8PM
+                </th>
+                <th className="px-3 py-3 text-center text-xs font-medium text-orange-500 uppercase tracking-wider bg-yellow-50 border-r">
+                  May VERVE
+                </th>
+                
+                {/* June columns */}
+                <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-red-50 border-l border-r">
+                  {getShortMonthName(data.currentMonth)} Total
+                </th>
+                <th className="px-3 py-3 text-center text-xs font-medium text-purple-500 uppercase tracking-wider bg-red-50">
+                  {getShortMonthName(data.currentMonth)} 8PM
+                </th>
+                <th className="px-3 py-3 text-center text-xs font-medium text-orange-500 uppercase tracking-wider bg-red-50 border-r">
+                  {getShortMonthName(data.currentMonth)} VERVE
+                </th>
+                
+                {/* 3-Month Averages */}
+                <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-purple-50 border-l border-r">
+                  3M Avg Total
+                </th>
+                <th className="px-3 py-3 text-center text-xs font-medium text-purple-500 uppercase tracking-wider bg-purple-50">
+                  3M Avg 8PM
+                </th>
+                <th className="px-3 py-3 text-center text-xs font-medium text-orange-500 uppercase tracking-wider bg-purple-50 border-r">
+                  3M Avg VERVE
+                </th>
+                
+                {/* Growth metrics */}
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Growth %
+                </th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  YoY %
+                </th>
+                <th className="px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Trend
+                </th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {currentShops.map((shop, index) => (
+                <tr key={shop.shopId} className={`hover:bg-gray-50 ${index < 3 ? 'bg-yellow-50' : ''}`}>
+                  {/* Sticky columns */}
+                  <td className="sticky left-0 z-10 bg-white px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 border-r">
+                    <div className="flex items-center">
+                      {startIndex + index + 1}
+                      {startIndex + index < 3 && (
+                        <span className="ml-2">
+                          {startIndex + index === 0 && '🥇'}
+                          {startIndex + index === 1 && '🥈'}
+                          {startIndex + index === 2 && '🥉'}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="sticky left-12 z-10 bg-white px-3 py-4 text-sm text-gray-900 border-r min-w-48">
+                    <div className="max-w-xs truncate font-medium">{shop.shopName}</div>
+                    <div className="text-xs text-gray-500 truncate">{shop.salesman}</div>
+                  </td>
+                  <td className="sticky left-60 z-10 bg-white px-3 py-4 whitespace-nowrap text-sm text-gray-900 border-r">
+                    {shop.department}
+                  </td>
+                  
+                  {/* March data */}
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-center font-medium bg-blue-50 border-l border-r">
+                    {shop.marchTotal?.toLocaleString() || 0}
+                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-center text-purple-600 bg-blue-50">
+                    {shop.marchEightPM?.toLocaleString() || 0}
+                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-center text-orange-600 bg-blue-50 border-r">
+                    {shop.marchVerve?.toLocaleString() || 0}
+                  </td>
+                  
+                  {/* April data */}
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-center font-medium bg-green-50 border-l border-r">
+                    {shop.aprilTotal?.toLocaleString() || 0}
+                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-center text-purple-600 bg-green-50">
+                    {shop.aprilEightPM?.toLocaleString() || 0}
+                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-center text-orange-600 bg-green-50 border-r">
+                    {shop.aprilVerve?.toLocaleString() || 0}
+                  </td>
+                  
+                  {/* May data */}
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-center font-medium bg-yellow-50 border-l border-r">
+                    {shop.mayTotal?.toLocaleString() || 0}
+                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-center text-purple-600 bg-yellow-50">
+                    {shop.mayEightPM?.toLocaleString() || 0}
+                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-center text-orange-600 bg-yellow-50 border-r">
+                    {shop.mayVerve?.toLocaleString() || 0}
+                  </td>
+                  
+                  {/* June data */}
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-center font-bold bg-red-50 border-l border-r">
+                    {shop.juneTotal?.toLocaleString() || shop.total.toLocaleString()}
+                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-center text-purple-600 font-bold bg-red-50">
+                    {shop.juneEightPM?.toLocaleString() || shop.eightPM.toLocaleString()}
+                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-center text-orange-600 font-bold bg-red-50 border-r">
+                    {shop.juneVerve?.toLocaleString() || shop.verve.toLocaleString()}
+                  </td>
+                  
+                  {/* 3-Month Averages */}
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-center font-bold text-blue-600 bg-purple-50 border-l border-r">
+                    {shop.threeMonthAvgTotal?.toFixed(1) || '0.0'}
+                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-center font-bold text-purple-600 bg-purple-50">
+                    {shop.threeMonthAvg8PM?.toFixed(1) || '0.0'}
+                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm text-center font-bold text-orange-600 bg-purple-50 border-r">
+                    {shop.threeMonthAvgVERVE?.toFixed(1) || '0.0'}
+                  </td>
+                  
+                  {/* Growth metrics */}
+                  <td className="px-3 py-4 whitespace-nowrap text-sm">
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      (shop.growthPercent || 0) > 0 
+                        ? 'bg-green-100 text-green-800' 
+                        : (shop.growthPercent || 0) < 0
+                        ? 'bg-red-100 text-red-800'
+                        : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {shop.growthPercent?.toFixed(1) || 0}%
+                    </span>
+                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm">
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      (shop.yoyGrowthPercent || 0) > 0 
+                        ? 'bg-blue-100 text-blue-800' 
+                        : (shop.yoyGrowthPercent || 0) < 0
+                        ? 'bg-red-100 text-red-800'
+                        : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {shop.yoyGrowthPercent?.toFixed(1) || 0}%
+                    </span>
+                  </td>
+                  <td className="px-3 py-4 whitespace-nowrap text-sm">
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      shop.monthlyTrend === 'improving' ? 'bg-green-100 text-green-800' :
+                      shop.monthlyTrend === 'declining' ? 'bg-red-100 text-red-800' :
+                      shop.monthlyTrend === 'new' ? 'bg-blue-100 text-blue-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {shop.monthlyTrend === 'improving' ? '📈' :
+                       shop.monthlyTrend === 'declining' ? '📉' :
+                       shop.monthlyTrend === 'new' ? '✨' : '➡️'}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Enhanced Pagination */}
+        <div className="px-6 py-3 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center">
+          <div className="text-sm text-gray-700 mb-2 sm:mb-0">
+            Showing {startIndex + 1} to {Math.min(endIndex, filteredShops.length)} of {filteredShops.length} shops
+            {filteredShops.length !== data.allShopsComparison.length && (
+              <span className="text-gray-500"> (filtered from {data.allShopsComparison.length} total)</span>
+            )}
+          </div>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="px-3 py-1 text-sm text-gray-700">
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* Legend and Summary */}
+      <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-6 rounded-lg">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Report Summary & Legend</h3>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <h4 className="font-medium text-gray-900 mb-2">Column Color Coding:</h4>
+            <div className="space-y-1 text-sm">
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 bg-blue-100 rounded"></div>
+                <span>March 2025 Data</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 bg-green-100 rounded"></div>
+                <span>April 2025 Data</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 bg-yellow-100 rounded"></div>
+                <span>May 2025 Data</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 bg-red-100 rounded"></div>
+                <span>{getMonthName(data.currentMonth)} 2025 Data</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <div className="w-4 h-4 bg-purple-100 rounded"></div>
+                <span>3-Month Averages (Mar-Apr-May only)</span>
+              </div>
+            </div>
+          </div>
+          <div>
+            <h4 className="font-medium text-gray-900 mb-2">Key Metrics:</h4>
+            <div className="space-y-1 text-sm">
+              <div>• <strong>3M Avg Total:</strong> Average of Mar + Apr + May cases</div>
+              <div>• <strong>Growth %:</strong> May to {getMonthName(data.currentMonth)} change</div>
+              <div>• <strong>YoY %:</strong> {getMonthName(data.currentMonth)} 2024 vs 2025</div>
+              <div>• <strong>Trend:</strong> 4-month performance pattern</div>
+              <div>• <strong>Ranking:</strong> Sorted by 3-month average (Mar-Apr-May)</div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
