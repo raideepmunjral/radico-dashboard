@@ -131,7 +131,7 @@ const InventoryDashboard = () => {
   // ==========================================
 
   // COMPREHENSIVE BRAND MAPPING DICTIONARY - FIXED FOR 8 PM VARIATIONS
-  const BRAND_MAPPING = {
+  const BRAND_MAPPING: { [key: string]: string } = {
     // 8 PM BRAND FAMILY - ENHANCED WITH ALL SIZE VARIATIONS
     '8 PM BLACK': '8 PM PREMIUM BLACK BLENDED WHISKY',
     '8 PM BLACK 750': '8 PM PREMIUM BLACK BLENDED WHISKY',
