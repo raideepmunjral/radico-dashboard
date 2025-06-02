@@ -161,10 +161,11 @@ const InventoryDashboard = () => {
     let cleanBrand = brandName?.toString().trim().toUpperCase();
     let extractedSize = '';
     
-    // Extract size from brand name (750, 375, 180, 90, 60 P)
+    // ✅ FIXED: Better size extraction to handle "180 P" -> "180P" matching
     const sizeMatch = cleanBrand.match(/(\d+)\s?(P|ML)?$/);
     if (sizeMatch) {
-      extractedSize = sizeMatch[1];
+      // Keep the "P" attached to size for matching with supply sheet
+      extractedSize = sizeMatch[1] + (sizeMatch[2] || '');  // "180" + "P" = "180P"
       cleanBrand = cleanBrand.replace(/\s*\d+\s?(P|ML)?$/, '').trim();
     }
     
@@ -175,7 +176,7 @@ const InventoryDashboard = () => {
     
     // ✅ ENHANCED: Check for direct brand matches first (including size variations)
     let normalizedName = cleanBrand;
-    const fullBrandWithSize = `${cleanBrand} ${extractedSize}${sizeMatch && sizeMatch[2] ? ' ' + sizeMatch[2] : ''}`.trim();
+    const fullBrandWithSize = `${cleanBrand} ${extractedSize}`.trim();
     
     // Check full brand name with size first
     if (BRAND_MAPPING[fullBrandWithSize]) {
@@ -192,6 +193,8 @@ const InventoryDashboard = () => {
       }
     }
     
+    console.log(`🔧 Brand normalization: "${brandName}" -> Brand: "${normalizedName}", Size: "${extractedSize}"`);
+    
     return { family: normalizedName, size: extractedSize, normalizedName };
   };
 
@@ -200,20 +203,19 @@ const InventoryDashboard = () => {
     return `${shopId}_${brandInfo.normalizedName}_${brandInfo.size}`;
   };
 
-  // ✅ FIXED: SIZE-SPECIFIC MATCHING - NO GENERIC KEYS
+  // ✅ FIXED: SIZE-SPECIFIC MATCHING - CORRECTED SIZE FORMAT
   const createMultipleBrandKeys = (shopId: string, brandName: string, size?: string): string[] => {
     const brandInfo = normalizeBrandInfo(brandName);
     const actualSize = size || brandInfo.size;
     
-    // ✅ FIXED: Only create size-specific keys - no generic fallbacks
+    // ✅ FIXED: Create size-specific keys with proper format matching
     const keys = [
-      `${shopId}_${brandInfo.normalizedName}_${actualSize}`,     // Primary match with size
+      `${shopId}_${brandInfo.normalizedName}_${actualSize}`,     // Primary match with size (e.g., "180P")
       `${shopId}_${brandInfo.family}_${actualSize}`,            // Family match with size
       `${shopId}_${brandName.toUpperCase()}_${actualSize}`,     // Original brand with size
     ];
     
-    // ✅ REMOVED: All generic keys without size that caused cross-contamination
-    // These were causing the bug where all sizes showed "restocked" when only one was supplied
+    console.log(`🔑 Creating keys for ${shopId} + ${brandName}:`, keys);
     
     return [...new Set(keys)]; // Remove duplicates
   };
