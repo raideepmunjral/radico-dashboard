@@ -580,6 +580,11 @@ const InventoryDashboard = () => {
         const reasonNoStock = row[columnIndices.reasonNoStock]?.toString().trim() || '';
         const lsDate = row[columnIndices.lsDate];
 
+        // 🔍 DEBUG: Special logging for 8 PM BLACK 180 P at GOVIND PURI
+        if (shopVisit.shopId === '01/2024/0535' && brand && brand.includes('8 PM BLACK 180')) {
+          console.log(`🔍 GOVIND PURI DEBUG - Found: "${brand}", Quantity: ${quantity}, Row: ${rowIndex}`);
+        }
+
         if (!brand) return;
         
         processedSKUs.add(brand);
@@ -591,6 +596,11 @@ const InventoryDashboard = () => {
           shopVisit.visitDate, 
           recentSupplies
         );
+
+        // 🔍 DEBUG: Enhanced logging for 8 PM BLACK 180 P supply check
+        if (brand && brand.includes('8 PM BLACK 180')) {
+          console.log(`🔍 8PM 180P DEBUG - Shop: ${shopVisit.shopName}, Brand: "${brand}", Quantity: ${quantity}, Restocked: ${supplyCheckResult.wasRestocked}`);
+        }
 
         let lastSupplyDate: Date | undefined;
         let isEstimatedAge = true;
@@ -1428,6 +1438,16 @@ const InventoryDashboard = () => {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        {/* 🔍 DEBUG: 8 PM BLACK 180 P Issue Banner */}
+        <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+          <h3 className="text-sm font-medium text-red-900 mb-2">🔍 KNOWN ISSUE: 8 PM BLACK 180 P Missing from GOVIND PURI, 24</h3>
+          <div className="text-xs text-red-700 space-y-1">
+            <p><strong>Problem:</strong> GOVIND PURI, 24 shows "8 PM BLACK 60 P" as awaiting supply, but "8 PM BLACK 180 P" is missing entirely.</p>
+            <p><strong>Expected:</strong> "8 PM BLACK 180 P" should show as "Restocked" since supply data exists after 26/05/2025 visit.</p>
+            <p><strong>Debug:</strong> Use the "🔍 Debug 8PM 180P" filter in Stock Intelligence tab to see all 8PM BLACK 180P entries.</p>
+          </div>
+        </div>
+        
         {activeTab === 'overview' && <EnhancedInventoryOverviewTab data={inventoryData} />}
         {activeTab === 'shops' && (
           <EnhancedShopInventoryTab 
@@ -1661,6 +1681,13 @@ const EnhancedShopInventoryTab = ({
         </select>
 
         <button
+          onClick={() => setFilters({ ...filters, searchText: "8 PM BLACK 180 P" })}
+          className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 flex items-center space-x-2 font-medium"
+        >
+          🔍 Find 8PM 180P
+        </button>
+
+        <button
           onClick={() => setFilters({ department: '', salesman: '', stockStatus: '', ageCategory: '', brand: '', supplyStatus: '', searchText: '' })}
           className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center space-x-2"
         >
@@ -1805,7 +1832,7 @@ const EnhancedAgingAnalysisTab = ({
 
       {/* Filter Controls */}
       <div className="bg-white p-4 rounded-lg shadow">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
           <select
             value={filters.department}
             onChange={(e) => setFilters({ ...filters, department: e.target.value })}
@@ -1866,6 +1893,13 @@ const EnhancedAgingAnalysisTab = ({
             <option value="aging_75_90">Aging 75-90 Days</option>
             <option value="aging_critical">Critical (90+ Days)</option>
           </select>
+
+          <button
+            onClick={() => setFilters({ ...filters, brand: "8 PM BLACK 180 P", department: '', salesman: '', ageCategory: '', supplyStatus: '' })}
+            className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 flex items-center justify-center space-x-2 font-medium"
+          >
+            🔍 8PM 180P
+          </button>
 
           <button
             onClick={() => setFilters({ ...filters, department: '', salesman: '', brand: '', ageCategory: '', supplyStatus: '' })}
@@ -2095,9 +2129,9 @@ const FixedStockIntelligenceTab = ({
         </p>
       </div>
 
-      {/* Enhanced Filter Controls */}
+      {/* Enhanced Filter Controls with 8 PM BLACK 180 P Debug Filter */}
       <div className="bg-white p-4 rounded-lg shadow">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
           <select
             value={filters.department}
             onChange={(e) => {
@@ -2135,6 +2169,7 @@ const FixedStockIntelligenceTab = ({
             className="border border-gray-300 rounded-lg px-3 py-2"
           >
             <option value="">All Brands</option>
+            <option value="8 PM BLACK 180 P" className="bg-red-50 font-bold">🔍 8 PM BLACK 180 P (DEBUG)</option>
             {brands.map((brand: string) => (
               <option key={brand} value={brand}>{brand}</option>
             ))}
@@ -2153,6 +2188,16 @@ const FixedStockIntelligenceTab = ({
 
           <button
             onClick={() => {
+              setFilters({ ...filters, brand: "8 PM BLACK 180 P", department: '', salesman: '', searchText: '' });
+              setCurrentPage(1);
+            }}
+            className="px-4 py-2 bg-red-100 text-red-700 rounded-lg hover:bg-red-200 flex items-center justify-center space-x-2 font-medium"
+          >
+            🔍 Debug 8PM 180P
+          </button>
+
+          <button
+            onClick={() => {
               setFilters({ ...filters, department: '', salesman: '', brand: '', searchText: '' });
               setCurrentPage(1);
             }}
@@ -2162,6 +2207,16 @@ const FixedStockIntelligenceTab = ({
             <span>Clear</span>
           </button>
         </div>
+        
+        {/* Debug Info Banner */}
+        {filters.brand === "8 PM BLACK 180 P" && (
+          <div className="mt-4 p-3 bg-red-50 border border-red-200 rounded-lg">
+            <h4 className="text-sm font-medium text-red-900 mb-1">🔍 DEBUG MODE: 8 PM BLACK 180 P</h4>
+            <p className="text-xs text-red-700">
+              Looking for all 8 PM BLACK 180 P entries. GOVIND PURI, 24 should show "Restocked" if supply data exists.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Alert Summary */}
