@@ -1411,6 +1411,17 @@ const RadicoDashboard = () => {
 // UPDATED TAB COMPONENTS WITH DYNAMIC MONTH DETECTION AND YoY
 
 const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
+  // NEW: State for salesman breakdown modal
+  const [showSalesmanBreakdown, setShowSalesmanBreakdown] = useState(false);
+  const [selectedSalesmanBreakdown, setSelectedSalesmanBreakdown] = useState<{
+    salesmanName: string;
+    month: string;
+    monthName: string;
+    total: number;
+    eightPM: number;
+    verve: number;
+  } | null>(null);
+
   // Calculate salesman performance data (FIXED HISTORICAL AGGREGATION)
   const salesmanPerformance = React.useMemo(() => {
     const performanceMap: Record<string, any> = {};
@@ -1491,6 +1502,117 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
   }, [data]);
 
   const sortedSalesmen = salesmanPerformance.sort((a: any, b: any) => b.totalSales - a.totalSales);
+
+  // NEW: Function to handle case breakdown click
+  const handleCaseBreakdownClick = (salesmanName: string, month: string, monthName: string, total: number, eightPM: number, verve: number) => {
+    setSelectedSalesmanBreakdown({
+      salesmanName,
+      month,
+      monthName,
+      total,
+      eightPM,
+      verve
+    });
+    setShowSalesmanBreakdown(true);
+  };
+
+  // NEW: Salesman Breakdown Modal Component
+  const SalesmanBreakdownModal = () => {
+    if (!selectedSalesmanBreakdown) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-hidden">
+          <div className="flex justify-between items-center p-6 border-b">
+            <h3 className="text-lg font-semibold">
+              {selectedSalesmanBreakdown.salesmanName} - {selectedSalesmanBreakdown.monthName} 2025 Breakdown
+            </h3>
+            <button 
+              onClick={() => setShowSalesmanBreakdown(false)} 
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+              <div className="text-center bg-blue-50 p-4 rounded-lg">
+                <div className="text-3xl font-bold text-blue-600">
+                  {selectedSalesmanBreakdown.total.toLocaleString()}
+                </div>
+                <div className="text-sm text-gray-500">Total Cases</div>
+                <div className="text-xs text-gray-400">{selectedSalesmanBreakdown.monthName} 2025</div>
+              </div>
+              <div className="text-center bg-purple-50 p-4 rounded-lg">
+                <div className="text-3xl font-bold text-purple-600">
+                  {selectedSalesmanBreakdown.eightPM.toLocaleString()}
+                </div>
+                <div className="text-sm text-gray-500">8PM Cases</div>
+                <div className="text-xs text-gray-400">
+                  {selectedSalesmanBreakdown.total > 0 ? 
+                    `${((selectedSalesmanBreakdown.eightPM / selectedSalesmanBreakdown.total) * 100).toFixed(1)}%` : '0%'} of total
+                </div>
+              </div>
+              <div className="text-center bg-orange-50 p-4 rounded-lg">
+                <div className="text-3xl font-bold text-orange-600">
+                  {selectedSalesmanBreakdown.verve.toLocaleString()}
+                </div>
+                <div className="text-sm text-gray-500">VERVE Cases</div>
+                <div className="text-xs text-gray-400">
+                  {selectedSalesmanBreakdown.total > 0 ? 
+                    `${((selectedSalesmanBreakdown.verve / selectedSalesmanBreakdown.total) * 100).toFixed(1)}%` : '0%'} of total
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h4 className="font-medium text-gray-900 mb-3">Brand Performance Distribution</h4>
+              <div className="space-y-3">
+                <div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span>8PM Family</span>
+                    <span>{selectedSalesmanBreakdown.total > 0 ? 
+                      `${((selectedSalesmanBreakdown.eightPM / selectedSalesmanBreakdown.total) * 100).toFixed(1)}%` : '0%'}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-3">
+                    <div 
+                      className="bg-purple-600 h-3 rounded-full" 
+                      style={{ width: `${selectedSalesmanBreakdown.total > 0 ? (selectedSalesmanBreakdown.eightPM / selectedSalesmanBreakdown.total) * 100 : 0}%` }}
+                    ></div>
+                  </div>
+                </div>
+                <div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span>VERVE Family</span>
+                    <span>{selectedSalesmanBreakdown.total > 0 ? 
+                      `${((selectedSalesmanBreakdown.verve / selectedSalesmanBreakdown.total) * 100).toFixed(1)}%` : '0%'}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-3">
+                    <div 
+                      className="bg-orange-600 h-3 rounded-full" 
+                      style={{ width: `${selectedSalesmanBreakdown.total > 0 ? (selectedSalesmanBreakdown.verve / selectedSalesmanBreakdown.total) * 100 : 0}%` }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={() => setShowSalesmanBreakdown(false)}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -1671,9 +1793,51 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
                 return (
                   <tr key={salesman.name}>
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">{salesman.name}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{salesman.marchTotal.toLocaleString()}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{salesman.aprilTotal.toLocaleString()}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{salesman.mayTotal.toLocaleString()}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <button
+                        onClick={() => handleCaseBreakdownClick(
+                          salesman.name, 
+                          'march', 
+                          'March', 
+                          salesman.marchTotal, 
+                          salesman.marchEightPM, 
+                          salesman.marchVerve
+                        )}
+                        className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                      >
+                        {salesman.marchTotal.toLocaleString()}
+                      </button>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <button
+                        onClick={() => handleCaseBreakdownClick(
+                          salesman.name, 
+                          'april', 
+                          'April', 
+                          salesman.aprilTotal, 
+                          salesman.aprilEightPM, 
+                          salesman.aprilVerve
+                        )}
+                        className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                      >
+                        {salesman.aprilTotal.toLocaleString()}
+                      </button>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <button
+                        onClick={() => handleCaseBreakdownClick(
+                          salesman.name, 
+                          'may', 
+                          'May', 
+                          salesman.mayTotal, 
+                          salesman.mayEightPM, 
+                          salesman.mayVerve
+                        )}
+                        className="text-blue-600 hover:text-blue-800 hover:underline font-medium"
+                      >
+                        {salesman.mayTotal.toLocaleString()}
+                      </button>
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                         trend === 'improving' ? 'bg-green-100 text-green-800' :
