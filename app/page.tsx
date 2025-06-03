@@ -718,35 +718,20 @@ const RadicoDashboard = () => {
         shop.yoyGrowthPercent = 0;
       }
       
-      // FIXED TREND LOGIC (IMPROVED 4-MONTH COMPARISON)
-      const hasCurrentData = june > 0;
-      const hasPreviousData = march > 0 || april > 0 || may > 0;
-      
-      if (!hasPreviousData && hasCurrentData) {
-        // No previous data but current data exists - new customer
+      // ENHANCED TREND LOGIC (4 MONTHS)
+      if (march === 0 && april === 0 && may === 0 && june > 0) {
         shop.monthlyTrend = 'new';
-      } else if (hasPreviousData && !hasCurrentData) {
-        // Had previous data but no current data - declining
+      } else if ((march > 0 || april > 0 || may > 0) && june === 0) {
         shop.monthlyTrend = 'declining';
-      } else if (hasCurrentData && hasPreviousData) {
-        // Both current and previous data exist - analyze trend
-        const monthlyValues = [march, april, may, june].filter(val => val > 0);
-        
-        if (monthlyValues.length >= 2) {
-          // Calculate trend based on last 2-3 non-zero values
-          const recent = monthlyValues.slice(-2);
-          if (recent[1] > recent[0] * 1.1) {
-            shop.monthlyTrend = 'improving';
-          } else if (recent[1] < recent[0] * 0.9) {
-            shop.monthlyTrend = 'declining';
-          } else {
-            shop.monthlyTrend = 'stable';
-          }
-        } else {
-          shop.monthlyTrend = 'stable';
-        }
+      } else if (march > 0 && april > march && may > april && june > may) {
+        shop.monthlyTrend = 'improving';
+      } else if (march > 0 && april < march && may < april && june < may && june > 0) {
+        shop.monthlyTrend = 'declining';
+      } else if (june > 0 && may > 0 && Math.abs(shop.growthPercent!) <= 10) {
+        shop.monthlyTrend = 'stable';
+      } else if (june > may && may > 0) {
+        shop.monthlyTrend = 'improving';
       } else {
-        // No data in any month
         shop.monthlyTrend = 'stable';
       }
 
@@ -1534,12 +1519,12 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
     console.log('🔥 State set, modal should show');
   };
 
-  // NEW: Salesman Breakdown Modal Component (FIXED RENDERING ISSUE)
+  // NEW: Salesman Breakdown Modal Component
   const SalesmanBreakdownModal = ({ onClose }: { onClose: () => void }) => {
     if (!selectedSalesmanBreakdown) return null;
 
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-hidden">
           <div className="flex justify-between items-center p-6 border-b">
             <h3 className="text-lg font-semibold">
@@ -1634,6 +1619,13 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
 
   return (
     <div className="space-y-6">
+      {/* DEBUG: Show modal state */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="bg-yellow-100 p-2 text-xs">
+          DEBUG: showSalesmanBreakdown={String(showSalesmanBreakdown)}, selectedData={selectedSalesmanBreakdown?.salesmanName || 'null'}
+        </div>
+      )}
+      
       <div className="text-center">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Salesman Performance Dashboard</h2>
         <p className="text-gray-600">Individual salesman achievements and targets for {getMonthName(data.currentMonth)} {data.currentYear}</p>
@@ -1705,6 +1697,7 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rank</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salesman</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shops</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Billed</th>
@@ -1984,16 +1977,6 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
           </div>
         </div>
       </div>
-
-      {/* FIXED: Render Modal with proper z-index */}
-      {showSalesmanBreakdown && selectedSalesmanBreakdown && (
-        <SalesmanBreakdownModal 
-          onClose={() => {
-            setShowSalesmanBreakdown(false);
-            setSelectedSalesmanBreakdown(null);
-          }} 
-        />
-      )}
     </div>
   );
 };
@@ -3498,7 +3481,7 @@ const TopShopsTab = ({
         </div>
       </div>
 
-      {/* Enhanced Top Shops Table with Detailed Brand Breakdown - FIXED FOR MOBILE */}
+      {/* Enhanced Top Shops Table with Detailed Brand Breakdown */}
       <div className="bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900">
@@ -3514,14 +3497,14 @@ const TopShopsTab = ({
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                {/* FIXED: Mobile responsive headers - removed sticky for mobile */}
-                <th className="lg:sticky left-0 z-10 bg-gray-50 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r">
+                {/* Sticky columns */}
+                <th className="sticky left-0 z-10 bg-gray-50 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r">
                   Rank
                 </th>
-                <th className="lg:sticky left-12 z-10 bg-gray-50 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r min-w-48">
+                <th className="sticky left-12 z-10 bg-gray-50 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r min-w-48">
                   Shop Name
                 </th>
-                <th className="lg:sticky left-60 z-10 bg-gray-50 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r">
+                <th className="sticky left-60 z-10 bg-gray-50 px-3 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider border-r">
                   Department
                 </th>
                 
@@ -3595,8 +3578,8 @@ const TopShopsTab = ({
             <tbody className="bg-white divide-y divide-gray-200">
               {currentShops.map((shop, index) => (
                 <tr key={shop.shopId} className={`hover:bg-gray-50 ${index < 3 ? 'bg-yellow-50' : ''}`}>
-                  {/* FIXED: Mobile responsive cells - removed sticky for mobile */}
-                  <td className="lg:sticky left-0 z-10 bg-white px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 border-r">
+                  {/* Sticky columns */}
+                  <td className="sticky left-0 z-10 bg-white px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 border-r">
                     <div className="flex items-center">
                       {startIndex + index + 1}
                       {startIndex + index < 3 && (
@@ -3608,11 +3591,11 @@ const TopShopsTab = ({
                       )}
                     </div>
                   </td>
-                  <td className="lg:sticky left-12 z-10 bg-white px-3 py-4 text-sm text-gray-900 border-r min-w-48">
+                  <td className="sticky left-12 z-10 bg-white px-3 py-4 text-sm text-gray-900 border-r min-w-48">
                     <div className="max-w-xs truncate font-medium">{shop.shopName}</div>
                     <div className="text-xs text-gray-500 truncate">{shop.salesman}</div>
                   </td>
-                  <td className="lg:sticky left-60 z-10 bg-white px-3 py-4 whitespace-nowrap text-sm text-gray-900 border-r">
+                  <td className="sticky left-60 z-10 bg-white px-3 py-4 whitespace-nowrap text-sm text-gray-900 border-r">
                     {shop.department}
                   </td>
                   
@@ -3823,5 +3806,4 @@ const MetricCard = ({ title, value, subtitle, icon: Icon, color }: {
   );
 };
 
-export default RadicoDashboard; text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rank</th>
-                <th className="px-6 py-3
+export default RadicoDashboard;
