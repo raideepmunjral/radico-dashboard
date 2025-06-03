@@ -3815,5 +3815,3 @@ const AdvancedAnalyticsTab = ({
     </div>
   );
 };
-
-export default RadicoDashboard;
