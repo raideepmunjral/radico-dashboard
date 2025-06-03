@@ -1328,7 +1328,11 @@ const RadicoDashboard = () => {
       </header>
 
       {showInventory ? (
-      <InventoryDashboard />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+            <strong>Note:</strong> InventoryDashboard component is not available in this environment. The inventory view would display inventory management features here.
+          </div>
+        </div>
       ) : (
         <>
           <nav className="bg-white border-b overflow-x-auto">
@@ -1405,904 +1409,6 @@ const RadicoDashboard = () => {
         />
       )}
     </div>
-  );
-};
-
-// UPDATED TAB COMPONENTS WITH DYNAMIC MONTH DETECTION AND YoY
-
-const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
-  // NEW: State for salesman breakdown modal
-  const [showSalesmanBreakdown, setShowSalesmanBreakdown] = useState(false);
-  const [selectedSalesmanBreakdown, setSelectedSalesmanBreakdown] = useState<{
-    salesmanName: string;
-    month: string;
-    monthName: string;
-    total: number;
-    eightPM: number;
-    verve: number;
-  } | null>(null);
-
-  // Calculate salesman performance data (FIXED HISTORICAL AGGREGATION)
-  const salesmanPerformance = React.useMemo(() => {
-    const performanceMap: Record<string, any> = {};
-    
-    const shopDetails = Object.values(data.salesData);
-    
-    shopDetails.forEach(shop => {
-      const salesmanName = shop.salesman;
-      if (!performanceMap[salesmanName]) {
-        performanceMap[salesmanName] = {
-          name: salesmanName,
-          totalShops: 0,
-          billedShops: 0,
-          coverage: 0,
-          total8PM: 0,
-          totalVERVE: 0,
-          totalSales: 0,
-          target8PM: 0,
-          targetVERVE: 0,
-          achievement8PM: 0,
-          achievementVERVE: 0,
-          // FIXED: 3-month historical data aggregation
-          marchTotal: 0,
-          marchEightPM: 0,
-          marchVerve: 0,
-          aprilTotal: 0,
-          aprilEightPM: 0,
-          aprilVerve: 0,
-          mayTotal: 0,
-          mayEightPM: 0,
-          mayVerve: 0,
-          shops: []
-        };
-      }
-      
-      performanceMap[salesmanName].totalShops++;
-      
-      // FIXED: Current month aggregation (June)
-      if (shop.total > 0) {
-        performanceMap[salesmanName].billedShops++;
-        performanceMap[salesmanName].total8PM += shop.eightPM;
-        performanceMap[salesmanName].totalVERVE += shop.verve;
-        performanceMap[salesmanName].totalSales += shop.total;
-        performanceMap[salesmanName].shops.push(shop);
-      }
-        
-      // FIXED: Historical data aggregation (Mar-Apr-May)
-      performanceMap[salesmanName].marchTotal += shop.marchTotal || 0;
-      performanceMap[salesmanName].marchEightPM += shop.marchEightPM || 0;
-      performanceMap[salesmanName].marchVerve += shop.marchVerve || 0;
-      
-      performanceMap[salesmanName].aprilTotal += shop.aprilTotal || 0;
-      performanceMap[salesmanName].aprilEightPM += shop.aprilEightPM || 0;
-      performanceMap[salesmanName].aprilVerve += shop.aprilVerve || 0;
-      
-      performanceMap[salesmanName].mayTotal += shop.mayTotal || 0;
-      performanceMap[salesmanName].mayEightPM += shop.mayEightPM || 0;
-      performanceMap[salesmanName].mayVerve += shop.mayVerve || 0;
-    });
-    
-    // Add target data from salespersonStats
-    Object.values(data.salespersonStats).forEach((stats: any) => {
-      const salesmanName = stats.name;
-      if (performanceMap[salesmanName]) {
-        performanceMap[salesmanName].target8PM = stats.eightPmTarget || 0;
-        performanceMap[salesmanName].targetVERVE = stats.verveTarget || 0;
-      }
-    });
-    
-    // Calculate coverage and achievements
-    Object.values(performanceMap).forEach((perf: any) => {
-      perf.coverage = perf.totalShops > 0 ? (perf.billedShops / perf.totalShops) * 100 : 0;
-      perf.achievement8PM = perf.target8PM > 0 ? (perf.total8PM / perf.target8PM) * 100 : 0;
-      perf.achievementVERVE = perf.targetVERVE > 0 ? (perf.totalVERVE / perf.targetVERVE) * 100 : 0;
-    });
-    
-    return Object.values(performanceMap).filter((p: any) => p.name !== 'Unknown');
-  }, [data]);
-
-  const sortedSalesmen = salesmanPerformance.sort((a: any, b: any) => b.totalSales - a.totalSales);
-
-  // NEW: Function to handle case breakdown click
-  const handleCaseBreakdownClick = (salesmanName: string, month: string, monthName: string, total: number, eightPM: number, verve: number) => {
-    console.log('🔥 BREAKDOWN CLICKED:', { salesmanName, month, monthName, total, eightPM, verve });
-    console.log('🔥 Setting state...');
-    setSelectedSalesmanBreakdown({
-      salesmanName,
-      month,
-      monthName,
-      total,
-      eightPM,
-      verve
-    });
-    setShowSalesmanBreakdown(true);
-    console.log('🔥 State set, modal should show');
-  };
-
-  // NEW: Salesman Breakdown Modal Component
-  const SalesmanBreakdownModal = ({ onClose }: { onClose: () => void }) => {
-    if (!selectedSalesmanBreakdown) return null;
-
-    return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-        <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-hidden">
-          <div className="flex justify-between items-center p-6 border-b">
-            <h3 className="text-lg font-semibold">
-              {selectedSalesmanBreakdown.salesmanName} - {selectedSalesmanBreakdown.monthName} 2025 Breakdown
-            </h3>
-            <button 
-              onClick={onClose} 
-              className="text-gray-400 hover:text-gray-600"
-            >
-              <X className="w-6 h-6" />
-            </button>
-          </div>
-
-          <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-              <div className="text-center bg-blue-50 p-4 rounded-lg">
-                <div className="text-3xl font-bold text-blue-600">
-                  {selectedSalesmanBreakdown.total.toLocaleString()}
-                </div>
-                <div className="text-sm text-gray-500">Total Cases</div>
-                <div className="text-xs text-gray-400">{selectedSalesmanBreakdown.monthName} 2025</div>
-              </div>
-              <div className="text-center bg-purple-50 p-4 rounded-lg">
-                <div className="text-3xl font-bold text-purple-600">
-                  {selectedSalesmanBreakdown.eightPM.toLocaleString()}
-                </div>
-                <div className="text-sm text-gray-500">8PM Cases</div>
-                <div className="text-xs text-gray-400">
-                  {selectedSalesmanBreakdown.total > 0 ? 
-                    `${((selectedSalesmanBreakdown.eightPM / selectedSalesmanBreakdown.total) * 100).toFixed(1)}%` : '0%'} of total
-                </div>
-              </div>
-              <div className="text-center bg-orange-50 p-4 rounded-lg">
-                <div className="text-3xl font-bold text-orange-600">
-                  {selectedSalesmanBreakdown.verve.toLocaleString()}
-                </div>
-                <div className="text-sm text-gray-500">VERVE Cases</div>
-                <div className="text-xs text-gray-400">
-                  {selectedSalesmanBreakdown.total > 0 ? 
-                    `${((selectedSalesmanBreakdown.verve / selectedSalesmanBreakdown.total) * 100).toFixed(1)}%` : '0%'} of total
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h4 className="font-medium text-gray-900 mb-3">Brand Performance Distribution</h4>
-              <div className="space-y-3">
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span>8PM Family</span>
-                    <span>{selectedSalesmanBreakdown.total > 0 ? 
-                      `${((selectedSalesmanBreakdown.eightPM / selectedSalesmanBreakdown.total) * 100).toFixed(1)}%` : '0%'}
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-3">
-                    <div 
-                      className="bg-purple-600 h-3 rounded-full" 
-                      style={{ width: `${selectedSalesmanBreakdown.total > 0 ? (selectedSalesmanBreakdown.eightPM / selectedSalesmanBreakdown.total) * 100 : 0}%` }}
-                    ></div>
-                  </div>
-                </div>
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span>VERVE Family</span>
-                    <span>{selectedSalesmanBreakdown.total > 0 ? 
-                      `${((selectedSalesmanBreakdown.verve / selectedSalesmanBreakdown.total) * 100).toFixed(1)}%` : '0%'}
-                    </span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-3">
-                    <div 
-                      className="bg-orange-600 h-3 rounded-full" 
-                      style={{ width: `${selectedSalesmanBreakdown.total > 0 ? (selectedSalesmanBreakdown.verve / selectedSalesmanBreakdown.total) * 100 : 0}%` }}
-                    ></div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-6 flex justify-end">
-              <button
-                onClick={onClose}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  return (
-    <div className="space-y-6">
-      {/* DEBUG: Show modal state */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="bg-yellow-100 p-2 text-xs">
-          DEBUG: showSalesmanBreakdown={String(showSalesmanBreakdown)}, selectedData={selectedSalesmanBreakdown?.salesmanName || 'null'}
-        </div>
-      )}
-      
-      <div className="text-center">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Salesman Performance Dashboard</h2>
-        <p className="text-gray-600">Individual salesman achievements and targets for {getMonthName(data.currentMonth)} {data.currentYear}</p>
-      </div>
-
-      {/* Performance Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Top Performer (Sales)</h3>
-          {sortedSalesmen.length > 0 && (
-            <div>
-              <div className="text-2xl font-bold text-blue-600">{sortedSalesmen[0].name}</div>
-              <div className="text-sm text-gray-500">{sortedSalesmen[0].totalSales.toLocaleString()} cases</div>
-            </div>
-          )}
-        </div>
-        
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Best 8PM Achievement</h3>
-          {(() => {
-            const best8PM = sortedSalesmen.filter((s: any) => s.target8PM > 0).sort((a: any, b: any) => b.achievement8PM - a.achievement8PM)[0];
-            return best8PM ? (
-              <div>
-                <div className="text-2xl font-bold text-purple-600">{best8PM.name}</div>
-                <div className="text-sm text-gray-500">{best8PM.achievement8PM.toFixed(1)}%</div>
-              </div>
-            ) : (
-              <div className="text-sm text-gray-500">No targets set</div>
-            );
-          })()}
-        </div>
-
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Best VERVE Achievement</h3>
-          {(() => {
-            const bestVERVE = sortedSalesmen.filter((s: any) => s.targetVERVE > 0).sort((a: any, b: any) => b.achievementVERVE - a.achievementVERVE)[0];
-            return bestVERVE ? (
-              <div>
-                <div className="text-2xl font-bold text-orange-600">{bestVERVE.name}</div>
-                <div className="text-sm text-gray-500">{bestVERVE.achievementVERVE.toFixed(1)}%</div>
-              </div>
-            ) : (
-              <div className="text-sm text-gray-500">No targets set</div>
-            );
-          })()}
-        </div>
-
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Best Coverage</h3>
-          {(() => {
-            const bestCoverage = sortedSalesmen.sort((a: any, b: any) => b.coverage - a.coverage)[0];
-            return bestCoverage ? (
-              <div>
-                <div className="text-2xl font-bold text-green-600">{bestCoverage.name}</div>
-                <div className="text-sm text-gray-500">{bestCoverage.coverage.toFixed(1)}%</div>
-              </div>
-            ) : null;
-          })()}
-        </div>
-      </div>
-
-      {/* Detailed Performance Table */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">Salesman Performance Details - {getMonthName(data.currentMonth)} {data.currentYear}</h3>
-          <p className="text-sm text-gray-500">Complete performance breakdown with current month targets and achievements</p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rank</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salesman</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shops</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Billed</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Coverage</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">8PM Sales</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">8PM Achievement</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">VERVE Sales</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">VERVE Achievement</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Sales</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {sortedSalesmen.map((salesman: any, index) => (
-                <tr key={salesman.name} className={index < 3 ? 'bg-yellow-50' : index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    <div className="flex items-center">
-                      {index + 1}
-                      {index < 3 && (
-                        <span className="ml-2">
-                          {index === 0 && '🥇'}
-                          {index === 1 && '🥈'}
-                          {index === 2 && '🥉'}
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 text-sm font-medium text-gray-900">{salesman.name}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{salesman.totalShops}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{salesman.billedShops}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      salesman.coverage >= 80 ? 'bg-green-100 text-green-800' :
-                      salesman.coverage >= 60 ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-red-100 text-red-800'
-                    }`}>
-                      {salesman.coverage.toFixed(1)}%
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-purple-600">
-                    <div className="font-medium">{salesman.total8PM.toLocaleString()}/{salesman.target8PM.toLocaleString()}</div>
-                    <div className="text-xs text-gray-500">
-                      {salesman.total8PM.toLocaleString()} cases, target {salesman.target8PM.toLocaleString()}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      salesman.achievement8PM >= 100 ? 'bg-green-100 text-green-800' :
-                      salesman.achievement8PM >= 80 ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-red-100 text-red-800'
-                    }`}>
-                      {salesman.target8PM > 0 ? `${salesman.achievement8PM.toFixed(1)}%` : 'No Target'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600">
-                    <div className="font-medium">{salesman.totalVERVE.toLocaleString()}/{salesman.targetVERVE.toLocaleString()}</div>
-                    <div className="text-xs text-gray-500">
-                      {salesman.totalVERVE.toLocaleString()} cases, target {salesman.targetVERVE.toLocaleString()}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      salesman.achievementVERVE >= 100 ? 'bg-green-100 text-green-800' :
-                      salesman.achievementVERVE >= 80 ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-red-100 text-red-800'
-                    }`}>
-                      {salesman.targetVERVE > 0 ? `${salesman.achievementVERVE.toFixed(1)}%` : 'No Target'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                    {salesman.totalSales.toLocaleString()}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* NEW: 3-Month Historical Performance */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">3-Month Performance Trend (Mar-Apr-May {data.currentYear})</h3>
-          <p className="text-sm text-gray-500">Historical performance comparison for 8PM and VERVE by salesman</p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salesman</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">March Total</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">April Total</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">May Total</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trend</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">3-Month Avg</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {sortedSalesmen.slice(0, 10).map((salesman: any) => {
-                const avg3Month = ((salesman.marchTotal + salesman.aprilTotal + salesman.mayTotal) / 3).toFixed(0);
-                const trend = salesman.mayTotal > salesman.aprilTotal && salesman.aprilTotal > salesman.marchTotal ? 'improving' :
-                            salesman.mayTotal < salesman.aprilTotal && salesman.aprilTotal < salesman.marchTotal ? 'declining' : 'stable';
-                
-                return (
-                  <tr key={salesman.name}>
-                    <td className="px-6 py-4 text-sm font-medium text-gray-900">{salesman.name}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <button
-                        onClick={() => {
-                          console.log('March clicked for:', salesman.name);
-                          handleCaseBreakdownClick(
-                            salesman.name, 
-                            'march', 
-                            'March', 
-                            salesman.marchTotal, 
-                            salesman.marchEightPM, 
-                            salesman.marchVerve
-                          );
-                        }}
-                        className="text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer"
-                        style={{ textDecoration: 'none' }}
-                      >
-                        {salesman.marchTotal.toLocaleString()}
-                      </button>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <button
-                        onClick={() => {
-                          console.log('April clicked for:', salesman.name);
-                          handleCaseBreakdownClick(
-                            salesman.name, 
-                            'april', 
-                            'April', 
-                            salesman.aprilTotal, 
-                            salesman.aprilEightPM, 
-                            salesman.aprilVerve
-                          );
-                        }}
-                        className="text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer"
-                        style={{ textDecoration: 'none' }}
-                      >
-                        {salesman.aprilTotal.toLocaleString()}
-                      </button>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <button
-                        onClick={() => {
-                          console.log('May clicked for:', salesman.name);
-                          handleCaseBreakdownClick(
-                            salesman.name, 
-                            'may', 
-                            'May', 
-                            salesman.mayTotal, 
-                            salesman.mayEightPM, 
-                            salesman.mayVerve
-                          );
-                        }}
-                        className="text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer"
-                        style={{ textDecoration: 'none' }}
-                      >
-                        {salesman.mayTotal.toLocaleString()}
-                      </button>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        trend === 'improving' ? 'bg-green-100 text-green-800' :
-                        trend === 'declining' ? 'bg-red-100 text-red-800' :
-                        'bg-gray-100 text-gray-800'
-                      }`}>
-                        {trend === 'improving' ? '📈 Growing' : trend === 'declining' ? '📉 Declining' : '➡️ Stable'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">{avg3Month}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Rest of the component remains the same... */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-medium text-gray-900">Achievement Comparison</h3>
-          </div>
-          <div className="p-6">
-            <div className="space-y-4">
-              {sortedSalesmen.slice(0, 8).map((salesman: any) => (
-                <div key={salesman.name}>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span className="font-medium">{salesman.name}</span>
-                    <span>8PM: {salesman.achievement8PM.toFixed(1)}% | VERVE: {salesman.achievementVERVE.toFixed(1)}%</span>
-                  </div>
-                  <div className="grid grid-cols-2 gap-2">
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
-                        className="bg-purple-600 h-2 rounded-full" 
-                        style={{ width: `${Math.min(salesman.achievement8PM, 100)}%` }}
-                      ></div>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2">
-                      <div 
-                        className="bg-orange-600 h-2 rounded-full" 
-                        style={{ width: `${Math.min(salesman.achievementVERVE, 100)}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-medium text-gray-900">Coverage vs Sales Performance</h3>
-          </div>
-          <div className="p-6">
-            <div className="space-y-4">
-              {sortedSalesmen.slice(0, 8).map((salesman: any) => (
-                <div key={salesman.name} className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="text-sm font-medium text-gray-900">{salesman.name}</div>
-                    <div className="text-xs text-gray-500">
-                      {salesman.billedShops}/{salesman.totalShops} shops • {salesman.totalSales.toLocaleString()} cases
-                    </div>
-                  </div>
-                  <div className="flex items-center space-x-4">
-                    <div className="text-center">
-                      <div className={`text-lg font-bold ${
-                        salesman.coverage >= 80 ? 'text-green-600' :
-                        salesman.coverage >= 60 ? 'text-yellow-600' : 'text-red-600'
-                      }`}>
-                        {salesman.coverage.toFixed(0)}%
-                      </div>
-                      <div className="text-xs text-gray-500">Coverage</div>
-                    </div>
-                    <div className="text-center">
-                      <div className="text-lg font-bold text-blue-600">{salesman.totalSales.toLocaleString()}</div>
-                      <div className="text-xs text-gray-500">Cases</div>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-gradient-to-r from-purple-50 to-orange-50 p-6 rounded-lg">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Salesman Achievement Summary - {getMonthName(data.currentMonth)} {data.currentYear}</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="text-center">
-            <div className="text-xl font-bold text-green-600">
-              {sortedSalesmen.filter((s: any) => s.achievement8PM >= 100 && s.target8PM > 0).length}
-            </div>
-            <div className="text-xs text-gray-600">8PM Target Achieved</div>
-          </div>
-          <div className="text-center">
-            <div className="text-xl font-bold text-orange-600">
-              {sortedSalesmen.filter((s: any) => s.achievementVERVE >= 100 && s.targetVERVE > 0).length}
-            </div>
-            <div className="text-xs text-gray-600">VERVE Target Achieved</div>
-          </div>
-          <div className="text-center">
-            <div className="text-xl font-bold text-blue-600">
-              {sortedSalesmen.filter((s: any) => s.coverage >= 80).length}
-            </div>
-            <div className="text-xs text-gray-600">High Coverage ({'>'}80%)</div>
-          </div>
-          <div className="text-center">
-            <div className="text-xl font-bold text-purple-600">
-              {sortedSalesmen.length}
-            </div>
-            <div className="text-xs text-gray-600">Active Salesmen</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const AdvancedAnalyticsTab = ({ 
-  data, 
-  onShowSKU, 
-  currentPage, 
-  setCurrentPage, 
-  itemsPerPage,
-  filters,
-  setFilters,
-  getFilteredShops
-}: { 
-  data: DashboardData, 
-  onShowSKU: (shop: ShopData) => void,
-  currentPage: number,
-  setCurrentPage: (page: number) => void,
-  itemsPerPage: number,
-  filters: FilterState,
-  setFilters: (filters: FilterState) => void,
-  getFilteredShops: (shops: ShopData[]) => ShopData[]
-}) => {
-  const filteredShops = getFilteredShops(data.allShopsComparison);
-  const totalPages = Math.ceil(filteredShops.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentShops = filteredShops.slice(startIndex, endIndex);
-
-  const departments = [...new Set(data.allShopsComparison.map(shop => shop.department))].sort();
-  const salesmen = [...new Set(data.allShopsComparison.map(shop => shop.salesman))].sort();
-
-  return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
-        <div className="bg-white p-4 sm:p-6 rounded-lg shadow">
-          <div className="flex items-center">
-            <div className="p-3 rounded-lg bg-green-100">
-              <UserPlus className="h-6 w-6 text-green-600" />
-            </div>
-            <div className="ml-4">
-              <div className="text-2xl font-bold text-gray-900">{data.customerInsights.firstTimeCustomers}</div>
-              <div className="text-sm text-gray-500">First-time Customers</div>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white p-4 sm:p-6 rounded-lg shadow">
-          <div className="flex items-center">
-            <div className="p-3 rounded-lg bg-red-100">
-              <AlertTriangle className="h-6 w-6 text-red-600" />
-            </div>
-            <div className="ml-4">
-              <div className="text-2xl font-bold text-gray-900">{data.customerInsights.lostCustomers}</div>
-              <div className="text-sm text-gray-500">Lost Customers</div>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white p-4 sm:p-6 rounded-lg shadow">
-          <div className="flex items-center">
-            <div className="p-3 rounded-lg bg-yellow-100">
-              <Star className="h-6 w-6 text-yellow-600" />
-            </div>
-            <div className="ml-4">
-              <div className="text-2xl font-bold text-gray-900">{data.customerInsights.consistentPerformers}</div>
-              <div className="text-sm text-gray-500">Consistent Performers</div>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white p-4 sm:p-6 rounded-lg shadow">
-          <div className="flex items-center">
-            <div className="p-3 rounded-lg bg-orange-100">
-              <TrendingDown className="h-6 w-6 text-orange-600" />
-            </div>
-            <div className="ml-4">
-              <div className="text-2xl font-bold text-gray-900">{data.customerInsights.decliningPerformers}</div>
-              <div className="text-sm text-gray-500">Declining Performers</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white p-4 rounded-lg shadow">
-        <div className="flex flex-wrap gap-4 items-center">
-          <div className="flex items-center space-x-2">
-            <Search className="w-5 h-5 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search shops, departments, salesmen..."
-              value={filters.searchText}
-              onChange={(e) => setFilters({ ...filters, searchText: e.target.value })}
-              className="border border-gray-300 rounded-lg px-3 py-2 w-64"
-            />
-          </div>
-          
-          <select
-            value={filters.department}
-            onChange={(e) => setFilters({ ...filters, department: e.target.value })}
-            className="border border-gray-300 rounded-lg px-3 py-2"
-          >
-            <option value="">All Departments</option>
-            {departments.map(dept => (
-              <option key={dept} value={dept}>{dept}</option>
-            ))}
-          </select>
-
-          <select
-            value={filters.salesman}
-            onChange={(e) => setFilters({ ...filters, salesman: e.target.value })}
-            className="border border-gray-300 rounded-lg px-3 py-2"
-          >
-            <option value="">All Salesmen</option>
-            {salesmen.map(salesman => (
-              <option key={salesman} value={salesman}>{salesman}</option>
-            ))}
-          </select>
-
-          <button
-            onClick={() => setFilters({ department: '', salesman: '', shop: '', searchText: '' })}
-            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center space-x-2"
-          >
-            <X className="w-4 h-4" />
-            <span>Clear</span>
-          </button>
-
-          <div className="text-sm text-gray-500">
-            Showing {filteredShops.length} of {data.allShopsComparison.length} shops
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-white rounded-lg shadow">
-        <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">Complete Shop Analysis - Rolling 4-Month Comparison (Mar-Apr-May-{getMonthName(data.currentMonth)} {data.currentYear})</h3>
-          <p className="text-sm text-gray-500">
-            {filteredShops.length} shops {filters.department || filters.salesman || filters.searchText ? '(filtered)' : ''} 
-            ranked by current month performance with rolling window analysis and YoY comparison
-          </p>
-        </div>
-        
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rank</th>
-                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shop Name</th>
-                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
-                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salesman</th>
-                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mar Cases</th>
-                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Apr Cases</th>
-                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">May Cases</th>
-                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{getMonthName(data.currentMonth)} Cases</th>
-                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Growth %</th>
-                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">YoY %</th>
-                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trend</th>
-                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">8PM</th>
-                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">VERVE</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {currentShops.map((shop, index) => (
-                <tr key={shop.shopId} className="hover:bg-gray-50">
-                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {startIndex + index + 1}
-                  </td>
-                  <td className="px-3 sm:px-6 py-4 text-sm text-gray-900">
-                    <div className="max-w-xs truncate">{shop.shopName}</div>
-                  </td>
-                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">{shop.department}</td>
-                  <td className="px-3 sm:px-6 py-4 text-sm text-gray-900">
-                    <div className="max-w-xs truncate">{shop.salesman}</div>
-                  </td>
-                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {shop.marchTotal?.toLocaleString() || 0}
-                  </td>
-                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {shop.aprilTotal?.toLocaleString() || 0}
-                  </td>
-                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {shop.mayTotal?.toLocaleString() || 0}
-                  </td>
-                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                    <button
-                      onClick={() => onShowSKU(shop)}  
-                      className="text-blue-600 hover:text-blue-800 hover:underline"
-                    >
-                      {shop.juneTotal?.toLocaleString() || shop.total.toLocaleString()}
-                    </button>
-                  </td>
-                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      (shop.growthPercent || 0) > 0 
-                        ? 'bg-green-100 text-green-800' 
-                        : (shop.growthPercent || 0) < 0
-                        ? 'bg-red-100 text-red-800'
-                        : 'bg-gray-100 text-gray-800'
-                    }`}>
-                      {shop.growthPercent?.toFixed(1) || 0}%
-                    </span>
-                  </td>
-                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      (shop.yoyGrowthPercent || 0) > 0 
-                        ? 'bg-blue-100 text-blue-800' 
-                        : (shop.yoyGrowthPercent || 0) < 0
-                        ? 'bg-red-100 text-red-800'
-                        : 'bg-gray-100 text-gray-800'
-                    }`}>
-                      {shop.yoyGrowthPercent?.toFixed(1) || 0}%
-                    </span>
-                  </td>
-                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      shop.monthlyTrend === 'improving' ? 'bg-green-100 text-green-800' :
-                      shop.monthlyTrend === 'declining' ? 'bg-red-100 text-red-800' :
-                      shop.monthlyTrend === 'new' ? 'bg-blue-100 text-blue-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {shop.monthlyTrend === 'improving' ? '📈' :
-                       shop.monthlyTrend === 'declining' ? '📉' :
-                       shop.monthlyTrend === 'new' ? '✨' : '➡️'}
-                    </span>
-                  </td>
-                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-purple-600">
-                    {shop.eightPM.toLocaleString()}
-                  </td>
-                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-orange-600">
-                    {shop.verve.toLocaleString()}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        <div className="px-4 sm:px-6 py-3 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center">
-          <div className="text-sm text-gray-700 mb-2 sm:mb-0">
-            Showing {startIndex + 1} to {Math.min(endIndex, filteredShops.length)} of {filteredShops.length} filtered shops
-          </div>
-          <div className="flex space-x-2">
-            <button
-              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-              disabled={currentPage === 1}
-              className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <span className="px-3 py-1 text-sm text-gray-700">
-              Page {currentPage} of {totalPages}
-            </span>
-            <button
-              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-              disabled={currentPage === totalPages}
-              className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b border-gray-200 flex items-center">
-            <UserPlus className="w-5 h-5 text-green-600 mr-2" />
-            <h3 className="text-lg font-medium text-gray-900">First-time Billing Shops ({data.customerInsights.firstTimeCustomers})</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shop Name</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Salesman</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{getMonthName(data.currentMonth)} Cases</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {data.customerInsights.newShops.slice(0, 10).map((shop) => (
-                  <tr key={shop.shopId}>
-                    <td className="px-4 py-4 text-sm text-gray-900 max-w-xs truncate">{shop.shopName}</td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">{shop.department}</td>
-                    <td className="px-4 py-4 text-sm text-gray-900 max-w-xs truncate">{shop.salesman}</td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-green-600">{shop.juneTotal || shop.total}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b border-gray-200 flex items-center">
-            <AlertTriangle className="w-5 h-5 text-red-600 mr-2" />
-            <h3 className="text-lg font-medium text-gray-900">Lost Customers ({data.customerInsights.lostCustomers})</h3>
-          </div>
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shop Name</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Salesman</th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">May Cases</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {data.customerInsights.lostShops.slice(0, 10).map((shop) => (
-                  <tr key={shop.shopId}>
-                    <td className="px-4 py-4 text-sm text-gray-900 max-w-xs truncate">{shop.shopName}</td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">{shop.department}</td>
-                    <td className="px-4 py-4 text-sm text-gray-900 max-w-xs truncate">{shop.salesman}</td>
-                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-red-600">{shop.mayTotal}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
 // ENHANCED: Historical Analysis Tab Component (UPDATED TO 12 MONTHS WITH YoY)
 const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
   const [debugInfo, setDebugInfo] = React.useState<any>(null);
@@ -2618,7 +1724,7 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
 
       {/* ROLLING 4-MONTH COMPARISON */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {monthlyData.map((month, index) => (
+        {monthlyData.slice(-4).map((month, index) => (
           <div key={month.month} className="bg-white p-6 rounded-lg shadow">
             <h3 className="text-lg font-medium text-gray-900 mb-4">{month.month}</h3>
             <div className="space-y-3">
@@ -2874,9 +1980,6 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
         </div>
       )}
     </div>
-  );
-};
-
 const DepartmentTab = ({ data }: { data: DashboardData }) => {
   return (
     <div className="space-y-6">
@@ -3799,6 +2902,908 @@ const MetricCard = ({ title, value, subtitle, icon: Icon, color }: {
               <dd className="text-lg font-bold text-gray-900">{value}</dd>
               {subtitle && <dd className="text-sm text-gray-500">{subtitle}</dd>}
             </dl>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default RadicoDashboard;
+
+// UPDATED TAB COMPONENTS WITH DYNAMIC MONTH DETECTION AND YoY
+
+const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
+  // NEW: State for salesman breakdown modal
+  const [showSalesmanBreakdown, setShowSalesmanBreakdown] = useState(false);
+  const [selectedSalesmanBreakdown, setSelectedSalesmanBreakdown] = useState<{
+    salesmanName: string;
+    month: string;
+    monthName: string;
+    total: number;
+    eightPM: number;
+    verve: number;
+  } | null>(null);
+
+  // Calculate salesman performance data (FIXED HISTORICAL AGGREGATION)
+  const salesmanPerformance = React.useMemo(() => {
+    const performanceMap: Record<string, any> = {};
+    
+    const shopDetails = Object.values(data.salesData);
+    
+    shopDetails.forEach(shop => {
+      const salesmanName = shop.salesman;
+      if (!performanceMap[salesmanName]) {
+        performanceMap[salesmanName] = {
+          name: salesmanName,
+          totalShops: 0,
+          billedShops: 0,
+          coverage: 0,
+          total8PM: 0,
+          totalVERVE: 0,
+          totalSales: 0,
+          target8PM: 0,
+          targetVERVE: 0,
+          achievement8PM: 0,
+          achievementVERVE: 0,
+          // FIXED: 3-month historical data aggregation
+          marchTotal: 0,
+          marchEightPM: 0,
+          marchVerve: 0,
+          aprilTotal: 0,
+          aprilEightPM: 0,
+          aprilVerve: 0,
+          mayTotal: 0,
+          mayEightPM: 0,
+          mayVerve: 0,
+          shops: []
+        };
+      }
+      
+      performanceMap[salesmanName].totalShops++;
+      
+      // FIXED: Current month aggregation (June)
+      if (shop.total > 0) {
+        performanceMap[salesmanName].billedShops++;
+        performanceMap[salesmanName].total8PM += shop.eightPM;
+        performanceMap[salesmanName].totalVERVE += shop.verve;
+        performanceMap[salesmanName].totalSales += shop.total;
+        performanceMap[salesmanName].shops.push(shop);
+      }
+        
+      // FIXED: Historical data aggregation (Mar-Apr-May)
+      performanceMap[salesmanName].marchTotal += shop.marchTotal || 0;
+      performanceMap[salesmanName].marchEightPM += shop.marchEightPM || 0;
+      performanceMap[salesmanName].marchVerve += shop.marchVerve || 0;
+      
+      performanceMap[salesmanName].aprilTotal += shop.aprilTotal || 0;
+      performanceMap[salesmanName].aprilEightPM += shop.aprilEightPM || 0;
+      performanceMap[salesmanName].aprilVerve += shop.aprilVerve || 0;
+      
+      performanceMap[salesmanName].mayTotal += shop.mayTotal || 0;
+      performanceMap[salesmanName].mayEightPM += shop.mayEightPM || 0;
+      performanceMap[salesmanName].mayVerve += shop.mayVerve || 0;
+    });
+    
+    // Add target data from salespersonStats
+    Object.values(data.salespersonStats).forEach((stats: any) => {
+      const salesmanName = stats.name;
+      if (performanceMap[salesmanName]) {
+        performanceMap[salesmanName].target8PM = stats.eightPmTarget || 0;
+        performanceMap[salesmanName].targetVERVE = stats.verveTarget || 0;
+      }
+    });
+    
+    // Calculate coverage and achievements
+    Object.values(performanceMap).forEach((perf: any) => {
+      perf.coverage = perf.totalShops > 0 ? (perf.billedShops / perf.totalShops) * 100 : 0;
+      perf.achievement8PM = perf.target8PM > 0 ? (perf.total8PM / perf.target8PM) * 100 : 0;
+      perf.achievementVERVE = perf.targetVERVE > 0 ? (perf.totalVERVE / perf.targetVERVE) * 100 : 0;
+    });
+    
+    return Object.values(performanceMap).filter((p: any) => p.name !== 'Unknown');
+  }, [data]);
+
+  const sortedSalesmen = salesmanPerformance.sort((a: any, b: any) => b.totalSales - a.totalSales);
+
+  // NEW: Function to handle case breakdown click
+  const handleCaseBreakdownClick = (salesmanName: string, month: string, monthName: string, total: number, eightPM: number, verve: number) => {
+    console.log('🔥 BREAKDOWN CLICKED:', { salesmanName, month, monthName, total, eightPM, verve });
+    console.log('🔥 Setting state...');
+    setSelectedSalesmanBreakdown({
+      salesmanName,
+      month,
+      monthName,
+      total,
+      eightPM,
+      verve
+    });
+    setShowSalesmanBreakdown(true);
+    console.log('🔥 State set, modal should show');
+  };
+
+  // NEW: Salesman Breakdown Modal Component
+  const SalesmanBreakdownModal = ({ onClose }: { onClose: () => void }) => {
+    if (!selectedSalesmanBreakdown) return null;
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-hidden">
+          <div className="flex justify-between items-center p-6 border-b">
+            <h3 className="text-lg font-semibold">
+              {selectedSalesmanBreakdown.salesmanName} - {selectedSalesmanBreakdown.monthName} 2025 Breakdown
+            </h3>
+            <button 
+              onClick={onClose} 
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+
+          <div className="p-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+              <div className="text-center bg-blue-50 p-4 rounded-lg">
+                <div className="text-3xl font-bold text-blue-600">
+                  {selectedSalesmanBreakdown.total.toLocaleString()}
+                </div>
+                <div className="text-sm text-gray-500">Total Cases</div>
+                <div className="text-xs text-gray-400">{selectedSalesmanBreakdown.monthName} 2025</div>
+              </div>
+              <div className="text-center bg-purple-50 p-4 rounded-lg">
+                <div className="text-3xl font-bold text-purple-600">
+                  {selectedSalesmanBreakdown.eightPM.toLocaleString()}
+                </div>
+                <div className="text-sm text-gray-500">8PM Cases</div>
+                <div className="text-xs text-gray-400">
+                  {selectedSalesmanBreakdown.total > 0 ? 
+                    `${((selectedSalesmanBreakdown.eightPM / selectedSalesmanBreakdown.total) * 100).toFixed(1)}%` : '0%'} of total
+                </div>
+              </div>
+              <div className="text-center bg-orange-50 p-4 rounded-lg">
+                <div className="text-3xl font-bold text-orange-600">
+                  {selectedSalesmanBreakdown.verve.toLocaleString()}
+                </div>
+                <div className="text-sm text-gray-500">VERVE Cases</div>
+                <div className="text-xs text-gray-400">
+                  {selectedSalesmanBreakdown.total > 0 ? 
+                    `${((selectedSalesmanBreakdown.verve / selectedSalesmanBreakdown.total) * 100).toFixed(1)}%` : '0%'} of total
+                </div>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 p-4 rounded-lg">
+              <h4 className="font-medium text-gray-900 mb-3">Brand Performance Distribution</h4>
+              <div className="space-y-3">
+                <div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span>8PM Family</span>
+                    <span>{selectedSalesmanBreakdown.total > 0 ? 
+                      `${((selectedSalesmanBreakdown.eightPM / selectedSalesmanBreakdown.total) * 100).toFixed(1)}%` : '0%'}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-3">
+                    <div 
+                      className="bg-purple-600 h-3 rounded-full" 
+                      style={{ width: `${selectedSalesmanBreakdown.total > 0 ? (selectedSalesmanBreakdown.eightPM / selectedSalesmanBreakdown.total) * 100 : 0}%` }}
+                    ></div>
+                  </div>
+                </div>
+                <div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span>VERVE Family</span>
+                    <span>{selectedSalesmanBreakdown.total > 0 ? 
+                      `${((selectedSalesmanBreakdown.verve / selectedSalesmanBreakdown.total) * 100).toFixed(1)}%` : '0%'}
+                    </span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-3">
+                    <div 
+                      className="bg-orange-600 h-3 rounded-full" 
+                      style={{ width: `${selectedSalesmanBreakdown.total > 0 ? (selectedSalesmanBreakdown.verve / selectedSalesmanBreakdown.total) * 100 : 0}%` }}
+                    ></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <button
+                onClick={onClose}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* DEBUG: Show modal state */}
+      {process.env.NODE_ENV === 'development' && (
+        <div className="bg-yellow-100 p-2 text-xs">
+          DEBUG: showSalesmanBreakdown={String(showSalesmanBreakdown)}, selectedData={selectedSalesmanBreakdown?.salesmanName || 'null'}
+        </div>
+      )}
+      
+      <div className="text-center">
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Salesman Performance Dashboard</h2>
+        <p className="text-gray-600">Individual salesman achievements and targets for {getMonthName(data.currentMonth)} {data.currentYear}</p>
+      </div>
+
+      {/* Performance Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Top Performer (Sales)</h3>
+          {sortedSalesmen.length > 0 && (
+            <div>
+              <div className="text-2xl font-bold text-blue-600">{sortedSalesmen[0].name}</div>
+              <div className="text-sm text-gray-500">{sortedSalesmen[0].totalSales.toLocaleString()} cases</div>
+            </div>
+          )}
+        </div>
+        
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Best 8PM Achievement</h3>
+          {(() => {
+            const best8PM = sortedSalesmen.filter((s: any) => s.target8PM > 0).sort((a: any, b: any) => b.achievement8PM - a.achievement8PM)[0];
+            return best8PM ? (
+              <div>
+                <div className="text-2xl font-bold text-purple-600">{best8PM.name}</div>
+                <div className="text-sm text-gray-500">{best8PM.achievement8PM.toFixed(1)}%</div>
+              </div>
+            ) : (
+              <div className="text-sm text-gray-500">No targets set</div>
+            );
+          })()}
+        </div>
+
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Best VERVE Achievement</h3>
+          {(() => {
+            const bestVERVE = sortedSalesmen.filter((s: any) => s.targetVERVE > 0).sort((a: any, b: any) => b.achievementVERVE - a.achievementVERVE)[0];
+            return bestVERVE ? (
+              <div>
+                <div className="text-2xl font-bold text-orange-600">{bestVERVE.name}</div>
+                <div className="text-sm text-gray-500">{bestVERVE.achievementVERVE.toFixed(1)}%</div>
+              </div>
+            ) : (
+              <div className="text-sm text-gray-500">No targets set</div>
+            );
+          })()}
+        </div>
+
+        <div className="bg-white p-6 rounded-lg shadow">
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Best Coverage</h3>
+          {(() => {
+            const bestCoverage = sortedSalesmen.sort((a: any, b: any) => b.coverage - a.coverage)[0];
+            return bestCoverage ? (
+              <div>
+                <div className="text-2xl font-bold text-green-600">{bestCoverage.name}</div>
+                <div className="text-sm text-gray-500">{bestCoverage.coverage.toFixed(1)}%</div>
+              </div>
+            ) : null;
+          })()}
+        </div>
+      </div>
+
+      {/* Detailed Performance Table */}
+      <div className="bg-white rounded-lg shadow">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-medium text-gray-900">Salesman Performance Details - {getMonthName(data.currentMonth)} {data.currentYear}</h3>
+          <p className="text-sm text-gray-500">Complete performance breakdown with current month targets and achievements</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rank</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salesman</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shops</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Billed</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Coverage</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">8PM Sales</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">8PM Achievement</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">VERVE Sales</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">VERVE Achievement</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Sales</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {sortedSalesmen.map((salesman: any, index) => (
+                <tr key={salesman.name} className={index < 3 ? 'bg-yellow-50' : index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    <div className="flex items-center">
+                      {index + 1}
+                      {index < 3 && (
+                        <span className="ml-2">
+                          {index === 0 && '🥇'}
+                          {index === 1 && '🥈'}
+                          {index === 2 && '🥉'}
+                        </span>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 text-sm font-medium text-gray-900">{salesman.name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{salesman.totalShops}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{salesman.billedShops}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      salesman.coverage >= 80 ? 'bg-green-100 text-green-800' :
+                      salesman.coverage >= 60 ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-red-100 text-red-800'
+                    }`}>
+                      {salesman.coverage.toFixed(1)}%
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-purple-600">
+                    <div className="font-medium">{salesman.total8PM.toLocaleString()}/{salesman.target8PM.toLocaleString()}</div>
+                    <div className="text-xs text-gray-500">
+                      {salesman.total8PM.toLocaleString()} cases, target {salesman.target8PM.toLocaleString()}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      salesman.achievement8PM >= 100 ? 'bg-green-100 text-green-800' :
+                      salesman.achievement8PM >= 80 ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-red-100 text-red-800'
+                    }`}>
+                      {salesman.target8PM > 0 ? `${salesman.achievement8PM.toFixed(1)}%` : 'No Target'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600">
+                    <div className="font-medium">{salesman.totalVERVE.toLocaleString()}/{salesman.targetVERVE.toLocaleString()}</div>
+                    <div className="text-xs text-gray-500">
+                      {salesman.totalVERVE.toLocaleString()} cases, target {salesman.targetVERVE.toLocaleString()}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      salesman.achievementVERVE >= 100 ? 'bg-green-100 text-green-800' :
+                      salesman.achievementVERVE >= 80 ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-red-100 text-red-800'
+                    }`}>
+                      {salesman.targetVERVE > 0 ? `${salesman.achievementVERVE.toFixed(1)}%` : 'No Target'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                    {salesman.totalSales.toLocaleString()}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* NEW: 3-Month Historical Performance */}
+      <div className="bg-white rounded-lg shadow">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-medium text-gray-900">3-Month Performance Trend (Mar-Apr-May {data.currentYear})</h3>
+          <p className="text-sm text-gray-500">Historical performance comparison for 8PM and VERVE by salesman</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salesman</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">March Total</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">April Total</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">May Total</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trend</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">3-Month Avg</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {sortedSalesmen.slice(0, 10).map((salesman: any) => {
+                const avg3Month = ((salesman.marchTotal + salesman.aprilTotal + salesman.mayTotal) / 3).toFixed(0);
+                const trend = salesman.mayTotal > salesman.aprilTotal && salesman.aprilTotal > salesman.marchTotal ? 'improving' :
+                            salesman.mayTotal < salesman.aprilTotal && salesman.aprilTotal < salesman.marchTotal ? 'declining' : 'stable';
+                
+                return (
+                  <tr key={salesman.name}>
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">{salesman.name}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <button
+                        onClick={() => {
+                          console.log('March clicked for:', salesman.name);
+                          handleCaseBreakdownClick(
+                            salesman.name, 
+                            'march', 
+                            'March', 
+                            salesman.marchTotal, 
+                            salesman.marchEightPM, 
+                            salesman.marchVerve
+                          );
+                        }}
+                        className="text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer"
+                        style={{ textDecoration: 'none' }}
+                      >
+                        {salesman.marchTotal.toLocaleString()}
+                      </button>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <button
+                        onClick={() => {
+                          console.log('April clicked for:', salesman.name);
+                          handleCaseBreakdownClick(
+                            salesman.name, 
+                            'april', 
+                            'April', 
+                            salesman.aprilTotal, 
+                            salesman.aprilEightPM, 
+                            salesman.aprilVerve
+                          );
+                        }}
+                        className="text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer"
+                        style={{ textDecoration: 'none' }}
+                      >
+                        {salesman.aprilTotal.toLocaleString()}
+                      </button>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <button
+                        onClick={() => {
+                          console.log('May clicked for:', salesman.name);
+                          handleCaseBreakdownClick(
+                            salesman.name, 
+                            'may', 
+                            'May', 
+                            salesman.mayTotal, 
+                            salesman.mayEightPM, 
+                            salesman.mayVerve
+                          );
+                        }}
+                        className="text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer"
+                        style={{ textDecoration: 'none' }}
+                      >
+                        {salesman.mayTotal.toLocaleString()}
+                      </button>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        trend === 'improving' ? 'bg-green-100 text-green-800' :
+                        trend === 'declining' ? 'bg-red-100 text-red-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {trend === 'improving' ? '📈 Growing' : trend === 'declining' ? '📉 Declining' : '➡️ Stable'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">{avg3Month}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Rest of the component remains the same... */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white rounded-lg shadow">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-medium text-gray-900">Achievement Comparison</h3>
+          </div>
+          <div className="p-6">
+            <div className="space-y-4">
+              {sortedSalesmen.slice(0, 8).map((salesman: any) => (
+                <div key={salesman.name}>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="font-medium">{salesman.name}</span>
+                    <span>8PM: {salesman.achievement8PM.toFixed(1)}% | VERVE: {salesman.achievementVERVE.toFixed(1)}%</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-purple-600 h-2 rounded-full" 
+                        style={{ width: `${Math.min(salesman.achievement8PM, 100)}%` }}
+                      ></div>
+                    </div>
+                    <div className="w-full bg-gray-200 rounded-full h-2">
+                      <div 
+                        className="bg-orange-600 h-2 rounded-full" 
+                        style={{ width: `${Math.min(salesman.achievementVERVE, 100)}%` }}
+                      ></div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow">
+          <div className="px-6 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-medium text-gray-900">Coverage vs Sales Performance</h3>
+          </div>
+          <div className="p-6">
+            <div className="space-y-4">
+              {sortedSalesmen.slice(0, 8).map((salesman: any) => (
+                <div key={salesman.name} className="flex items-center justify-between">
+                  <div className="flex-1">
+                    <div className="text-sm font-medium text-gray-900">{salesman.name}</div>
+                    <div className="text-xs text-gray-500">
+                      {salesman.billedShops}/{salesman.totalShops} shops • {salesman.totalSales.toLocaleString()} cases
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-4">
+                    <div className="text-center">
+                      <div className={`text-lg font-bold ${
+                        salesman.coverage >= 80 ? 'text-green-600' :
+                        salesman.coverage >= 60 ? 'text-yellow-600' : 'text-red-600'
+                      }`}>
+                        {salesman.coverage.toFixed(0)}%
+                      </div>
+                      <div className="text-xs text-gray-500">Coverage</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-lg font-bold text-blue-600">{salesman.totalSales.toLocaleString()}</div>
+                      <div className="text-xs text-gray-500">Cases</div>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-gradient-to-r from-purple-50 to-orange-50 p-6 rounded-lg">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Salesman Achievement Summary - {getMonthName(data.currentMonth)} {data.currentYear}</h3>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="text-center">
+            <div className="text-xl font-bold text-green-600">
+              {sortedSalesmen.filter((s: any) => s.achievement8PM >= 100 && s.target8PM > 0).length}
+            </div>
+            <div className="text-xs text-gray-600">8PM Target Achieved</div>
+          </div>
+          <div className="text-center">
+            <div className="text-xl font-bold text-orange-600">
+              {sortedSalesmen.filter((s: any) => s.achievementVERVE >= 100 && s.targetVERVE > 0).length}
+            </div>
+            <div className="text-xs text-gray-600">VERVE Target Achieved</div>
+          </div>
+          <div className="text-center">
+            <div className="text-xl font-bold text-blue-600">
+              {sortedSalesmen.filter((s: any) => s.coverage >= 80).length}
+            </div>
+            <div className="text-xs text-gray-600">High Coverage ({'>'}80%)</div>
+          </div>
+          <div className="text-center">
+            <div className="text-xl font-bold text-purple-600">
+              {sortedSalesmen.length}
+            </div>
+            <div className="text-xs text-gray-600">Active Salesmen</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Salesman Breakdown Modal */}
+      {showSalesmanBreakdown && (
+        <SalesmanBreakdownModal onClose={() => setShowSalesmanBreakdown(false)} />
+      )}
+    </div>
+  );
+};
+
+const AdvancedAnalyticsTab = ({ 
+  data, 
+  onShowSKU, 
+  currentPage, 
+  setCurrentPage, 
+  itemsPerPage,
+  filters,
+  setFilters,
+  getFilteredShops
+}: { 
+  data: DashboardData, 
+  onShowSKU: (shop: ShopData) => void,
+  currentPage: number,
+  setCurrentPage: (page: number) => void,
+  itemsPerPage: number,
+  filters: FilterState,
+  setFilters: (filters: FilterState) => void,
+  getFilteredShops: (shops: ShopData[]) => ShopData[]
+}) => {
+  const filteredShops = getFilteredShops(data.allShopsComparison);
+  const totalPages = Math.ceil(filteredShops.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentShops = filteredShops.slice(startIndex, endIndex);
+
+  const departments = [...new Set(data.allShopsComparison.map(shop => shop.department))].sort();
+  const salesmen = [...new Set(data.allShopsComparison.map(shop => shop.salesman))].sort();
+
+  return (
+    <div className="space-y-6">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+        <div className="bg-white p-4 sm:p-6 rounded-lg shadow">
+          <div className="flex items-center">
+            <div className="p-3 rounded-lg bg-green-100">
+              <UserPlus className="h-6 w-6 text-green-600" />
+            </div>
+            <div className="ml-4">
+              <div className="text-2xl font-bold text-gray-900">{data.customerInsights.firstTimeCustomers}</div>
+              <div className="text-sm text-gray-500">First-time Customers</div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white p-4 sm:p-6 rounded-lg shadow">
+          <div className="flex items-center">
+            <div className="p-3 rounded-lg bg-red-100">
+              <AlertTriangle className="h-6 w-6 text-red-600" />
+            </div>
+            <div className="ml-4">
+              <div className="text-2xl font-bold text-gray-900">{data.customerInsights.lostCustomers}</div>
+              <div className="text-sm text-gray-500">Lost Customers</div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white p-4 sm:p-6 rounded-lg shadow">
+          <div className="flex items-center">
+            <div className="p-3 rounded-lg bg-yellow-100">
+              <Star className="h-6 w-6 text-yellow-600" />
+            </div>
+            <div className="ml-4">
+              <div className="text-2xl font-bold text-gray-900">{data.customerInsights.consistentPerformers}</div>
+              <div className="text-sm text-gray-500">Consistent Performers</div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white p-4 sm:p-6 rounded-lg shadow">
+          <div className="flex items-center">
+            <div className="p-3 rounded-lg bg-orange-100">
+              <TrendingDown className="h-6 w-6 text-orange-600" />
+            </div>
+            <div className="ml-4">
+              <div className="text-2xl font-bold text-gray-900">{data.customerInsights.decliningPerformers}</div>
+              <div className="text-sm text-gray-500">Declining Performers</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white p-4 rounded-lg shadow">
+        <div className="flex flex-wrap gap-4 items-center">
+          <div className="flex items-center space-x-2">
+            <Search className="w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search shops, departments, salesmen..."
+              value={filters.searchText}
+              onChange={(e) => setFilters({ ...filters, searchText: e.target.value })}
+              className="border border-gray-300 rounded-lg px-3 py-2 w-64"
+            />
+          </div>
+          
+          <select
+            value={filters.department}
+            onChange={(e) => setFilters({ ...filters, department: e.target.value })}
+            className="border border-gray-300 rounded-lg px-3 py-2"
+          >
+            <option value="">All Departments</option>
+            {departments.map(dept => (
+              <option key={dept} value={dept}>{dept}</option>
+            ))}
+          </select>
+
+          <select
+            value={filters.salesman}
+            onChange={(e) => setFilters({ ...filters, salesman: e.target.value })}
+            className="border border-gray-300 rounded-lg px-3 py-2"
+          >
+            <option value="">All Salesmen</option>
+            {salesmen.map(salesman => (
+              <option key={salesman} value={salesman}>{salesman}</option>
+            ))}
+          </select>
+
+          <button
+            onClick={() => setFilters({ department: '', salesman: '', shop: '', searchText: '' })}
+            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center space-x-2"
+          >
+            <X className="w-4 h-4" />
+            <span>Clear</span>
+          </button>
+
+          <div className="text-sm text-gray-500">
+            Showing {filteredShops.length} of {data.allShopsComparison.length} shops
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-lg shadow">
+        <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-medium text-gray-900">Complete Shop Analysis - Rolling 4-Month Comparison (Mar-Apr-May-{getMonthName(data.currentMonth)} {data.currentYear})</h3>
+          <p className="text-sm text-gray-500">
+            {filteredShops.length} shops {filters.department || filters.salesman || filters.searchText ? '(filtered)' : ''} 
+            ranked by current month performance with rolling window analysis and YoY comparison
+          </p>
+        </div>
+        
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rank</th>
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shop Name</th>
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salesman</th>
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Mar Cases</th>
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Apr Cases</th>
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">May Cases</th>
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{getMonthName(data.currentMonth)} Cases</th>
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Growth %</th>
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">YoY %</th>
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trend</th>
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">8PM</th>
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">VERVE</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {currentShops.map((shop, index) => (
+                <tr key={shop.shopId} className="hover:bg-gray-50">
+                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {startIndex + index + 1}
+                  </td>
+                  <td className="px-3 sm:px-6 py-4 text-sm text-gray-900">
+                    <div className="max-w-xs truncate">{shop.shopName}</div>
+                  </td>
+                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">{shop.department}</td>
+                  <td className="px-3 sm:px-6 py-4 text-sm text-gray-900">
+                    <div className="max-w-xs truncate">{shop.salesman}</div>
+                  </td>
+                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {shop.marchTotal?.toLocaleString() || 0}
+                  </td>
+                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {shop.aprilTotal?.toLocaleString() || 0}
+                  </td>
+                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {shop.mayTotal?.toLocaleString() || 0}
+                  </td>
+                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                    <button
+                      onClick={() => onShowSKU(shop)}  
+                      className="text-blue-600 hover:text-blue-800 hover:underline"
+                    >
+                      {shop.juneTotal?.toLocaleString() || shop.total.toLocaleString()}
+                    </button>
+                  </td>
+                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm">
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      (shop.growthPercent || 0) > 0 
+                        ? 'bg-green-100 text-green-800' 
+                        : (shop.growthPercent || 0) < 0
+                        ? 'bg-red-100 text-red-800'
+                        : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {shop.growthPercent?.toFixed(1) || 0}%
+                    </span>
+                  </td>
+                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm">
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      (shop.yoyGrowthPercent || 0) > 0 
+                        ? 'bg-blue-100 text-blue-800' 
+                        : (shop.yoyGrowthPercent || 0) < 0
+                        ? 'bg-red-100 text-red-800'
+                        : 'bg-gray-100 text-gray-800'
+                    }`}>
+                      {shop.yoyGrowthPercent?.toFixed(1) || 0}%
+                    </span>
+                  </td>
+                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm">
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      shop.monthlyTrend === 'improving' ? 'bg-green-100 text-green-800' :
+                      shop.monthlyTrend === 'declining' ? 'bg-red-100 text-red-800' :
+                      shop.monthlyTrend === 'new' ? 'bg-blue-100 text-blue-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {shop.monthlyTrend === 'improving' ? '📈' :
+                       shop.monthlyTrend === 'declining' ? '📉' :
+                       shop.monthlyTrend === 'new' ? '✨' : '➡️'}
+                    </span>
+                  </td>
+                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-purple-600">
+                    {shop.eightPM.toLocaleString()}
+                  </td>
+                  <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-orange-600">
+                    {shop.verve.toLocaleString()}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="px-4 sm:px-6 py-3 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center">
+          <div className="text-sm text-gray-700 mb-2 sm:mb-0">
+            Showing {startIndex + 1} to {Math.min(endIndex, filteredShops.length)} of {filteredShops.length} filtered shops
+          </div>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="px-3 py-1 text-sm text-gray-700">
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="bg-white rounded-lg shadow">
+          <div className="px-6 py-4 border-b border-gray-200 flex items-center">
+            <UserPlus className="w-5 h-5 text-green-600 mr-2" />
+            <h3 className="text-lg font-medium text-gray-900">First-time Billing Shops ({data.customerInsights.firstTimeCustomers})</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shop Name</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Salesman</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">{getMonthName(data.currentMonth)} Cases</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {data.customerInsights.newShops.slice(0, 10).map((shop) => (
+                  <tr key={shop.shopId}>
+                    <td className="px-4 py-4 text-sm text-gray-900 max-w-xs truncate">{shop.shopName}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">{shop.department}</td>
+                    <td className="px-4 py-4 text-sm text-gray-900 max-w-xs truncate">{shop.salesman}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-green-600">{shop.juneTotal || shop.total}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow">
+          <div className="px-6 py-4 border-b border-gray-200 flex items-center">
+            <AlertTriangle className="w-5 h-5 text-red-600 mr-2" />
+            <h3 className="text-lg font-medium text-gray-900">Lost Customers ({data.customerInsights.lostCustomers})</h3>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shop Name</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Salesman</th>
+                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">May Cases</th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {data.customerInsights.lostShops.slice(0, 10).map((shop) => (
+                  <tr key={shop.shopId}>
+                    <td className="px-4 py-4 text-sm text-gray-900 max-w-xs truncate">{shop.shopName}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">{shop.department}</td>
+                    <td className="px-4 py-4 text-sm text-gray-900 max-w-xs truncate">{shop.salesman}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-red-600">{shop.mayTotal}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </div>
         </div>
       </div>
