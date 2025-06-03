@@ -1891,10 +1891,6 @@ const MetricCard = ({ title, value, subtitle, icon: Icon, color }: {
 };
 
 export default RadicoDashboard;
-              onChange={(e) => setFilters({ ...filters, searchText: e.target.value })}
-              className="border border-gray-300 rounded-lg px-3 py-2 w-64"
-            />
-          </div>
           
           <select
             value={filters.department}
