@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import { Target, TrendingUp, Users, MapPin, Star, AlertTriangle, CheckCircle, BarChart3, Filter, Search, Download, Edit3 } from 'lucide-react';
 
-// 🎯 FOCUS SHOPS CONFIGURATION - Easy to change anytime
+// 🎯 UPDATED FOCUS SHOPS CONFIGURATION - Your Complete List
 const FOCUS_SHOP_CODES = [
   '01/2024/1034', '01/2024/1041', '01/2024/0498', '01/2024/1458', '01/2024/1176', '01/2024/1480',
   '01/2024/0507', '01/2024/1612', '01/2024/0352', '01/2024/1900', '01/2024/0692', '01/2024/1417',
@@ -225,6 +225,7 @@ const FocusShopsTab = ({ data }: { data: any }) => {
             <p>2. Find the <code className="bg-yellow-100 px-1 rounded">FOCUS_SHOP_CODES</code> array at the top</p>
             <p>3. Add, remove, or modify shop codes as needed</p>
             <p>4. Save the file - changes will appear immediately</p>
+            <p>5. Current tracking: <strong>{FOCUS_SHOP_CODES.length} shops</strong></p>
           </div>
         </div>
       )}
