@@ -1,10 +1,10 @@
 'use client';
 
-import React from 'react';
-import { UserPlus, AlertTriangle, Star, TrendingDown, Search, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Download, UserPlus, AlertTriangle, TrendingDown, Star, Search, Filter, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 // ==========================================
-// TYPE DEFINITIONS & INTERFACES
+// TYPE DEFINITIONS
 // ==========================================
 
 interface ShopData {
@@ -34,7 +34,6 @@ interface ShopData {
   growthPercent?: number;
   monthlyTrend?: 'improving' | 'declining' | 'stable' | 'new';
   skuBreakdown?: SKUData[];
-  historicalData?: MonthlyData[];
   threeMonthAvgTotal?: number;
   threeMonthAvg8PM?: number;
   threeMonthAvgVERVE?: number;
@@ -45,14 +44,6 @@ interface SKUData {
   cases: number;
   percentage: number;
   month?: string;
-}
-
-interface MonthlyData {
-  month: string;
-  total: number;
-  eightPM: number;
-  verve: number;
-  skuBreakdown: SKUData[];
 }
 
 interface CustomerInsights {
@@ -67,31 +58,8 @@ interface CustomerInsights {
 }
 
 interface DashboardData {
-  summary: {
-    totalShops: number;
-    billedShops: number;
-    total8PM: number;
-    totalVERVE: number;
-    totalSales: number;
-    coverage: string;
-    total8PMTarget: number;
-    totalVerveTarget: number;
-    eightPmAchievement: string;
-    verveAchievement: string;
-    lastYearTotal8PM?: number;
-    lastYearTotalVERVE?: number;
-    yoy8PMGrowth?: string;
-    yoyVerveGrowth?: string;
-  };
-  topShops: ShopData[];
-  deptPerformance: Record<string, any>;
-  salesData: Record<string, ShopData>;
-  visitData: number;
-  lastUpdated: Date;
-  salespersonStats: Record<string, any>;
-  customerInsights: CustomerInsights;
   allShopsComparison: ShopData[];
-  historicalData?: any;
+  customerInsights: CustomerInsights;
   currentMonth: string;
   currentYear: string;
 }
@@ -112,29 +80,51 @@ const getMonthName = (monthNum: string) => {
   return months[parseInt(monthNum) - 1] || 'Unknown';
 };
 
+const getShortMonthName = (monthNum: string) => {
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return months[parseInt(monthNum) - 1] || 'Unknown';
+};
+
 // ==========================================
-// ADVANCED ANALYTICS TAB COMPONENT
+// MAIN COMPONENT
 // ==========================================
 
-const AdvancedAnalyticsTab = ({ 
-  data, 
-  onShowSKU, 
-  currentPage, 
-  setCurrentPage, 
-  itemsPerPage,
-  filters,
-  setFilters,
-  getFilteredShops
-}: { 
-  data: DashboardData, 
-  onShowSKU: (shop: ShopData) => void,
-  currentPage: number,
-  setCurrentPage: (page: number) => void,
-  itemsPerPage: number,
-  filters: FilterState,
-  setFilters: (filters: FilterState) => void,
-  getFilteredShops: (shops: ShopData[]) => ShopData[]
-}) => {
+const AdvancedAnalyticsTab = ({ data }: { data: DashboardData }) => {
+  // ==========================================
+  // INTERNAL STATE MANAGEMENT
+  // ==========================================
+  
+  const [showSKUModal, setShowSKUModal] = useState(false);
+  const [selectedShopSKU, setSelectedShopSKU] = useState<ShopData | null>(null);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(20);
+  const [filters, setFilters] = useState<FilterState>({
+    department: '',
+    salesman: '',
+    shop: '',
+    searchText: ''
+  });
+
+  // ==========================================
+  // INTERNAL UTILITY FUNCTIONS
+  // ==========================================
+
+  const getFilteredShops = useMemo(() => {
+    return (shops: ShopData[]): ShopData[] => {
+      return shops.filter(shop => {
+        const matchesDepartment = !filters.department || shop.department === filters.department;
+        const matchesSalesman = !filters.salesman || shop.salesman === filters.salesman;
+        const matchesShop = !filters.shop || shop.shopName.toLowerCase().includes(filters.shop.toLowerCase());
+        const matchesSearch = !filters.searchText || 
+          shop.shopName.toLowerCase().includes(filters.searchText.toLowerCase()) ||
+          shop.department.toLowerCase().includes(filters.searchText.toLowerCase()) ||
+          shop.salesman.toLowerCase().includes(filters.searchText.toLowerCase());
+        
+        return matchesDepartment && matchesSalesman && matchesShop && matchesSearch;
+      });
+    };
+  }, [filters]);
+
   const filteredShops = getFilteredShops(data.allShopsComparison);
   const totalPages = Math.ceil(filteredShops.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -143,6 +133,168 @@ const AdvancedAnalyticsTab = ({
 
   const departments = [...new Set(data.allShopsComparison.map(shop => shop.department))].sort();
   const salesmen = [...new Set(data.allShopsComparison.map(shop => shop.salesman))].sort();
+
+  // ==========================================
+  // INTERNAL EXPORT FUNCTION
+  // ==========================================
+
+  const exportToExcel = async () => {
+    try {
+      let csvContent = "data:text/csv;charset=utf-8,";
+      csvContent += `Radico Enhanced Shop Analysis Report - Rolling 4-Month Comparison - ${new Date().toLocaleDateString()}\n`;
+      csvContent += `Report Period: Mar-Apr-May-${getShortMonthName(data.currentMonth)} ${data.currentYear}\n`;
+      
+      if (filters.department || filters.salesman || filters.searchText) {
+        csvContent += "APPLIED FILTERS: ";
+        if (filters.department) csvContent += `Department: ${filters.department}, `;
+        if (filters.salesman) csvContent += `Salesman: ${filters.salesman}, `;
+        if (filters.searchText) csvContent += `Search: ${filters.searchText}`;
+        csvContent += "\n";
+      }
+      csvContent += "\n";
+      
+      csvContent += "EXECUTIVE SUMMARY\n";
+      csvContent += "Total Shops," + data.allShopsComparison.length + "\n";
+      csvContent += "Filtered Shops," + filteredShops.length + "\n";
+      csvContent += "First-time Customers," + data.customerInsights.firstTimeCustomers + "\n";
+      csvContent += "Lost Customers," + data.customerInsights.lostCustomers + "\n";
+      csvContent += "Consistent Performers," + data.customerInsights.consistentPerformers + "\n";
+      csvContent += "Declining Performers," + data.customerInsights.decliningPerformers + "\n\n";
+      
+      csvContent += `ROLLING WINDOW SHOP COMPARISON (Mar-Apr-May-${getShortMonthName(data.currentMonth)} ${data.currentYear})\n`;
+      csvContent += `Shop Name,Department,Salesman,Mar Cases,Apr Cases,May Cases,${getShortMonthName(data.currentMonth)} Cases,8PM Cases,VERVE Cases,Growth %,YoY Growth %,Monthly Trend\n`;
+      
+      filteredShops.forEach(shop => {
+        csvContent += `"${shop.shopName}","${shop.department}","${shop.salesman}",${shop.marchTotal || 0},${shop.aprilTotal || 0},${shop.mayTotal || 0},${shop.juneTotal || shop.total},${shop.eightPM},${shop.verve},${shop.growthPercent?.toFixed(1) || 0}%,${shop.yoyGrowthPercent?.toFixed(1) || 0}%,"${shop.monthlyTrend || 'stable'}"\n`;
+      });
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `Radico_Enhanced_Analysis_${getShortMonthName(data.currentMonth)}_${data.currentYear}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Error exporting to Excel:', error);
+      alert('Error exporting data. Please try again.');
+    }
+  };
+
+  // ==========================================
+  // INTERNAL SKU MODAL COMPONENT
+  // ==========================================
+
+  const EnhancedSKUModal = ({ shop, onClose }: { shop: ShopData, onClose: () => void }) => {
+    const [activeMonth, setActiveMonth] = useState(getShortMonthName(data.currentMonth));
+    
+    const getSKUDataForMonth = (month: string) => {
+      if (month === getShortMonthName(data.currentMonth)) {
+        return shop.skuBreakdown || [];
+      }
+      return [];
+    };
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg max-w-4xl w-full max-h-[80vh] overflow-hidden">
+          <div className="flex justify-between items-center p-6 border-b">
+            <h3 className="text-lg font-semibold">SKU Analysis - {shop.shopName}</h3>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+
+          <div className="flex border-b">
+            {['March', 'April', 'May', getShortMonthName(data.currentMonth)].map((month) => (
+              <button
+                key={month}
+                onClick={() => setActiveMonth(month)}
+                className={`px-6 py-3 font-medium ${
+                  activeMonth === month
+                    ? 'border-b-2 border-blue-600 text-blue-600'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                {month} {data.currentYear}
+              </button>
+            ))}
+          </div>
+
+          <div className="p-6 overflow-y-auto">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+              <div className="text-center bg-blue-50 p-4 rounded-lg">
+                <div className="text-2xl font-bold text-blue-600">
+                  {activeMonth === getShortMonthName(data.currentMonth) ? shop.juneTotal || shop.total :
+                   activeMonth === 'May' ? shop.mayTotal || 0 :
+                   activeMonth === 'April' ? shop.aprilTotal || 0 :
+                   shop.marchTotal || 0}
+                </div>
+                <div className="text-sm text-gray-500">Total Cases</div>
+              </div>
+              <div className="text-center bg-purple-50 p-4 rounded-lg">
+                <div className="text-2xl font-bold text-purple-600">
+                  {activeMonth === getShortMonthName(data.currentMonth) ? shop.juneEightPM || shop.eightPM :
+                   activeMonth === 'May' ? shop.mayEightPM || 0 :
+                   activeMonth === 'April' ? shop.aprilEightPM || 0 :
+                   shop.marchEightPM || 0}
+                </div>
+                <div className="text-sm text-gray-500">8PM Cases</div>
+              </div>
+              <div className="text-center bg-orange-50 p-4 rounded-lg">
+                <div className="text-2xl font-bold text-orange-600">
+                  {activeMonth === getShortMonthName(data.currentMonth) ? shop.juneVerve || shop.verve :
+                   activeMonth === 'May' ? shop.mayVerve || 0 :
+                   activeMonth === 'April' ? shop.aprilVerve || 0 :
+                   shop.marchVerve || 0}
+                </div>
+                <div className="text-sm text-gray-500">VERVE Cases</div>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Brand/SKU</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cases</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Percentage</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {getSKUDataForMonth(activeMonth).map((sku, index) => (
+                    <tr key={index}>
+                      <td className="px-4 py-4 text-sm text-gray-900">{sku.brand}</td>
+                      <td className="px-4 py-4 text-sm font-medium text-gray-900">{sku.cases}</td>
+                      <td className="px-4 py-4 text-sm text-gray-900">{sku.percentage}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ==========================================
+  // INTERNAL HANDLERS
+  // ==========================================
+
+  const handleShowSKU = (shop: ShopData) => {
+    setSelectedShopSKU(shop);
+    setShowSKUModal(true);
+  };
+
+  const handleCloseSKUModal = () => {
+    setShowSKUModal(false);
+    setSelectedShopSKU(null);
+  };
+
+  // ==========================================
+  // RENDER
+  // ==========================================
 
   return (
     <div className="space-y-6">
@@ -239,6 +391,14 @@ const AdvancedAnalyticsTab = ({
             <span>Clear</span>
           </button>
 
+          <button
+            onClick={exportToExcel}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center space-x-2"
+          >
+            <Download className="w-4 h-4" />
+            <span>Export</span>
+          </button>
+
           <div className="text-sm text-gray-500">
             Showing {filteredShops.length} of {data.allShopsComparison.length} shops
           </div>
@@ -297,7 +457,7 @@ const AdvancedAnalyticsTab = ({
                   </td>
                   <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
                     <button
-                      onClick={() => onShowSKU(shop)}  
+                      onClick={() => handleShowSKU(shop)}  
                       className="text-blue-600 hover:text-blue-800 hover:underline"
                     >
                       {shop.juneTotal?.toLocaleString() || shop.total.toLocaleString()}
@@ -434,6 +594,14 @@ const AdvancedAnalyticsTab = ({
           </div>
         </div>
       </div>
+
+      {/* SKU MODAL */}
+      {showSKUModal && selectedShopSKU && (
+        <EnhancedSKUModal 
+          shop={selectedShopSKU} 
+          onClose={handleCloseSKUModal} 
+        />
+      )}
     </div>
   );
 };
