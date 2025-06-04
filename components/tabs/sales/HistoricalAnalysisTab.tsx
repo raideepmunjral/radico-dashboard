@@ -1,52 +1,10 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 // ==========================================
-// TYPE DEFINITIONS & INTERFACES
+// TYPE DEFINITIONS
 // ==========================================
-
-interface ShopData {
-  shopId: string;
-  shopName: string;
-  department: string;
-  salesman: string;
-  total: number;
-  eightPM: number;
-  verve: number;
-  marchTotal?: number;
-  marchEightPM?: number;
-  marchVerve?: number;
-  aprilTotal?: number;
-  aprilEightPM?: number;
-  aprilVerve?: number;
-  mayTotal?: number;
-  mayEightPM?: number;
-  mayVerve?: number;
-  juneTotal?: number;
-  juneEightPM?: number;
-  juneVerve?: number;
-  juneLastYearTotal?: number;
-  juneLastYearEightPM?: number;
-  juneLastYearVerve?: number;
-  yoyGrowthPercent?: number;
-  growthPercent?: number;
-  monthlyTrend?: 'improving' | 'declining' | 'stable' | 'new';
-  threeMonthAvgTotal?: number;
-  threeMonthAvg8PM?: number;
-  threeMonthAvgVERVE?: number;
-}
-
-interface CustomerInsights {
-  firstTimeCustomers: number;
-  lostCustomers: number;
-  consistentPerformers: number;
-  decliningPerformers: number;
-  newShops: ShopData[];
-  lostShops: ShopData[];
-  consistentShops: ShopData[];
-  decliningShops: ShopData[];
-}
 
 interface DashboardData {
   summary: {
@@ -65,17 +23,15 @@ interface DashboardData {
     yoy8PMGrowth?: string;
     yoyVerveGrowth?: string;
   };
-  topShops: ShopData[];
-  deptPerformance: Record<string, any>;
-  salesData: Record<string, ShopData>;
-  visitData: number;
-  lastUpdated: Date;
-  salespersonStats: Record<string, any>;
-  customerInsights: CustomerInsights;
-  allShopsComparison: ShopData[];
-  historicalData?: any;
+  customerInsights: {
+    firstTimeCustomers: number;
+    lostCustomers: number;
+    consistentPerformers: number;
+    decliningPerformers: number;
+  };
   currentMonth: string;
   currentYear: string;
+  historicalData?: any;
 }
 
 // ==========================================
@@ -93,11 +49,17 @@ const getShortMonthName = (monthNum: string) => {
 };
 
 // ==========================================
-// HISTORICAL ANALYSIS TAB COMPONENT
+// MAIN COMPONENT
 // ==========================================
 
 const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
   const [debugInfo, setDebugInfo] = useState<any>(null);
+
+  // Calculate month-over-month growth
+  const calculateGrowth = (current: number, previous: number) => {
+    if (previous === 0) return current > 0 ? 100 : 0;
+    return ((current - previous) / previous * 100);
+  };
 
   useEffect(() => {
     if (data.historicalData) {
@@ -181,12 +143,6 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
       });
     }
   }, [data]);
-
-  // Calculate month-over-month growth
-  const calculateGrowth = (current: number, previous: number) => {
-    if (previous === 0) return current > 0 ? 100 : 0;
-    return ((current - previous) / previous * 100);
-  };
 
   // EXTENDED: 12-month data for comprehensive analysis
   const monthlyData = debugInfo?.monthlyTotals ? [
@@ -410,7 +366,7 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
 
       {/* ROLLING 4-MONTH COMPARISON */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        {monthlyData.slice(-4).map((month, index) => (
+        {monthlyData.map((month, index) => (
           <div key={month.month} className="bg-white p-6 rounded-lg shadow">
             <h3 className="text-lg font-medium text-gray-900 mb-4">{month.month}</h3>
             <div className="space-y-3">
