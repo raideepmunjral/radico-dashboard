@@ -36,6 +36,7 @@ interface DashboardData {
   salespersonStats: Record<string, any>;
   currentMonth: string;
   currentYear: string;
+  allShopsComparison: ShopData[];
 }
 
 // ==========================================
@@ -290,14 +291,28 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
     );
   };
 
-  // INTERNAL CALCULATION: Calculate salesman performance data
+  // ==========================================
+  // FIXED: ENHANCED SALESMAN PERFORMANCE CALCULATION
+  // This now includes ALL assigned shops, not just those with sales data
+  // ==========================================
+  
   const salesmanPerformance = useMemo(() => {
     const performanceMap: Record<string, any> = {};
     
-    const shopDetails = Object.values(data.salesData);
+    console.log('🔧 PROCESSING SALESMAN PERFORMANCE WITH ALL ASSIGNED SHOPS');
     
-    shopDetails.forEach(shop => {
+    // STEP 1: Use allShopsComparison which includes ALL shops (assigned + sales data)
+    const allShops = data.allShopsComparison || [];
+    console.log(`📊 Total shops in allShopsComparison: ${allShops.length}`);
+    
+    allShops.forEach(shop => {
       const salesmanName = shop.salesman;
+      
+      // Skip shops with unknown/invalid salesman
+      if (!salesmanName || salesmanName === 'Unknown' || salesmanName.trim() === '') {
+        return;
+      }
+      
       if (!performanceMap[salesmanName]) {
         performanceMap[salesmanName] = {
           name: salesmanName,
@@ -324,16 +339,19 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
         };
       }
       
+      // Count ALL assigned shops (this is the key fix)
       performanceMap[salesmanName].totalShops++;
+      performanceMap[salesmanName].shops.push(shop);
       
+      // Only count as billed if shop has sales in current month
       if (shop.total > 0) {
         performanceMap[salesmanName].billedShops++;
-        performanceMap[salesmanName].total8PM += shop.eightPM;
-        performanceMap[salesmanName].totalVERVE += shop.verve;
-        performanceMap[salesmanName].totalSales += shop.total;
-        performanceMap[salesmanName].shops.push(shop);
+        performanceMap[salesmanName].total8PM += shop.eightPM || 0;
+        performanceMap[salesmanName].totalVERVE += shop.verve || 0;
+        performanceMap[salesmanName].totalSales += shop.total || 0;
       }
         
+      // Add historical data regardless of current sales
       performanceMap[salesmanName].marchTotal += shop.marchTotal || 0;
       performanceMap[salesmanName].marchEightPM += shop.marchEightPM || 0;
       performanceMap[salesmanName].marchVerve += shop.marchVerve || 0;
@@ -347,8 +365,8 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
       performanceMap[salesmanName].mayVerve += shop.mayVerve || 0;
     });
     
-    // Add target data from salespersonStats
-    Object.values(data.salespersonStats).forEach((stats: any) => {
+    // STEP 2: Add target data from salespersonStats
+    Object.values(data.salespersonStats || {}).forEach((stats: any) => {
       const salesmanName = stats.name;
       if (performanceMap[salesmanName]) {
         performanceMap[salesmanName].target8PM = stats.eightPmTarget || 0;
@@ -356,14 +374,22 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
       }
     });
     
-    // Calculate coverage and achievements
+    // STEP 3: Calculate coverage and achievements
     Object.values(performanceMap).forEach((perf: any) => {
       perf.coverage = perf.totalShops > 0 ? (perf.billedShops / perf.totalShops) * 100 : 0;
       perf.achievement8PM = perf.target8PM > 0 ? (perf.total8PM / perf.target8PM) * 100 : 0;
       perf.achievementVERVE = perf.targetVERVE > 0 ? (perf.totalVERVE / perf.targetVERVE) * 100 : 0;
     });
     
-    return Object.values(performanceMap).filter((p: any) => p.name !== 'Unknown');
+    const result = Object.values(performanceMap).filter((p: any) => p.name !== 'Unknown');
+    
+    // Debug logging
+    console.log('🎯 SALESMAN PERFORMANCE SUMMARY:');
+    result.forEach((salesman: any) => {
+      console.log(`${salesman.name}: ${salesman.billedShops}/${salesman.totalShops} shops (${salesman.coverage.toFixed(1)}% coverage)`);
+    });
+    
+    return result;
   }, [data]);
 
   const sortedSalesmen = salesmanPerformance.sort((a: any, b: any) => b.totalSales - a.totalSales);
@@ -463,8 +489,8 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rank</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salesman</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shops</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Billed</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Shops</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Billed Shops</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Coverage</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">8PM Sales</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">8PM Achievement</th>
@@ -489,7 +515,7 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
                     </div>
                   </td>
                   <td className="px-6 py-4 text-sm font-medium text-gray-900">{salesman.name}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{salesman.totalShops}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-bold">{salesman.totalShops}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{salesman.billedShops}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
