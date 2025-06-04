@@ -299,23 +299,52 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
   const salesmanPerformance = useMemo(() => {
     const performanceMap: Record<string, any> = {};
     
-    console.log('🔧 PROCESSING SALESMAN PERFORMANCE WITH ALL ASSIGNED SHOPS');
+    // Helper function to normalize salesman names (case-insensitive)
+    const normalizeName = (name: string): string => {
+      if (!name) return 'unknown';
+      return name.toString().trim().toLowerCase().replace(/\s+/g, ' ');
+    };
+
+    // Helper function to get the best display name (prefer proper case)
+    const getBestDisplayName = (names: string[]): string => {
+      // Prefer names with proper capitalization
+      const properCase = names.find(name => /^[A-Z]/.test(name) && /[a-z]/.test(name));
+      if (properCase) return properCase;
+      
+      // Fallback to first name found
+      return names[0] || 'Unknown';
+    };
+    
+    console.log('🔧 PROCESSING SALESMAN PERFORMANCE WITH CASE-INSENSITIVE MATCHING');
     
     // STEP 1: Use allShopsComparison which includes ALL shops (assigned + sales data)
     const allShops = data.allShopsComparison || [];
     console.log(`📊 Total shops in allShopsComparison: ${allShops.length}`);
     
+    // Track all name variations for each normalized name
+    const nameVariations: Record<string, string[]> = {};
+    
     allShops.forEach(shop => {
-      const salesmanName = shop.salesman;
+      const originalSalesmanName = shop.salesman;
+      const normalizedName = normalizeName(originalSalesmanName);
       
       // Skip shops with unknown/invalid salesman
-      if (!salesmanName || salesmanName === 'Unknown' || salesmanName.trim() === '') {
+      if (!originalSalesmanName || normalizedName === 'unknown' || normalizedName.trim() === '') {
         return;
       }
       
-      if (!performanceMap[salesmanName]) {
-        performanceMap[salesmanName] = {
-          name: salesmanName,
+      // Track name variations
+      if (!nameVariations[normalizedName]) {
+        nameVariations[normalizedName] = [];
+      }
+      if (!nameVariations[normalizedName].includes(originalSalesmanName)) {
+        nameVariations[normalizedName].push(originalSalesmanName);
+      }
+      
+      if (!performanceMap[normalizedName]) {
+        performanceMap[normalizedName] = {
+          name: originalSalesmanName, // Will be updated to best display name later
+          originalNames: [originalSalesmanName],
           totalShops: 0,
           billedShops: 0,
           coverage: 0,
@@ -337,40 +366,56 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
           mayVerve: 0,
           shops: []
         };
+      } else {
+        // Add to existing entry
+        if (!performanceMap[normalizedName].originalNames.includes(originalSalesmanName)) {
+          performanceMap[normalizedName].originalNames.push(originalSalesmanName);
+        }
       }
       
       // Count ALL assigned shops (this is the key fix)
-      performanceMap[salesmanName].totalShops++;
-      performanceMap[salesmanName].shops.push(shop);
+      performanceMap[normalizedName].totalShops++;
+      performanceMap[normalizedName].shops.push(shop);
       
       // Only count as billed if shop has sales in current month
       if (shop.total > 0) {
-        performanceMap[salesmanName].billedShops++;
-        performanceMap[salesmanName].total8PM += shop.eightPM || 0;
-        performanceMap[salesmanName].totalVERVE += shop.verve || 0;
-        performanceMap[salesmanName].totalSales += shop.total || 0;
+        performanceMap[normalizedName].billedShops++;
+        performanceMap[normalizedName].total8PM += shop.eightPM || 0;
+        performanceMap[normalizedName].totalVERVE += shop.verve || 0;
+        performanceMap[normalizedName].totalSales += shop.total || 0;
       }
         
       // Add historical data regardless of current sales
-      performanceMap[salesmanName].marchTotal += shop.marchTotal || 0;
-      performanceMap[salesmanName].marchEightPM += shop.marchEightPM || 0;
-      performanceMap[salesmanName].marchVerve += shop.marchVerve || 0;
+      performanceMap[normalizedName].marchTotal += shop.marchTotal || 0;
+      performanceMap[normalizedName].marchEightPM += shop.marchEightPM || 0;
+      performanceMap[normalizedName].marchVerve += shop.marchVerve || 0;
       
-      performanceMap[salesmanName].aprilTotal += shop.aprilTotal || 0;
-      performanceMap[salesmanName].aprilEightPM += shop.aprilEightPM || 0;
-      performanceMap[salesmanName].aprilVerve += shop.aprilVerve || 0;
+      performanceMap[normalizedName].aprilTotal += shop.aprilTotal || 0;
+      performanceMap[normalizedName].aprilEightPM += shop.aprilEightPM || 0;
+      performanceMap[normalizedName].aprilVerve += shop.aprilVerve || 0;
       
-      performanceMap[salesmanName].mayTotal += shop.mayTotal || 0;
-      performanceMap[salesmanName].mayEightPM += shop.mayEightPM || 0;
-      performanceMap[salesmanName].mayVerve += shop.mayVerve || 0;
+      performanceMap[normalizedName].mayTotal += shop.mayTotal || 0;
+      performanceMap[normalizedName].mayEightPM += shop.mayEightPM || 0;
+      performanceMap[normalizedName].mayVerve += shop.mayVerve || 0;
     });
     
-    // STEP 2: Add target data from salespersonStats
+    // Update display names to best format
+    Object.keys(performanceMap).forEach(normalizedName => {
+      const variations = nameVariations[normalizedName] || [];
+      performanceMap[normalizedName].name = getBestDisplayName(variations);
+    });
+    
+    // STEP 2: Add target data from salespersonStats with case-insensitive matching
     Object.values(data.salespersonStats || {}).forEach((stats: any) => {
-      const salesmanName = stats.name;
-      if (performanceMap[salesmanName]) {
-        performanceMap[salesmanName].target8PM = stats.eightPmTarget || 0;
-        performanceMap[salesmanName].targetVERVE = stats.verveTarget || 0;
+      const originalStatsName = stats.name;
+      const normalizedStatsName = normalizeName(originalStatsName);
+      
+      if (performanceMap[normalizedStatsName]) {
+        performanceMap[normalizedStatsName].target8PM = stats.eightPmTarget || 0;
+        performanceMap[normalizedStatsName].targetVERVE = stats.verveTarget || 0;
+        console.log(`✅ Matched targets for: "${originalStatsName}" (normalized: "${normalizedStatsName}")`);
+      } else {
+        console.log(`❌ No match found for target: "${originalStatsName}" (normalized: "${normalizedStatsName}")`);
       }
     });
     
@@ -383,10 +428,12 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
     
     const result = Object.values(performanceMap).filter((p: any) => p.name !== 'Unknown');
     
-    // Debug logging
-    console.log('🎯 SALESMAN PERFORMANCE SUMMARY:');
+    // Enhanced debug logging
+    console.log('🎯 CASE-INSENSITIVE SALESMAN PERFORMANCE SUMMARY:');
     result.forEach((salesman: any) => {
-      console.log(`${salesman.name}: ${salesman.billedShops}/${salesman.totalShops} shops (${salesman.coverage.toFixed(1)}% coverage)`);
+      const nameInfo = salesman.originalNames.length > 1 ? 
+        ` (merged ${salesman.originalNames.length} variations: ${salesman.originalNames.join(', ')})` : '';
+      console.log(`${salesman.name}: ${salesman.billedShops}/${salesman.totalShops} shops (${salesman.coverage.toFixed(1)}% coverage)${nameInfo}`);
     });
     
     return result;
