@@ -22,7 +22,7 @@ const FOCUS_SHOP_CODES = [
   '01/2024/0205', '01/2024/0796'
 ];
 
-const FocusShopsTab = ({ data }: { data: any }) => {
+const FocusShopsTab = ({ data }: { data: DashboardData }) => {
   const [searchFilter, setSearchFilter] = useState('');
   const [sortBy, setSortBy] = useState('total'); // total, growth, trend
   const [showEditMode, setShowEditMode] = useState(false);
@@ -31,7 +31,7 @@ const FocusShopsTab = ({ data }: { data: any }) => {
   // MOBILE CARD COMPONENT
   // ==========================================
 
-  const MobileFocusShopCard = ({ shop, index }: { shop: any, index: number }) => (
+  const MobileFocusShopCard = ({ shop, index }: { shop: ShopData, index: number }) => (
     <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
       <div className="flex justify-between items-start mb-3">
         <div className="flex-1">
@@ -105,12 +105,12 @@ const FocusShopsTab = ({ data }: { data: any }) => {
   );
 
   // Filter data to show only focus shops
-  const focusShopsData = useMemo(() => {
+  const focusShopsData = useMemo((): ShopData[] => {
     if (!data?.salesData) return [];
 
-    const focusShops = Object.values(data.salesData)
-      .filter((shop: any) => FOCUS_SHOP_CODES.includes(shop.shopId))
-      .filter((shop: any) => 
+    const focusShops = (Object.values(data.salesData) as ShopData[])
+      .filter((shop: ShopData) => FOCUS_SHOP_CODES.includes(shop.shopId))
+      .filter((shop: ShopData) => 
         !searchFilter || 
         shop.shopName.toLowerCase().includes(searchFilter.toLowerCase()) ||
         shop.department.toLowerCase().includes(searchFilter.toLowerCase()) ||
@@ -118,7 +118,7 @@ const FocusShopsTab = ({ data }: { data: any }) => {
       );
 
     // Sort focus shops
-    return focusShops.sort((a: any, b: any) => {
+    return focusShops.sort((a: ShopData, b: ShopData) => {
       switch (sortBy) {
         case 'growth':
           return (b.growthPercent || 0) - (a.growthPercent || 0);
@@ -138,15 +138,15 @@ const FocusShopsTab = ({ data }: { data: any }) => {
 
     const totalFocusShops = FOCUS_SHOP_CODES.length;
     const activeFocusShops = focusShopsData.length;
-    const totalSales = focusShopsData.reduce((sum: number, shop: any) => sum + (shop.total || 0), 0);
-    const total8PM = focusShopsData.reduce((sum: number, shop: any) => sum + (shop.eightPM || 0), 0);
-    const totalVERVE = focusShopsData.reduce((sum: number, shop: any) => sum + (shop.verve || 0), 0);
-    const avgGrowth = focusShopsData.reduce((sum: number, shop: any) => sum + (shop.growthPercent || 0), 0) / activeFocusShops;
+    const totalSales = focusShopsData.reduce((sum: number, shop: ShopData) => sum + (shop.total || 0), 0);
+    const total8PM = focusShopsData.reduce((sum: number, shop: ShopData) => sum + (shop.eightPM || 0), 0);
+    const totalVERVE = focusShopsData.reduce((sum: number, shop: ShopData) => sum + (shop.verve || 0), 0);
+    const avgGrowth = focusShopsData.reduce((sum: number, shop: ShopData) => sum + (shop.growthPercent || 0), 0) / activeFocusShops;
     
-    const improving = focusShopsData.filter((shop: any) => shop.monthlyTrend === 'improving').length;
-    const declining = focusShopsData.filter((shop: any) => shop.monthlyTrend === 'declining').length;
-    const stable = focusShopsData.filter((shop: any) => shop.monthlyTrend === 'stable').length;
-    const newShops = focusShopsData.filter((shop: any) => shop.monthlyTrend === 'new').length;
+    const improving = focusShopsData.filter((shop: ShopData) => shop.monthlyTrend === 'improving').length;
+    const declining = focusShopsData.filter((shop: ShopData) => shop.monthlyTrend === 'declining').length;
+    const stable = focusShopsData.filter((shop: ShopData) => shop.monthlyTrend === 'stable').length;
+    const newShops = focusShopsData.filter((shop: ShopData) => shop.monthlyTrend === 'new').length;
 
     return {
       totalFocusShops,
@@ -324,7 +324,7 @@ const FocusShopsTab = ({ data }: { data: any }) => {
           </div>
           
           <div className="p-4">
-            {focusShopsData.map((shop, index) => (
+            {focusShopsData.map((shop: ShopData, index: number) => (
               <MobileFocusShopCard key={shop.shopId} shop={shop} index={index} />
             ))}
           </div>
@@ -335,7 +335,7 @@ const FocusShopsTab = ({ data }: { data: any }) => {
       <div className="hidden lg:block bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900">Focus Shops Detailed Performance</h3>
-          <p className="text-sm text-gray-500">Rolling 4-month analysis for priority shops (Mar-Apr-May-Jun {data?.currentYear})</p>
+          <p className="text-sm text-gray-500">Rolling 4-month analysis for priority shops (Mar-Apr-May-Jun {data?.currentYear || '2025'})</p>
         </div>
         
         <div className="overflow-x-auto">
@@ -354,7 +354,7 @@ const FocusShopsTab = ({ data }: { data: any }) => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {focusShopsData.map((shop: any, index: number) => (
+              {focusShopsData.map((shop: ShopData, index: number) => (
                 <tr key={shop.shopId} className={`${index < 5 ? 'bg-green-50' : ''} hover:bg-gray-50`}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     <div className="flex items-center">
