@@ -3,6 +3,44 @@
 import React, { useState, useMemo } from 'react';
 import { Target, TrendingUp, Users, MapPin, Star, AlertTriangle, CheckCircle, BarChart3, Filter, Search, Download, Edit3 } from 'lucide-react';
 
+// ==========================================
+// TYPE DEFINITIONS
+// ==========================================
+
+interface ShopData {
+  shopId: string;
+  shopName: string;
+  department: string;
+  salesman: string;
+  total: number;
+  eightPM: number;
+  verve: number;
+  marchTotal?: number;
+  marchEightPM?: number;
+  marchVerve?: number;
+  aprilTotal?: number;
+  aprilEightPM?: number;
+  aprilVerve?: number;
+  mayTotal?: number;
+  mayEightPM?: number;
+  mayVerve?: number;
+  juneTotal?: number;
+  juneEightPM?: number;
+  juneVerve?: number;
+  growthPercent?: number;
+  monthlyTrend?: 'improving' | 'declining' | 'stable' | 'new';
+  skuBreakdown?: any[];
+  threeMonthAvgTotal?: number;
+  threeMonthAvg8PM?: number;
+  threeMonthAvgVERVE?: number;
+}
+
+interface DashboardData {
+  salesData?: Record<string, ShopData>;
+  currentMonth?: string;
+  currentYear?: string;
+}
+
 // 🎯 UPDATED FOCUS SHOPS CONFIGURATION - Your Complete List
 const FOCUS_SHOP_CODES = [
   '01/2024/1034', '01/2024/1041', '01/2024/0498', '01/2024/1458', '01/2024/1176', '01/2024/1480',
