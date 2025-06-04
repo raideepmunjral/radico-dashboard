@@ -10,6 +10,7 @@ import InventoryDashboard from '../components/InventoryDashboard';
 import AdvancedAnalyticsTab from '../components/tabs/sales/AdvancedAnalyticsTab';
 import HistoricalAnalysisTab from '../components/tabs/sales/HistoricalAnalysisTab';
 import SalesmanPerformanceTab from '../components/tabs/sales/SalesmanPerformanceTab';
+import FocusShopsTab from '../components/tabs/sales/FocusShopsTab';
 
 // ==========================================
 // PART 1: TYPE DEFINITIONS & INTERFACES
@@ -1152,6 +1153,7 @@ const RadicoDashboard = () => {
                 {[
                   { id: 'overview', label: 'Sales Overview', icon: BarChart3 },
                   { id: 'shops', label: 'Top Shops', icon: Trophy },
+                  { id: 'focus-shops', label: 'Focus Shops', icon: Target },
                   { id: 'department', label: 'Department Analysis', icon: Building },
                   { id: 'salesman', label: 'Salesman Performance', icon: Users },
                   { id: 'analytics', label: 'Advanced Analytics', icon: Activity },
@@ -1188,6 +1190,7 @@ const RadicoDashboard = () => {
                   getFilteredShops={getFilteredTopShops}
                   exportCSV={exportTopShopsToCSV}
                 />}
+                {activeTab === 'focus-shops' && <FocusShopsTab data={dashboardData} />}
                 {activeTab === 'department' && <DepartmentTab data={dashboardData} />}
                 {activeTab === 'salesman' && <SalesmanPerformanceTab data={dashboardData} />}
                 {activeTab === 'analytics' && <AdvancedAnalyticsTab data={dashboardData} />}
