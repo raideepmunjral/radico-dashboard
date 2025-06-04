@@ -65,8 +65,6 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
 
   // INTERNAL FUNCTION to handle case breakdown click
   const handleCaseBreakdownClick = (salesmanName: string, month: string, monthName: string, total: number, eightPM: number, verve: number) => {
-    console.log('🔥 BREAKDOWN CLICKED:', { salesmanName, month, monthName, total, eightPM, verve });
-    console.log('🔥 Setting state...');
     setSelectedSalesmanBreakdown({
       salesmanName,
       month,
@@ -76,8 +74,123 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
       verve
     });
     setShowSalesmanBreakdown(true);
-    console.log('🔥 State set, modal should show');
   };
+
+  // ==========================================
+  // MOBILE CARD COMPONENT
+  // ==========================================
+
+  const MobileSalesmanCard = ({ salesman, index }: { salesman: any, index: number }) => (
+    <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
+      <div className="flex justify-between items-start mb-3">
+        <div className="flex-1">
+          <div className="flex items-center mb-1">
+            <span className="text-lg font-bold text-gray-900 mr-2">#{index + 1}</span>
+            {index < 3 && (
+              <span>
+                {index === 0 && '🥇'}
+                {index === 1 && '🥈'}
+                {index === 2 && '🥉'}
+              </span>
+            )}
+          </div>
+          <h3 className="font-medium text-gray-900 text-base">{salesman.name}</h3>
+          <p className="text-sm text-gray-500">{salesman.billedShops}/{salesman.totalShops} shops</p>
+        </div>
+        <div className="text-right">
+          <div className="text-lg font-bold text-blue-600">{salesman.totalSales.toLocaleString()}</div>
+          <div className="text-xs text-gray-500">Total Cases</div>
+        </div>
+      </div>
+      
+      {/* Current Month Performance */}
+      <div className="grid grid-cols-2 gap-3 mb-3 p-3 bg-blue-50 rounded-lg">
+        <div className="text-center">
+          <div className="text-sm font-bold text-purple-600">{salesman.total8PM.toLocaleString()}</div>
+          <div className="text-xs text-gray-500">8PM Cases</div>
+          <div className="text-xs text-gray-400">Target: {salesman.target8PM.toLocaleString()}</div>
+        </div>
+        <div className="text-center">
+          <div className="text-sm font-bold text-orange-600">{salesman.totalVERVE.toLocaleString()}</div>
+          <div className="text-xs text-gray-500">VERVE Cases</div>
+          <div className="text-xs text-gray-400">Target: {salesman.targetVERVE.toLocaleString()}</div>
+        </div>
+      </div>
+
+      {/* Achievements */}
+      <div className="grid grid-cols-3 gap-3 mb-3">
+        <div className="text-center p-2 bg-gray-50 rounded">
+          <div className={`text-sm font-medium ${
+            salesman.coverage >= 80 ? 'text-green-600' :
+            salesman.coverage >= 60 ? 'text-yellow-600' : 'text-red-600'
+          }`}>
+            {salesman.coverage.toFixed(0)}%
+          </div>
+          <div className="text-xs text-gray-500">Coverage</div>
+        </div>
+        <div className="text-center p-2 bg-purple-50 rounded">
+          <div className={`text-sm font-medium ${
+            salesman.achievement8PM >= 100 ? 'text-green-600' :
+            salesman.achievement8PM >= 80 ? 'text-yellow-600' : 'text-red-600'
+          }`}>
+            {salesman.target8PM > 0 ? `${salesman.achievement8PM.toFixed(0)}%` : 'N/A'}
+          </div>
+          <div className="text-xs text-gray-500">8PM Achievement</div>
+        </div>
+        <div className="text-center p-2 bg-orange-50 rounded">
+          <div className={`text-sm font-medium ${
+            salesman.achievementVERVE >= 100 ? 'text-green-600' :
+            salesman.achievementVERVE >= 80 ? 'text-yellow-600' : 'text-red-600'
+          }`}>
+            {salesman.targetVERVE > 0 ? `${salesman.achievementVERVE.toFixed(0)}%` : 'N/A'}
+          </div>
+          <div className="text-xs text-gray-500">VERVE Achievement</div>
+        </div>
+      </div>
+
+      {/* Historical Trend */}
+      <div className="grid grid-cols-3 gap-2 mb-3">
+        <button
+          onClick={() => handleCaseBreakdownClick(salesman.name, 'march', 'March', salesman.marchTotal, salesman.marchEightPM, salesman.marchVerve)}
+          className="text-center p-2 bg-blue-100 rounded hover:bg-blue-200 transition-colors"
+        >
+          <div className="text-sm font-medium text-gray-900">{salesman.marchTotal.toLocaleString()}</div>
+          <div className="text-xs text-gray-500">Mar</div>
+        </button>
+        <button
+          onClick={() => handleCaseBreakdownClick(salesman.name, 'april', 'April', salesman.aprilTotal, salesman.aprilEightPM, salesman.aprilVerve)}
+          className="text-center p-2 bg-green-100 rounded hover:bg-green-200 transition-colors"
+        >
+          <div className="text-sm font-medium text-gray-900">{salesman.aprilTotal.toLocaleString()}</div>
+          <div className="text-xs text-gray-500">Apr</div>
+        </button>
+        <button
+          onClick={() => handleCaseBreakdownClick(salesman.name, 'may', 'May', salesman.mayTotal, salesman.mayEightPM, salesman.mayVerve)}
+          className="text-center p-2 bg-yellow-100 rounded hover:bg-yellow-200 transition-colors"
+        >
+          <div className="text-sm font-medium text-gray-900">{salesman.mayTotal.toLocaleString()}</div>
+          <div className="text-xs text-gray-500">May</div>
+        </button>
+      </div>
+
+      {/* Trend Indicator */}
+      <div className="flex justify-center">
+        {(() => {
+          const trend = salesman.mayTotal > salesman.aprilTotal && salesman.aprilTotal > salesman.marchTotal ? 'improving' :
+                      salesman.mayTotal < salesman.aprilTotal && salesman.aprilTotal < salesman.marchTotal ? 'declining' : 'stable';
+          return (
+            <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${
+              trend === 'improving' ? 'bg-green-100 text-green-800' :
+              trend === 'declining' ? 'bg-red-100 text-red-800' :
+              'bg-gray-100 text-gray-800'
+            }`}>
+              {trend === 'improving' ? '📈 Growing' : trend === 'declining' ? '📉 Declining' : '➡️ Stable'}
+            </span>
+          );
+        })()}
+      </div>
+    </div>
+  );
 
   // INTERNAL COMPONENT: Salesman Breakdown Modal
   const SalesmanBreakdownModal = ({ onClose }: { onClose: () => void }) => {
@@ -86,7 +199,7 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
         <div className="bg-white rounded-lg max-w-2xl w-full max-h-[80vh] overflow-hidden">
-          <div className="flex justify-between items-center p-6 border-b">
+          <div className="flex justify-between items-center p-4 sm:p-6 border-b">
             <h3 className="text-lg font-semibold">
               {selectedSalesmanBreakdown.salesmanName} - {selectedSalesmanBreakdown.monthName} 2025 Breakdown
             </h3>
@@ -98,17 +211,17 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
             </button>
           </div>
 
-          <div className="p-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+          <div className="p-4 sm:p-6">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6 mb-6">
               <div className="text-center bg-blue-50 p-4 rounded-lg">
-                <div className="text-3xl font-bold text-blue-600">
+                <div className="text-2xl sm:text-3xl font-bold text-blue-600">
                   {selectedSalesmanBreakdown.total.toLocaleString()}
                 </div>
                 <div className="text-sm text-gray-500">Total Cases</div>
                 <div className="text-xs text-gray-400">{selectedSalesmanBreakdown.monthName} 2025</div>
               </div>
               <div className="text-center bg-purple-50 p-4 rounded-lg">
-                <div className="text-3xl font-bold text-purple-600">
+                <div className="text-2xl sm:text-3xl font-bold text-purple-600">
                   {selectedSalesmanBreakdown.eightPM.toLocaleString()}
                 </div>
                 <div className="text-sm text-gray-500">8PM Cases</div>
@@ -118,7 +231,7 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
                 </div>
               </div>
               <div className="text-center bg-orange-50 p-4 rounded-lg">
-                <div className="text-3xl font-bold text-orange-600">
+                <div className="text-2xl sm:text-3xl font-bold text-orange-600">
                   {selectedSalesmanBreakdown.verve.toLocaleString()}
                 </div>
                 <div className="text-sm text-gray-500">VERVE Cases</div>
@@ -141,7 +254,7 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-3">
                     <div 
-                      className="bg-purple-600 h-3 rounded-full" 
+                      className="bg-purple-600 h-3 rounded-full transition-all duration-500" 
                       style={{ width: `${selectedSalesmanBreakdown.total > 0 ? (selectedSalesmanBreakdown.eightPM / selectedSalesmanBreakdown.total) * 100 : 0}%` }}
                     ></div>
                   </div>
@@ -155,7 +268,7 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-3">
                     <div 
-                      className="bg-orange-600 h-3 rounded-full" 
+                      className="bg-orange-600 h-3 rounded-full transition-all duration-500" 
                       style={{ width: `${selectedSalesmanBreakdown.total > 0 ? (selectedSalesmanBreakdown.verve / selectedSalesmanBreakdown.total) * 100 : 0}%` }}
                     ></div>
                   </div>
@@ -177,7 +290,7 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
     );
   };
 
-  // INTERNAL CALCULATION: Calculate salesman performance data (FIXED HISTORICAL AGGREGATION)
+  // INTERNAL CALCULATION: Calculate salesman performance data
   const salesmanPerformance = useMemo(() => {
     const performanceMap: Record<string, any> = {};
     
@@ -198,7 +311,6 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
           targetVERVE: 0,
           achievement8PM: 0,
           achievementVERVE: 0,
-          // FIXED: 3-month historical data aggregation
           marchTotal: 0,
           marchEightPM: 0,
           marchVerve: 0,
@@ -214,7 +326,6 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
       
       performanceMap[salesmanName].totalShops++;
       
-      // FIXED: Current month aggregation (June)
       if (shop.total > 0) {
         performanceMap[salesmanName].billedShops++;
         performanceMap[salesmanName].total8PM += shop.eightPM;
@@ -223,7 +334,6 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
         performanceMap[salesmanName].shops.push(shop);
       }
         
-      // FIXED: Historical data aggregation (Mar-Apr-May)
       performanceMap[salesmanName].marchTotal += shop.marchTotal || 0;
       performanceMap[salesmanName].marchEightPM += shop.marchEightPM || 0;
       performanceMap[salesmanName].marchVerve += shop.marchVerve || 0;
@@ -260,76 +370,89 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
 
   return (
     <div className="space-y-6">
-      {/* DEBUG: Show modal state */}
-      {process.env.NODE_ENV === 'development' && (
-        <div className="bg-yellow-100 p-2 text-xs">
-          DEBUG: showSalesmanBreakdown={String(showSalesmanBreakdown)}, selectedData={selectedSalesmanBreakdown?.salesmanName || 'null'}
-        </div>
-      )}
-      
       <div className="text-center">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Salesman Performance Dashboard</h2>
-        <p className="text-gray-600">Individual salesman achievements and targets for {getMonthName(data.currentMonth)} {data.currentYear}</p>
+        <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Salesman Performance Dashboard</h2>
+        <p className="text-gray-600 text-sm sm:text-base">Individual salesman achievements and targets for {getMonthName(data.currentMonth)} {data.currentYear}</p>
       </div>
 
-      {/* Performance Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Top Performer (Sales)</h3>
+      {/* Performance Summary Cards - Mobile Responsive */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
+        <div className="bg-white p-3 sm:p-6 rounded-lg shadow">
+          <h3 className="text-sm sm:text-lg font-medium text-gray-900 mb-1 sm:mb-2">Top Performer</h3>
           {sortedSalesmen.length > 0 && (
             <div>
-              <div className="text-2xl font-bold text-blue-600">{sortedSalesmen[0].name}</div>
-              <div className="text-sm text-gray-500">{sortedSalesmen[0].totalSales.toLocaleString()} cases</div>
+              <div className="text-lg sm:text-2xl font-bold text-blue-600 truncate">{sortedSalesmen[0].name}</div>
+              <div className="text-xs sm:text-sm text-gray-500">{sortedSalesmen[0].totalSales.toLocaleString()} cases</div>
             </div>
           )}
         </div>
         
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Best 8PM Achievement</h3>
+        <div className="bg-white p-3 sm:p-6 rounded-lg shadow">
+          <h3 className="text-sm sm:text-lg font-medium text-gray-900 mb-1 sm:mb-2">Best 8PM</h3>
           {(() => {
             const best8PM = sortedSalesmen.filter((s: any) => s.target8PM > 0).sort((a: any, b: any) => b.achievement8PM - a.achievement8PM)[0];
             return best8PM ? (
               <div>
-                <div className="text-2xl font-bold text-purple-600">{best8PM.name}</div>
-                <div className="text-sm text-gray-500">{best8PM.achievement8PM.toFixed(1)}%</div>
+                <div className="text-lg sm:text-2xl font-bold text-purple-600 truncate">{best8PM.name}</div>
+                <div className="text-xs sm:text-sm text-gray-500">{best8PM.achievement8PM.toFixed(1)}%</div>
               </div>
             ) : (
-              <div className="text-sm text-gray-500">No targets set</div>
+              <div className="text-xs sm:text-sm text-gray-500">No targets set</div>
             );
           })()}
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Best VERVE Achievement</h3>
+        <div className="bg-white p-3 sm:p-6 rounded-lg shadow">
+          <h3 className="text-sm sm:text-lg font-medium text-gray-900 mb-1 sm:mb-2">Best VERVE</h3>
           {(() => {
             const bestVERVE = sortedSalesmen.filter((s: any) => s.targetVERVE > 0).sort((a: any, b: any) => b.achievementVERVE - a.achievementVERVE)[0];
             return bestVERVE ? (
               <div>
-                <div className="text-2xl font-bold text-orange-600">{bestVERVE.name}</div>
-                <div className="text-sm text-gray-500">{bestVERVE.achievementVERVE.toFixed(1)}%</div>
+                <div className="text-lg sm:text-2xl font-bold text-orange-600 truncate">{bestVERVE.name}</div>
+                <div className="text-xs sm:text-sm text-gray-500">{bestVERVE.achievementVERVE.toFixed(1)}%</div>
               </div>
             ) : (
-              <div className="text-sm text-gray-500">No targets set</div>
+              <div className="text-xs sm:text-sm text-gray-500">No targets set</div>
             );
           })()}
         </div>
 
-        <div className="bg-white p-6 rounded-lg shadow">
-          <h3 className="text-lg font-medium text-gray-900 mb-2">Best Coverage</h3>
+        <div className="bg-white p-3 sm:p-6 rounded-lg shadow">
+          <h3 className="text-sm sm:text-lg font-medium text-gray-900 mb-1 sm:mb-2">Best Coverage</h3>
           {(() => {
             const bestCoverage = sortedSalesmen.sort((a: any, b: any) => b.coverage - a.coverage)[0];
             return bestCoverage ? (
               <div>
-                <div className="text-2xl font-bold text-green-600">{bestCoverage.name}</div>
-                <div className="text-sm text-gray-500">{bestCoverage.coverage.toFixed(1)}%</div>
+                <div className="text-lg sm:text-2xl font-bold text-green-600 truncate">{bestCoverage.name}</div>
+                <div className="text-xs sm:text-sm text-gray-500">{bestCoverage.coverage.toFixed(1)}%</div>
               </div>
             ) : null;
           })()}
         </div>
       </div>
 
-      {/* Detailed Performance Table */}
-      <div className="bg-white rounded-lg shadow">
+      {/* Mobile View - Card Layout */}
+      <div className="block lg:hidden">
+        <div className="bg-white rounded-lg shadow">
+          <div className="px-4 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-medium text-gray-900">
+              Salesman Performance - Mobile View
+            </h3>
+            <p className="text-sm text-gray-500">
+              Ranked by total sales ({getMonthName(data.currentMonth)} {data.currentYear})
+            </p>
+          </div>
+          
+          <div className="p-4">
+            {sortedSalesmen.map((salesman, index) => (
+              <MobileSalesmanCard key={salesman.name} salesman={salesman} index={index} />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Desktop View - Enhanced Table */}
+      <div className="hidden lg:block bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900">Salesman Performance Details - {getMonthName(data.currentMonth)} {data.currentYear}</h3>
           <p className="text-sm text-gray-500">Complete performance breakdown with current month targets and achievements</p>
@@ -417,8 +540,8 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-      {/* NEW: 3-Month Historical Performance */}
-      <div className="bg-white rounded-lg shadow">
+      {/* 3-Month Historical Performance - Desktop Only */}
+      <div className="hidden lg:block bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900">3-Month Performance Trend (Mar-Apr-May {data.currentYear})</h3>
           <p className="text-sm text-gray-500">Historical performance comparison for 8PM and VERVE by salesman</p>
@@ -446,57 +569,24 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">{salesman.name}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       <button
-                        onClick={() => {
-                          console.log('March clicked for:', salesman.name);
-                          handleCaseBreakdownClick(
-                            salesman.name, 
-                            'march', 
-                            'March', 
-                            salesman.marchTotal, 
-                            salesman.marchEightPM, 
-                            salesman.marchVerve
-                          );
-                        }}
+                        onClick={() => handleCaseBreakdownClick(salesman.name, 'march', 'March', salesman.marchTotal, salesman.marchEightPM, salesman.marchVerve)}
                         className="text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer"
-                        style={{ textDecoration: 'none' }}
                       >
                         {salesman.marchTotal.toLocaleString()}
                       </button>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       <button
-                        onClick={() => {
-                          console.log('April clicked for:', salesman.name);
-                          handleCaseBreakdownClick(
-                            salesman.name, 
-                            'april', 
-                            'April', 
-                            salesman.aprilTotal, 
-                            salesman.aprilEightPM, 
-                            salesman.aprilVerve
-                          );
-                        }}
+                        onClick={() => handleCaseBreakdownClick(salesman.name, 'april', 'April', salesman.aprilTotal, salesman.aprilEightPM, salesman.aprilVerve)}
                         className="text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer"
-                        style={{ textDecoration: 'none' }}
                       >
                         {salesman.aprilTotal.toLocaleString()}
                       </button>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       <button
-                        onClick={() => {
-                          console.log('May clicked for:', salesman.name);
-                          handleCaseBreakdownClick(
-                            salesman.name, 
-                            'may', 
-                            'May', 
-                            salesman.mayTotal, 
-                            salesman.mayEightPM, 
-                            salesman.mayVerve
-                          );
-                        }}
+                        onClick={() => handleCaseBreakdownClick(salesman.name, 'may', 'May', salesman.mayTotal, salesman.mayEightPM, salesman.mayVerve)}
                         className="text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer"
-                        style={{ textDecoration: 'none' }}
                       >
                         {salesman.mayTotal.toLocaleString()}
                       </button>
@@ -519,30 +609,32 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-      {/* Rest of the component... */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Bottom Charts - Mobile Responsive */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b border-gray-200">
+          <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
             <h3 className="text-lg font-medium text-gray-900">Achievement Comparison</h3>
           </div>
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             <div className="space-y-4">
               {sortedSalesmen.slice(0, 8).map((salesman: any) => (
                 <div key={salesman.name}>
                   <div className="flex justify-between text-sm mb-1">
-                    <span className="font-medium">{salesman.name}</span>
-                    <span>8PM: {salesman.achievement8PM.toFixed(1)}% | VERVE: {salesman.achievementVERVE.toFixed(1)}%</span>
+                    <span className="font-medium truncate flex-1 mr-2">{salesman.name}</span>
+                    <span className="whitespace-nowrap text-xs sm:text-sm">
+                      8PM: {salesman.achievement8PM.toFixed(1)}% | VERVE: {salesman.achievementVERVE.toFixed(1)}%
+                    </span>
                   </div>
                   <div className="grid grid-cols-2 gap-2">
                     <div className="w-full bg-gray-200 rounded-full h-2">
                       <div 
-                        className="bg-purple-600 h-2 rounded-full" 
+                        className="bg-purple-600 h-2 rounded-full transition-all duration-500" 
                         style={{ width: `${Math.min(salesman.achievement8PM, 100)}%` }}
                       ></div>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-2">
                       <div 
-                        className="bg-orange-600 h-2 rounded-full" 
+                        className="bg-orange-600 h-2 rounded-full transition-all duration-500" 
                         style={{ width: `${Math.min(salesman.achievementVERVE, 100)}%` }}
                       ></div>
                     </div>
@@ -554,20 +646,20 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
         </div>
 
         <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b border-gray-200">
+          <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
             <h3 className="text-lg font-medium text-gray-900">Coverage vs Sales Performance</h3>
           </div>
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             <div className="space-y-4">
               {sortedSalesmen.slice(0, 8).map((salesman: any) => (
                 <div key={salesman.name} className="flex items-center justify-between">
-                  <div className="flex-1">
-                    <div className="text-sm font-medium text-gray-900">{salesman.name}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-gray-900 truncate">{salesman.name}</div>
                     <div className="text-xs text-gray-500">
                       {salesman.billedShops}/{salesman.totalShops} shops • {salesman.totalSales.toLocaleString()} cases
                     </div>
                   </div>
-                  <div className="flex items-center space-x-4">
+                  <div className="flex items-center space-x-3 sm:space-x-4 ml-2">
                     <div className="text-center">
                       <div className={`text-lg font-bold ${
                         salesman.coverage >= 80 ? 'text-green-600' :
@@ -589,29 +681,30 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-      <div className="bg-gradient-to-r from-purple-50 to-orange-50 p-6 rounded-lg">
+      {/* Summary - Mobile Responsive */}
+      <div className="bg-gradient-to-r from-purple-50 to-orange-50 p-4 sm:p-6 rounded-lg">
         <h3 className="text-lg font-medium text-gray-900 mb-4">Salesman Achievement Summary - {getMonthName(data.currentMonth)} {data.currentYear}</h3>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="text-center">
-            <div className="text-xl font-bold text-green-600">
+            <div className="text-xl sm:text-2xl font-bold text-green-600">
               {sortedSalesmen.filter((s: any) => s.achievement8PM >= 100 && s.target8PM > 0).length}
             </div>
             <div className="text-xs text-gray-600">8PM Target Achieved</div>
           </div>
           <div className="text-center">
-            <div className="text-xl font-bold text-orange-600">
+            <div className="text-xl sm:text-2xl font-bold text-orange-600">
               {sortedSalesmen.filter((s: any) => s.achievementVERVE >= 100 && s.targetVERVE > 0).length}
             </div>
             <div className="text-xs text-gray-600">VERVE Target Achieved</div>
           </div>
           <div className="text-center">
-            <div className="text-xl font-bold text-blue-600">
+            <div className="text-xl sm:text-2xl font-bold text-blue-600">
               {sortedSalesmen.filter((s: any) => s.coverage >= 80).length}
             </div>
             <div className="text-xs text-gray-600">High Coverage ({'>'}80%)</div>
           </div>
           <div className="text-center">
-            <div className="text-xl font-bold text-purple-600">
+            <div className="text-xl sm:text-2xl font-bold text-purple-600">
               {sortedSalesmen.length}
             </div>
             <div className="text-xs text-gray-600">Active Salesmen</div>
@@ -619,7 +712,7 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-      {/* MODAL RENDER */}
+      {/* Modal */}
       {showSalesmanBreakdown && (
         <SalesmanBreakdownModal 
           onClose={() => {
