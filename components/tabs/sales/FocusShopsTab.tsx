@@ -27,6 +27,83 @@ const FocusShopsTab = ({ data }: { data: any }) => {
   const [sortBy, setSortBy] = useState('total'); // total, growth, trend
   const [showEditMode, setShowEditMode] = useState(false);
 
+  // ==========================================
+  // MOBILE CARD COMPONENT
+  // ==========================================
+
+  const MobileFocusShopCard = ({ shop, index }: { shop: any, index: number }) => (
+    <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
+      <div className="flex justify-between items-start mb-3">
+        <div className="flex-1">
+          <div className="flex items-center mb-1">
+            <span className="text-lg font-bold text-gray-900 mr-2">#{index + 1}</span>
+            {index < 3 && (
+              <span>
+                {index === 0 && '🥇'}
+                {index === 1 && '🥈'}
+                {index === 2 && '🥉'}
+              </span>
+            )}
+            {index < 5 && <Star className="w-4 h-4 text-yellow-500 ml-1" />}
+          </div>
+          <h3 className="font-medium text-gray-900 text-sm leading-tight">{shop.shopName}</h3>
+          <p className="text-xs text-gray-500">{shop.shopId}</p>
+          <p className="text-xs text-gray-500">{shop.department} • {shop.salesman}</p>
+        </div>
+        <div className="text-right">
+          <div className="text-lg font-bold text-blue-600">{(shop.juneTotal || shop.total || 0).toLocaleString()}</div>
+          <div className="text-xs text-gray-500">Total Cases</div>
+        </div>
+      </div>
+      
+      {/* Current Month Performance */}
+      <div className="grid grid-cols-2 gap-3 mb-3 p-3 bg-blue-50 rounded-lg">
+        <div className="text-center">
+          <div className="text-sm font-bold text-purple-600">{(shop.juneEightPM || shop.eightPM || 0).toLocaleString()}</div>
+          <div className="text-xs text-gray-500">8PM Cases</div>
+        </div>
+        <div className="text-center">
+          <div className="text-sm font-bold text-orange-600">{(shop.juneVerve || shop.verve || 0).toLocaleString()}</div>
+          <div className="text-xs text-gray-500">VERVE Cases</div>
+        </div>
+      </div>
+
+      {/* Metrics */}
+      <div className="grid grid-cols-2 gap-3 mb-3">
+        <div className="text-center p-2 bg-gray-50 rounded">
+          <div className="text-sm font-bold text-blue-600">
+            {shop.threeMonthAvgTotal?.toFixed(1) || 
+             (((shop.marchTotal || 0) + (shop.aprilTotal || 0) + (shop.mayTotal || 0)) / 3).toFixed(1)}
+          </div>
+          <div className="text-xs text-gray-500">3M Avg</div>
+        </div>
+        <div className="text-center p-2 bg-gray-50 rounded">
+          <div className={`text-sm font-bold ${
+            (shop.growthPercent || 0) > 0 ? 'text-green-600' : 
+            (shop.growthPercent || 0) < 0 ? 'text-red-600' : 'text-gray-600'
+          }`}>
+            {(shop.growthPercent || 0) >= 0 ? '+' : ''}{(shop.growthPercent || 0).toFixed(1)}%
+          </div>
+          <div className="text-xs text-gray-500">Growth</div>
+        </div>
+      </div>
+
+      {/* Trend Indicator */}
+      <div className="flex justify-center">
+        <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${
+          shop.monthlyTrend === 'improving' ? 'bg-green-100 text-green-800' :
+          shop.monthlyTrend === 'declining' ? 'bg-red-100 text-red-800' :
+          shop.monthlyTrend === 'new' ? 'bg-blue-100 text-blue-800' :
+          'bg-gray-100 text-gray-800'
+        }`}>
+          {shop.monthlyTrend === 'improving' ? '📈 Growing' :
+           shop.monthlyTrend === 'declining' ? '📉 Declining' :
+           shop.monthlyTrend === 'new' ? '✨ New' : '➡️ Stable'}
+        </span>
+      </div>
+    </div>
+  );
+
   // Filter data to show only focus shops
   const focusShopsData = useMemo(() => {
     if (!data?.salesData) return [];
@@ -88,58 +165,58 @@ const FocusShopsTab = ({ data }: { data: any }) => {
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Header - Mobile Responsive */}
       <div className="text-center">
         <div className="flex items-center justify-center space-x-2 mb-2">
-          <Target className="w-8 h-8 text-blue-600" />
-          <h2 className="text-2xl font-bold text-gray-900">Focus Shops Performance</h2>
+          <Target className="w-6 sm:w-8 h-6 sm:h-8 text-blue-600" />
+          <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Focus Shops Performance</h2>
         </div>
-        <p className="text-gray-600">Tracking {FOCUS_SHOP_CODES.length} priority shops for detailed analysis</p>
-        <div className="mt-2 flex justify-center space-x-4 text-sm text-gray-500">
+        <p className="text-gray-600 text-sm sm:text-base">Tracking {FOCUS_SHOP_CODES.length} priority shops for detailed analysis</p>
+        <div className="mt-2 flex flex-col sm:flex-row justify-center space-y-1 sm:space-y-0 sm:space-x-4 text-sm text-gray-500">
           <span>Period: {data?.currentMonth ? `${data.currentMonth}/${data.currentYear}` : 'Current Month'}</span>
-          <span>•</span>
+          <span className="hidden sm:inline">•</span>
           <span>Active: {focusMetrics?.activeFocusShops || 0}/{FOCUS_SHOP_CODES.length}</span>
-          <span>•</span>
+          <span className="hidden sm:inline">•</span>
           <span>Coverage: {focusMetrics?.coveragePercent?.toFixed(1) || 0}%</span>
         </div>
       </div>
 
-      {/* Focus Group Summary */}
+      {/* Focus Group Summary - Mobile Responsive */}
       {focusMetrics && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-          <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-6 rounded-lg border border-blue-200">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 sm:gap-6">
+          <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 sm:p-6 rounded-lg border border-blue-200">
             <div className="flex items-center">
-              <div className="p-3 rounded-lg bg-blue-600">
-                <Target className="h-6 w-6 text-white" />
+              <div className="p-2 sm:p-3 rounded-lg bg-blue-600">
+                <Target className="h-5 w-5 sm:h-6 sm:w-6 text-white" />
               </div>
-              <div className="ml-4">
-                <div className="text-2xl font-bold text-blue-900">{focusMetrics.activeFocusShops}</div>
+              <div className="ml-3 sm:ml-4">
+                <div className="text-xl sm:text-2xl font-bold text-blue-900">{focusMetrics.activeFocusShops}</div>
                 <div className="text-sm text-blue-700">Active Focus Shops</div>
                 <div className="text-xs text-blue-600">of {focusMetrics.totalFocusShops} tracked</div>
               </div>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow">
+          <div className="bg-white p-4 sm:p-6 rounded-lg shadow">
             <div className="flex items-center">
-              <div className="p-3 rounded-lg bg-green-100">
-                <BarChart3 className="h-6 w-6 text-green-600" />
+              <div className="p-2 sm:p-3 rounded-lg bg-green-100">
+                <BarChart3 className="h-5 w-5 sm:h-6 sm:w-6 text-green-600" />
               </div>
-              <div className="ml-4">
-                <div className="text-2xl font-bold text-gray-900">{focusMetrics.totalSales.toLocaleString()}</div>
+              <div className="ml-3 sm:ml-4">
+                <div className="text-xl sm:text-2xl font-bold text-gray-900">{focusMetrics.totalSales.toLocaleString()}</div>
                 <div className="text-sm text-gray-500">Total Cases</div>
                 <div className="text-xs text-gray-400">Focus group total</div>
               </div>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow">
+          <div className="bg-white p-4 sm:p-6 rounded-lg shadow">
             <div className="flex items-center">
-              <div className="p-3 rounded-lg bg-purple-100">
-                <TrendingUp className="h-6 w-6 text-purple-600" />
+              <div className="p-2 sm:p-3 rounded-lg bg-purple-100">
+                <TrendingUp className="h-5 w-5 sm:h-6 sm:w-6 text-purple-600" />
               </div>
-              <div className="ml-4">
-                <div className={`text-2xl font-bold ${focusMetrics.avgGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              <div className="ml-3 sm:ml-4">
+                <div className={`text-xl sm:text-2xl font-bold ${focusMetrics.avgGrowth >= 0 ? 'text-green-600' : 'text-red-600'}`}>
                   {focusMetrics.avgGrowth >= 0 ? '+' : ''}{focusMetrics.avgGrowth.toFixed(1)}%
                 </div>
                 <div className="text-sm text-gray-500">Avg Growth</div>
@@ -148,26 +225,26 @@ const FocusShopsTab = ({ data }: { data: any }) => {
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow">
+          <div className="bg-white p-4 sm:p-6 rounded-lg shadow">
             <div className="flex items-center">
-              <div className="p-3 rounded-lg bg-orange-100">
-                <Star className="h-6 w-6 text-orange-600" />
+              <div className="p-2 sm:p-3 rounded-lg bg-orange-100">
+                <Star className="h-5 w-5 sm:h-6 sm:w-6 text-orange-600" />
               </div>
-              <div className="ml-4">
-                <div className="text-2xl font-bold text-gray-900">{focusMetrics.improving}</div>
+              <div className="ml-3 sm:ml-4">
+                <div className="text-xl sm:text-2xl font-bold text-gray-900">{focusMetrics.improving}</div>
                 <div className="text-sm text-gray-500">Improving</div>
                 <div className="text-xs text-gray-400">{focusMetrics.declining} declining</div>
               </div>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-lg shadow">
+          <div className="bg-white p-4 sm:p-6 rounded-lg shadow">
             <div className="flex items-center">
-              <div className="p-3 rounded-lg bg-yellow-100">
-                <Users className="h-6 w-6 text-yellow-600" />
+              <div className="p-2 sm:p-3 rounded-lg bg-yellow-100">
+                <Users className="h-5 w-5 sm:h-6 sm:w-6 text-yellow-600" />
               </div>
-              <div className="ml-4">
-                <div className="text-2xl font-bold text-gray-900">{focusMetrics.stable}</div>
+              <div className="ml-3 sm:ml-4">
+                <div className="text-xl sm:text-2xl font-bold text-gray-900">{focusMetrics.stable}</div>
                 <div className="text-sm text-gray-500">Stable</div>
                 <div className="text-xs text-gray-400">{focusMetrics.newShops} new shops</div>
               </div>
@@ -176,53 +253,57 @@ const FocusShopsTab = ({ data }: { data: any }) => {
         </div>
       )}
 
-      {/* Controls */}
+      {/* Controls - Mobile Responsive */}
       <div className="bg-white p-4 rounded-lg shadow">
-        <div className="flex flex-wrap gap-4 items-center justify-between">
-          <div className="flex flex-wrap gap-4 items-center">
-            <div className="flex items-center space-x-2">
-              <Search className="w-5 h-5 text-gray-400" />
+        <div className="space-y-4">
+          {/* Search Row */}
+          <div className="flex flex-col sm:flex-row sm:items-center gap-3">
+            <div className="flex items-center space-x-2 flex-1">
+              <Search className="w-5 h-5 text-gray-400 flex-shrink-0" />
               <input
                 type="text"
                 placeholder="Search focus shops..."
                 value={searchFilter}
                 onChange={(e) => setSearchFilter(e.target.value)}
-                className="border border-gray-300 rounded-lg px-3 py-2 w-64"
+                className="border border-gray-300 rounded-lg px-3 py-2 flex-1"
               />
             </div>
             
-            <select
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value)}
-              className="border border-gray-300 rounded-lg px-3 py-2"
-            >
-              <option value="total">Sort by Total Sales</option>
-              <option value="growth">Sort by Growth %</option>
-              <option value="trend">Sort by Trend</option>
-            </select>
+            <div className="flex gap-3">
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value)}
+                className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              >
+                <option value="total">Sort by Total Sales</option>
+                <option value="growth">Sort by Growth %</option>
+                <option value="trend">Sort by Trend</option>
+              </select>
 
-            <button
-              onClick={() => setShowEditMode(!showEditMode)}
-              className="px-4 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 flex items-center space-x-2"
-            >
-              <Edit3 className="w-4 h-4" />
-              <span>Edit Focus List</span>
-            </button>
+              <button
+                onClick={() => setShowEditMode(!showEditMode)}
+                className="px-3 py-2 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 flex items-center space-x-2 text-sm"
+              >
+                <Edit3 className="w-4 h-4" />
+                <span className="hidden sm:inline">Edit Focus List</span>
+                <span className="sm:hidden">Edit</span>
+              </button>
+            </div>
           </div>
 
-          <div className="text-sm text-gray-500">
+          <div className="text-sm text-gray-500 text-center sm:text-left">
             Showing {focusShopsData.length} focus shops
           </div>
         </div>
       </div>
 
-      {/* Edit Mode Instructions */}
+      {/* Edit Mode Instructions - Mobile Responsive */}
       {showEditMode && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <h4 className="font-medium text-yellow-900 mb-2">📝 How to Update Focus Shops List:</h4>
           <div className="text-sm text-yellow-800 space-y-1">
-            <p>1. Open <code className="bg-yellow-100 px-1 rounded">components/tabs/sales/FocusShopsTab.tsx</code></p>
-            <p>2. Find the <code className="bg-yellow-100 px-1 rounded">FOCUS_SHOP_CODES</code> array at the top</p>
+            <p>1. Open <code className="bg-yellow-100 px-1 rounded text-xs">components/tabs/sales/FocusShopsTab.tsx</code></p>
+            <p>2. Find the <code className="bg-yellow-100 px-1 rounded text-xs">FOCUS_SHOP_CODES</code> array at the top</p>
             <p>3. Add, remove, or modify shop codes as needed</p>
             <p>4. Save the file - changes will appear immediately</p>
             <p>5. Current tracking: <strong>{FOCUS_SHOP_CODES.length} shops</strong></p>
@@ -230,8 +311,28 @@ const FocusShopsTab = ({ data }: { data: any }) => {
         </div>
       )}
 
-      {/* Focus Shops Table */}
-      <div className="bg-white rounded-lg shadow">
+      {/* Mobile View - Card Layout */}
+      <div className="block lg:hidden">
+        <div className="bg-white rounded-lg shadow">
+          <div className="px-4 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-medium text-gray-900">
+              Focus Shops - Mobile View
+            </h3>
+            <p className="text-sm text-gray-500">
+              Priority shops ranked by {sortBy === 'total' ? 'total sales' : sortBy === 'growth' ? 'growth %' : 'trend'}
+            </p>
+          </div>
+          
+          <div className="p-4">
+            {focusShopsData.map((shop, index) => (
+              <MobileFocusShopCard key={shop.shopId} shop={shop} index={index} />
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Desktop View - Enhanced Table */}
+      <div className="hidden lg:block bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900">Focus Shops Detailed Performance</h3>
           <p className="text-sm text-gray-500">Rolling 4-month analysis for priority shops (Mar-Apr-May-Jun {data?.currentYear})</p>
@@ -319,13 +420,13 @@ const FocusShopsTab = ({ data }: { data: any }) => {
         </div>
       </div>
 
-      {/* Focus Group Insights */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      {/* Focus Group Insights - Mobile Responsive */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b border-gray-200">
+          <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
             <h3 className="text-lg font-medium text-gray-900">Focus Group Performance Distribution</h3>
           </div>
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             <div className="space-y-4">
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Top Performers (Top 25%)</span>
@@ -348,27 +449,27 @@ const FocusShopsTab = ({ data }: { data: any }) => {
         </div>
 
         <div className="bg-white rounded-lg shadow">
-          <div className="px-6 py-4 border-b border-gray-200">
+          <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
             <h3 className="text-lg font-medium text-gray-900">Action Items</h3>
           </div>
-          <div className="p-6">
+          <div className="p-4 sm:p-6">
             <div className="space-y-4">
               <div className="flex items-start space-x-3">
-                <CheckCircle className="w-5 h-5 text-green-500 mt-0.5" />
+                <CheckCircle className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
                 <div>
                   <div className="text-sm font-medium text-gray-900">High Performers</div>
                   <div className="text-sm text-gray-600">Maintain momentum, consider expansion</div>
                 </div>
               </div>
               <div className="flex items-start space-x-3">
-                <AlertTriangle className="w-5 h-5 text-yellow-500 mt-0.5" />
+                <AlertTriangle className="w-5 h-5 text-yellow-500 mt-0.5 flex-shrink-0" />
                 <div>
                   <div className="text-sm font-medium text-gray-900">Declining Trends</div>
                   <div className="text-sm text-gray-600">Investigate causes, implement recovery plan</div>
                 </div>
               </div>
               <div className="flex items-start space-x-3">
-                <Target className="w-5 h-5 text-blue-500 mt-0.5" />
+                <Target className="w-5 h-5 text-blue-500 mt-0.5 flex-shrink-0" />
                 <div>
                   <div className="text-sm font-medium text-gray-900">Growth Opportunities</div>
                   <div className="text-sm text-gray-600">Focus on stable shops with potential</div>
