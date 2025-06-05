@@ -328,7 +328,7 @@ const RadicoDashboard = () => {
   };
 
   // ==========================================
-  // PART 4: ENHANCED DATA PROCESSING WITH DYNAMIC MONTH DETECTION & YoY
+  // PART 4: ENHANCED DATA PROCESSING WITH COMPLETE SKU BREAKDOWN
   // ==========================================
 
   const processEnhancedRadicoData = (masterData: Record<string, any[]>, visitData: any[], historicalData: any[]): DashboardData => {
@@ -339,9 +339,10 @@ const RadicoDashboard = () => {
     console.log(`🔧 PROCESSING DATA WITH DYNAMIC MONTH DETECTION: ${currentMonth}-${currentYear}`);
     console.log('🔄 ROLLING 4-MONTH WINDOW: Mar-Apr-May-Jun 2025 + YoY (Jun 2024)');
     
-    // ENHANCED MONTHLY DATA PROCESSING WITH DYNAMIC DATES
+    // ENHANCED MONTHLY DATA PROCESSING WITH COMPLETE SKU BREAKDOWN
     const processMonthlyData = (monthNumber: string, year: string = currentYear, useHistorical: boolean = false) => {
       let monthShopSales: Record<string, any> = {};
+      let monthShopSKUs: Record<string, Record<string, number>> = {}; // NEW: Track SKUs per shop
       let monthlyUniqueShops = new Set<string>();
       let monthly8PM = 0, monthlyVERVE = 0;
 
@@ -383,11 +384,19 @@ const RadicoDashboard = () => {
 
                     if (!monthShopSales[shopIdentifier]) {
                       monthShopSales[shopIdentifier] = { total: 0, eightPM: 0, verve: 0, shopName: shopName };
+                      monthShopSKUs[shopIdentifier] = {}; // Initialize SKU tracking
                     }
                     
                     monthShopSales[shopIdentifier].total += cases;
                     if (parentBrand === "8PM") monthShopSales[shopIdentifier].eightPM += cases;
                     else if (parentBrand === "VERVE") monthShopSales[shopIdentifier].verve += cases;
+                    
+                    // NEW: Track individual SKUs
+                    const brandName = fullBrand || brandShort || 'Unknown Brand';
+                    if (!monthShopSKUs[shopIdentifier][brandName]) {
+                      monthShopSKUs[shopIdentifier][brandName] = 0;
+                    }
+                    monthShopSKUs[shopIdentifier][brandName] += cases;
                   }
                 }
               }
@@ -412,7 +421,6 @@ const RadicoDashboard = () => {
         );
         
         console.log(`📋 Found ${monthChallans.length} challans for ${monthNumber}-${year}`);
-        console.log(`📋 Sample challan dates:`, challans.slice(0, 5).map(row => row[1]?.toString()));
 
         monthChallans.forEach(row => {
           if (row.length >= 15) {
@@ -429,11 +437,18 @@ const RadicoDashboard = () => {
 
               if (!monthShopSales[shopId]) {
                 monthShopSales[shopId] = { total: 0, eightPM: 0, verve: 0 };
+                monthShopSKUs[shopId] = {}; // Initialize SKU tracking
               }
               
               monthShopSales[shopId].total += cases;
               if (parentBrand === "8PM") monthShopSales[shopId].eightPM += cases;
               else if (parentBrand === "VERVE") monthShopSales[shopId].verve += cases;
+              
+              // NEW: Track individual SKUs
+              if (!monthShopSKUs[shopId][brand]) {
+                monthShopSKUs[shopId][brand] = 0;
+              }
+              monthShopSKUs[shopId][brand] += cases;
             }
           }
         });
@@ -441,6 +456,7 @@ const RadicoDashboard = () => {
 
       return { 
         shopSales: monthShopSales, 
+        shopSKUs: monthShopSKUs, // NEW: Return SKU data
         uniqueShops: monthlyUniqueShops, 
         total8PM: monthly8PM, 
         totalVERVE: monthlyVERVE,
@@ -484,8 +500,11 @@ const RadicoDashboard = () => {
     const totalVERVE = juneData.totalVERVE;
     const uniqueShops = juneData.uniqueShops;
 
-    // ENHANCED SHOP DATA BUILDING WITH ROLLING 4-MONTH + YoY
+    // ENHANCED SHOP DATA BUILDING WITH COMPLETE SKU BREAKDOWN
     const shopSales: Record<string, ShopData> = {};
+    
+    // NEW: Master SKU aggregation across ALL months for each shop
+    const masterShopSKUs: Record<string, Record<string, number>> = {};
     
     // Build comprehensive shop name mapping
     const shopNameMap: Record<string, string> = {};
@@ -506,7 +525,70 @@ const RadicoDashboard = () => {
       }
     });
 
-    // Process current month data (June 2025)
+    // NEW: Function to merge SKUs from multiple months
+    const mergeSKUsFromMonth = (monthData: any, shopIdentifierMap: Record<string, string>) => {
+      Object.keys(monthData.shopSKUs || {}).forEach(shopIdentifier => {
+        const actualShopId = shopIdentifierMap[shopIdentifier] || shopIdentifier;
+        const skuData = monthData.shopSKUs[shopIdentifier];
+        
+        if (!masterShopSKUs[actualShopId]) {
+          masterShopSKUs[actualShopId] = {};
+        }
+        
+        Object.keys(skuData).forEach(brand => {
+          const cases = skuData[brand];
+          if (!masterShopSKUs[actualShopId][brand]) {
+            masterShopSKUs[actualShopId][brand] = 0;
+          }
+          masterShopSKUs[actualShopId][brand] += cases;
+        });
+      });
+    };
+
+    // Build identifier mapping for all shops
+    const shopIdentifierMap: Record<string, string> = {};
+    
+    // Map current month shop IDs
+    Object.keys(juneData.shopSales).forEach(shopId => {
+      shopIdentifierMap[shopId] = shopId;
+    });
+    
+    // Map historical shop identifiers to actual shop IDs
+    [mayData, aprilData, marchData, februaryData, januaryData, juneLastYearData].forEach(monthData => {
+      Object.keys(monthData.shopSales).forEach(shopIdentifier => {
+        if (!shopIdentifierMap[shopIdentifier]) {
+          // Try to find the actual shop ID
+          if (shopDetailsMap[shopIdentifier]) {
+            shopIdentifierMap[shopIdentifier] = shopDetailsMap[shopIdentifier].shopId || shopIdentifier;
+          } else {
+            const matchingShop = shopDetails.slice(1).find(row => 
+              row[3]?.toString().trim() === shopIdentifier
+            );
+            if (matchingShop) {
+              shopIdentifierMap[shopIdentifier] = matchingShop[0]?.toString().trim();
+            } else {
+              shopIdentifierMap[shopIdentifier] = shopIdentifier;
+            }
+          }
+        }
+      });
+    });
+
+    // NEW: Merge SKUs from ALL months
+    console.log('🔄 MERGING SKUs FROM ALL MONTHS...');
+    mergeSKUsFromMonth(juneData, shopIdentifierMap);
+    mergeSKUsFromMonth(mayData, shopIdentifierMap);
+    mergeSKUsFromMonth(aprilData, shopIdentifierMap);
+    mergeSKUsFromMonth(marchData, shopIdentifierMap);
+    mergeSKUsFromMonth(februaryData, shopIdentifierMap);
+    mergeSKUsFromMonth(januaryData, shopIdentifierMap);
+    
+    console.log('✅ COMPLETE SKU BREAKDOWN COLLECTED:', {
+      shopsWithSKUs: Object.keys(masterShopSKUs).length,
+      sampleShopSKUs: Object.keys(masterShopSKUs)[0] ? Object.keys(masterShopSKUs[Object.keys(masterShopSKUs)[0]]) : []
+    });
+
+    // Process current month data (June 2025) - KEEP EXISTING LOGIC
     juneData.challans.forEach(row => {
       if (row.length >= 15) {
         const shopId = row[8]?.toString().trim();
@@ -546,7 +628,7 @@ const RadicoDashboard = () => {
               juneLastYearVerve: 0,
               yoyGrowthPercent: 0,
               monthlyTrend: 'stable',
-              skuBreakdown: [],
+              skuBreakdown: [], // Will be populated from masterShopSKUs
               // NEW: 3-month averages
               threeMonthAvgTotal: 0,
               threeMonthAvg8PM: 0,
@@ -565,25 +647,18 @@ const RadicoDashboard = () => {
             shopSales[shopId].verve += cases;
             shopSales[shopId].juneVerve! += cases;
           }
-
-          const existing = shopSales[shopId].skuBreakdown!.find(sku => sku.brand === brand);
-          if (existing) {
-            existing.cases += cases;
-          } else {
-            shopSales[shopId].skuBreakdown!.push({ brand, cases, percentage: 0, month: 'June' });
-          }
         }
       }
     });
 
-    // Add historical data for rolling window + YoY
+    // Add historical data for rolling window + YoY - KEEP EXISTING LOGIC
     [mayData, aprilData, marchData, juneLastYearData].forEach((monthData, index) => {
       const monthKey = index === 0 ? 'may' : index === 1 ? 'april' : index === 2 ? 'march' : 'juneLastYear';
       
       Object.keys(monthData.shopSales).forEach(shopIdentifier => {
         const monthShopData = monthData.shopSales[shopIdentifier];
         
-        let actualShopId = shopIdentifier;
+        let actualShopId = shopIdentifierMap[shopIdentifier] || shopIdentifier;
         let actualShopName = monthShopData.shopName || shopIdentifier;
         
         if (shopDetailsMap[shopIdentifier]) {
@@ -592,12 +667,12 @@ const RadicoDashboard = () => {
           actualShopName = details.shopName || actualShopName;
         } else {
           const matchingShop = shopDetails.slice(1).find(row => 
-            row[1]?.toString().trim() === shopIdentifier
+            row[3]?.toString().trim() === shopIdentifier
           );
           
           if (matchingShop) {
             actualShopId = matchingShop[0]?.toString().trim();
-            actualShopName = matchingShop[1]?.toString().trim();
+            actualShopName = matchingShop[3]?.toString().trim();
           } else {
             if (!shopIdentifier.includes('@') && !shopIdentifier.includes('.com')) {
               actualShopName = shopIdentifier;
@@ -632,7 +707,7 @@ const RadicoDashboard = () => {
             juneLastYearVerve: 0,
             yoyGrowthPercent: 0,
             monthlyTrend: 'declining',
-            skuBreakdown: [],
+            skuBreakdown: [], // Will be populated from masterShopSKUs
             threeMonthAvgTotal: 0,
             threeMonthAvg8PM: 0,
             threeMonthAvgVERVE: 0
@@ -660,7 +735,45 @@ const RadicoDashboard = () => {
       });
     });
 
-    // ENHANCED GROWTH AND TREND CALCULATION WITH YoY + 3-MONTH AVERAGES
+    // NEW: Populate complete SKU breakdown for ALL shops
+    console.log('🔄 POPULATING COMPLETE SKU BREAKDOWN...');
+    let totalSKUsPopulated = 0;
+    
+    Object.keys(shopSales).forEach(shopId => {
+      const shop = shopSales[shopId];
+      
+      // Get complete SKU data for this shop
+      const shopSKUData = masterShopSKUs[shopId] || {};
+      
+      // Convert to SKUData format
+      shop.skuBreakdown = Object.keys(shopSKUData).map(brand => ({
+        brand,
+        cases: shopSKUData[brand],
+        percentage: 0, // Will be calculated below
+        month: 'All Months'
+      }));
+      
+      totalSKUsPopulated += shop.skuBreakdown.length;
+      
+      // Calculate total for percentage calculation
+      const totalCases = shop.skuBreakdown.reduce((sum, sku) => sum + sku.cases, 0);
+      
+      // Calculate percentages and sort
+      if (totalCases > 0) {
+        shop.skuBreakdown.forEach(sku => {
+          sku.percentage = Math.round((sku.cases / totalCases) * 100 * 100) / 100;
+        });
+        shop.skuBreakdown.sort((a, b) => b.cases - a.cases);
+      }
+    });
+    
+    console.log('✅ COMPLETE SKU BREAKDOWN POPULATED:', {
+      shopsProcessed: Object.keys(shopSales).length,
+      totalSKUsPopulated,
+      sampleShopSKUs: shopSales[Object.keys(shopSales)[0]]?.skuBreakdown?.slice(0, 3)
+    });
+
+    // ENHANCED GROWTH AND TREND CALCULATION WITH YoY + 3-MONTH AVERAGES - KEEP EXISTING LOGIC
     Object.keys(shopSales).forEach(shopId => {
       const shop = shopSales[shopId];
       const june = shop.juneTotal || 0;
@@ -708,17 +821,9 @@ const RadicoDashboard = () => {
       } else {
         shop.monthlyTrend = 'stable';
       }
-
-      // Calculate SKU percentages
-      if (shop.total > 0) {
-        shop.skuBreakdown!.forEach(sku => {
-          sku.percentage = Math.round((sku.cases / shop.total) * 100 * 100) / 100;
-        });
-        shop.skuBreakdown!.sort((a, b) => b.cases - a.cases);
-      }
     });
 
-    // Enhance shop data with department and salesman info
+    // Enhance shop data with department and salesman info - KEEP EXISTING LOGIC
     shopDetails.slice(1).forEach(row => {
       const shopId = row[0]?.toString().trim();
       const dept = row[2]?.toString().trim() === "DSIIDC" ? "DSIDC" : row[2]?.toString().trim();
@@ -730,7 +835,7 @@ const RadicoDashboard = () => {
       }
     });
 
-    // ENHANCED CUSTOMER INSIGHTS ANALYSIS (ROLLING 4 MONTHS)
+    // ENHANCED CUSTOMER INSIGHTS ANALYSIS (ROLLING 4 MONTHS) - KEEP EXISTING LOGIC
     const allCurrentShops = Object.values(shopSales).filter(shop => shop.juneTotal! > 0);
     
     const newShops = Object.values(shopSales).filter(shop => 
@@ -772,7 +877,7 @@ const RadicoDashboard = () => {
     const allShopsComparison = Object.values(shopSales)
       .sort((a, b) => (b.threeMonthAvgTotal! || 0) - (a.threeMonthAvgTotal! || 0));
 
-    // Calculate department performance
+    // Calculate department performance - KEEP EXISTING LOGIC
     const deptPerformance: Record<string, any> = {};
     shopDetails.slice(1).forEach(row => {
       if (row[0] && row[2]) {
@@ -791,7 +896,7 @@ const RadicoDashboard = () => {
       }
     });
 
-    // Process targets for current month
+    // Process targets for current month - KEEP EXISTING LOGIC
     let total8PMTarget = 0, totalVerveTarget = 0;
     const salespersonStats: Record<string, any> = {};
 
@@ -824,8 +929,6 @@ const RadicoDashboard = () => {
           const eightPMTarget = parseFloat(row[5]) || 0;
           const verveTarget = parseFloat(row[7]) || 0;
           
-          console.log(`✅ Found target for shop ${shopId}: 8PM=${eightPMTarget}, VERVE=${verveTarget}, Month=${targetMonth}`);
-          
           total8PMTarget += eightPMTarget;
           totalVerveTarget += verveTarget;
           
@@ -846,13 +949,7 @@ const RadicoDashboard = () => {
       }
     });
 
-    console.log('🎯 FIXED TARGET PROCESSING RESULTS:', {
-      total8PMTarget,
-      totalVerveTarget,
-      salespersonStats: Object.keys(salespersonStats).length
-    });
-
-    // Calculate achievements and YoY growth
+    // Calculate achievements and YoY growth - KEEP EXISTING LOGIC
     const eightPmAchievement = total8PMTarget > 0 ? ((total8PM / total8PMTarget) * 100).toFixed(1) : '0';
     const verveAchievement = totalVerveTarget > 0 ? ((totalVERVE / totalVerveTarget) * 100).toFixed(1) : '0';
     
