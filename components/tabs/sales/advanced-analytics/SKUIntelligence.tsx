@@ -214,64 +214,59 @@ const SKUIntelligence = ({ data }: { data: DashboardData }) => {
   // ==========================================
 
   const skuAnalysis = useMemo((): SKUAnalysis => {
-    console.log('🔍 Starting SKU Intelligence Analysis with existing brand logic...');
+    console.log('🔍 Starting SKU Intelligence Analysis using COMPLETE SKU breakdown data...');
     
-    // Process shop SKU data using the EXISTING brand classification
+    // Process shop SKU data using the COMPLETE skuBreakdown from page.tsx
     const processedShops = data.allShopsComparison.map(shop => {
       const skus = shop.skuBreakdown || [];
       
-      // Use the EXISTING getBrandFamily function that already works
-      const classifiedSKUs = skus.map(sku => {
-        const brandFamily = getBrandFamily('', sku.brand);
-        const size = extractSize(sku.brand);
-        const verveFlavor = brandFamily === 'VERVE' ? getVerveFlavor(sku.brand) : null;
-        
-        return {
-          ...sku,
-          brandFamily,
-          size,
-          verveFlavor,
-          displayName: brandFamily === '8PM' ? `8PM ${size}` : 
-                      brandFamily === 'VERVE' ? `${verveFlavor?.replace('VERVE_', 'VERVE ')} ${size}` : 
-                      sku.brand
-        };
-      });
-
-      // Build enhanced shop profile using existing logic
-      const has8PM = classifiedSKUs.some(s => s.brandFamily === '8PM');
-      const hasVERVE = classifiedSKUs.some(s => s.brandFamily === 'VERVE');
+      console.log(`Processing ${shop.shopName}: ${skus.length} SKUs found`);
       
-      const eightPMSizes = [...new Set(
-        classifiedSKUs
-          .filter(s => s.brandFamily === '8PM')
-          .map(s => s.size)
-      )];
+      // Use the COMPLETE SKU breakdown directly (no re-classification needed)
+      const has8PM = skus.some(sku => getBrandFamily('', sku.brand) === '8PM');
+      const hasVERVE = skus.some(sku => getBrandFamily('', sku.brand) === 'VERVE');
       
-      const verveFlavors = [...new Set(
-        classifiedSKUs
-          .filter(s => s.brandFamily === 'VERVE')
-          .map(s => s.verveFlavor)
-          .filter(Boolean)
-      )];
+      // Extract 8PM sizes from actual SKU data
+      const eightPMSKUs = skus.filter(sku => getBrandFamily('', sku.brand) === '8PM');
+      const eightPMSizes = [...new Set(eightPMSKUs.map(sku => {
+        const brand = sku.brand.toUpperCase();
+        if (brand.includes('750')) return '750ml';
+        if (brand.includes('375')) return '375ml';
+        if (brand.includes('180')) return '180ml';
+        if (brand.includes('90')) return '90ml';
+        if (brand.includes('60')) return '60ml';
+        return '750ml'; // Default
+      }))];
+      
+      // Extract VERVE flavors from actual SKU data
+      const verveSKUs = skus.filter(sku => getBrandFamily('', sku.brand) === 'VERVE');
+      const verveFlavors = [...new Set(verveSKUs.map(sku => {
+        const brand = sku.brand.toUpperCase();
+        if (brand.includes('CRANBERRY')) return 'VERVE Cranberry';
+        if (brand.includes('GREEN APPLE')) return 'VERVE Green Apple';
+        if (brand.includes('LEMON')) return 'VERVE Lemon Lush';
+        if (brand.includes('GRAIN')) return 'VERVE Grain';
+        return 'VERVE Grain'; // Default
+      }))];
 
-      const verveFlavorNames = verveFlavors.map(flavor => {
-        switch(flavor) {
-          case 'VERVE_CRANBERRY': return 'VERVE Cranberry';
-          case 'VERVE_GREEN_APPLE': return 'VERVE Green Apple';
-          case 'VERVE_LEMON_LUSH': return 'VERVE Lemon Lush';
-          case 'VERVE_GRAIN': return 'VERVE Grain';
-          default: return flavor?.replace('VERVE_', 'VERVE ') || '';
-        }
-      });
+      if (shop.shopName === 'LOK NAYAK BHAWAN') {
+        console.log('🔍 LOK NAYAK BHAWAN SKU Analysis:', {
+          totalSKUs: skus.length,
+          skuList: skus.map(s => `${s.brand} (${s.cases} cases)`),
+          has8PM,
+          hasVERVE,
+          eightPMSizes,
+          verveFlavors
+        });
+      }
 
       return {
         ...shop,
-        classifiedSKUs,
         has8PM,
         hasVERVE,
         eightPMSizes,
         verveFlavors,
-        verveFlavorNames
+        rawSKUs: skus // Keep original SKU data
       };
     });
 
@@ -311,7 +306,7 @@ const SKUIntelligence = ({ data }: { data: DashboardData }) => {
     processedShops.forEach(shop => {
       const verveVolume = shop.threeMonthAvgVERVE || shop.verve;
       if (verveVolume >= minimumVolume && shop.hasVERVE) {
-        const currentFlavors = shop.verveFlavorNames || [];
+        const currentFlavors = shop.verveFlavors || [];
         const allVerveFlavors = ['VERVE Grain', 'VERVE Cranberry', 'VERVE Green Apple', 'VERVE Lemon Lush'];
         const missingFlavors = allVerveFlavors.filter(flavor => !currentFlavors.includes(flavor));
         
@@ -443,12 +438,13 @@ const SKUIntelligence = ({ data }: { data: DashboardData }) => {
       }
     });
 
-    console.log('✅ SKU Analysis Complete using existing brand logic:', {
+    console.log('✅ SKU Analysis Complete using complete SKU breakdown data:', {
       eightPMVariants: eightPMVariants.length,
       verveFlavors: verveFlavors.length,
       sizeMigration: sizeMigration.length,
       crossBrand: crossBrand.length,
-      territoryGaps: territoryGaps.length
+      territoryGaps: territoryGaps.length,
+      sampleShopData: processedShops.find(s => s.shopName === 'LOK NAYAK BHAWAN')
     });
 
     return {
