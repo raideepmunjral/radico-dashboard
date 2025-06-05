@@ -1,12 +1,12 @@
 'use client';
 
-import React, { useState, lazy, Suspense } from 'react';
+import React, { useState } from 'react';
 import { Brain, BarChart3, Heart, Zap, RefreshCw } from 'lucide-react';
 
-// Lazy load sub-components for performance
-const CurrentAnalytics = lazy(() => import('./advanced-analytics/CurrentAnalytics'));
-const CustomerHealth = lazy(() => import('./advanced-analytics/CustomerHealth'));
-const SKUIntelligence = lazy(() => import('./advanced-analytics/SKUIntelligence'));
+// Regular imports instead of lazy loading (temporary fix)
+import CurrentAnalytics from './advanced-analytics/CurrentAnalytics';
+import CustomerHealth from './advanced-analytics/CustomerHealth';
+import SKUIntelligence from './advanced-analytics/SKUIntelligence';
 
 // Sub-tab configuration
 const subTabs = [
@@ -40,24 +40,19 @@ interface DashboardData {
 
 const AdvancedAnalyticsTab = ({ data }: { data: DashboardData }) => {
   const [activeSubTab, setActiveSubTab] = useState('current');
-  
-  // Loading component for lazy-loaded components
-  const LoadingSpinner = () => (
-    <div className="flex items-center justify-center py-12">
-      <RefreshCw className="w-8 h-8 animate-spin text-blue-600" />
-      <span className="ml-3 text-gray-600">Loading analytics...</span>
-    </div>
-  );
 
   // Render active sub-tab content
   const renderSubTabContent = () => {
-    return (
-      <Suspense fallback={<LoadingSpinner />}>
-        {activeSubTab === 'current' && <CurrentAnalytics data={data} />}
-        {activeSubTab === 'customer-health' && <CustomerHealth data={data} />}
-        {activeSubTab === 'sku-intelligence' && <SKUIntelligence data={data} />}
-      </Suspense>
-    );
+    switch (activeSubTab) {
+      case 'current':
+        return <CurrentAnalytics data={data} />;
+      case 'customer-health':
+        return <CustomerHealth data={data} />;
+      case 'sku-intelligence':
+        return <SKUIntelligence data={data} />;
+      default:
+        return <CurrentAnalytics data={data} />;
+    }
   };
 
   return (
