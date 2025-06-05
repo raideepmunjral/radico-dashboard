@@ -434,7 +434,7 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
               <h4 className="font-medium text-yellow-800">Quarterly Declining</h4>
             </div>
             <div className="text-2xl font-bold text-yellow-600">{healthMetrics.quarterlyDeclining}</div>
-            <p className="text-sm text-yellow-600">Q1 vs Q2 decline >10%</p>
+            <p className="text-sm text-yellow-600">Q1 vs Q2 decline &gt;10%</p>
           </div>
         </div>
       </div>
