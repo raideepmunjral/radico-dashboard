@@ -288,7 +288,7 @@ const SKUIntelligence = ({ data }: { data: DashboardData }) => {
       const verveVolume = shop.threeMonthAvgVERVE || shop.verve;
       if (verveVolume >= minimumVolume && shop.hasVERVE) {
         const currentFlavors = (shop.verveFlavors || []) as string[];
-        const allVerveFlavors = ['VERVE Grain', 'VERVE Cranberry', 'VERVE Green Apple', 'VERVE Lemon Lush'];
+        const allVerveFlavors: string[] = ['VERVE Grain', 'VERVE Cranberry', 'VERVE Green Apple', 'VERVE Lemon Lush'];
         const missingFlavors = allVerveFlavors.filter(flavor => !currentFlavors.includes(flavor));
         
         if (missingFlavors.length > 0 && currentFlavors.length > 0) {
@@ -317,8 +317,9 @@ const SKUIntelligence = ({ data }: { data: DashboardData }) => {
     const sizeMigration: SKUOpportunity[] = [];
     processedShops.forEach(shop => {
       if (shop.has8PM && shop.eightPM >= minimumVolume * 2) {
-        const largeSizes = (shop.eightPMSizes as string[]).filter(size => size === '750ml' || size === '375ml');
-        const smallSizes = (shop.eightPMSizes as string[]).filter(size => size === '180ml' || size === '90ml' || size === '60ml');
+        const allSizes = (shop.eightPMSizes || []) as string[];
+        const largeSizes = allSizes.filter(size => size === '750ml' || size === '375ml');
+        const smallSizes = allSizes.filter(size => size === '180ml' || size === '90ml' || size === '60ml');
 
         const totalVolume = shop.threeMonthAvg8PM || shop.eightPM;
         
