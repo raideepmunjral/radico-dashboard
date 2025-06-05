@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Brain, BarChart3, Heart, Zap, RefreshCw } from 'lucide-react';
+import { Brain, BarChart3, Heart, Zap } from 'lucide-react';
 
-// Regular imports instead of lazy loading (temporary fix)
+// REGULAR IMPORTS - NO LAZY LOADING
 import CurrentAnalytics from './advanced-analytics/CurrentAnalytics';
 import CustomerHealth from './advanced-analytics/CustomerHealth';
 import SKUIntelligence from './advanced-analytics/SKUIntelligence';
@@ -35,13 +35,12 @@ interface DashboardData {
   customerInsights: any;
   currentMonth: string;
   currentYear: string;
-  // Add other properties as needed
 }
 
 const AdvancedAnalyticsTab = ({ data }: { data: DashboardData }) => {
   const [activeSubTab, setActiveSubTab] = useState('current');
 
-  // Render active sub-tab content
+  // Render active sub-tab content - NO SUSPENSE NEEDED
   const renderSubTabContent = () => {
     switch (activeSubTab) {
       case 'current':
