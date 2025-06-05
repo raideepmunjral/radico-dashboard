@@ -81,81 +81,104 @@ interface TerritoryGap {
 }
 
 // ==========================================
-// SKU MAPPING & INTELLIGENCE
+// BRAND CLASSIFICATION (USING EXISTING LOGIC FROM PAGE.TSX)
 // ==========================================
 
-const SKU_FAMILIES = {
-  '8PM': {
-    variants: ['8PM 750ml', '8PM 375ml', '8PM 180ml', '8PM 90ml', '8PM 60ml'],
-    sizes: ['750ml', '375ml', '180ml', '90ml', '60ml']
-  },
-  'VERVE': {
-    flavors: ['VERVE Grain', 'VERVE Cranberry', 'VERVE Green Apple', 'VERVE Lemon Lush'],
-    sizes: ['750ml', '375ml', '180ml']
+// Using the EXACT same brand mapping from page.tsx that already works perfectly
+const brandFamily: Record<string, string> = {
+  // Historical Data Brand Short Variations
+  "VERVE": "VERVE",
+  "8 PM BLACK": "8PM", 
+  "8PM BLACK": "8PM",
+  "8PM": "8PM",
+  "8 PM": "8PM",
+  
+  // Current Data Variations from Pending Challans (EXACT matches from your data)
+  "8 PM PREMIUM BLACK BLENDED WHISKY": "8PM",
+  "8 PM PREMIUM BLACK BLENDED WHISKY Pet": "8PM",
+  "8 PM PREMIUM BLACK BLENDED WHISKY PET": "8PM",
+  "8 PM BLACK 750": "8PM",
+  "8 PM BLACK 375": "8PM",
+  "8 PM BLACK 180 P": "8PM",
+  "8 PM BLACK 90": "8PM",
+  "8 PM BLACK 60 P": "8PM",
+  "8PM PREMIUM BLACK BLENDED WHISKY": "8PM",
+  "8PM PREMIUM BLACK SUPERIOR WHISKY": "8PM",
+  
+  // VERVE Variations (EXACT matches from your data)
+  "M2M VERVE CRANBERRY TEASE SP FL VODKA": "VERVE",
+  "M2M VERVE GREEN APPLE SUPERIOR FL. VODKA": "VERVE",
+  "M2M VERVE LEMON LUSH SUP FL VODKA": "VERVE",
+  "M2M VERVE SUPERIOR GRAIN VODKA": "VERVE",
+  "VERVE CRANBERRY 750": "VERVE",
+  "VERVE CRANBERRY 375": "VERVE",
+  "VERVE CRANBERRY 180": "VERVE",
+  "VERVE GREEN APPLE 750": "VERVE",
+  "VERVE GREEN APPLE 375": "VERVE",
+  "VERVE GREEN APPLE 180": "VERVE",
+  "VERVE LEMON LUSH 750": "VERVE",
+  "VERVE LEMON LUSH 375": "VERVE",
+  "VERVE LEMON LUSH 180": "VERVE",
+  "VERVE GRAIN 750": "VERVE",
+  "VERVE GRAIN 375": "VERVE",
+  "VERVE GRAIN 180": "VERVE",
+  
+  // Full brand name patterns from historical data
+  "M2 MAGIC MOMENTS VERVE CRANBERRY TEASE SUPERIOR FLAVOURED VODKA": "VERVE",
+  "M2 MAGIC MOMENTS VERVE GREEN APPLE SUPERIOR FLAVOURED VODKA": "VERVE",
+  "M2 MAGIC MOMENTS VERVE LEMON LUSH SUPERIOR FLAVOURED VODKA": "VERVE",
+  "M2 MAGIC MOMENTS VERVE SUPERIOR GRAIN VODKA": "VERVE"
+};
+
+// Using the EXACT same getBrandFamily function logic from page.tsx
+const getBrandFamily = (brandShort?: string, brand?: string): string | null => {
+  const cleanBrandShort = brandShort?.toString().trim();
+  const cleanBrand = brand?.toString().trim();
+  
+  if (cleanBrandShort && brandFamily[cleanBrandShort]) {
+    return brandFamily[cleanBrandShort];
   }
-};
-
-const BRAND_PATTERNS = {
-  '8PM': [
-    '8 PM PREMIUM BLACK BLENDED WHISKY',
-    '8PM PREMIUM BLACK BLENDED WHISKY',
-    '8 PM BLACK',
-    '8PM BLACK',
-    '8PM',
-    '8 PM'
-  ],
-  'VERVE_GRAIN': [
-    'M2M VERVE SUPERIOR GRAIN VODKA',
-    'VERVE GRAIN',
-    'M2 MAGIC MOMENTS VERVE SUPERIOR GRAIN VODKA'
-  ],
-  'VERVE_CRANBERRY': [
-    'M2M VERVE CRANBERRY TEASE SP FL VODKA',
-    'VERVE CRANBERRY',
-    'M2 MAGIC MOMENTS VERVE CRANBERRY TEASE SUPERIOR FLAVOURED VODKA'
-  ],
-  'VERVE_GREEN_APPLE': [
-    'M2M VERVE GREEN APPLE SUPERIOR FL. VODKA',
-    'VERVE GREEN APPLE',
-    'M2 MAGIC MOMENTS VERVE GREEN APPLE SUPERIOR FLAVOURED VODKA'
-  ],
-  'VERVE_LEMON_LUSH': [
-    'M2M VERVE LEMON LUSH SUP FL VODKA',
-    'VERVE LEMON LUSH',
-    'M2 MAGIC MOMENTS VERVE LEMON LUSH SUPERIOR FLAVOURED VODKA'
-  ]
+  
+  if (cleanBrand && brandFamily[cleanBrand]) {
+    return brandFamily[cleanBrand];
+  }
+  
+  const combinedText = ((cleanBrandShort || '') + ' ' + (cleanBrand || '')).toUpperCase();
+  
+  if (combinedText.includes('VERVE') || combinedText.includes('M2 MAGIC MOMENTS VERVE')) return 'VERVE';
+  if (combinedText.includes('8PM') || combinedText.includes('8 PM')) return '8PM';
+  if (combinedText.includes('PREMIUM BLACK') && (combinedText.includes('WHISKY') || combinedText.includes('BLENDED'))) return '8PM';
+  
+  return null;
 };
 
 // ==========================================
-// HELPER FUNCTIONS
+// SKU INTELLIGENCE FUNCTIONS
 // ==========================================
 
-const classifyBrand = (brandName: string): string => {
+const getVerveFlavor = (brandName: string): string => {
   const brand = brandName.toUpperCase();
-  
-  if (BRAND_PATTERNS['8PM'].some(pattern => brand.includes(pattern.toUpperCase()))) {
-    return '8PM';
-  }
-  if (BRAND_PATTERNS['VERVE_GRAIN'].some(pattern => brand.includes(pattern.toUpperCase()))) {
-    return 'VERVE_GRAIN';
-  }
-  if (BRAND_PATTERNS['VERVE_CRANBERRY'].some(pattern => brand.includes(pattern.toUpperCase()))) {
-    return 'VERVE_CRANBERRY';
-  }
-  if (BRAND_PATTERNS['VERVE_GREEN_APPLE'].some(pattern => brand.includes(pattern.toUpperCase()))) {
-    return 'VERVE_GREEN_APPLE';
-  }
-  if (BRAND_PATTERNS['VERVE_LEMON_LUSH'].some(pattern => brand.includes(pattern.toUpperCase()))) {
-    return 'VERVE_LEMON_LUSH';
-  }
-  
-  return 'OTHER';
+  if (brand.includes('CRANBERRY')) return 'VERVE_CRANBERRY';
+  if (brand.includes('GREEN APPLE')) return 'VERVE_GREEN_APPLE';
+  if (brand.includes('LEMON LUSH') || brand.includes('LEMON')) return 'VERVE_LEMON_LUSH';
+  if (brand.includes('GRAIN') || brand.includes('SUPERIOR GRAIN')) return 'VERVE_GRAIN';
+  return 'VERVE_GRAIN'; // Default VERVE flavor
 };
 
 const extractSize = (brandName: string): string => {
-  const sizePattern = /(\d+)\s*(ml|ML)/;
-  const match = brandName.match(sizePattern);
-  return match ? `${match[1]}ml` : 'Unknown';
+  // Extract size from brand name or common patterns
+  const brand = brandName.toUpperCase();
+  if (brand.includes('750')) return '750ml';
+  if (brand.includes('375')) return '375ml';
+  if (brand.includes('180')) return '180ml';
+  if (brand.includes('90')) return '90ml';
+  if (brand.includes('60')) return '60ml';
+  
+  // Default sizes based on brand family
+  if (brand.includes('8PM') || brand.includes('8 PM')) return '750ml';
+  if (brand.includes('VERVE')) return '750ml';
+  
+  return '750ml'; // Default size
 };
 
 const calculateOpportunityValue = (currentVolume: number, benchmarkVolume: number): number => {
@@ -184,34 +207,71 @@ const SKUIntelligence = ({ data }: { data: DashboardData }) => {
   const [departmentFilter, setDepartmentFilter] = useState('');
   const [salesmanFilter, setSalesmanFilter] = useState('');
   const [priorityFilter, setPriorityFilter] = useState('');
-  const [minimumVolume, setMinimumVolume] = useState(50);
+  const [minimumVolume, setMinimumVolume] = useState(5);
 
   // ==========================================
-  // SKU ANALYSIS ENGINE
+  // SKU ANALYSIS ENGINE (USING EXISTING BRAND LOGIC)
   // ==========================================
 
   const skuAnalysis = useMemo((): SKUAnalysis => {
-    console.log('🔍 Starting SKU Intelligence Analysis...');
+    console.log('🔍 Starting SKU Intelligence Analysis with existing brand logic...');
     
-    // Process shop SKU data
+    // Process shop SKU data using the EXISTING brand classification
     const processedShops = data.allShopsComparison.map(shop => {
       const skus = shop.skuBreakdown || [];
-      const classifiedSKUs = skus.map(sku => ({
-        ...sku,
-        classification: classifyBrand(sku.brand),
-        size: extractSize(sku.brand)
-      }));
+      
+      // Use the EXISTING getBrandFamily function that already works
+      const classifiedSKUs = skus.map(sku => {
+        const brandFamily = getBrandFamily('', sku.brand);
+        const size = extractSize(sku.brand);
+        const verveFlavor = brandFamily === 'VERVE' ? getVerveFlavor(sku.brand) : null;
+        
+        return {
+          ...sku,
+          brandFamily,
+          size,
+          verveFlavor,
+          displayName: brandFamily === '8PM' ? `8PM ${size}` : 
+                      brandFamily === 'VERVE' ? `${verveFlavor?.replace('VERVE_', 'VERVE ')} ${size}` : 
+                      sku.brand
+        };
+      });
+
+      // Build enhanced shop profile using existing logic
+      const has8PM = classifiedSKUs.some(s => s.brandFamily === '8PM');
+      const hasVERVE = classifiedSKUs.some(s => s.brandFamily === 'VERVE');
+      
+      const eightPMSizes = [...new Set(
+        classifiedSKUs
+          .filter(s => s.brandFamily === '8PM')
+          .map(s => s.size)
+      )];
+      
+      const verveFlavors = [...new Set(
+        classifiedSKUs
+          .filter(s => s.brandFamily === 'VERVE')
+          .map(s => s.verveFlavor)
+          .filter(Boolean)
+      )];
+
+      const verveFlavorNames = verveFlavors.map(flavor => {
+        switch(flavor) {
+          case 'VERVE_CRANBERRY': return 'VERVE Cranberry';
+          case 'VERVE_GREEN_APPLE': return 'VERVE Green Apple';
+          case 'VERVE_LEMON_LUSH': return 'VERVE Lemon Lush';
+          case 'VERVE_GRAIN': return 'VERVE Grain';
+          default: return flavor?.replace('VERVE_', 'VERVE ') || '';
+        }
+      });
 
       return {
         ...shop,
         classifiedSKUs,
-        has8PM: classifiedSKUs.some(s => s.classification === '8PM'),
-        hasVerveGrain: classifiedSKUs.some(s => s.classification === 'VERVE_GRAIN'),
-        hasVerveCranberry: classifiedSKUs.some(s => s.classification === 'VERVE_CRANBERRY'),
-        hasVerveGreenApple: classifiedSKUs.some(s => s.classification === 'VERVE_GREEN_APPLE'),
-        hasVerveLemonLush: classifiedSKUs.some(s => s.classification === 'VERVE_LEMON_LUSH'),
-        eightPMSizes: [...new Set(classifiedSKUs.filter(s => s.classification === '8PM').map(s => s.size))],
-        verveFlavors: [...new Set(classifiedSKUs.filter(s => s.classification.startsWith('VERVE_')).map(s => s.classification))]
+        has8PM,
+        hasVERVE,
+        eightPMSizes,
+        verveFlavors,
+        verveFlavorNames
       };
     });
 
@@ -220,11 +280,12 @@ const SKUIntelligence = ({ data }: { data: DashboardData }) => {
     processedShops.forEach(shop => {
       if (shop.has8PM && shop.eightPM >= minimumVolume) {
         const currentSizes = shop.eightPMSizes;
-        const missingSizes = SKU_FAMILIES['8PM'].sizes.filter(size => !currentSizes.includes(size));
+        const allAvailableSizes = ['750ml', '375ml', '180ml', '90ml', '60ml'];
+        const missingSizes = allAvailableSizes.filter(size => !currentSizes.includes(size));
         
-        if (missingSizes.length > 0) {
+        if (missingSizes.length > 0 && currentSizes.length > 0) {
           const avgVolume = shop.threeMonthAvg8PM || shop.eightPM;
-          const potentialVolume = avgVolume * 0.3; // 30% expansion potential
+          const potentialVolume = avgVolume * 0.3;
           
           eightPMVariants.push({
             shopId: shop.shopId,
@@ -239,7 +300,7 @@ const SKUIntelligence = ({ data }: { data: DashboardData }) => {
             currentVolume: avgVolume,
             potentialVolume,
             priority: potentialVolume > 50 ? 'HIGH' : potentialVolume > 25 ? 'MEDIUM' : 'LOW',
-            reasoning: `Strong 8PM performer (${avgVolume.toFixed(0)} cases/month) missing ${missingSizes.length} size variants`
+            reasoning: `Strong 8PM performer (${avgVolume.toFixed(0)} cases/month) with ${currentSizes.length} sizes, missing ${missingSizes.length} size variants`
           });
         }
       }
@@ -249,28 +310,28 @@ const SKUIntelligence = ({ data }: { data: DashboardData }) => {
     const verveFlavors: SKUOpportunity[] = [];
     processedShops.forEach(shop => {
       const verveVolume = shop.threeMonthAvgVERVE || shop.verve;
-      if (verveVolume >= minimumVolume * 0.5) { // Lower threshold for VERVE
-        const currentFlavors = shop.verveFlavors;
-        const allVerveFlavors = ['VERVE_GRAIN', 'VERVE_CRANBERRY', 'VERVE_GREEN_APPLE', 'VERVE_LEMON_LUSH'];
+      if (verveVolume >= minimumVolume && shop.hasVERVE) {
+        const currentFlavors = shop.verveFlavorNames || [];
+        const allVerveFlavors = ['VERVE Grain', 'VERVE Cranberry', 'VERVE Green Apple', 'VERVE Lemon Lush'];
         const missingFlavors = allVerveFlavors.filter(flavor => !currentFlavors.includes(flavor));
         
         if (missingFlavors.length > 0 && currentFlavors.length > 0) {
-          const potentialVolume = verveVolume * 0.4; // 40% expansion potential for flavors
+          const potentialVolume = verveVolume * 0.4;
           
           verveFlavors.push({
             shopId: shop.shopId,
             shopName: shop.shopName,
             department: shop.department,
             salesman: shop.salesman,
-            currentProducts: currentFlavors.map(f => f.replace('VERVE_', 'VERVE ')),
-            missingProducts: missingFlavors.map(f => f.replace('VERVE_', 'VERVE ')),
+            currentProducts: currentFlavors,
+            missingProducts: missingFlavors,
             opportunityValue: potentialVolume,
             confidenceScore: getConfidenceScore(verveVolume, 50, 0.7),
             recommendationType: 'VERVE_FLAVOR',
             currentVolume: verveVolume,
             potentialVolume,
             priority: potentialVolume > 30 ? 'HIGH' : potentialVolume > 15 ? 'MEDIUM' : 'LOW',
-            reasoning: `VERVE customer (${verveVolume.toFixed(0)} cases/month) ready for ${missingFlavors.length} new flavors`
+            reasoning: `Active VERVE customer (${verveVolume.toFixed(0)} cases/month) with ${currentFlavors.length} flavors, ready for ${missingFlavors.length} new flavors`
           });
         }
       }
@@ -279,35 +340,29 @@ const SKUIntelligence = ({ data }: { data: DashboardData }) => {
     // Size Migration Opportunities
     const sizeMigration: SKUOpportunity[] = [];
     processedShops.forEach(shop => {
-      // Identify shops with high volume in large sizes that could adopt smaller sizes
-      if (shop.has8PM && shop.eightPM >= 100) {
-        const large8PM = shop.classifiedSKUs?.filter(s => 
-          s.classification === '8PM' && 
-          (s.size === '750ml' || s.size === '375ml')
-        ).reduce((sum, sku) => sum + sku.cases, 0) || 0;
+      if (shop.has8PM && shop.eightPM >= minimumVolume * 2) {
+        const largeSizes = shop.eightPMSizes.filter(size => size === '750ml' || size === '375ml');
+        const smallSizes = shop.eightPMSizes.filter(size => size === '180ml' || size === '90ml' || size === '60ml');
 
-        const small8PM = shop.classifiedSKUs?.filter(s => 
-          s.classification === '8PM' && 
-          (s.size === '180ml' || s.size === '90ml' || s.size === '60ml')
-        ).reduce((sum, sku) => sum + sku.cases, 0) || 0;
-
-        if (large8PM > 80 && small8PM < 20) {
-          const potentialSmallSize = large8PM * 0.2; // 20% migration potential
+        const totalVolume = shop.threeMonthAvg8PM || shop.eightPM;
+        
+        if (largeSizes.length > 0 && smallSizes.length === 0 && totalVolume > minimumVolume * 3) {
+          const potentialSmallSize = totalVolume * 0.25;
           
           sizeMigration.push({
             shopId: shop.shopId,
             shopName: shop.shopName,
             department: shop.department,
             salesman: shop.salesman,
-            currentProducts: ['8PM Large Sizes (750ml, 375ml)'],
-            missingProducts: ['8PM Small Sizes (180ml, 90ml, 60ml)'],
+            currentProducts: largeSizes.map(size => `8PM ${size}`),
+            missingProducts: ['8PM 180ml', '8PM 90ml', '8PM 60ml'],
             opportunityValue: potentialSmallSize,
-            confidenceScore: getConfidenceScore(large8PM, 100, 0.9),
+            confidenceScore: getConfidenceScore(totalVolume, 75, 0.8),
             recommendationType: 'SIZE_MIGRATION',
-            currentVolume: large8PM,
+            currentVolume: totalVolume,
             potentialVolume: potentialSmallSize,
-            priority: potentialSmallSize > 30 ? 'HIGH' : potentialSmallSize > 15 ? 'MEDIUM' : 'LOW',
-            reasoning: `High volume large size buyer (${large8PM} cases) - ideal for small size introduction`
+            priority: potentialSmallSize > 25 ? 'HIGH' : potentialSmallSize > 12 ? 'MEDIUM' : 'LOW',
+            reasoning: `Strong large-size 8PM buyer (${totalVolume.toFixed(0)} cases) - excellent candidate for small size introduction`
           });
         }
       }
@@ -317,40 +372,40 @@ const SKUIntelligence = ({ data }: { data: DashboardData }) => {
     const crossBrand: SKUOpportunity[] = [];
     processedShops.forEach(shop => {
       // 8PM customers who could try VERVE
-      if (shop.has8PM && !shop.hasVerveGrain && shop.eightPM >= 75) {
+      if (shop.has8PM && !shop.hasVERVE && shop.eightPM >= minimumVolume * 2) {
         crossBrand.push({
           shopId: shop.shopId,
           shopName: shop.shopName,
           department: shop.department,
           salesman: shop.salesman,
-          currentProducts: ['8PM Products'],
-          missingProducts: ['VERVE Portfolio'],
-          opportunityValue: shop.eightPM * 0.15, // 15% cross-brand potential
-          confidenceScore: getConfidenceScore(shop.eightPM, 100, 0.6),
+          currentProducts: ['8PM Portfolio'],
+          missingProducts: ['VERVE Vodka Range'],
+          opportunityValue: shop.eightPM * 0.2,
+          confidenceScore: getConfidenceScore(shop.eightPM, 75, 0.7),
           recommendationType: 'CROSS_BRAND',
           currentVolume: shop.eightPM,
-          potentialVolume: shop.eightPM * 0.15,
-          priority: shop.eightPM > 150 ? 'HIGH' : 'MEDIUM',
-          reasoning: `Strong 8PM customer (${shop.eightPM} cases) - excellent VERVE prospect`
+          potentialVolume: shop.eightPM * 0.2,
+          priority: shop.eightPM > 100 ? 'HIGH' : shop.eightPM > 60 ? 'MEDIUM' : 'LOW',
+          reasoning: `Loyal 8PM customer (${shop.eightPM} cases/month) - prime candidate for VERVE vodka introduction`
         });
       }
       
       // VERVE customers who could try 8PM
-      if (shop.verve >= 30 && !shop.has8PM) {
+      if (shop.hasVERVE && !shop.has8PM && shop.verve >= minimumVolume) {
         crossBrand.push({
           shopId: shop.shopId,
           shopName: shop.shopName,
           department: shop.department,
           salesman: shop.salesman,
-          currentProducts: ['VERVE Products'],
-          missingProducts: ['8PM Portfolio'],
-          opportunityValue: shop.verve * 2, // Higher potential for vodka→whiskey
-          confidenceScore: getConfidenceScore(shop.verve, 50, 0.7),
+          currentProducts: ['VERVE Portfolio'],
+          missingProducts: ['8PM Whisky Range'],
+          opportunityValue: shop.verve * 1.5,
+          confidenceScore: getConfidenceScore(shop.verve, 40, 0.8),
           recommendationType: 'CROSS_BRAND',
           currentVolume: shop.verve,
-          potentialVolume: shop.verve * 2,
-          priority: shop.verve > 50 ? 'HIGH' : 'MEDIUM',
-          reasoning: `VERVE loyalist (${shop.verve} cases) - premium whiskey opportunity`
+          potentialVolume: shop.verve * 1.5,
+          priority: shop.verve > 40 ? 'HIGH' : shop.verve > 25 ? 'MEDIUM' : 'LOW',
+          reasoning: `Premium VERVE customer (${shop.verve} cases/month) - excellent opportunity for 8PM whisky upgrade`
         });
       }
     });
@@ -371,11 +426,11 @@ const SKUIntelligence = ({ data }: { data: DashboardData }) => {
       const totalShops = shops.length;
       const activeShops = shops.filter(s => (s.juneTotal || 0) > 0);
       
-      if (activeShops.length >= 3) { // Only analyze territories with sufficient data
+      if (activeShops.length >= 3) {
         const penetrationRate = (activeShops.length / totalShops) * 100;
         const avgVolume = activeShops.reduce((sum, s) => sum + (s.juneTotal || 0), 0);
         
-        if (penetrationRate < 80) { // Territory with expansion potential
+        if (penetrationRate < 80) {
           territoryGaps.push({
             department,
             salesman,
@@ -388,7 +443,7 @@ const SKUIntelligence = ({ data }: { data: DashboardData }) => {
       }
     });
 
-    console.log('✅ SKU Analysis Complete:', {
+    console.log('✅ SKU Analysis Complete using existing brand logic:', {
       eightPMVariants: eightPMVariants.length,
       verveFlavors: verveFlavors.length,
       sizeMigration: sizeMigration.length,
@@ -545,9 +600,9 @@ const SKUIntelligence = ({ data }: { data: DashboardData }) => {
               <input
                 type="number"
                 value={minimumVolume}
-                onChange={(e) => setMinimumVolume(parseInt(e.target.value) || 50)}
+                onChange={(e) => setMinimumVolume(parseInt(e.target.value) || 5)}
                 className="border border-gray-300 rounded px-3 py-1 w-20 text-sm"
-                min="10"
+                min="1"
                 max="200"
               />
               <span className="text-sm text-gray-600">cases</span>
