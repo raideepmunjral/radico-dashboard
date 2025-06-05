@@ -391,10 +391,23 @@ const RadicoDashboard = () => {
                     if (parentBrand === "8PM") monthShopSales[shopIdentifier].eightPM += cases;
                     else if (parentBrand === "VERVE") monthShopSales[shopIdentifier].verve += cases;
                     
-            // NEW: Track individual SKUs with size information  
+            // NEW: Track individual SKUs with size information
             const brandName = fullBrand || brandShort || 'Unknown Brand';
-            const sizeInfo = row[8]?.toString().trim(); // Size info from historical data
+            const sizeInfo = row[4]?.toString().trim(); // Size info from historical data (Column E = index 4)
             const enhancedBrandName = sizeInfo ? `${brandName} ${sizeInfo}ml` : brandName;
+            
+            // Debug logging for LOK NAYAK BHAWAN in historical data
+            if (shopName === 'LOK NAYAK BHAWAN') {
+              console.log('🔍 LOK NAYAK BHAWAN Historical SKU Debug:', {
+                brandName,
+                sizeInfo,
+                enhancedBrandName,
+                cases,
+                month: monthNumber,
+                year
+              });
+            }
+            
             if (!monthShopSKUs[shopIdentifier][enhancedBrandName]) {
               monthShopSKUs[shopIdentifier][enhancedBrandName] = 0;
             }
@@ -447,7 +460,7 @@ const RadicoDashboard = () => {
               else if (parentBrand === "VERVE") monthShopSales[shopId].verve += cases;
               
               // NEW: Track individual SKUs with size information
-              const sizeInfo = row[12]?.toString().trim(); // Size column
+              const sizeInfo = row[12]?.toString().trim(); // Size column (Column M = index 12 for current data)
               const enhancedBrandName = sizeInfo ? `${brand} ${sizeInfo}ml` : brand;
               if (!monthShopSKUs[shopId][enhancedBrandName]) {
                 monthShopSKUs[shopId][enhancedBrandName] = 0;
