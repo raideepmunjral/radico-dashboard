@@ -282,14 +282,20 @@ const SKUIntelligence = ({ data }: { data: DashboardData }) => {
       }
     });
 
-    // VERVE Flavor Opportunities
+    // =====================================================
+    // VERVE FLAVOR OPPORTUNITIES - TYPESCRIPT SAFE VERSION
+    // =====================================================
     const verveFlavors: SKUOpportunity[] = [];
     processedShops.forEach(shop => {
       const verveVolume = shop.threeMonthAvgVERVE || shop.verve;
       if (verveVolume >= minimumVolume && shop.hasVERVE) {
-        const currentFlavors = (shop.verveFlavors || []) as string[];
+        // TypeScript safe array handling
+        const shopFlavors = shop.verveFlavors || [];
+        const currentFlavors: string[] = shopFlavors.filter(flavor => flavor && flavor.length > 0);
         const allVerveFlavors: string[] = ['VERVE Grain', 'VERVE Cranberry', 'VERVE Green Apple', 'VERVE Lemon Lush'];
-        const missingFlavors = allVerveFlavors.filter(flavor => !currentFlavors.includes(flavor));
+        const missingFlavors: string[] = allVerveFlavors.filter(availableFlavor => 
+          !currentFlavors.some(currentFlavor => currentFlavor === availableFlavor)
+        );
         
         if (missingFlavors.length > 0 && currentFlavors.length > 0) {
           const potentialVolume = verveVolume * 0.4;
@@ -313,13 +319,17 @@ const SKUIntelligence = ({ data }: { data: DashboardData }) => {
       }
     });
 
-    // Size Migration Opportunities
+    // =====================================================
+    // SIZE MIGRATION OPPORTUNITIES - TYPESCRIPT SAFE VERSION
+    // =====================================================
     const sizeMigration: SKUOpportunity[] = [];
     processedShops.forEach(shop => {
       if (shop.has8PM && shop.eightPM >= minimumVolume * 2) {
-        const allSizes = (shop.eightPMSizes || []) as string[];
-        const largeSizes = allSizes.filter(size => size === '750ml' || size === '375ml');
-        const smallSizes = allSizes.filter(size => size === '180ml' || size === '90ml' || size === '60ml');
+        // TypeScript safe array handling
+        const shopSizes = shop.eightPMSizes || [];
+        const allSizes: string[] = shopSizes.filter(size => size && size.length > 0);
+        const largeSizes: string[] = allSizes.filter(size => size === '750ml' || size === '375ml');
+        const smallSizes: string[] = allSizes.filter(size => size === '180ml' || size === '90ml' || size === '60ml');
 
         const totalVolume = shop.threeMonthAvg8PM || shop.eightPM;
         
