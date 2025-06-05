@@ -86,10 +86,10 @@ const getShortMonthName = (monthNum: string) => {
 };
 
 // ==========================================
-// MAIN COMPONENT
+// MAIN COMPONENT - RENAMED FROM AdvancedAnalyticsTab
 // ==========================================
 
-const AdvancedAnalyticsTab = ({ data }: { data: DashboardData }) => {
+const CurrentAnalytics = ({ data }: { data: DashboardData }) => {
   // ==========================================
   // INTERNAL STATE MANAGEMENT
   // ==========================================
@@ -606,4 +606,4 @@ const AdvancedAnalyticsTab = ({ data }: { data: DashboardData }) => {
   );
 };
 
-export default AdvancedAnalyticsTab;
+export default CurrentAnalytics;
