@@ -334,6 +334,124 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
+      {/* TARGET VS ACHIEVEMENT PROGRESS BARS */}
+      <div className="bg-white rounded-lg shadow p-4 sm:p-6">
+        <div className="mb-4">
+          <h3 className="text-lg font-medium text-gray-900 mb-2">🎯 8PM Target Achievement Overview</h3>
+          <p className="text-sm text-gray-500">Combined performance of all {focusMetrics?.activeFocusShops || 0} focus shops</p>
+        </div>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* June Progress */}
+          <div className="space-y-3">
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-purple-900">June 2025 - 8PM Target</span>
+              <span className="text-sm text-gray-500">{focusMetrics?.totalJune8PM || 0} / {focusMetrics?.totalJuneTarget8PM || 0}</span>
+            </div>
+            
+            <div className="w-full bg-purple-100 rounded-full h-6 relative overflow-hidden">
+              <div 
+                className={`h-full rounded-full transition-all duration-500 ${
+                  (focusMetrics?.juneTargetAchievement || 0) >= 80 ? 'bg-green-500' :
+                  (focusMetrics?.juneTargetAchievement || 0) >= 50 ? 'bg-yellow-500' :
+                  'bg-red-500'
+                }`}
+                style={{ width: `${Math.min((focusMetrics?.juneTargetAchievement || 0), 100)}%` }}
+              />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-xs font-bold text-gray-800">
+                  {focusMetrics?.juneTargetAchievement?.toFixed(1) || 0}%
+                </span>
+              </div>
+            </div>
+            
+            <div className="flex justify-between text-xs text-gray-600">
+              <span>Achieved: {focusMetrics?.totalJune8PM?.toLocaleString() || 0}</span>
+              <span>Target: {focusMetrics?.totalJuneTarget8PM?.toLocaleString() || 0}</span>
+            </div>
+            
+            <div className="text-xs text-center">
+              <span className={`inline-flex px-2 py-1 rounded-full text-xs font-semibold ${
+                (focusMetrics?.juneTargetAchievement || 0) >= 100 ? 'bg-green-100 text-green-800' :
+                (focusMetrics?.juneTargetAchievement || 0) >= 80 ? 'bg-yellow-100 text-yellow-800' :
+                (focusMetrics?.juneTargetAchievement || 0) >= 50 ? 'bg-orange-100 text-orange-800' :
+                'bg-red-100 text-red-800'
+              }`}>
+                {(focusMetrics?.juneTargetAchievement || 0) >= 100 ? '🎉 Target Exceeded!' :
+                 (focusMetrics?.juneTargetAchievement || 0) >= 80 ? '✅ Near Target' :
+                 (focusMetrics?.juneTargetAchievement || 0) >= 50 ? '⚠️ Below Target' :
+                 '🚨 Critical Gap'}
+              </span>
+            </div>
+          </div>
+
+          {/* July Progress */}
+          <div className="space-y-3">
+            <div className="flex justify-between items-center">
+              <span className="text-sm font-medium text-orange-900">July 2025 - 8PM Target</span>
+              <span className="text-sm text-gray-500">{focusMetrics?.totalJuly8PM || 0} / {focusMetrics?.totalJulyTarget8PM || 0}</span>
+            </div>
+            
+            <div className="w-full bg-orange-100 rounded-full h-6 relative overflow-hidden">
+              <div 
+                className={`h-full rounded-full transition-all duration-500 ${
+                  (focusMetrics?.julyTargetAchievement || 0) >= 80 ? 'bg-green-500' :
+                  (focusMetrics?.julyTargetAchievement || 0) >= 50 ? 'bg-yellow-500' :
+                  'bg-red-500'
+                }`}
+                style={{ width: `${Math.min((focusMetrics?.julyTargetAchievement || 0), 100)}%` }}
+              />
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-xs font-bold text-gray-800">
+                  {focusMetrics?.julyTargetAchievement?.toFixed(1) || 0}%
+                </span>
+              </div>
+            </div>
+            
+            <div className="flex justify-between text-xs text-gray-600">
+              <span>Achieved: {focusMetrics?.totalJuly8PM?.toLocaleString() || 0}</span>
+              <span>Target: {focusMetrics?.totalJulyTarget8PM?.toLocaleString() || 0}</span>
+            </div>
+            
+            <div className="text-xs text-center">
+              <span className={`inline-flex px-2 py-1 rounded-full text-xs font-semibold ${
+                (focusMetrics?.julyTargetAchievement || 0) >= 100 ? 'bg-green-100 text-green-800' :
+                (focusMetrics?.julyTargetAchievement || 0) >= 80 ? 'bg-yellow-100 text-yellow-800' :
+                (focusMetrics?.julyTargetAchievement || 0) >= 50 ? 'bg-orange-100 text-orange-800' :
+                'bg-red-100 text-red-800'
+              }`}>
+                {(focusMetrics?.julyTargetAchievement || 0) >= 100 ? '🎉 Target Exceeded!' :
+                 (focusMetrics?.julyTargetAchievement || 0) >= 80 ? '✅ Near Target' :
+                 (focusMetrics?.julyTargetAchievement || 0) >= 50 ? '⚠️ Below Target' :
+                 '🚨 Critical Gap'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Quick Stats Row */}
+        <div className="mt-6 pt-4 border-t border-gray-200">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
+            <div>
+              <div className="text-lg font-bold text-gray-900">{focusMetrics?.juneTargetAchievers || 0}</div>
+              <div className="text-xs text-gray-500">June Target Achievers</div>
+            </div>
+            <div>
+              <div className="text-lg font-bold text-gray-900">{focusMetrics?.julyTargetAchievers || 0}</div>
+              <div className="text-xs text-gray-500">July Target Achievers</div>
+            </div>
+            <div>
+              <div className="text-lg font-bold text-purple-600">{((focusMetrics?.totalJune8PM || 0) + (focusMetrics?.totalJuly8PM || 0)).toLocaleString()}</div>
+              <div className="text-xs text-gray-500">Total 8PM Sales</div>
+            </div>
+            <div>
+              <div className="text-lg font-bold text-blue-600">{((focusMetrics?.totalJuneTarget8PM || 0) + (focusMetrics?.totalJulyTarget8PM || 0)).toLocaleString()}</div>
+              <div className="text-xs text-gray-500">Combined Targets</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Enhanced Focus Group Summary with Targets */}
       {focusMetrics && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-3 sm:gap-4">
