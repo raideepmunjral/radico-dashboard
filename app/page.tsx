@@ -391,12 +391,14 @@ const RadicoDashboard = () => {
                     if (parentBrand === "8PM") monthShopSales[shopIdentifier].eightPM += cases;
                     else if (parentBrand === "VERVE") monthShopSales[shopIdentifier].verve += cases;
                     
-                    // NEW: Track individual SKUs
-                    const brandName = fullBrand || brandShort || 'Unknown Brand';
-                    if (!monthShopSKUs[shopIdentifier][brandName]) {
-                      monthShopSKUs[shopIdentifier][brandName] = 0;
-                    }
-                    monthShopSKUs[shopIdentifier][brandName] += cases;
+            // NEW: Track individual SKUs with size information  
+            const brandName = fullBrand || brandShort || 'Unknown Brand';
+            const sizeInfo = row[8]?.toString().trim(); // Size info from historical data
+            const enhancedBrandName = sizeInfo ? `${brandName} ${sizeInfo}ml` : brandName;
+            if (!monthShopSKUs[shopIdentifier][enhancedBrandName]) {
+              monthShopSKUs[shopIdentifier][enhancedBrandName] = 0;
+            }
+            monthShopSKUs[shopIdentifier][enhancedBrandName] += cases;
                   }
                 }
               }
@@ -444,11 +446,13 @@ const RadicoDashboard = () => {
               if (parentBrand === "8PM") monthShopSales[shopId].eightPM += cases;
               else if (parentBrand === "VERVE") monthShopSales[shopId].verve += cases;
               
-              // NEW: Track individual SKUs
-              if (!monthShopSKUs[shopId][brand]) {
-                monthShopSKUs[shopId][brand] = 0;
+              // NEW: Track individual SKUs with size information
+              const sizeInfo = row[12]?.toString().trim(); // Size column
+              const enhancedBrandName = sizeInfo ? `${brand} ${sizeInfo}ml` : brand;
+              if (!monthShopSKUs[shopId][enhancedBrandName]) {
+                monthShopSKUs[shopId][enhancedBrandName] = 0;
               }
-              monthShopSKUs[shopId][brand] += cases;
+              monthShopSKUs[shopId][enhancedBrandName] += cases;
             }
           }
         });
