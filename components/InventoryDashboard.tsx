@@ -584,7 +584,7 @@ const InventoryDashboard = () => {
         else if (ageInDays >= 30) ageCategory = 'days30to45';
 
         // Enhanced supply status
-        const advancedSupplyStatus = getEnhancedSupplyStatus(
+        const enhancedSupplyStatus = getEnhancedSupplyStatus(
           quantity,
           shopVisit.visitDate,
           supplyCheckResult,
@@ -635,7 +635,7 @@ const InventoryDashboard = () => {
         (inventoryItem as any).supplyDateAfterVisit = supplyCheckResult.supplyDate;
         (inventoryItem as any).currentDaysOutOfStock = isOutOfStock ? calculateDaysCurrentlyOutOfStock(shopVisit.visitDate) : undefined;
         (inventoryItem as any).isInGracePeriod = supplyCheckResult.isInGracePeriod;
-        (inventoryItem as any).enhancedSupplyStatus = advancedSupplyStatus;
+        (inventoryItem as any).enhancedSupplyStatus = enhancedSupplyStatus;
         (inventoryItem as any).daysSinceSupply = supplyCheckResult.daysSinceSupply;
 
         shopInventory.items[brand] = inventoryItem;
@@ -677,7 +677,7 @@ const InventoryDashboard = () => {
             currentDaysOutOfStock: calculateDaysCurrentlyOutOfStock(shopVisit.visitDate),
             supplyDateAfterVisit: supplyCheckResult.supplyDate,
             isInGracePeriod: supplyCheckResult.isInGracePeriod,
-            enhancedSupplyStatus: advancedSupplyStatus,
+            enhancedSupplyStatus: enhancedSupplyStatus,
             daysSinceSupply: supplyCheckResult.daysSinceSupply,
             daysSinceLastSupply: lastSupplyDate ? Math.floor((today.getTime() - lastSupplyDate.getTime()) / (1000 * 60 * 60 * 24)) : undefined
           } as any;
@@ -1434,292 +1434,296 @@ const InventoryDashboard = () => {
 // TAB COMPONENTS
 // ==========================================
 
-const InventoryOverviewTab = ({ data }: { data: InventoryData }) => (
-  <div className="space-y-6">
-    <div className="text-center">
-      <h2 className="text-2xl font-bold text-gray-900 mb-2">Inventory Overview</h2>
-      <p className="text-gray-600">
-        Real-time inventory status ({data.summary.rollingPeriodDays}-Day Rolling Period)
-      </p>
-      <p className="text-sm text-gray-500">
-        Period: {data.summary.periodStartDate.toLocaleDateString()} - {data.summary.periodEndDate.toLocaleDateString()}
-      </p>
-    </div>
-
-    {/* Summary Cards */}
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-      <div className="bg-white p-6 rounded-lg shadow">
-        <div className="flex items-center">
-          <div className="p-3 rounded-lg bg-blue-100">
-            <ShoppingBag className="h-6 w-6 text-blue-600" />
-          </div>
-          <div className="ml-4">
-            <div className="text-2xl font-bold text-gray-900">{data.summary.visitedShops}</div>
-            <div className="text-sm text-gray-500">Shops Visited</div>
-          </div>
-        </div>
-      </div>
-      
-      <div className="bg-white p-6 rounded-lg shadow">
-        <div className="flex items-center">
-          <div className="p-3 rounded-lg bg-purple-100">
-            <Package className="h-6 w-6 text-purple-600" />
-          </div>
-          <div className="ml-4">
-            <div className="text-2xl font-bold text-gray-900">{data.summary.totalSKUs}</div>
-            <div className="text-sm text-gray-500">SKUs Tracked</div>
-          </div>
-        </div>
-      </div>
-      
-      <div className="bg-white p-6 rounded-lg shadow">
-        <div className="flex items-center">
-          <div className="p-3 rounded-lg bg-red-100">
-            <AlertTriangle className="h-6 w-6 text-red-600" />
-          </div>
-          <div className="ml-4">
-            <div className="text-2xl font-bold text-gray-900">{data.summary.totalOutOfStock}</div>
-            <div className="text-sm text-gray-500">Out of Stock Items</div>
-          </div>
-        </div>
-      </div>
-      
-      <div className="bg-white p-6 rounded-lg shadow">
-        <div className="flex items-center">
-          <div className="p-3 rounded-lg bg-yellow-100">
-            <Clock className="h-6 w-6 text-yellow-600" />
-          </div>
-          <div className="ml-4">
-            <div className="text-2xl font-bold text-gray-900">{data.summary.totalAging}</div>
-            <div className="text-sm text-gray-500">Aging Items (30+ Days)</div>
-          </div>
-        </div>
-      </div>
-      
-      <div className="bg-white p-6 rounded-lg shadow">
-        <div className="flex items-center">
-          <div className="p-3 rounded-lg bg-green-100">
-            <TrendingUp className="h-6 w-6 text-green-600" />
-          </div>
-          <div className="ml-4">
-            <div className="text-2xl font-bold text-gray-900">{data.summary.recentlyRestockedItems}</div>
-            <div className="text-sm text-gray-500">Recently Restocked</div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    {/* SKU Performance - EXPLANATION */}
-    <div className="bg-white rounded-lg shadow">
-      <div className="px-6 py-4 border-b border-gray-200">
-        <h3 className="text-lg font-medium text-gray-900">All SKU Stock Status</h3>
+const InventoryOverviewTab = ({ data }: { data: InventoryData }) => {
+  return (
+    <div className="space-y-6">
+      <div className="text-center">
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Inventory Overview</h2>
+        <p className="text-gray-600">
+          Real-time inventory status ({data.summary.rollingPeriodDays}-Day Rolling Period)
+        </p>
         <p className="text-sm text-gray-500">
-          Complete inventory status for {data.summary.rollingPeriodDays}-day rolling period.
-          <span className="font-medium text-blue-600 ml-2">
-            Out of Stock counts represent shops where items had zero quantity during their latest visit (not adjusted for subsequent restocking).
-          </span>
+          Period: {data.summary.periodStartDate.toLocaleDateString()} - {data.summary.periodEndDate.toLocaleDateString()}
         </p>
       </div>
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tracked Shops</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">In Stock</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Out of Stock</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock Rate</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Aging Locations</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {data.skuPerformance.slice(0, 20).map((sku, index) => (
-              <tr key={sku.name}>
-                <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{sku.name}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{sku.trackedShops}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600">{sku.inStockCount}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600">{sku.outOfStockCount}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm">
-                  <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                    sku.outOfStockPercentage <= 10 ? 'bg-green-100 text-green-800' :
-                    sku.outOfStockPercentage <= 30 ? 'bg-yellow-100 text-yellow-800' :
-                    'bg-red-100 text-red-800'
-                  }`}>
-                    {100 - sku.outOfStockPercentage}% in stock
-                  </span>
-                </td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600">{sku.agingLocations.length}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-);
 
-const ShopInventoryTab = ({ data, filteredShops, filters, setFilters, getEnhancedSupplyStatusDisplay, departments, salesmen, expandedShop, setExpandedShop }: any) => (
-  <div className="space-y-6">
-    {/* Filter Controls */}
-    <div className="bg-white p-4 rounded-lg shadow">
-      <div className="flex flex-wrap gap-4 items-center">
-        <div className="flex items-center space-x-2">
-          <Search className="w-5 h-5 text-gray-400" />
-          <input
-            type="text"
-            placeholder="Search shops, salesmen..."
-            value={filters.searchText}
-            onChange={(e) => setFilters({ ...filters, searchText: e.target.value })}
-            className="border border-gray-300 rounded-lg px-3 py-2 w-64"
-          />
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
+        <div className="bg-white p-6 rounded-lg shadow">
+          <div className="flex items-center">
+            <div className="p-3 rounded-lg bg-blue-100">
+              <ShoppingBag className="h-6 w-6 text-blue-600" />
+            </div>
+            <div className="ml-4">
+              <div className="text-2xl font-bold text-gray-900">{data.summary.visitedShops}</div>
+              <div className="text-sm text-gray-500">Shops Visited</div>
+            </div>
+          </div>
         </div>
         
-        <select
-          value={filters.department}
-          onChange={(e) => setFilters({ ...filters, department: e.target.value })}
-          className="border border-gray-300 rounded-lg px-3 py-2"
-        >
-          <option value="">All Departments</option>
-          {departments.map((dept: string) => (
-            <option key={dept} value={dept}>{dept}</option>
-          ))}
-        </select>
+        <div className="bg-white p-6 rounded-lg shadow">
+          <div className="flex items-center">
+            <div className="p-3 rounded-lg bg-purple-100">
+              <Package className="h-6 w-6 text-purple-600" />
+            </div>
+            <div className="ml-4">
+              <div className="text-2xl font-bold text-gray-900">{data.summary.totalSKUs}</div>
+              <div className="text-sm text-gray-500">SKUs Tracked</div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white p-6 rounded-lg shadow">
+          <div className="flex items-center">
+            <div className="p-3 rounded-lg bg-red-100">
+              <AlertTriangle className="h-6 w-6 text-red-600" />
+            </div>
+            <div className="ml-4">
+              <div className="text-2xl font-bold text-gray-900">{data.summary.totalOutOfStock}</div>
+              <div className="text-sm text-gray-500">Out of Stock Items</div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white p-6 rounded-lg shadow">
+          <div className="flex items-center">
+            <div className="p-3 rounded-lg bg-yellow-100">
+              <Clock className="h-6 w-6 text-yellow-600" />
+            </div>
+            <div className="ml-4">
+              <div className="text-2xl font-bold text-gray-900">{data.summary.totalAging}</div>
+              <div className="text-sm text-gray-500">Aging Items (30+ Days)</div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-white p-6 rounded-lg shadow">
+          <div className="flex items-center">
+            <div className="p-3 rounded-lg bg-green-100">
+              <TrendingUp className="h-6 w-6 text-green-600" />
+            </div>
+            <div className="ml-4">
+              <div className="text-2xl font-bold text-gray-900">{data.summary.recentlyRestockedItems}</div>
+              <div className="text-sm text-gray-500">Recently Restocked</div>
+            </div>
+          </div>
+        </div>
+      </div>
 
-        <select
-          value={filters.salesman}
-          onChange={(e) => setFilters({ ...filters, salesman: e.target.value })}
-          className="border border-gray-300 rounded-lg px-3 py-2"
-        >
-          <option value="">All Salesmen</option>
-          {salesmen.map((salesman: string) => (
-            <option key={salesman} value={salesman}>{salesman}</option>
-          ))}
-        </select>
-
-        <select
-          value={filters.stockStatus}
-          onChange={(e) => setFilters({ ...filters, stockStatus: e.target.value })}
-          className="border border-gray-300 rounded-lg px-3 py-2"
-        >
-          <option value="">All Stock Status</option>
-          <option value="out-of-stock">Out of Stock</option>
-          <option value="low-stock">Low Stock</option>
-          <option value="aging">Aging Inventory</option>
-        </select>
-
-        <button
-          onClick={() => setFilters({ department: '', salesman: '', stockStatus: '', ageCategory: '', brand: '', supplyStatus: '', searchText: '' })}
-          className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center space-x-2"
-        >
-          <X className="w-4 h-4" />
-          <span>Clear</span>
-        </button>
+      {/* SKU Performance - EXPLANATION */}
+      <div className="bg-white rounded-lg shadow">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-medium text-gray-900">All SKU Stock Status</h3>
+          <p className="text-sm text-gray-500">
+            Complete inventory status for {data.summary.rollingPeriodDays}-day rolling period.
+            <span className="font-medium text-blue-600 ml-2">
+              Out of Stock counts represent shops where items had zero quantity during their latest visit (not adjusted for subsequent restocking).
+            </span>
+          </p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tracked Shops</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">In Stock</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Out of Stock</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Stock Rate</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Aging Locations</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {data.skuPerformance.slice(0, 20).map((sku, index) => (
+                <tr key={sku.name}>
+                  <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{sku.name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{sku.trackedShops}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600">{sku.inStockCount}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-red-600">{sku.outOfStockCount}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      sku.outOfStockPercentage <= 10 ? 'bg-green-100 text-green-800' :
+                      sku.outOfStockPercentage <= 30 ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-red-100 text-red-800'
+                    }`}>
+                      {100 - sku.outOfStockPercentage}% in stock
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600">{sku.agingLocations.length}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
+  );
+};
 
-    {/* Shop Inventory List */}
-    <div className="bg-white rounded-lg shadow">
-      <div className="px-6 py-4 border-b border-gray-200">
-        <h3 className="text-lg font-medium text-gray-900">Shop Inventory Status</h3>
-        <p className="text-sm text-gray-500">Showing {filteredShops.length} shops ({data.summary.rollingPeriodDays}-day rolling period)</p>
+const ShopInventoryTab = ({ data, filteredShops, filters, setFilters, getEnhancedSupplyStatusDisplay, departments, salesmen, expandedShop, setExpandedShop }: any) => {
+  return (
+    <div className="space-y-6">
+      {/* Filter Controls */}
+      <div className="bg-white p-4 rounded-lg shadow">
+        <div className="flex flex-wrap gap-4 items-center">
+          <div className="flex items-center space-x-2">
+            <Search className="w-5 h-5 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search shops, salesmen..."
+              value={filters.searchText}
+              onChange={(e) => setFilters({ ...filters, searchText: e.target.value })}
+              className="border border-gray-300 rounded-lg px-3 py-2 w-64"
+            />
+          </div>
+          
+          <select
+            value={filters.department}
+            onChange={(e) => setFilters({ ...filters, department: e.target.value })}
+            className="border border-gray-300 rounded-lg px-3 py-2"
+          >
+            <option value="">All Departments</option>
+            {departments.map((dept: string) => (
+              <option key={dept} value={dept}>{dept}</option>
+            ))}
+          </select>
+
+          <select
+            value={filters.salesman}
+            onChange={(e) => setFilters({ ...filters, salesman: e.target.value })}
+            className="border border-gray-300 rounded-lg px-3 py-2"
+          >
+            <option value="">All Salesmen</option>
+            {salesmen.map((salesman: string) => (
+              <option key={salesman} value={salesman}>{salesman}</option>
+            ))}
+          </select>
+
+          <select
+            value={filters.stockStatus}
+            onChange={(e) => setFilters({ ...filters, stockStatus: e.target.value })}
+            className="border border-gray-300 rounded-lg px-3 py-2"
+          >
+            <option value="">All Stock Status</option>
+            <option value="out-of-stock">Out of Stock</option>
+            <option value="low-stock">Low Stock</option>
+            <option value="aging">Aging Inventory</option>
+          </select>
+
+          <button
+            onClick={() => setFilters({ department: '', salesman: '', stockStatus: '', ageCategory: '', brand: '', supplyStatus: '', searchText: '' })}
+            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center space-x-2"
+          >
+            <X className="w-4 h-4" />
+            <span>Clear</span>
+          </button>
+        </div>
       </div>
-      <div className="divide-y divide-gray-200">
-        {filteredShops.map((shop: ShopInventory) => (
-          <div key={shop.shopId} className="p-6">
-            <div 
-              className="flex items-center justify-between cursor-pointer"
-              onClick={() => setExpandedShop(expandedShop === shop.shopId ? null : shop.shopId)}
-            >
-              <div className="flex items-center space-x-4">
-                <div>
-                  <h4 className="text-lg font-medium text-gray-900">{shop.shopName}</h4>
-                  <p className="text-sm text-gray-500">{shop.department} • {shop.salesman} • ID: {shop.shopId}</p>
-                </div>
-                <div className="flex space-x-4">
-                  <div className="text-center">
-                    <div className="text-sm font-medium text-green-600">{shop.inStockCount}</div>
-                    <div className="text-xs text-gray-500">In Stock</div>
+
+      {/* Shop Inventory List */}
+      <div className="bg-white rounded-lg shadow">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-medium text-gray-900">Shop Inventory Status</h3>
+          <p className="text-sm text-gray-500">Showing {filteredShops.length} shops ({data.summary.rollingPeriodDays}-day rolling period)</p>
+        </div>
+        <div className="divide-y divide-gray-200">
+          {filteredShops.map((shop: ShopInventory) => (
+            <div key={shop.shopId} className="p-6">
+              <div 
+                className="flex items-center justify-between cursor-pointer"
+                onClick={() => setExpandedShop(expandedShop === shop.shopId ? null : shop.shopId)}
+              >
+                <div className="flex items-center space-x-4">
+                  <div>
+                    <h4 className="text-lg font-medium text-gray-900">{shop.shopName}</h4>
+                    <p className="text-sm text-gray-500">{shop.department} • {shop.salesman} • ID: {shop.shopId}</p>
                   </div>
-                  <div className="text-center">
-                    <div className="text-sm font-medium text-red-600">{shop.outOfStockCount}</div>
-                    <div className="text-xs text-gray-500">Out of Stock</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-sm font-medium text-yellow-600">{shop.agingInventoryCount}</div>
-                    <div className="text-xs text-gray-500">Aging (30+)</div>
-                  </div>
-                  <div className="text-center">
-                    <div className="text-sm font-medium text-blue-600">
-                      {Object.values(shop.items).filter(item => item.suppliedAfterOutOfStock).length}
+                  <div className="flex space-x-4">
+                    <div className="text-center">
+                      <div className="text-sm font-medium text-green-600">{shop.inStockCount}</div>
+                      <div className="text-xs text-gray-500">In Stock</div>
                     </div>
-                    <div className="text-xs text-gray-500">Restocked</div>
+                    <div className="text-center">
+                      <div className="text-sm font-medium text-red-600">{shop.outOfStockCount}</div>
+                      <div className="text-xs text-gray-500">Out of Stock</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-sm font-medium text-yellow-600">{shop.agingInventoryCount}</div>
+                      <div className="text-xs text-gray-500">Aging (30+)</div>
+                    </div>
+                    <div className="text-center">
+                      <div className="text-sm font-medium text-blue-600">
+                        {Object.values(shop.items).filter(item => item.suppliedAfterOutOfStock).length}
+                      </div>
+                      <div className="text-xs text-gray-500">Restocked</div>
+                    </div>
                   </div>
                 </div>
+                {expandedShop === shop.shopId ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
               </div>
-              {expandedShop === shop.shopId ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-            </div>
-            
-            {expandedShop === shop.shopId && (
-              <div className="mt-4 border-t pt-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {Object.values(shop.items).map((item: InventoryItem) => (
-                    <div key={item.brand} className="border rounded-lg p-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <h5 className="text-sm font-medium text-gray-900 truncate">{item.brand}</h5>
-                        <div className="flex items-center space-x-1">
-                          {item.isInStock ? (
-                            <CheckCircle className="w-4 h-4 text-green-500" />
-                          ) : item.isOutOfStock ? (
-                            <XCircle className="w-4 h-4 text-red-500" />
-                          ) : (
-                            <AlertCircle className="w-4 h-4 text-yellow-500" />
-                          )}
-                          {item.suppliedAfterOutOfStock && (
-                            <div className="relative group">
-                              <Truck className="w-4 h-4 text-blue-500" />
-                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 px-2 py-1 text-xs text-white bg-gray-800 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                                Recently Restocked
+              
+              {expandedShop === shop.shopId && (
+                <div className="mt-4 border-t pt-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {Object.values(shop.items).map((item: InventoryItem) => (
+                      <div key={item.brand} className="border rounded-lg p-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <h5 className="text-sm font-medium text-gray-900 truncate">{item.brand}</h5>
+                          <div className="flex items-center space-x-1">
+                            {item.isInStock ? (
+                              <CheckCircle className="w-4 h-4 text-green-500" />
+                            ) : item.isOutOfStock ? (
+                              <XCircle className="w-4 h-4 text-red-500" />
+                            ) : (
+                              <AlertCircle className="w-4 h-4 text-yellow-500" />
+                            )}
+                            {item.suppliedAfterOutOfStock && (
+                              <div className="relative group">
+                                <Truck className="w-4 h-4 text-blue-500" />
+                                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 px-2 py-1 text-xs text-white bg-gray-800 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                  Recently Restocked
+                                </div>
                               </div>
+                            )}
+                          </div>
+                        </div>
+                        <div className="space-y-1">
+                          <div className="text-sm text-gray-600">Quantity: {item.quantity}</div>
+                          <div className="text-sm text-gray-600">
+                            Age: {item.ageInDays} days {item.isEstimatedAge && '(est.)'}
+                          </div>
+                          {item.lastSupplyDate && (
+                            <div className="text-xs text-blue-600">
+                              Last Supply: {item.lastSupplyDate.toLocaleDateString('en-GB')}
                             </div>
                           )}
-                        </div>
-                      </div>
-                      <div className="space-y-1">
-                        <div className="text-sm text-gray-600">Quantity: {item.quantity}</div>
-                        <div className="text-sm text-gray-600">
-                          Age: {item.ageInDays} days {item.isEstimatedAge && '(est.)'}
-                        </div>
-                        {item.lastSupplyDate && (
-                          <div className="text-xs text-blue-600">
-                            Last Supply: {item.lastSupplyDate.toLocaleDateString('en-GB')}
+                          {item.reasonNoStock && (
+                            <div className="text-xs text-red-600">{item.reasonNoStock}</div>
+                          )}
+                          <div className="text-xs">
+                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                              item.supplyStatus === 'current' ? 'bg-green-100 text-green-800' :
+                              item.suppliedAfterOutOfStock ? 'bg-blue-100 text-blue-800' :
+                              item.supplyStatus === 'awaiting_supply' ? 'bg-red-100 text-red-800' :
+                              item.supplyStatus?.startsWith('aging') ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {getEnhancedSupplyStatusDisplay(item)}
+                            </span>
                           </div>
-                        )}
-                        {item.reasonNoStock && (
-                          <div className="text-xs text-red-600">{item.reasonNoStock}</div>
-                        )}
-                        <div className="text-xs">
-                          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                            item.supplyStatus === 'current' ? 'bg-green-100 text-green-800' :
-                            item.suppliedAfterOutOfStock ? 'bg-blue-100 text-blue-800' :
-                            item.supplyStatus === 'awaiting_supply' ? 'bg-red-100 text-red-800' :
-                            item.supplyStatus?.startsWith('aging') ? 'bg-yellow-100 text-yellow-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
-                            {getEnhancedSupplyStatusDisplay(item)}
-                          </span>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
-        ))}
+              )}
+            </div>
+          ))}
+        </div>
       </div>
     </div>
-  </div>
-);
+  );
+};
 
 const AgingAnalysisTab = ({ data, filters, setFilters, getFilteredItems, getEnhancedSupplyStatusDisplay, departments, salesmen, brands, currentPage, setCurrentPage, itemsPerPage }: any) => {
   const filteredAging = getFilteredItems(data.allAgingLocations);
@@ -1805,3 +1809,451 @@ const AgingAnalysisTab = ({ data, filters, setFilters, getFilteredItems, getEnha
           <button
             onClick={() => setFilters({ ...filters, department: '', salesman: '', brand: '', ageCategory: '', supplyStatus: '' })}
             className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center justify-center space-x-2"
+          >
+            <X className="w-4 h-4" />
+            <span>Clear</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Aging Statistics */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="bg-white p-6 rounded-lg shadow text-center">
+          <div className="text-3xl font-bold text-yellow-600">{filteredAging.length}</div>
+          <div className="text-sm text-gray-500">Total Aging Items</div>
+        </div>
+        <div className="bg-white p-6 rounded-lg shadow text-center">
+          <div className="text-3xl font-bold text-orange-600">{data.summary.avgAge}</div>
+          <div className="text-sm text-gray-500">Average Age (Days)</div>
+        </div>
+        <div className="bg-white p-6 rounded-lg shadow text-center">
+          <div className="text-3xl font-bold text-red-600">
+            {filteredAging.filter((item: any) => item.ageInDays >= 60).length}
+          </div>
+          <div className="text-sm text-gray-500">Critical (60+ Days)</div>
+        </div>
+        <div className="bg-white p-6 rounded-lg shadow text-center">
+          <div className="text-3xl font-bold text-green-600">
+            {filteredAging.filter((item: any) => !item.isEstimatedAge).length}
+          </div>
+          <div className="text-sm text-gray-500">Accurate Dates</div>
+        </div>
+      </div>
+
+      {/* All Aging Locations with Pagination */}
+      <div className="bg-white rounded-lg shadow">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-medium text-gray-900">All Aging Inventory Locations (30+ Days)</h3>
+          <p className="text-sm text-gray-500">
+            Showing {startIndex + 1}-{Math.min(endIndex, filteredAging.length)} of {filteredAging.length} aging items
+          </p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rank</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shop</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Salesman</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Age (Days)</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Supply</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {currentItems.map((location: any, index: number) => (
+                <tr key={`${location.shopName}-${location.sku}`} className={startIndex + index < 10 ? 'bg-red-50' : ''}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {startIndex + index + 1}
+                    {startIndex + index < 10 && <span className="ml-2 text-red-600">🔥</span>}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{location.sku}</td>
+                  <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{location.shopName}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{location.department}</td>
+                  <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{location.salesman}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      location.ageInDays > 90 ? 'bg-red-100 text-red-800' :
+                      location.ageInDays > 60 ? 'bg-orange-100 text-orange-800' :
+                      location.ageInDays > 45 ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-blue-100 text-blue-800'
+                    }`}>
+                      {location.ageInDays} {location.isEstimatedAge && '(est.)'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{location.quantity}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                    {location.lastSupplyDate ? location.lastSupplyDate.toLocaleDateString('en-GB') : 'Apr 1 (fallback)'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                      location.supplyStatus === 'current' ? 'bg-green-100 text-green-800' :
+                      location.suppliedAfterOutOfStock ? 'bg-blue-100 text-blue-800' :
+                      location.supplyStatus === 'awaiting_supply' ? 'bg-red-100 text-red-800' :
+                      location.supplyStatus?.startsWith('aging') ? 'bg-yellow-100 text-yellow-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {getEnhancedSupplyStatusDisplay(location)}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Pagination */}
+        <div className="px-6 py-3 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center">
+          <div className="text-sm text-gray-700 mb-2 sm:mb-0">
+            Showing {startIndex + 1} to {Math.min(endIndex, filteredAging.length)} of {filteredAging.length} aging items
+          </div>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="px-3 py-1 text-sm text-gray-700">
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const VisitComplianceTab = ({ data }: { data: InventoryData }) => {
+  return (
+    <div className="space-y-6">
+      <div className="text-center">
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Visit Compliance Dashboard</h2>
+        <p className="text-gray-600">{data.summary.rollingPeriodDays}-day rolling visit metrics</p>
+        <p className="text-sm text-gray-500">
+          Period: {data.summary.periodStartDate.toLocaleDateString()} - {data.summary.periodEndDate.toLocaleDateString()}
+        </p>
+      </div>
+
+      {/* Visit Summary */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="bg-white p-6 rounded-lg shadow text-center">
+          <div className="text-3xl font-bold text-blue-600">{data.visitCompliance.totalSalesmen}</div>
+          <div className="text-sm text-gray-500">Total Salesmen</div>
+        </div>
+        <div className="bg-white p-6 rounded-lg shadow text-center">
+          <div className="text-3xl font-bold text-green-600">{data.visitCompliance.rollingPeriodVisits}</div>
+          <div className="text-sm text-gray-500">{data.summary.rollingPeriodDays}-Day Visits</div>
+        </div>
+        <div className="bg-white p-6 rounded-lg shadow text-center">
+          <div className="text-3xl font-bold text-purple-600">{data.visitCompliance.yesterdayVisits}</div>
+          <div className="text-sm text-gray-500">Yesterday's Visits</div>
+        </div>
+        <div className="bg-white p-6 rounded-lg shadow text-center">
+          <div className="text-3xl font-bold text-orange-600">{data.visitCompliance.lastWeekVisits}</div>
+          <div className="text-sm text-gray-500">Last 7 Days</div>
+        </div>
+      </div>
+
+      {/* Salesman Performance */}
+      <div className="bg-white rounded-lg shadow">
+        <div className="px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-medium text-gray-900">{data.summary.rollingPeriodDays}-Day Rolling Salesman Performance</h3>
+          <p className="text-sm text-gray-500">Individual visit statistics (Last {data.summary.rollingPeriodDays} Days)</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rank</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Salesman</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">{data.summary.rollingPeriodDays}-Day Visits</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unique Shops</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Yesterday Visits</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last 7 Days</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {data.visitCompliance.salesmenStats.map((salesman, index) => (
+                <tr key={salesman.name} className={index < 3 ? 'bg-green-50' : ''}>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                    {index + 1}
+                    {index < 3 && <span className="ml-2">🏆</span>}
+                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{salesman.name}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">{salesman.rollingPeriodVisits}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{salesman.uniqueShops}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-purple-600">{salesman.yesterdayVisits}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600">{salesman.lastWeekVisits}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const StockIntelligenceTab = ({ data, filters, setFilters, getFilteredItems, getEnhancedSupplyStatusDisplay, departments, salesmen, brands, supplyStatuses, currentPage, setCurrentPage, itemsPerPage, exportStockIntelligenceCSV }: any) => {
+  const filteredOutOfStock = getFilteredItems(data.outOfStockItems);
+  const totalPages = Math.ceil(filteredOutOfStock.length / itemsPerPage);
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const currentItems = filteredOutOfStock.slice(startIndex, endIndex);
+
+  return (
+    <div className="space-y-6">
+      <div className="text-center">
+        <h2 className="text-2xl font-bold text-gray-900 mb-2">Stock Intelligence & Supply Chain Analysis</h2>
+        <p className="text-gray-600">Advanced out-of-stock analysis ({data.summary.rollingPeriodDays}-day rolling period)</p>
+        <p className="text-sm text-gray-500">
+          Period: {data.summary.periodStartDate.toLocaleDateString()} - {data.summary.periodEndDate.toLocaleDateString()}
+        </p>
+      </div>
+
+      {/* Enhanced Filter Controls */}
+      <div className="bg-white p-4 rounded-lg shadow">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
+          <select
+            value={filters.department}
+            onChange={(e) => {
+              setFilters({ ...filters, department: e.target.value });
+              setCurrentPage(1);
+            }}
+            className="border border-gray-300 rounded-lg px-3 py-2"
+          >
+            <option value="">All Departments</option>
+            {departments.map((dept: string) => (
+              <option key={dept} value={dept}>{dept}</option>
+            ))}
+          </select>
+
+          <select
+            value={filters.salesman}
+            onChange={(e) => {
+              setFilters({ ...filters, salesman: e.target.value });
+              setCurrentPage(1);
+            }}
+            className="border border-gray-300 rounded-lg px-3 py-2"
+          >
+            <option value="">All Salesmen</option>
+            {salesmen.map((salesman: string) => (
+              <option key={salesman} value={salesman}>{salesman}</option>
+            ))}
+          </select>
+
+          <select
+            value={filters.brand}
+            onChange={(e) => {
+              setFilters({ ...filters, brand: e.target.value });
+              setCurrentPage(1);
+            }}
+            className="border border-gray-300 rounded-lg px-3 py-2"
+          >
+            <option value="">All Brands</option>
+            {brands.map((brand: string) => (
+              <option key={brand} value={brand}>{brand}</option>
+            ))}
+          </select>
+
+          <select
+            value={filters.supplyStatus}
+            onChange={(e) => {
+              setFilters({ ...filters, supplyStatus: e.target.value });
+              setCurrentPage(1);
+            }}
+            className="border border-gray-300 rounded-lg px-3 py-2"
+          >
+            <option value="">All Supply Status</option>
+            <option value="restocked">Recently Restocked</option>
+            <option value="awaiting">Awaiting Supply</option>
+            <option value="recently_restocked">Recently Restocked (Status)</option>
+            <option value="awaiting_supply">Awaiting Supply (Status)</option>
+          </select>
+
+          <input
+            type="text"
+            placeholder="Search..."
+            value={filters.searchText}
+            onChange={(e) => {
+              setFilters({ ...filters, searchText: e.target.value });
+              setCurrentPage(1);
+            }}
+            className="border border-gray-300 rounded-lg px-3 py-2"
+          />
+
+          <button
+            onClick={() => {
+              setFilters({ ...filters, department: '', salesman: '', brand: '', searchText: '', supplyStatus: '' });
+              setCurrentPage(1);
+            }}
+            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center justify-center space-x-2"
+          >
+            <X className="w-4 h-4" />
+            <span>Clear</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Alert Summary */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+        <div className="bg-red-50 border border-red-200 p-6 rounded-lg">
+          <div className="flex items-center">
+            <AlertTriangle className="w-8 h-8 text-red-600" />
+            <div className="ml-4">
+              <div className="text-2xl font-bold text-red-600">{filteredOutOfStock.length}</div>
+              <div className="text-sm text-red-700">Out of Stock Items</div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-blue-50 border border-blue-200 p-6 rounded-lg">
+          <div className="flex items-center">
+            <Truck className="w-8 h-8 text-blue-600" />
+            <div className="ml-4">
+              <div className="text-2xl font-bold text-blue-600">
+                {filteredOutOfStock.filter((item: any) => 
+                  item.suppliedAfterOutOfStock || (item as any).enhancedSupplyStatus?.includes('Restocked')
+                ).length}
+              </div>
+              <div className="text-sm text-blue-700">Recently Restocked</div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-yellow-50 border border-yellow-200 p-6 rounded-lg">
+          <div className="flex items-center">
+            <Clock className="w-8 h-8 text-yellow-600" />
+            <div className="ml-4">
+              <div className="text-2xl font-bold text-yellow-600">
+                {filteredOutOfStock.filter((item: any) => 
+                  !item.suppliedAfterOutOfStock && !(item as any).enhancedSupplyStatus?.includes('Restocked')
+                ).length}
+              </div>
+              <div className="text-sm text-yellow-700">Still Awaiting Supply</div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="bg-green-50 border border-green-200 p-6 rounded-lg">
+          <div className="flex items-center">
+            <TrendingUp className="w-8 h-8 text-green-600" />
+            <div className="ml-4">
+              <div className="text-2xl font-bold text-green-600">
+                {filteredOutOfStock.length > 0 ? Math.round((filteredOutOfStock.filter((item: any) => 
+                  item.suppliedAfterOutOfStock || (item as any).enhancedSupplyStatus?.includes('Restocked')
+                ).length / filteredOutOfStock.length) * 100) : 0}%
+              </div>
+              <div className="text-sm text-green-700">Response Rate</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Enhanced Out of Stock Analysis with Pagination */}
+      <div className="bg-white rounded-lg shadow">
+        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+          <div>
+            <h3 className="text-lg font-medium text-gray-900">Out of Stock Intelligence</h3>
+            <p className="text-sm text-gray-500">
+              Complete out-of-stock analysis. Showing {startIndex + 1}-{Math.min(endIndex, filteredOutOfStock.length)} of {filteredOutOfStock.length} items
+            </p>
+          </div>
+          <button
+            onClick={exportStockIntelligenceCSV}
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors text-sm"
+          >
+            <Download className="w-4 h-4" />
+            <span>Export Intelligence CSV</span>
+          </button>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">SKU</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shop</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Salesman</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Visit Date</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Enhanced Supply Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Days Since Last Supply</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {currentItems.map((item: any, index: number) => (
+                <tr key={`${item.shopName}-${item.sku}-${index}`} className={
+                  (item as any).enhancedSupplyStatus?.includes('Restocked') ? 'bg-green-50' : 
+                  item.suppliedAfterOutOfStock ? 'bg-blue-50' : ''
+                }>
+                  <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{item.sku}</td>
+                  <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{item.shopName}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.department}</td>
+                  <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{item.salesman}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{item.reasonNoStock}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{item.visitDate.toLocaleDateString('en-GB')}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <span className={`inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full ${
+                      (item as any).enhancedSupplyStatus?.includes('Restocked') ? 'bg-green-100 text-green-800' :
+                      (item as any).enhancedSupplyStatus?.includes('Awaiting Supply') ? 'bg-red-100 text-red-800' :
+                      (item as any).enhancedSupplyStatus?.includes('In Stock') ? 'bg-blue-100 text-blue-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {(item as any).enhancedSupplyStatus?.includes('Restocked') && <Truck className="w-3 h-3 mr-1" />}
+                      {(item as any).enhancedSupplyStatus?.includes('Awaiting Supply') && <AlertTriangle className="w-3 h-3 mr-1" />}
+                      {(item as any).enhancedSupplyStatus || 'Unknown Status'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                    {(item as any).daysSinceLastSupply !== undefined ? `${(item as any).daysSinceLastSupply} days` : 'N/A'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {/* Enhanced Pagination for Stock Intelligence */}
+        <div className="px-6 py-3 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center">
+          <div className="text-sm text-gray-700 mb-2 sm:mb-0">
+            Showing {startIndex + 1} to {Math.min(endIndex, filteredOutOfStock.length)} of {filteredOutOfStock.length} out-of-stock items
+          </div>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
+              disabled={currentPage === 1}
+              className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <span className="px-3 py-1 text-sm text-gray-700">
+              Page {currentPage} of {totalPages}
+            </span>
+            <button
+              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+              disabled={currentPage === totalPages}
+              className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default InventoryDashboard;
