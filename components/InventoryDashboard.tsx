@@ -127,11 +127,58 @@ const InventoryDashboard = () => {
   };
 
   // ==========================================
-  // ENHANCED BRAND NORMALIZATION SYSTEM
+  // FIXED COMPREHENSIVE BRAND NORMALIZATION SYSTEM
   // ==========================================
 
-  const BRAND_MAPPING: { [key: string]: string } = {
-    // 8 PM BRAND FAMILY - ENHANCED WITH ALL SIZE VARIATIONS
+  // COMPREHENSIVE BRAND FAMILY MAPPING (FROM PAGE.TSX)
+  const BRAND_FAMILY_MAPPING: Record<string, string> = {
+    // Historical Data Brand Short Variations
+    "VERVE": "VERVE",
+    "8 PM BLACK": "8PM", 
+    "8PM BLACK": "8PM",
+    "8PM": "8PM",
+    "8 PM": "8PM",
+    
+    // Current Data Variations from Pending Challans
+    "8 PM PREMIUM BLACK BLENDED WHISKY": "8PM",
+    "8 PM PREMIUM BLACK BLENDED WHISKY Pet": "8PM",
+    "8 PM PREMIUM BLACK BLENDED WHISKY PET": "8PM",
+    "8 PM BLACK 750": "8PM",
+    "8 PM BLACK 375": "8PM",
+    "8 PM BLACK 180 P": "8PM",
+    "8 PM BLACK 90": "8PM",
+    "8 PM BLACK 60 P": "8PM",
+    "8PM PREMIUM BLACK BLENDED WHISKY": "8PM",
+    "8PM PREMIUM BLACK SUPERIOR WHISKY": "8PM",
+    
+    // VERVE Variations
+    "M2M VERVE CRANBERRY TEASE SP FL VODKA": "VERVE",
+    "M2M VERVE GREEN APPLE SUPERIOR FL. VODKA": "VERVE",
+    "M2M VERVE LEMON LUSH SUP FL VODKA": "VERVE",
+    "M2M VERVE SUPERIOR GRAIN VODKA": "VERVE",
+    "VERVE CRANBERRY 750": "VERVE",
+    "VERVE CRANBERRY 375": "VERVE",
+    "VERVE CRANBERRY 180": "VERVE",
+    "VERVE GREEN APPLE 750": "VERVE",
+    "VERVE GREEN APPLE 375": "VERVE",
+    "VERVE GREEN APPLE 180": "VERVE",
+    "VERVE LEMON LUSH 750": "VERVE",
+    "VERVE LEMON LUSH 375": "VERVE",
+    "VERVE LEMON LUSH 180": "VERVE",
+    "VERVE GRAIN 750": "VERVE",
+    "VERVE GRAIN 375": "VERVE",
+    "VERVE GRAIN 180": "VERVE",
+    
+    // Full brand name patterns from historical data
+    "M2 MAGIC MOMENTS VERVE CRANBERRY TEASE SUPERIOR FLAVOURED VODKA": "VERVE",
+    "M2 MAGIC MOMENTS VERVE GREEN APPLE SUPERIOR FLAVOURED VODKA": "VERVE",
+    "M2 MAGIC MOMENTS VERVE LEMON LUSH SUPERIOR FLAVOURED VODKA": "VERVE",
+    "M2 MAGIC MOMENTS VERVE SUPERIOR GRAIN VODKA": "VERVE"
+  };
+  
+  // SUPPLY DATA NORMALIZATION MAPPING
+  const SUPPLY_BRAND_MAPPING: { [key: string]: string } = {
+    // 8 PM BRAND FAMILY - ALL VARIANTS TO CONSISTENT SUPPLY NAMES
     '8 PM BLACK': '8 PM PREMIUM BLACK BLENDED WHISKY',
     '8 PM BLACK 750': '8 PM PREMIUM BLACK BLENDED WHISKY',
     '8 PM BLACK 375': '8 PM PREMIUM BLACK BLENDED WHISKY', 
@@ -141,15 +188,27 @@ const InventoryDashboard = () => {
     '8 PM BLACK 60': '8 PM PREMIUM BLACK BLENDED WHISKY Pet',
     '8 PM BLACK 60 P': '8 PM PREMIUM BLACK BLENDED WHISKY Pet',
     
-    // Direct supply sheet mappings
+    // Direct supply sheet mappings (exact matches)
     '8 PM PREMIUM BLACK BLENDED WHISKY': '8 PM PREMIUM BLACK BLENDED WHISKY',
     '8 PM PREMIUM BLACK BLENDED WHISKY Pet': '8 PM PREMIUM BLACK BLENDED WHISKY Pet',
     
-    // VERVE BRAND FAMILY
+    // VERVE BRAND FAMILY - ALL VARIANTS TO CONSISTENT SUPPLY NAMES
     'VERVE LEMON LUSH': 'M2M VERVE LEMON LUSH SUP FL VODKA',
     'VERVE GRAIN': 'M2M VERVE SUPERIOR GRAIN VODKA',
     'VERVE CRANBERRY': 'M2M VERVE CRANBERRY TEASE SP FL VODKA',
     'VERVE GREEN APPLE': 'M2M VERVE GREEN APPLE SUPERIOR FL VODKA',
+    'VERVE LEMON LUSH 750': 'M2M VERVE LEMON LUSH SUP FL VODKA',
+    'VERVE LEMON LUSH 375': 'M2M VERVE LEMON LUSH SUP FL VODKA',
+    'VERVE LEMON LUSH 180': 'M2M VERVE LEMON LUSH SUP FL VODKA',
+    'VERVE GRAIN 750': 'M2M VERVE SUPERIOR GRAIN VODKA',
+    'VERVE GRAIN 375': 'M2M VERVE SUPERIOR GRAIN VODKA',
+    'VERVE GRAIN 180': 'M2M VERVE SUPERIOR GRAIN VODKA',
+    'VERVE CRANBERRY 750': 'M2M VERVE CRANBERRY TEASE SP FL VODKA',
+    'VERVE CRANBERRY 375': 'M2M VERVE CRANBERRY TEASE SP FL VODKA',
+    'VERVE CRANBERRY 180': 'M2M VERVE CRANBERRY TEASE SP FL VODKA',
+    'VERVE GREEN APPLE 750': 'M2M VERVE GREEN APPLE SUPERIOR FL VODKA',
+    'VERVE GREEN APPLE 375': 'M2M VERVE GREEN APPLE SUPERIOR FL VODKA',
+    'VERVE GREEN APPLE 180': 'M2M VERVE GREEN APPLE SUPERIOR FL VODKA',
     
     // Direct supply sheet mappings for VERVE
     'M2M VERVE LEMON LUSH SUP FL VODKA': 'M2M VERVE LEMON LUSH SUP FL VODKA',
@@ -158,35 +217,72 @@ const InventoryDashboard = () => {
     'M2M VERVE GREEN APPLE SUPERIOR FL VODKA': 'M2M VERVE GREEN APPLE SUPERIOR FL VODKA'
   };
 
-  const normalizeBrandInfo = (brandName: string): { family: string, size: string, normalizedName: string } => {
-    let cleanBrand = brandName?.toString().trim().toUpperCase();
+  // FIXED BRAND FAMILY DETECTION
+  const getBrandFamily = (brandShort?: string, brand?: string): string | null => {
+    const cleanBrandShort = brandShort?.toString().trim();
+    const cleanBrand = brand?.toString().trim();
+    
+    if (cleanBrandShort && BRAND_FAMILY_MAPPING[cleanBrandShort]) {
+      return BRAND_FAMILY_MAPPING[cleanBrandShort];
+    }
+    
+    if (cleanBrand && BRAND_FAMILY_MAPPING[cleanBrand]) {
+      return BRAND_FAMILY_MAPPING[cleanBrand];
+    }
+    
+    const combinedText = ((cleanBrandShort || '') + ' ' + (cleanBrand || '')).toUpperCase();
+    
+    if (combinedText.includes('VERVE') || combinedText.includes('M2 MAGIC MOMENTS VERVE')) return 'VERVE';
+    if (combinedText.includes('8PM') || combinedText.includes('8 PM')) return '8PM';
+    if (combinedText.includes('PREMIUM BLACK') && (combinedText.includes('WHISKY') || combinedText.includes('BLENDED'))) return '8PM';
+    
+    return null;
+  };
+
+  // COMPREHENSIVE BRAND NORMALIZATION WITH DEBUGGING
+  const normalizeBrandInfo = (brandName: string, sourceContext?: string): { family: string, size: string, normalizedName: string } => {
+    if (!brandName) {
+      console.warn(`⚠️ Empty brand name in ${sourceContext || 'unknown context'}`);
+      return { family: brandName, size: '750', normalizedName: brandName };
+    }
+
+    let cleanBrand = brandName.toString().trim().toUpperCase();
     let extractedSize = '';
     
+    // ENHANCED SIZE EXTRACTION
     const sizeMatch = cleanBrand.match(/(\d+)\s?(P|ML)?$/);
     if (sizeMatch) {
       extractedSize = sizeMatch[1] + (sizeMatch[2] || '');
       cleanBrand = cleanBrand.replace(/\s*\d+\s?(P|ML)?$/, '').trim();
     }
     
+    // Default size if not found
     if (!extractedSize) {
       extractedSize = '750';
     }
     
+    // STEP 1: Check direct mapping first
     let normalizedName = cleanBrand;
     const fullBrandWithSize = `${cleanBrand} ${extractedSize}`.trim();
     
-    if (BRAND_MAPPING[fullBrandWithSize]) {
-      normalizedName = BRAND_MAPPING[fullBrandWithSize];
-    } else if (BRAND_MAPPING[cleanBrand]) {
-      normalizedName = BRAND_MAPPING[cleanBrand];
+    if (SUPPLY_BRAND_MAPPING[fullBrandWithSize]) {
+      normalizedName = SUPPLY_BRAND_MAPPING[fullBrandWithSize];
+      console.log(`🎯 EXACT MATCH: "${brandName}" -> "${normalizedName}" (${extractedSize}) [${sourceContext}]`);
+    } else if (SUPPLY_BRAND_MAPPING[cleanBrand]) {
+      normalizedName = SUPPLY_BRAND_MAPPING[cleanBrand];
+      console.log(`🎯 BRAND MATCH: "${brandName}" -> "${normalizedName}" (${extractedSize}) [${sourceContext}]`);
     } else {
+      // STEP 2: Pattern-based matching
       if (cleanBrand.includes('8 PM') && cleanBrand.includes('BLACK')) {
-        if (extractedSize === '180P' || extractedSize === '60P' || extractedSize === '90P') {
+        // Handle Pet variants specifically (smaller sizes)
+        if (extractedSize === '180P' || extractedSize === '60P' || extractedSize === '90P' || extractedSize === '180' || extractedSize === '60' || extractedSize === '90') {
           normalizedName = '8 PM PREMIUM BLACK BLENDED WHISKY Pet';
         } else {
           normalizedName = '8 PM PREMIUM BLACK BLENDED WHISKY';
         }
+        console.log(`🔧 8PM PATTERN: "${brandName}" -> "${normalizedName}" (${extractedSize}) [${sourceContext}]`);
       }
+      // VERVE pattern matching
       else if (cleanBrand.includes('VERVE')) {
         if (cleanBrand.includes('LEMON')) {
           normalizedName = 'M2M VERVE LEMON LUSH SUP FL VODKA';
@@ -197,28 +293,46 @@ const InventoryDashboard = () => {
         } else if (cleanBrand.includes('GREEN') || cleanBrand.includes('APPLE')) {
           normalizedName = 'M2M VERVE GREEN APPLE SUPERIOR FL VODKA';
         }
+        console.log(`🔧 VERVE PATTERN: "${brandName}" -> "${normalizedName}" (${extractedSize}) [${sourceContext}]`);
+      } else {
+        console.warn(`⚠️ NO MATCH: "${brandName}" not mapped [${sourceContext}]`);
       }
     }
     
     return { family: normalizedName, size: extractedSize, normalizedName };
   };
 
-  const createBrandMatchingKey = (shopId: string, brandName: string): string => {
-    const brandInfo = normalizeBrandInfo(brandName);
-    return `${shopId}_${brandInfo.normalizedName}_${brandInfo.size}`;
+  // FIXED BRAND KEY CREATION WITH COMPREHENSIVE DEBUGGING
+  const createBrandMatchingKey = (shopId: string, brandName: string, sourceContext?: string): string => {
+    const brandInfo = normalizeBrandInfo(brandName, sourceContext);
+    const key = `${shopId}_${brandInfo.normalizedName}_${brandInfo.size}`;
+    
+    // Enhanced debugging for key creation
+    console.log(`🔑 KEY CREATION [${sourceContext}]: "${brandName}" -> "${key}"`);
+    
+    return key;
   };
 
-  const createMultipleBrandKeys = (shopId: string, brandName: string, size?: string): string[] => {
-    const brandInfo = normalizeBrandInfo(brandName);
+  // FIXED MULTIPLE BRAND KEYS WITH COMPREHENSIVE MATCHING
+  const createMultipleBrandKeys = (shopId: string, brandName: string, size?: string, sourceContext?: string): string[] => {
+    const brandInfo = normalizeBrandInfo(brandName, sourceContext);
     const actualSize = size || brandInfo.size;
     
+    // Create comprehensive key combinations for better matching
     const keys = [
-      `${shopId}_${brandInfo.normalizedName}_${actualSize}`,
-      `${shopId}_${brandInfo.family}_${actualSize}`,
-      `${shopId}_${brandName.toUpperCase()}_${actualSize}`,
+      `${shopId}_${brandInfo.normalizedName}_${actualSize}`,     // Primary match with normalized name
+      `${shopId}_${brandInfo.family}_${actualSize}`,            // Family match
+      `${shopId}_${brandName.toUpperCase()}_${actualSize}`,     // Original brand match
+      `${shopId}_${brandInfo.normalizedName}`,                  // Without size
+      `${shopId}_${brandName.toUpperCase()}`                    // Original without size
     ];
     
-    return [...new Set(keys)];
+    // Enhanced debugging
+    if (sourceContext && (brandName.includes('8 PM BLACK') || brandName.includes('VERVE'))) {
+      console.log(`🔑 MULTIPLE KEYS [${sourceContext}]: "${brandName}" -> ${keys.length} keys:`, keys);
+    }
+    
+    return [...new Set(keys)]; // Remove duplicates
   };
 
   // ==========================================
@@ -536,7 +650,7 @@ const InventoryDashboard = () => {
         
         processedSKUs.add(brand);
         
-        // Enhanced supply check
+        // Enhanced supply check WITH FIXED BRAND NORMALIZATION
         const supplyCheckResult = checkSuppliedAfterOutOfStock(
           shopVisit.shopId, 
           brand, 
@@ -544,15 +658,25 @@ const InventoryDashboard = () => {
           recentSupplies
         );
 
+        // DEBUG: Enhanced logging for LAWRENCE ROAD 8PM BLACK 750
+        if (shopVisit.shopId === '01/2024/0804' && brand && brand.includes('8 PM BLACK 750')) {
+          console.log(`🔍 LAWRENCE ROAD MAIN PROCESSING: "${brand}", Quantity: ${quantity}, Restocked: ${supplyCheckResult.wasRestocked}`);
+          if (supplyCheckResult.wasRestocked) {
+            console.log(`🎉 LAWRENCE ROAD RESTOCKED: Supply date: ${supplyCheckResult.supplyDate?.toLocaleDateString()}, Days since: ${supplyCheckResult.daysSinceSupply}`);
+          }
+        }
+
         let lastSupplyDate: Date | undefined;
         let isEstimatedAge = true;
         let ageInDays = 0;
         
+        // Use supply date if found, otherwise fallback
         if (supplyCheckResult.supplyDate) {
           lastSupplyDate = supplyCheckResult.supplyDate;
           isEstimatedAge = false;
           ageInDays = Math.floor((shopVisit.visitDate.getTime() - lastSupplyDate.getTime()) / (1000 * 60 * 60 * 24));
         } else {
+          // Fallback to historical or LS date WITH FIXED NORMALIZATION
           const lastSupplyFromHistory = getLastSupplyDate(shopVisit.shopId, brand, supplyHistory);
           const lastSupplyFromLS = lsDate ? parseDate(lsDate) : null;
           
@@ -565,6 +689,7 @@ const InventoryDashboard = () => {
             isEstimatedAge = false;
             ageInDays = Math.floor((shopVisit.visitDate.getTime() - lastSupplyDate.getTime()) / (1000 * 60 * 60 * 24));
           } else {
+            // No supply found - use fallback
             const fallbackDate = new Date('2025-04-01');
             lastSupplyDate = fallbackDate;
             ageInDays = Math.floor((shopVisit.visitDate.getTime() - fallbackDate.getTime()) / (1000 * 60 * 60 * 24));
@@ -842,8 +967,13 @@ const InventoryDashboard = () => {
     const casesIndex = headers.findIndex(h => h?.toLowerCase().includes('cases'));
     
     if (shopIdIndex === -1 || (brandShortIndex === -1 && brandIndex === -1) || dateIndex === -1) {
+      console.warn('⚠️ Historical data columns not found for supply processing');
       return supplyHistory;
     }
+    
+    console.log('📊 Processing historical supply data with FIXED brand normalization...');
+    let processedEntries = 0;
+    let debugEntries = 0;
     
     rows.forEach((row, index) => {
       if (row.length > Math.max(shopIdIndex, brandShortIndex !== -1 ? brandShortIndex : brandIndex, dateIndex)) {
@@ -856,15 +986,33 @@ const InventoryDashboard = () => {
         if (shopId && brand && dateStr && cases > 0) {
           const date = parseDate(dateStr);
           if (date && !isNaN(date.getTime())) {
-            const possibleKeys = createMultipleBrandKeys(shopId, brand, size);
+            // DEBUG: Enhanced logging for specific shops
+            if (shopId === '01/2024/0804' && brand.includes('8 PM')) {
+              console.log(`🔍 LAWRENCE ROAD HISTORICAL: "${brand}" size:"${size}" date:${dateStr}`);
+              debugEntries++;
+            }
+            
+            const possibleKeys = createMultipleBrandKeys(shopId, brand, size, 'HISTORICAL');
             possibleKeys.forEach(key => {
               if (!supplyHistory[key] || date > supplyHistory[key]) {
                 supplyHistory[key] = date;
+                
+                // DEBUG: Log key updates for specific cases
+                if (debugEntries <= 5 && shopId === '01/2024/0804') {
+                  console.log(`✅ HISTORICAL KEY UPDATE: "${key}" -> ${date.toLocaleDateString()}`);
+                }
               }
             });
+            processedEntries++;
           }
         }
       }
+    });
+    
+    console.log('📊 Historical supply data processed:', {
+      processedEntries,
+      totalKeys: Object.keys(supplyHistory).length,
+      sampleKeys: Object.keys(supplyHistory).slice(0, 3)
     });
     
     return supplyHistory;
@@ -878,13 +1026,20 @@ const InventoryDashboard = () => {
     const headers = pendingChallans[0];
     const rows = pendingChallans.slice(1);
     
-    const challansDateIndex = 1;
-    const shopIdIndex = 8;
-    const shopNameIndex = 9;
-    const brandIndex = 11;
-    const sizeIndex = 12;
-    const packIndex = 13;
-    const casesIndex = 14;
+    // CORRECTED: Based on actual CSV structure from your images
+    const challansDateIndex = 1;  // Column B (challandate)
+    const shopIdIndex = 8;        // Column I (Shop_Id)
+    const shopNameIndex = 9;      // Column J (shop_name)
+    const brandIndex = 11;        // Column L (brand)
+    const sizeIndex = 12;         // Column M (size)
+    const packIndex = 13;         // Column N (pack)
+    const casesIndex = 14;        // Column O (cases)
+    
+    console.log('📦 Processing Pending Challans with FIXED brand normalization...');
+    console.log(`📦 Using column indices: Date:${challansDateIndex}, Shop:${shopIdIndex}, Brand:${brandIndex}, Size:${sizeIndex}, Cases:${casesIndex}`);
+    
+    let processedEntries = 0;
+    let debugEntries = 0;
     
     rows.forEach((row, index) => {
       if (row.length > Math.max(shopIdIndex, brandIndex, challansDateIndex, casesIndex)) {
@@ -898,38 +1053,69 @@ const InventoryDashboard = () => {
         if (shopId && brand && dateStr && cases > 0) {
           const date = parseDate(dateStr);
           if (date && !isNaN(date.getTime())) {
-            const possibleKeys = createMultipleBrandKeys(shopId, brand, size);
+            
+            // DEBUG: Enhanced logging for LAWRENCE ROAD
+            if (shopId === '01/2024/0804' && brand.includes('8 PM PREMIUM BLACK')) {
+              console.log(`🔍 LAWRENCE ROAD PENDING: "${brand}" size:"${size}" date:${dateStr} cases:${cases}`);
+              debugEntries++;
+            }
+            
+            const possibleKeys = createMultipleBrandKeys(shopId, brand, size, 'PENDING_CHALLANS');
             possibleKeys.forEach(key => {
               if (!recentSupplies[key] || date > recentSupplies[key]) {
                 recentSupplies[key] = date;
+                
+                // DEBUG: Log key updates for LAWRENCE ROAD
+                if (debugEntries <= 10 && shopId === '01/2024/0804') {
+                  console.log(`✅ PENDING KEY UPDATE: "${key}" -> ${date.toLocaleDateString()}`);
+                }
               }
             });
+            
+            processedEntries++;
           }
         }
       }
+    });
+    
+    console.log('📦 Pending Challans processed:', {
+      processedEntries,
+      totalKeys: Object.keys(recentSupplies).length,
+      sampleKeys: Object.keys(recentSupplies).slice(0, 3)
     });
     
     return recentSupplies;
   };
 
   const getLastSupplyDate = (shopId: string, brandName: string, supplyHistory: Record<string, Date>) => {
-    const brandInfo = normalizeBrandInfo(brandName);
-    const possibleKeys = [
-      `${shopId}_${brandInfo.normalizedName}_${brandInfo.size}`,
-      `${shopId}_${brandInfo.normalizedName}`,
-      `${shopId}_${brandInfo.family}_${brandInfo.size}`,
-      `${shopId}_${brandInfo.family}`
-    ];
+    const possibleKeys = createMultipleBrandKeys(shopId, brandName, undefined, 'SUPPLY_LOOKUP');
+    
+    // DEBUG: Enhanced logging for specific brands
+    if (shopId === '01/2024/0804' && brandName.includes('8 PM BLACK 750')) {
+      console.log(`🔍 LAWRENCE ROAD SUPPLY LOOKUP: "${brandName}"`);
+      console.log('🔑 Keys to check:', possibleKeys);
+      
+      // Show what keys exist in supply history for this shop
+      const shopKeys = Object.keys(supplyHistory).filter(k => k.startsWith(shopId));
+      console.log('📋 Available supply keys for this shop:', shopKeys);
+    }
     
     for (const key of possibleKeys) {
       if (supplyHistory[key]) {
+        console.log(`✅ SUPPLY FOUND: "${key}" -> ${supplyHistory[key].toLocaleDateString()}`);
         return supplyHistory[key];
       }
+    }
+    
+    // DEBUG: Log when no supply found
+    if (shopId === '01/2024/0804' && brandName.includes('8 PM BLACK 750')) {
+      console.log(`❌ NO SUPPLY FOUND for "${brandName}" at ${shopId}`);
     }
     
     return null;
   };
 
+  // ENHANCED SUPPLY CHECKING WITH COMPREHENSIVE DEBUGGING
   const checkSuppliedAfterOutOfStock = (
     shopId: string, 
     brandName: string, 
@@ -944,7 +1130,27 @@ const InventoryDashboard = () => {
     matchedKey?: string
   } => {
     const today = new Date();
-    const possibleKeys = createMultipleBrandKeys(shopId, brandName);
+    const possibleKeys = createMultipleBrandKeys(shopId, brandName, undefined, 'RESTOCK_CHECK');
+    
+    // DEBUG: Enhanced logging for LAWRENCE ROAD 8PM BLACK 750
+    if (shopId === '01/2024/0804' && brandName.includes('8 PM BLACK 750')) {
+      console.log(`🔍 LAWRENCE ROAD RESTOCK CHECK: "${brandName}"`);
+      console.log(`📅 Visit date: ${visitDate.toLocaleDateString()}`);
+      console.log('🔑 Keys to check:', possibleKeys);
+      
+      // Show available supply keys for this shop
+      const shopSupplyKeys = Object.keys(recentSupplies).filter(k => k.startsWith(shopId));
+      console.log('📋 Available recent supply keys for this shop:', shopSupplyKeys);
+      
+      // Show exact matches
+      possibleKeys.forEach(key => {
+        if (recentSupplies[key]) {
+          console.log(`✅ MATCH FOUND: "${key}" -> ${recentSupplies[key].toLocaleDateString()}`);
+        } else {
+          console.log(`❌ NO MATCH: "${key}"`);
+        }
+      });
+    }
     
     let latestSupplyDate: Date | null = null;
     let matchedKey = '';
@@ -963,7 +1169,10 @@ const InventoryDashboard = () => {
       const daysOutOfStock = Math.floor((latestSupplyDate.getTime() - visitDate.getTime()) / (1000 * 60 * 60 * 24));
       const daysSinceSupply = Math.floor((today.getTime() - latestSupplyDate.getTime()) / (1000 * 60 * 60 * 24));
       
+      // Grace period: 7 days from supply date
       const isInGracePeriod = daysSinceSupply <= 7;
+      
+      console.log(`🎉 RESTOCKED: "${brandName}" at ${shopId} -> Supply: ${latestSupplyDate.toLocaleDateString()}, Out: ${daysOutOfStock}d, Since: ${daysSinceSupply}d`);
       
       return { 
         wasRestocked: true, 
@@ -973,6 +1182,11 @@ const InventoryDashboard = () => {
         daysSinceSupply: daysSinceSupply,
         matchedKey: matchedKey
       };
+    }
+    
+    // DEBUG: Log when no restocking found
+    if (shopId === '01/2024/0804' && brandName.includes('8 PM BLACK 750')) {
+      console.log(`❌ NO RECENT SUPPLY AFTER VISIT for "${brandName}" at ${shopId}`);
     }
     
     return { wasRestocked: false };
