@@ -127,26 +127,25 @@ const InventoryDashboard = () => {
   };
 
   // ==========================================
-  // FIXED BRAND NORMALIZATION SYSTEM
+  // ENHANCED BRAND NORMALIZATION SYSTEM
   // ==========================================
 
-  // ✅ ISSUE 2 FIX: ENHANCED BRAND MAPPING DICTIONARY
   const BRAND_MAPPING: { [key: string]: string } = {
-    // 8 PM BRAND FAMILY - ENHANCED WITH ALL SIZE VARIATIONS TO MATCH SUPPLY DATA
+    // 8 PM BRAND FAMILY - ENHANCED WITH ALL SIZE VARIATIONS
     '8 PM BLACK': '8 PM PREMIUM BLACK BLENDED WHISKY',
     '8 PM BLACK 750': '8 PM PREMIUM BLACK BLENDED WHISKY',
     '8 PM BLACK 375': '8 PM PREMIUM BLACK BLENDED WHISKY', 
     '8 PM BLACK 180': '8 PM PREMIUM BLACK BLENDED WHISKY Pet',
-    '8 PM BLACK 180 P': '8 PM PREMIUM BLACK BLENDED WHISKY Pet',  // ✅ KEY FIX
+    '8 PM BLACK 180 P': '8 PM PREMIUM BLACK BLENDED WHISKY Pet',
     '8 PM BLACK 90': '8 PM PREMIUM BLACK BLENDED WHISKY Pet',
     '8 PM BLACK 60': '8 PM PREMIUM BLACK BLENDED WHISKY Pet',
     '8 PM BLACK 60 P': '8 PM PREMIUM BLACK BLENDED WHISKY Pet',
     
-    // Direct supply sheet mappings (for reverse matching)
+    // Direct supply sheet mappings
     '8 PM PREMIUM BLACK BLENDED WHISKY': '8 PM PREMIUM BLACK BLENDED WHISKY',
     '8 PM PREMIUM BLACK BLENDED WHISKY Pet': '8 PM PREMIUM BLACK BLENDED WHISKY Pet',
     
-    // VERVE BRAND FAMILY - EXACT NAMES FROM SUPPLY SHEET
+    // VERVE BRAND FAMILY
     'VERVE LEMON LUSH': 'M2M VERVE LEMON LUSH SUP FL VODKA',
     'VERVE GRAIN': 'M2M VERVE SUPERIOR GRAIN VODKA',
     'VERVE CRANBERRY': 'M2M VERVE CRANBERRY TEASE SP FL VODKA',
@@ -163,43 +162,31 @@ const InventoryDashboard = () => {
     let cleanBrand = brandName?.toString().trim().toUpperCase();
     let extractedSize = '';
     
-    // ✅ ENHANCED: Better size extraction to handle "180 P" -> "180P" matching
     const sizeMatch = cleanBrand.match(/(\d+)\s?(P|ML)?$/);
     if (sizeMatch) {
-      // Keep the "P" attached to size for matching with supply sheet
-      extractedSize = sizeMatch[1] + (sizeMatch[2] || '');  // "180" + "P" = "180P"
+      extractedSize = sizeMatch[1] + (sizeMatch[2] || '');
       cleanBrand = cleanBrand.replace(/\s*\d+\s?(P|ML)?$/, '').trim();
     }
     
-    // Default size if not found
     if (!extractedSize) {
       extractedSize = '750';
     }
     
-    // ✅ CRITICAL FIX: Enhanced brand matching with specific 8 PM BLACK handling
     let normalizedName = cleanBrand;
     const fullBrandWithSize = `${cleanBrand} ${extractedSize}`.trim();
     
-    // Step 1: Check for direct exact matches first
     if (BRAND_MAPPING[fullBrandWithSize]) {
       normalizedName = BRAND_MAPPING[fullBrandWithSize];
-      console.log(`🎯 EXACT MATCH: "${brandName}" -> "${normalizedName}" (${extractedSize})`);
     } else if (BRAND_MAPPING[cleanBrand]) {
       normalizedName = BRAND_MAPPING[cleanBrand];
-      console.log(`🎯 BRAND MATCH: "${brandName}" -> "${normalizedName}" (${extractedSize})`);
     } else {
-      // Step 2: Pattern-based matching for 8 PM variants
       if (cleanBrand.includes('8 PM') && cleanBrand.includes('BLACK')) {
-        // Handle Pet variants specifically (smaller sizes)
         if (extractedSize === '180P' || extractedSize === '60P' || extractedSize === '90P') {
           normalizedName = '8 PM PREMIUM BLACK BLENDED WHISKY Pet';
-          console.log(`🎯 8PM PET PATTERN: "${brandName}" -> "${normalizedName}" (${extractedSize})`);
         } else {
           normalizedName = '8 PM PREMIUM BLACK BLENDED WHISKY';
-          console.log(`🎯 8PM REGULAR PATTERN: "${brandName}" -> "${normalizedName}" (${extractedSize})`);
         }
       }
-      // Step 3: VERVE pattern matching
       else if (cleanBrand.includes('VERVE')) {
         if (cleanBrand.includes('LEMON')) {
           normalizedName = 'M2M VERVE LEMON LUSH SUP FL VODKA';
@@ -210,22 +197,8 @@ const InventoryDashboard = () => {
         } else if (cleanBrand.includes('GREEN') || cleanBrand.includes('APPLE')) {
           normalizedName = 'M2M VERVE GREEN APPLE SUPERIOR FL VODKA';
         }
-        console.log(`🎯 VERVE PATTERN: "${brandName}" -> "${normalizedName}" (${extractedSize})`);
       }
     }
-    
-    // ✅ DEBUG: Special logging for 8 PM BLACK 180 P issue
-    if (brandName.includes('8 PM BLACK 180')) {
-      console.log('🔧 8PM 180P BRAND DEBUG:', {
-        original: brandName,
-        cleanBrand: cleanBrand,
-        extractedSize: extractedSize,
-        normalizedName: normalizedName,
-        expectedKey: `01/2024/0271_${normalizedName}_${extractedSize}`
-      });
-    }
-    
-    console.log(`🔧 Brand normalization: "${brandName}" -> Brand: "${normalizedName}", Size: "${extractedSize}"`);
     
     return { family: normalizedName, size: extractedSize, normalizedName };
   };
@@ -235,33 +208,17 @@ const InventoryDashboard = () => {
     return `${shopId}_${brandInfo.normalizedName}_${brandInfo.size}`;
   };
 
-  // ✅ ENHANCED: SIZE-SPECIFIC MATCHING WITH DEBUGGING
   const createMultipleBrandKeys = (shopId: string, brandName: string, size?: string): string[] => {
     const brandInfo = normalizeBrandInfo(brandName);
     const actualSize = size || brandInfo.size;
     
-    // ✅ FIXED: Create size-specific keys with proper format matching
     const keys = [
-      `${shopId}_${brandInfo.normalizedName}_${actualSize}`,     // Primary match with size (e.g., "180P")
-      `${shopId}_${brandInfo.family}_${actualSize}`,            // Family match with size
-      `${shopId}_${brandName.toUpperCase()}_${actualSize}`,     // Original brand with size
+      `${shopId}_${brandInfo.normalizedName}_${actualSize}`,
+      `${shopId}_${brandInfo.family}_${actualSize}`,
+      `${shopId}_${brandName.toUpperCase()}_${actualSize}`,
     ];
     
-    // ✅ DEBUG: Enhanced logging for 8 PM BLACK 180 P
-    if (brandName.includes('8 PM BLACK 180')) {
-      console.log(`🔑 8PM 180P KEY CREATION:`, {
-        shopId: shopId,
-        brandName: brandName,
-        normalizedBrand: brandInfo.normalizedName,
-        size: actualSize,
-        primaryKey: keys[0],
-        allKeys: keys
-      });
-    }
-    
-    console.log(`🔑 Creating keys for ${shopId} + ${brandName}:`, keys);
-    
-    return [...new Set(keys)]; // Remove duplicates
+    return [...new Set(keys)];
   };
 
   // ==========================================
@@ -277,8 +234,6 @@ const InventoryDashboard = () => {
         throw new Error('Google API key not configured');
       }
 
-      console.log(`🔄 Fetching inventory data for ${rollingPeriodDays}-day rolling period...`);
-
       const [visitData, historicalData, masterData] = await Promise.all([
         fetchVisitSheetData(),
         fetchHistoricalSheetData(),
@@ -289,7 +244,7 @@ const InventoryDashboard = () => {
       setInventoryData(processedData);
       
     } catch (error: any) {
-      console.error('❌ Error fetching inventory data:', error);
+      console.error('Error fetching inventory data:', error);
       setError(error.message);
     } finally {
       setLoading(false);
@@ -307,10 +262,9 @@ const InventoryDashboard = () => {
       }
       
       const result = await response.json();
-      console.log('✅ Visit data fetched:', result.values?.length || 0, 'rows');
       return result.values || [];
     } catch (error) {
-      console.error('❌ Error fetching visit data:', error);
+      console.error('Error fetching visit data:', error);
       return [];
     }
   };
@@ -327,7 +281,6 @@ const InventoryDashboard = () => {
           
           if (response.ok) {
             const result = await response.json();
-            console.log(`✅ Historical data fetched from ${sheetName}:`, result.values?.length || 0, 'rows');
             return result.values || [];
           }
         } catch (err) {
@@ -335,10 +288,9 @@ const InventoryDashboard = () => {
         }
       }
       
-      console.warn('❌ No accessible historical sheet found');
       return [];
     } catch (error) {
-      console.warn('❌ Error fetching historical data:', error);
+      console.warn('Error fetching historical data:', error);
       return [];
     }
   };
@@ -350,26 +302,22 @@ const InventoryDashboard = () => {
       );
       
       if (!response.ok) {
-        console.warn('Pending Challans sheet not accessible');
         return [];
       }
       
       const result = await response.json();
-      console.log('✅ Pending Challans data fetched:', result.values?.length || 0, 'rows');
       return result.values || [];
     } catch (error) {
-      console.warn('❌ Error fetching pending challans:', error);
+      console.warn('Error fetching pending challans:', error);
       return [];
     }
   };
 
   // ==========================================
-  // FIXED DATA PROCESSING LOGIC - FORWARD HIERARCHICAL PROCESSING
+  // DATA PROCESSING LOGIC
   // ==========================================
 
   const processEnhancedInventoryData = (visitData: any[][], historicalData: any[][], pendingChallans: any[][], rollingDays: number = 15): InventoryData => {
-    console.log(`🔧 Processing inventory data with ${rollingDays}-DAY ROLLING PERIOD...`);
-    
     if (visitData.length === 0) {
       throw new Error('No visit data found');
     }
@@ -377,19 +325,15 @@ const InventoryDashboard = () => {
     const headers = visitData[0];
     const rows = visitData.slice(1);
 
-    console.log('📋 Headers found:', headers);
-
     const getColumnIndex = (searchTerms: string[]) => {
       for (const term of searchTerms) {
         const index = headers.findIndex(header => 
           header && header.toString().toLowerCase().includes(term.toLowerCase())
         );
         if (index !== -1) {
-          console.log(`✅ Found column "${term}" at index ${index}: "${headers[index]}"`);
           return index;
         }
       }
-      console.warn(`❌ Column not found for terms:`, searchTerms);
       return -1;
     };
 
@@ -405,8 +349,6 @@ const InventoryDashboard = () => {
       lsDate: getColumnIndex(['ls date', 'ls_date'])
     };
 
-    console.log('📊 Column indices found:', columnIndices);
-
     const requiredColumns = ['shopId', 'shopName', 'invBrand', 'invQuantity', 'checkInDateTime'];
     for (const col of requiredColumns) {
       if (columnIndices[col as keyof typeof columnIndices] === -1) {
@@ -414,30 +356,17 @@ const InventoryDashboard = () => {
       }
     }
 
-    // Process supply data with FIXED column mapping
+    // Process supply data
     const supplyHistory = processHistoricalSupplyData(historicalData);
     const recentSupplies = processPendingChallans(pendingChallans);
     
-    console.log('📊 Supply data processed:', {
-      historicalEntries: Object.keys(supplyHistory).length,
-      recentSupplies: Object.keys(recentSupplies).length
-    });
-    
-    // ==========================================
-    // ✅ FIXED: FORWARD HIERARCHICAL PROCESSING
-    // ==========================================
-    console.log('🔧 Processing with CORRECTED FORWARD hierarchical logic...');
-    
+    // Forward hierarchical processing
     let currentShopInfo: any = null;
-    let propagatedRows = 0;
     
-    // Process rows in FORWARD order (top to bottom) - CORRECT APPROACH
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       
-      // Check if this row contains shop information
       if (row[columnIndices.shopId] && row[columnIndices.shopName]) {
-        // This is a shop info row - update current shop context
         currentShopInfo = {
           shopId: row[columnIndices.shopId],
           shopName: row[columnIndices.shopName],
@@ -445,61 +374,23 @@ const InventoryDashboard = () => {
           department: row[columnIndices.department],
           salesman: row[columnIndices.salesman]
         };
-        
-        console.log(`🏪 Found shop: ${currentShopInfo.shopName} (${currentShopInfo.shopId})`);
       }
       
-      // Check if this row contains brand information without shop info
       const invBrand = row[columnIndices.invBrand];
       if (invBrand && invBrand.toString().trim() && !row[columnIndices.shopId] && currentShopInfo) {
-        // This is a brand row - assign current shop info to it
         row[columnIndices.shopId] = currentShopInfo.shopId;
         row[columnIndices.shopName] = currentShopInfo.shopName;
         row[columnIndices.checkInDateTime] = currentShopInfo.checkInDateTime;
         row[columnIndices.department] = currentShopInfo.department;
         row[columnIndices.salesman] = currentShopInfo.salesman;
-        
-        propagatedRows++;
-        
-        console.log(`📦 CORRECTLY ASSIGNED "${invBrand}" to shop "${currentShopInfo.shopName}" (${currentShopInfo.shopId})`);
       }
     }
-    
-    console.log(`🎉 FORWARD propagation complete: ${propagatedRows} brand rows CORRECTLY assigned`);
 
-    // ==========================================
-    // DEBUGGING FUNCTION FOR SHOP-BRAND ASSOCIATIONS
-    // ==========================================
-    console.log('🔍 DEBUGGING SHOP-BRAND ASSOCIATIONS:');
-    
-    rows.forEach((row, index) => {
-      const shopId = row[columnIndices.shopId];
-      const shopName = row[columnIndices.shopName];
-      const invBrand = row[columnIndices.invBrand];
-      
-      if (invBrand && invBrand.toString().includes('8 PM BLACK 180')) {
-        console.log(`Row ${index + 2}: "${invBrand}" -> Shop: "${shopName}" (${shopId})`);
-      }
-    });
-    
-    // Special check for GOVIND PURI issue
-    const govindPuriRows = rows.filter(row => 
-      row[columnIndices.shopName] && 
-      row[columnIndices.shopName].toString().includes('GOVIND PURI')
-    );
-    
-    console.log(`🏪 GOVIND PURI rows found: ${govindPuriRows.length}`);
-    govindPuriRows.forEach((row, index) => {
-      console.log(`GOVIND PURI ${index + 1}: Brand="${row[columnIndices.invBrand]}", Shop="${row[columnIndices.shopName]}", ID="${row[columnIndices.shopId]}"`);
-    });
-
-    // STEP 2: ROLLING PERIOD LOGIC
+    // Rolling period logic
     const today = new Date();
     const rollingPeriodStart = new Date(today.getTime() - (rollingDays * 24 * 60 * 60 * 1000));
     const yesterday = new Date(today.getTime() - 24 * 60 * 60 * 1000);
     const lastWeek = new Date(today.getTime() - (7 * 24 * 60 * 60 * 1000));
-
-    console.log(`📅 ${rollingDays}-Day Rolling Period: ${rollingPeriodStart.toLocaleDateString()} to ${today.toLocaleDateString()}`);
 
     const rollingPeriodRows = rows.filter(row => {
       const dateStr = row[columnIndices.checkInDateTime];
@@ -512,24 +403,16 @@ const InventoryDashboard = () => {
         const isWithinRollingPeriod = rowDate >= rollingPeriodStart && rowDate <= today;
         return isWithinRollingPeriod;
       } catch (error) {
-        console.warn(`Failed to parse date: ${dateStr}`, error);
         return false;
       }
     });
 
-    console.log(`📅 Rolling period visits: ${rollingPeriodRows.length} out of ${rows.length} total rows`);
-
-    // If no data in rolling period, expand the search
     if (rollingPeriodRows.length === 0) {
-      console.log(`⚠️ No data found in ${rollingDays}-day period, expanding to 60 days...`);
-      
       const extendedPeriodStart = new Date(today.getTime() - (60 * 24 * 60 * 60 * 1000));
-      console.log(`📅 Extended period: ${extendedPeriodStart.toLocaleDateString()} to ${today.toLocaleDateString()}`);
-      
       return processEnhancedInventoryData(visitData, historicalData, pendingChallans, 60);
     }
 
-    // STEP 3: Find latest visits for each shop
+    // Find latest visits for each shop
     const shopLatestVisits: Record<string, any> = {};
     
     rollingPeriodRows.forEach(row => {
@@ -554,11 +437,9 @@ const InventoryDashboard = () => {
           };
         }
       } catch (error) {
-        console.warn(`Invalid date format for shop ${shopId}: ${checkInDateTime}`, error);
+        // Skip invalid dates
       }
     });
-
-    console.log(`🏪 Latest visits found for ${Object.keys(shopLatestVisits).length} unique shops in ${rollingDays}-day rolling period`);
     
     const shopLatestVisitRows: Record<string, any[]> = {};
     
@@ -585,7 +466,7 @@ const InventoryDashboard = () => {
       }
     });
 
-    // STEP 4: Process inventory for each shop with FIXED SUPPLY STATUS LOGIC
+    // Process inventory for each shop
     const shops: Record<string, ShopInventory> = {};
     const skuTracker: Record<string, any> = {};
     const allAgingLocations: Array<any> = [];
@@ -644,7 +525,6 @@ const InventoryDashboard = () => {
       }
 
       const visitRows = shopLatestVisitRows[shopVisit.shopId] || [];
-      console.log(`🔧 Processing ${visitRows.length} rows for shop ${shopVisit.shopId}`);
       
       visitRows.forEach((row: any[], rowIndex: number) => {
         const brand = row[columnIndices.invBrand]?.toString().trim();
@@ -652,16 +532,11 @@ const InventoryDashboard = () => {
         const reasonNoStock = row[columnIndices.reasonNoStock]?.toString().trim() || '';
         const lsDate = row[columnIndices.lsDate];
 
-        // 🔍 DEBUG: Special logging for 8 PM BLACK 180 P at GOVIND PURI
-        if (shopVisit.shopId === '01/2024/0535' && brand && brand.includes('8 PM BLACK 180')) {
-          console.log(`🔍 GOVIND PURI DEBUG - Found: "${brand}", Quantity: ${quantity}, Row: ${rowIndex}`);
-        }
-
         if (!brand) return;
         
         processedSKUs.add(brand);
         
-        // ✅ FIXED: Get supply date with SIZE-SPECIFIC matching
+        // Enhanced supply check
         const supplyCheckResult = checkSuppliedAfterOutOfStock(
           shopVisit.shopId, 
           brand, 
@@ -669,22 +544,15 @@ const InventoryDashboard = () => {
           recentSupplies
         );
 
-        // 🔍 DEBUG: Enhanced logging for 8 PM BLACK 180 P supply check
-        if (brand && brand.includes('8 PM BLACK 180')) {
-          console.log(`🔍 8PM 180P DEBUG - Shop: ${shopVisit.shopName}, Brand: "${brand}", Quantity: ${quantity}, Restocked: ${supplyCheckResult.wasRestocked}`);
-        }
-
         let lastSupplyDate: Date | undefined;
         let isEstimatedAge = true;
         let ageInDays = 0;
         
-        // Use supply date if found, otherwise fallback
         if (supplyCheckResult.supplyDate) {
           lastSupplyDate = supplyCheckResult.supplyDate;
           isEstimatedAge = false;
           ageInDays = Math.floor((shopVisit.visitDate.getTime() - lastSupplyDate.getTime()) / (1000 * 60 * 60 * 24));
         } else {
-          // Fallback to historical or LS date
           const lastSupplyFromHistory = getLastSupplyDate(shopVisit.shopId, brand, supplyHistory);
           const lastSupplyFromLS = lsDate ? parseDate(lsDate) : null;
           
@@ -697,7 +565,6 @@ const InventoryDashboard = () => {
             isEstimatedAge = false;
             ageInDays = Math.floor((shopVisit.visitDate.getTime() - lastSupplyDate.getTime()) / (1000 * 60 * 60 * 24));
           } else {
-            // No supply found - use fallback
             const fallbackDate = new Date('2025-04-01');
             lastSupplyDate = fallbackDate;
             ageInDays = Math.floor((shopVisit.visitDate.getTime() - fallbackDate.getTime()) / (1000 * 60 * 60 * 24));
@@ -705,7 +572,6 @@ const InventoryDashboard = () => {
           }
         }
 
-        // Ensure positive age days
         if (ageInDays < 0) {
           ageInDays = Math.abs(ageInDays);
         }
@@ -717,14 +583,14 @@ const InventoryDashboard = () => {
         else if (ageInDays >= 45) ageCategory = 'days45to60';
         else if (ageInDays >= 30) ageCategory = 'days30to45';
 
-        // Enhanced supply status with FIXED logic
-        const advancedSupplyStatus = getAdvancedSupplyStatus(
+        // Enhanced supply status
+        const advancedSupplyStatus = getEnhancedSupplyStatus(
           quantity,
           shopVisit.visitDate,
-          supplyCheckResult
+          supplyCheckResult,
+          lastSupplyDate
         );
 
-        // ✅ FIXED: Determine supply status with accurate logic
         let supplyStatus: InventoryItem['supplyStatus'] = 'unknown';
         
         if (supplyCheckResult.wasRestocked) {
@@ -740,7 +606,6 @@ const InventoryDashboard = () => {
           else supplyStatus = 'current';
         }
 
-        // Stock status detection
         const isNeverOrdered = reasonNoStock && reasonNoStock.toLowerCase().includes('never');
         const isDiscontinued = reasonNoStock && reasonNoStock.toLowerCase().includes('discontin');
         const isOutOfStock = quantity === 0 && !isNeverOrdered && !isDiscontinued;
@@ -770,7 +635,7 @@ const InventoryDashboard = () => {
         (inventoryItem as any).supplyDateAfterVisit = supplyCheckResult.supplyDate;
         (inventoryItem as any).currentDaysOutOfStock = isOutOfStock ? calculateDaysCurrentlyOutOfStock(shopVisit.visitDate) : undefined;
         (inventoryItem as any).isInGracePeriod = supplyCheckResult.isInGracePeriod;
-        (inventoryItem as any).advancedSupplyStatus = advancedSupplyStatus;
+        (inventoryItem as any).enhancedSupplyStatus = advancedSupplyStatus;
         (inventoryItem as any).daysSinceSupply = supplyCheckResult.daysSinceSupply;
 
         shopInventory.items[brand] = inventoryItem;
@@ -780,7 +645,6 @@ const InventoryDashboard = () => {
         else if (isLowStock) shopInventory.lowStockCount++;
         else if (isOutOfStock) shopInventory.outOfStockCount++;
 
-        // Track aging inventory (30+ days) ONLY for items with stock > 0
         if (ageInDays >= 30 && quantity > 0) {
           shopInventory.agingInventoryCount++;
           
@@ -800,7 +664,6 @@ const InventoryDashboard = () => {
           allAgingLocations.push(agingLocation);
         }
 
-        // Track all out of stock items with enhanced status
         if (isOutOfStock || supplyCheckResult.wasRestocked) {
           const outOfStockItem = {
             sku: brand,
@@ -814,8 +677,9 @@ const InventoryDashboard = () => {
             currentDaysOutOfStock: calculateDaysCurrentlyOutOfStock(shopVisit.visitDate),
             supplyDateAfterVisit: supplyCheckResult.supplyDate,
             isInGracePeriod: supplyCheckResult.isInGracePeriod,
-            advancedSupplyStatus: advancedSupplyStatus,
-            daysSinceSupply: supplyCheckResult.daysSinceSupply
+            enhancedSupplyStatus: advancedSupplyStatus,
+            daysSinceSupply: supplyCheckResult.daysSinceSupply,
+            daysSinceLastSupply: lastSupplyDate ? Math.floor((today.getTime() - lastSupplyDate.getTime()) / (1000 * 60 * 60 * 24)) : undefined
           } as any;
           
           outOfStockItems.push(outOfStockItem);
@@ -870,7 +734,7 @@ const InventoryDashboard = () => {
       Math.round(allAgingLocations.reduce((sum, item) => sum + item.ageInDays, 0) / allAgingLocations.length) : 0;
     const recentlyRestockedItems = Object.values(shops).reduce((sum, shop) => 
       sum + Object.values(shop.items).filter(item => {
-        const isRestocked = item.suppliedAfterOutOfStock || (item as any).advancedSupplyStatus?.includes('Restocked');
+        const isRestocked = item.suppliedAfterOutOfStock || (item as any).enhancedSupplyStatus?.includes('Restocked');
         return isRestocked;
       }).length, 0);
 
@@ -881,20 +745,6 @@ const InventoryDashboard = () => {
       yesterdayVisits: salesman.yesterdayVisits,
       lastWeekVisits: salesman.lastWeekVisits
     })).sort((a, b) => b.rollingPeriodVisits - a.rollingPeriodVisits);
-
-    console.log(`🎉 Inventory processing complete (${rollingDays}-day rolling):`, {
-      totalShops,
-      totalSKUs,
-      totalOutOfStock,
-      totalAging,
-      recentlyRestockedItems,
-      processedSKUs: processedSKUs.size,
-      outOfStockItemsCollected: outOfStockItems.length,
-      agingLocationsCollected: allAgingLocations.length,
-      rollingPeriodDays: rollingDays,
-      periodStart: rollingPeriodStart.toLocaleDateString(),
-      periodEnd: today.toLocaleDateString()
-    });
 
     return {
       summary: {
@@ -934,46 +784,37 @@ const InventoryDashboard = () => {
     if (!dateStr) return null;
     
     try {
-      // Handle DD-MMM-YYYY HH:MM format (from visit sheet: "13-May-2025 15:43")
       if (dateStr.includes('-') && (dateStr.includes('Jan') || dateStr.includes('Feb') || dateStr.includes('Mar') || 
           dateStr.includes('Apr') || dateStr.includes('May') || dateStr.includes('Jun') || 
           dateStr.includes('Jul') || dateStr.includes('Aug') || dateStr.includes('Sep') || 
           dateStr.includes('Oct') || dateStr.includes('Nov') || dateStr.includes('Dec'))) {
-        // JavaScript can parse this format directly
         const parsedDate = new Date(dateStr);
         if (!isNaN(parsedDate.getTime())) {
           return parsedDate;
         }
       }
       
-      // Handle DD-MM-YYYY format (from Pending Challans)
       if (dateStr.includes('-') && !dateStr.includes(':')) {
         const dateParts = dateStr.split('-');
         if (dateParts.length === 3) {
-          // Check if it's DD-MM-YYYY or YYYY-MM-DD
           if (dateParts[0].length === 4) {
-            // YYYY-MM-DD format
             const parsedDate = new Date(dateStr);
             return parsedDate;
           } else {
-            // DD-MM-YYYY format
             const parsedDate = new Date(`${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`);
             return parsedDate;
           }
         }
       }
       
-      // Handle DD/MM/YYYY format
       if (dateStr.includes('/')) {
         const dateParts = dateStr.split('/');
         if (dateParts.length === 3) {
-          // Assume DD/MM/YYYY format
           const parsedDate = new Date(`${dateParts[2]}-${dateParts[1]}-${dateParts[0]}`);
           return parsedDate;
         }
       }
       
-      // Try direct parsing as fallback
       const parsedDate = new Date(dateStr);
       if (!isNaN(parsedDate.getTime())) {
         return parsedDate;
@@ -1001,11 +842,8 @@ const InventoryDashboard = () => {
     const casesIndex = headers.findIndex(h => h?.toLowerCase().includes('cases'));
     
     if (shopIdIndex === -1 || (brandShortIndex === -1 && brandIndex === -1) || dateIndex === -1) {
-      console.warn('⚠️ Historical data columns not found');
       return supplyHistory;
     }
-    
-    let processedEntries = 0;
     
     rows.forEach((row, index) => {
       if (row.length > Math.max(shopIdIndex, brandShortIndex !== -1 ? brandShortIndex : brandIndex, dateIndex)) {
@@ -1024,13 +862,11 @@ const InventoryDashboard = () => {
                 supplyHistory[key] = date;
               }
             });
-            processedEntries++;
           }
         }
       }
     });
     
-    console.log('📊 Historical supply data processed:', processedEntries, 'valid entries');
     return supplyHistory;
   };
 
@@ -1042,19 +878,13 @@ const InventoryDashboard = () => {
     const headers = pendingChallans[0];
     const rows = pendingChallans.slice(1);
     
-    // CORRECTED: Based on actual CSV structure
-    const challansDateIndex = 1;  // Column B (challandate)
-    const shopIdIndex = 8;        // Column I (Shop_Id)
-    const shopNameIndex = 9;      // Column J (shop_name)
-    const brandIndex = 11;        // Column L (brand)
-    const sizeIndex = 12;         // Column M (size)
-    const packIndex = 13;         // Column N (pack)
-    const casesIndex = 14;        // Column O (cases)
-    
-    console.log('📊 Using column indices for Pending Challans:');
-    console.log(`Date: ${challansDateIndex} (B), Shop: ${shopIdIndex} (I), Brand: ${brandIndex} (L), Size: ${sizeIndex} (M), Cases: ${casesIndex} (O)`);
-    
-    let processedEntries = 0;
+    const challansDateIndex = 1;
+    const shopIdIndex = 8;
+    const shopNameIndex = 9;
+    const brandIndex = 11;
+    const sizeIndex = 12;
+    const packIndex = 13;
+    const casesIndex = 14;
     
     rows.forEach((row, index) => {
       if (row.length > Math.max(shopIdIndex, brandIndex, challansDateIndex, casesIndex)) {
@@ -1068,22 +898,16 @@ const InventoryDashboard = () => {
         if (shopId && brand && dateStr && cases > 0) {
           const date = parseDate(dateStr);
           if (date && !isNaN(date.getTime())) {
-            // ✅ FIXED: Create SIZE-SPECIFIC matching keys for supply data
             const possibleKeys = createMultipleBrandKeys(shopId, brand, size);
             possibleKeys.forEach(key => {
               if (!recentSupplies[key] || date > recentSupplies[key]) {
                 recentSupplies[key] = date;
               }
             });
-            
-            processedEntries++;
           }
         }
       }
     });
-    
-    console.log('📦 Pending Challans processed:', processedEntries, 'valid entries');
-    console.log('📦 Total supply keys created:', Object.keys(recentSupplies).length);
     
     return recentSupplies;
   };
@@ -1106,7 +930,6 @@ const InventoryDashboard = () => {
     return null;
   };
 
-  // ✅ ENHANCED: SIZE-SPECIFIC SUPPLY CHECKING WITH DEBUG
   const checkSuppliedAfterOutOfStock = (
     shopId: string, 
     brandName: string, 
@@ -1121,27 +944,7 @@ const InventoryDashboard = () => {
     matchedKey?: string
   } => {
     const today = new Date();
-    const brandInfo = normalizeBrandInfo(brandName);
-    
-    // ✅ FIXED: Create SIZE-SPECIFIC matching keys only
     const possibleKeys = createMultipleBrandKeys(shopId, brandName);
-    
-    // ✅ ENHANCED DEBUG: Special logging for 8 PM BLACK 180 P
-    if (brandName.includes('8 PM BLACK 180')) {
-      console.log(`🔍 8PM 180P SUPPLY CHECK:`, {
-        shopId: shopId,
-        brandName: brandName,
-        visitDate: visitDate.toLocaleDateString(),
-        normalizedBrand: brandInfo.normalizedName,
-        keysToCheck: possibleKeys
-      });
-      
-      // Show available supply keys for comparison
-      const availableKeys = Object.keys(recentSupplies).filter(k => 
-        k.includes(shopId) && k.includes('8 PM')
-      );
-      console.log(`🔍 Available 8PM supply keys for shop ${shopId}:`, availableKeys);
-    }
     
     let latestSupplyDate: Date | null = null;
     let matchedKey = '';
@@ -1156,27 +959,11 @@ const InventoryDashboard = () => {
       }
     }
     
-    // ✅ ENHANCED DEBUG: Log results for 8 PM BLACK 180 P
-    if (brandName.includes('8 PM BLACK 180')) {
-      console.log(`🔍 8PM 180P SUPPLY RESULT:`, {
-        brandName: brandName,
-        shopId: shopId,
-        foundSupply: !!latestSupplyDate,
-        matchedKey: matchedKey,
-        supplyDate: latestSupplyDate?.toLocaleDateString(),
-        visitDate: visitDate.toLocaleDateString(),
-        supplyAfterVisit: latestSupplyDate ? latestSupplyDate > visitDate : false
-      });
-    }
-    
     if (latestSupplyDate && latestSupplyDate > visitDate) {
       const daysOutOfStock = Math.floor((latestSupplyDate.getTime() - visitDate.getTime()) / (1000 * 60 * 60 * 24));
       const daysSinceSupply = Math.floor((today.getTime() - latestSupplyDate.getTime()) / (1000 * 60 * 60 * 24));
       
-      // Grace period: 7 days from supply date
       const isInGracePeriod = daysSinceSupply <= 7;
-      
-      console.log(`✅ RESTOCKED: ${brandName} was restocked after ${daysOutOfStock} days. Supply on ${latestSupplyDate.toLocaleDateString()}, ${daysSinceSupply} days ago. Key: ${matchedKey}`);
       
       return { 
         wasRestocked: true, 
@@ -1191,25 +978,31 @@ const InventoryDashboard = () => {
     return { wasRestocked: false };
   };
 
-  const getAdvancedSupplyStatus = (
+  // Enhanced supply status with comprehensive information
+  const getEnhancedSupplyStatus = (
     quantity: number,
     visitDate: Date,
-    supplyCheckResult: any
+    supplyCheckResult: any,
+    lastSupplyDate?: Date
   ): string => {
+    const today = new Date();
+    
     if (quantity === 0) {
-      // ✅ CORRECT: Product is currently out of stock
       if (supplyCheckResult.wasRestocked) {
-        const { daysSinceSupply } = supplyCheckResult;
-        return `Restocked (${daysSinceSupply}d)`;  // Only for out-of-stock items
+        const { daysSinceSupply, daysOutOfStock } = supplyCheckResult;
+        return `Restocked (${daysSinceSupply}d ago, was out ${daysOutOfStock}d)`;
       } else {
-        // No recent supply
-        const daysOutOfStock = Math.floor((new Date().getTime() - visitDate.getTime()) / (1000 * 60 * 60 * 24));
-        return `Awaiting Supply (out for ${daysOutOfStock} days)`;
+        const daysOutOfStock = Math.floor((today.getTime() - visitDate.getTime()) / (1000 * 60 * 60 * 24));
+        const daysSinceLastSupply = lastSupplyDate ? Math.floor((today.getTime() - lastSupplyDate.getTime()) / (1000 * 60 * 60 * 24)) : null;
+        
+        if (daysSinceLastSupply !== null) {
+          return `Awaiting Supply (${daysOutOfStock}d since visit, ${daysSinceLastSupply}d since last supply)`;
+        } else {
+          return `Awaiting Supply (${daysOutOfStock}d since visit)`;
+        }
       }
     } else {
-      // ✅ FIXED: Product has stock - NEVER show as "restocked"
-      // Items with stock during visit should only show "In Stock"
-      return 'In Stock';  // Simple "In Stock" for items with quantity > 0
+      return 'In Stock';
     }
   };
 
@@ -1223,12 +1016,10 @@ const InventoryDashboard = () => {
   // ==========================================
 
   const getEnhancedSupplyStatusDisplay = (item: any) => {
-    // Use the advanced supply status if available
-    if ((item as any).advancedSupplyStatus) {
-      return (item as any).advancedSupplyStatus;
+    if ((item as any).enhancedSupplyStatus) {
+      return (item as any).enhancedSupplyStatus;
     }
     
-    // Fallback to legacy logic for compatibility
     if (item.suppliedAfterOutOfStock && (item as any).daysSinceSupply !== undefined) {
       return `Restocked (${(item as any).daysSinceSupply}d)`;
     } else if (item.supplyStatus === 'awaiting_supply' && (item as any).currentDaysOutOfStock) {
@@ -1243,7 +1034,9 @@ const InventoryDashboard = () => {
       const matchesDepartment = !filters.department || item.department === filters.department;
       const matchesSalesman = !filters.salesman || item.salesman === filters.salesman;
       const matchesBrand = !filters.brand || item.sku?.includes(filters.brand) || item.brand?.includes(filters.brand);
-      const matchesSupplyStatus = !filters.supplyStatus || item.supplyStatus === filters.supplyStatus;
+      const matchesSupplyStatus = !filters.supplyStatus || 
+        (item.supplyStatus === filters.supplyStatus) ||
+        ((item as any).enhancedSupplyStatus?.toLowerCase().includes(filters.supplyStatus.toLowerCase()));
       const matchesSearch = !filters.searchText || 
         item.shopName?.toLowerCase().includes(filters.searchText.toLowerCase()) ||
         item.sku?.toLowerCase().includes(filters.searchText.toLowerCase()) ||
@@ -1308,6 +1101,19 @@ const InventoryDashboard = () => {
     return Array.from(brands).sort();
   };
 
+  const getSupplyStatuses = () => {
+    return [
+      'recently_restocked',
+      'awaiting_supply', 
+      'current',
+      'aging_30_45',
+      'aging_45_60', 
+      'aging_60_75',
+      'aging_75_90',
+      'aging_critical'
+    ];
+  };
+
   // ==========================================
   // DOWNLOAD FUNCTIONALITY
   // ==========================================
@@ -1365,7 +1171,7 @@ const InventoryDashboard = () => {
         csvContent += "SKU,Shop Name,Department,Salesman,Reason,Visit Date,Supply Status,Days Since Supply\n";
         
         inventoryData.outOfStockItems.forEach(item => {
-          const status = (item as any).advancedSupplyStatus || 'Unknown';
+          const status = (item as any).enhancedSupplyStatus || 'Unknown';
           const daysSinceSupply = (item as any).daysSinceSupply || 'N/A';
           
           csvContent += `"${item.sku}","${item.shopName}","${item.department}","${item.salesman}","${item.reasonNoStock}","${item.visitDate.toLocaleDateString()}","${status}","${daysSinceSupply}"\n`;
@@ -1385,6 +1191,42 @@ const InventoryDashboard = () => {
     }
   };
 
+  // Enhanced Stock Intelligence CSV Export
+  const exportStockIntelligenceCSV = async () => {
+    if (!inventoryData) return;
+
+    try {
+      const filteredOutOfStock = getFilteredItems(inventoryData.outOfStockItems);
+      
+      let csvContent = "data:text/csv;charset=utf-8,";
+      csvContent += `Stock Intelligence Report - ${new Date().toLocaleDateString()}\n`;
+      csvContent += `Period: ${inventoryData.summary.periodStartDate.toLocaleDateString()} - ${inventoryData.summary.periodEndDate.toLocaleDateString()}\n`;
+      csvContent += `Filtered Results: ${filteredOutOfStock.length} items\n\n`;
+      
+      csvContent += "SKU,Shop Name,Department,Salesman,Reason,Visit Date,Days Since Visit,Days Since Last Supply,Out of Stock Duration,Enhanced Supply Status\n";
+      
+      filteredOutOfStock.forEach(item => {
+        const daysSinceVisit = Math.floor((new Date().getTime() - item.visitDate.getTime()) / (1000 * 60 * 60 * 24));
+        const daysSinceLastSupply = (item as any).daysSinceLastSupply || 'N/A';
+        const outOfStockDuration = (item as any).daysOutOfStock || 'N/A';
+        const enhancedStatus = (item as any).enhancedSupplyStatus || 'Unknown';
+        
+        csvContent += `"${item.sku}","${item.shopName}","${item.department}","${item.salesman}","${item.reasonNoStock}","${item.visitDate.toLocaleDateString()}","${daysSinceVisit}","${daysSinceLastSupply}","${outOfStockDuration}","${enhancedStatus}"\n`;
+      });
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `Stock_Intelligence_Report_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Error exporting Stock Intelligence CSV:', error);
+      alert('Error exporting data. Please try again.');
+    }
+  };
+
   // ==========================================
   // COMPONENT LIFECYCLE
   // ==========================================
@@ -1393,7 +1235,6 @@ const InventoryDashboard = () => {
     fetchInventoryData();
   }, []);
 
-  // Refresh data when rolling period changes
   useEffect(() => {
     if (inventoryData) {
       fetchInventoryData();
@@ -1456,9 +1297,6 @@ const InventoryDashboard = () => {
           <div className="flex flex-col sm:flex-row justify-between items-center h-auto sm:h-16 py-4 sm:py-0">
             <div className="flex items-center mb-4 sm:mb-0">
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Inventory Analytics Dashboard</h1>
-              <span className="ml-3 px-3 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
-                ✅ ISSUE 2 FIXED: Enhanced Brand Matching
-              </span>
             </div>
             <div className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4">
               {/* Rolling Period Selector */}
@@ -1540,19 +1378,9 @@ const InventoryDashboard = () => {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-        {/* ✅ ISSUE 2 FIX BANNER */}
-        <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-          <h3 className="text-sm font-medium text-blue-900 mb-2">✅ ISSUE 2 FIXED: Enhanced Brand Matching</h3>
-          <div className="text-xs text-blue-700 space-y-1">
-            <p><strong>Fix Applied:</strong> Enhanced brand normalization for 8 PM variants</p>
-            <p><strong>Expected:</strong> "8 PM BLACK 180 P" will now correctly map to "8 PM PREMIUM BLACK BLENDED WHISKY Pet"</p>
-            <p><strong>Debug:</strong> Check browser console for detailed brand matching logs</p>
-          </div>
-        </div>
-        
-        {activeTab === 'overview' && <EnhancedInventoryOverviewTab data={inventoryData} />}
+        {activeTab === 'overview' && <InventoryOverviewTab data={inventoryData} />}
         {activeTab === 'shops' && (
-          <EnhancedShopInventoryTab 
+          <ShopInventoryTab 
             data={inventoryData} 
             filteredShops={getFilteredShops()}
             filters={filters}
@@ -1565,7 +1393,7 @@ const InventoryDashboard = () => {
           />
         )}
         {activeTab === 'aging' && (
-          <EnhancedAgingAnalysisTab 
+          <AgingAnalysisTab 
             data={inventoryData} 
             filters={filters}
             setFilters={setFilters}
@@ -1579,9 +1407,9 @@ const InventoryDashboard = () => {
             itemsPerPage={itemsPerPage}
           />
         )}
-        {activeTab === 'visits' && <EnhancedVisitComplianceTab data={inventoryData} />}
+        {activeTab === 'visits' && <VisitComplianceTab data={inventoryData} />}
         {activeTab === 'alerts' && (
-          <FixedStockIntelligenceTab 
+          <StockIntelligenceTab 
             data={inventoryData}
             filters={filters}
             setFilters={setFilters}
@@ -1590,9 +1418,11 @@ const InventoryDashboard = () => {
             departments={getDepartments()}
             salesmen={getSalesmen()}
             brands={getBrands()}
+            supplyStatuses={getSupplyStatuses()}
             currentPage={currentPage}
             setCurrentPage={setCurrentPage}
             itemsPerPage={itemsPerPage}
+            exportStockIntelligenceCSV={exportStockIntelligenceCSV}
           />
         )}
       </main>
@@ -1601,15 +1431,15 @@ const InventoryDashboard = () => {
 };
 
 // ==========================================
-// TAB COMPONENTS - ALL REMAIN THE SAME
+// TAB COMPONENTS
 // ==========================================
 
-const EnhancedInventoryOverviewTab = ({ data }: { data: InventoryData }) => (
+const InventoryOverviewTab = ({ data }: { data: InventoryData }) => (
   <div className="space-y-6">
     <div className="text-center">
       <h2 className="text-2xl font-bold text-gray-900 mb-2">Inventory Overview</h2>
       <p className="text-gray-600">
-        Real-time inventory status with CORRECTED shop-brand associations ({data.summary.rollingPeriodDays}-Day Rolling Period)
+        Real-time inventory status ({data.summary.rollingPeriodDays}-Day Rolling Period)
       </p>
       <p className="text-sm text-gray-500">
         Period: {data.summary.periodStartDate.toLocaleDateString()} - {data.summary.periodEndDate.toLocaleDateString()}
@@ -1679,11 +1509,16 @@ const EnhancedInventoryOverviewTab = ({ data }: { data: InventoryData }) => (
       </div>
     </div>
 
-    {/* SKU Performance */}
+    {/* SKU Performance - EXPLANATION */}
     <div className="bg-white rounded-lg shadow">
       <div className="px-6 py-4 border-b border-gray-200">
         <h3 className="text-lg font-medium text-gray-900">All SKU Stock Status</h3>
-        <p className="text-sm text-gray-500">Complete inventory status with CORRECTED data associations ({data.summary.rollingPeriodDays}-day rolling period)</p>
+        <p className="text-sm text-gray-500">
+          Complete inventory status for {data.summary.rollingPeriodDays}-day rolling period.
+          <span className="font-medium text-blue-600 ml-2">
+            Out of Stock counts represent shops where items had zero quantity during their latest visit (not adjusted for subsequent restocking).
+          </span>
+        </p>
       </div>
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
@@ -1723,11 +1558,7 @@ const EnhancedInventoryOverviewTab = ({ data }: { data: InventoryData }) => (
   </div>
 );
 
-// ALL OTHER TAB COMPONENTS REMAIN EXACTLY THE SAME...
-// (EnhancedShopInventoryTab, EnhancedAgingAnalysisTab, EnhancedVisitComplianceTab, FixedStockIntelligenceTab)
-// These are not changed by the hierarchical processing fix
-
-const EnhancedShopInventoryTab = ({ data, filteredShops, filters, setFilters, getEnhancedSupplyStatusDisplay, departments, salesmen, expandedShop, setExpandedShop }: any) => (
+const ShopInventoryTab = ({ data, filteredShops, filters, setFilters, getEnhancedSupplyStatusDisplay, departments, salesmen, expandedShop, setExpandedShop }: any) => (
   <div className="space-y-6">
     {/* Filter Controls */}
     <div className="bg-white p-4 rounded-lg shadow">
@@ -1777,13 +1608,6 @@ const EnhancedShopInventoryTab = ({ data, filteredShops, filters, setFilters, ge
         </select>
 
         <button
-          onClick={() => setFilters({ ...filters, searchText: "GOVIND PURI" })}
-          className="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 flex items-center space-x-2 font-medium"
-        >
-          ✅ Check GOVIND PURI
-        </button>
-
-        <button
           onClick={() => setFilters({ department: '', salesman: '', stockStatus: '', ageCategory: '', brand: '', supplyStatus: '', searchText: '' })}
           className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center space-x-2"
         >
@@ -1797,7 +1621,7 @@ const EnhancedShopInventoryTab = ({ data, filteredShops, filters, setFilters, ge
     <div className="bg-white rounded-lg shadow">
       <div className="px-6 py-4 border-b border-gray-200">
         <h3 className="text-lg font-medium text-gray-900">Shop Inventory Status</h3>
-        <p className="text-sm text-gray-500">Showing {filteredShops.length} shops with CORRECTED shop-brand associations ({data.summary.rollingPeriodDays}-day rolling period)</p>
+        <p className="text-sm text-gray-500">Showing {filteredShops.length} shops ({data.summary.rollingPeriodDays}-day rolling period)</p>
       </div>
       <div className="divide-y divide-gray-200">
         {filteredShops.map((shop: ShopInventory) => (
@@ -1897,7 +1721,7 @@ const EnhancedShopInventoryTab = ({ data, filteredShops, filters, setFilters, ge
   </div>
 );
 
-const EnhancedAgingAnalysisTab = ({ data, filters, setFilters, getFilteredItems, getEnhancedSupplyStatusDisplay, departments, salesmen, brands, currentPage, setCurrentPage, itemsPerPage }: any) => {
+const AgingAnalysisTab = ({ data, filters, setFilters, getFilteredItems, getEnhancedSupplyStatusDisplay, departments, salesmen, brands, currentPage, setCurrentPage, itemsPerPage }: any) => {
   const filteredAging = getFilteredItems(data.allAgingLocations);
   const totalPages = Math.ceil(filteredAging.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
@@ -1908,7 +1732,7 @@ const EnhancedAgingAnalysisTab = ({ data, filters, setFilters, getFilteredItems,
     <div className="space-y-6">
       <div className="text-center">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Aging Inventory Analysis</h2>
-        <p className="text-gray-600">All aging products (30+ days) with CORRECTED shop-brand associations ({data.summary.rollingPeriodDays}-day rolling period)</p>
+        <p className="text-gray-600">All aging products (30+ days) ({data.summary.rollingPeriodDays}-day rolling period)</p>
         <p className="text-sm text-gray-500">
           Period: {data.summary.periodStartDate.toLocaleDateString()} - {data.summary.periodEndDate.toLocaleDateString()}
         </p>
@@ -1916,7 +1740,7 @@ const EnhancedAgingAnalysisTab = ({ data, filters, setFilters, getFilteredItems,
 
       {/* Filter Controls */}
       <div className="bg-white p-4 rounded-lg shadow">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-7 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
           <select
             value={filters.department}
             onChange={(e) => setFilters({ ...filters, department: e.target.value })}
@@ -1979,507 +1803,5 @@ const EnhancedAgingAnalysisTab = ({ data, filters, setFilters, getFilteredItems,
           </select>
 
           <button
-            onClick={() => setFilters({ ...filters, brand: "8 PM BLACK 180 P", department: '', salesman: '', ageCategory: '', supplyStatus: '' })}
-            className="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 flex items-center justify-center space-x-2 font-medium"
-          >
-            ✅ Find 8PM 180P
-          </button>
-
-          <button
             onClick={() => setFilters({ ...filters, department: '', salesman: '', brand: '', ageCategory: '', supplyStatus: '' })}
             className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center justify-center space-x-2"
-          >
-            <X className="w-4 h-4" />
-            <span>Clear</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Aging Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-white p-6 rounded-lg shadow text-center">
-          <div className="text-3xl font-bold text-yellow-600">{filteredAging.length}</div>
-          <div className="text-sm text-gray-500">Total Aging Items</div>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow text-center">
-          <div className="text-3xl font-bold text-orange-600">{data.summary.avgAge}</div>
-          <div className="text-sm text-gray-500">Average Age (Days)</div>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow text-center">
-          <div className="text-3xl font-bold text-red-600">
-            {filteredAging.filter((item: any) => item.ageInDays >= 60).length}
-          </div>
-          <div className="text-sm text-gray-500">Critical (60+ Days)</div>
-        </div>
-        <div className="bg-white p-6 rounded-lg shadow text-center">
-          <div className="text-3xl font-bold text-green-600">
-            {filteredAging.filter((item: any) => !item.isEstimatedAge).length}
-          </div>
-          <div className="text-sm text-gray-500">Accurate Dates</div>
-        </div>
-      </div>
-
-      {/* All Aging Locations with Pagination */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">All Aging Inventory Locations (30+ Days)</h3>
-          <p className="text-sm text-gray-500">
-            Showing {startIndex + 1}-{Math.min(endIndex, filteredAging.length)} of {filteredAging.length} aging items with CORRECTED data
-          </p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rank</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Product</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shop</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Salesman</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Age (Days)</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Quantity</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last Supply</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {currentItems.map((location: any, index: number) => (
-                <tr key={`${location.shopName}-${location.sku}`} className={startIndex + index < 10 ? 'bg-red-50' : ''}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                    {startIndex + index + 1}
-                    {startIndex + index < 10 && <span className="ml-2 text-red-600">🔥</span>}
-                  </td>
-                  <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{location.sku}</td>
-                  <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{location.shopName}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{location.department}</td>
-                  <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{location.salesman}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      location.ageInDays > 90 ? 'bg-red-100 text-red-800' :
-                      location.ageInDays > 60 ? 'bg-orange-100 text-orange-800' :
-                      location.ageInDays > 45 ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-blue-100 text-blue-800'
-                    }`}>
-                      {location.ageInDays} {location.isEstimatedAge && '(est.)'}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{location.quantity}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                    {location.lastSupplyDate ? location.lastSupplyDate.toLocaleDateString('en-GB') : 'Apr 1 (fallback)'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      location.supplyStatus === 'current' ? 'bg-green-100 text-green-800' :
-                      location.suppliedAfterOutOfStock ? 'bg-blue-100 text-blue-800' :
-                      location.supplyStatus === 'awaiting_supply' ? 'bg-red-100 text-red-800' :
-                      location.supplyStatus?.startsWith('aging') ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {getEnhancedSupplyStatusDisplay(location)}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Pagination */}
-        <div className="px-6 py-3 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center">
-          <div className="text-sm text-gray-700 mb-2 sm:mb-0">
-            Showing {startIndex + 1} to {Math.min(endIndex, filteredAging.length)} of {filteredAging.length} aging items
-          </div>
-          <div className="flex space-x-2">
-            <button
-              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-              disabled={currentPage === 1}
-              className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <span className="px-3 py-1 text-sm text-gray-700">
-              Page {currentPage} of {totalPages}
-            </span>
-            <button
-              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-              disabled={currentPage === totalPages}
-              className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-const EnhancedVisitComplianceTab = ({ data }: { data: InventoryData }) => (
-  <div className="space-y-6">
-    <div className="text-center">
-      <h2 className="text-2xl font-bold text-gray-900 mb-2">Visit Compliance Dashboard</h2>
-      <p className="text-gray-600">{data.summary.rollingPeriodDays}-day rolling visit metrics</p>
-      <p className="text-sm text-gray-500">
-        Period: {data.summary.periodStartDate.toLocaleDateString()} - {data.summary.periodEndDate.toLocaleDateString()}
-      </p>
-    </div>
-
-    {/* Visit Summary */}
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-      <div className="bg-white p-6 rounded-lg shadow text-center">
-        <div className="text-3xl font-bold text-blue-600">{data.visitCompliance.totalSalesmen}</div>
-        <div className="text-sm text-gray-500">Total Salesmen</div>
-      </div>
-      <div className="bg-white p-6 rounded-lg shadow text-center">
-        <div className="text-3xl font-bold text-green-600">{data.visitCompliance.rollingPeriodVisits}</div>
-        <div className="text-sm text-gray-500">{data.summary.rollingPeriodDays}-Day Visits</div>
-      </div>
-      <div className="bg-white p-6 rounded-lg shadow text-center">
-        <div className="text-3xl font-bold text-purple-600">{data.visitCompliance.yesterdayVisits}</div>
-        <div className="text-sm text-gray-500">Yesterday's Visits</div>
-      </div>
-      <div className="bg-white p-6 rounded-lg shadow text-center">
-        <div className="text-3xl font-bold text-orange-600">{data.visitCompliance.lastWeekVisits}</div>
-        <div className="text-sm text-gray-500">Last 7 Days</div>
-      </div>
-    </div>
-
-    {/* Salesman Performance */}
-    <div className="bg-white rounded-lg shadow">
-      <div className="px-6 py-4 border-b border-gray-200">
-        <h3 className="text-lg font-medium text-gray-900">{data.summary.rollingPeriodDays}-Day Rolling Salesman Performance</h3>
-        <p className="text-sm text-gray-500">Individual visit statistics (Last {data.summary.rollingPeriodDays} Days)</p>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rank</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Salesman</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">{data.summary.rollingPeriodDays}-Day Visits</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Unique Shops</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Yesterday Visits</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Last 7 Days</th>
-            </tr>
-          </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
-            {data.visitCompliance.salesmenStats.map((salesman, index) => (
-              <tr key={salesman.name} className={index < 3 ? 'bg-green-50' : ''}>
-                <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                  {index + 1}
-                  {index < 3 && <span className="ml-2">🏆</span>}
-                </td>
-                <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{salesman.name}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">{salesman.rollingPeriodVisits}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{salesman.uniqueShops}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-purple-600">{salesman.yesterdayVisits}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600">{salesman.lastWeekVisits}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  </div>
-);
-
-const FixedStockIntelligenceTab = ({ data, filters, setFilters, getFilteredItems, getEnhancedSupplyStatusDisplay, departments, salesmen, brands, currentPage, setCurrentPage, itemsPerPage }: any) => {
-  // Add pagination for out-of-stock items
-  const filteredOutOfStock = getFilteredItems(data.outOfStockItems);
-  const totalPages = Math.ceil(filteredOutOfStock.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const endIndex = startIndex + itemsPerPage;
-  const currentItems = filteredOutOfStock.slice(startIndex, endIndex);
-
-  return (
-    <div className="space-y-6">
-      <div className="text-center">
-        <h2 className="text-2xl font-bold text-gray-900 mb-2">Stock Intelligence & Supply Chain Analysis</h2>
-        <p className="text-gray-600">Advanced out-of-stock analysis with CORRECTED shop-brand associations ({data.summary.rollingPeriodDays}-day rolling period)</p>
-        <p className="text-sm text-gray-500">
-          Period: {data.summary.periodStartDate.toLocaleDateString()} - {data.summary.periodEndDate.toLocaleDateString()}
-        </p>
-      </div>
-
-      {/* Enhanced Filter Controls */}
-      <div className="bg-white p-4 rounded-lg shadow">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4">
-          <select
-            value={filters.department}
-            onChange={(e) => {
-              setFilters({ ...filters, department: e.target.value });
-              setCurrentPage(1);
-            }}
-            className="border border-gray-300 rounded-lg px-3 py-2"
-          >
-            <option value="">All Departments</option>
-            {departments.map((dept: string) => (
-              <option key={dept} value={dept}>{dept}</option>
-            ))}
-          </select>
-
-          <select
-            value={filters.salesman}
-            onChange={(e) => {
-              setFilters({ ...filters, salesman: e.target.value });
-              setCurrentPage(1);
-            }}
-            className="border border-gray-300 rounded-lg px-3 py-2"
-          >
-            <option value="">All Salesmen</option>
-            {salesmen.map((salesman: string) => (
-              <option key={salesman} value={salesman}>{salesman}</option>
-            ))}
-          </select>
-
-          <select
-            value={filters.brand}
-            onChange={(e) => {
-              setFilters({ ...filters, brand: e.target.value });
-              setCurrentPage(1);
-            }}
-            className="border border-gray-300 rounded-lg px-3 py-2"
-          >
-            <option value="">All Brands</option>
-            <option value="8 PM BLACK 180 P" className="bg-green-50 font-bold">✅ 8 PM BLACK 180 P (FIXED)</option>
-            {brands.map((brand: string) => (
-              <option key={brand} value={brand}>{brand}</option>
-            ))}
-          </select>
-
-          <input
-            type="text"
-            placeholder="Search..."
-            value={filters.searchText}
-            onChange={(e) => {
-              setFilters({ ...filters, searchText: e.target.value });
-              setCurrentPage(1);
-            }}
-            className="border border-gray-300 rounded-lg px-3 py-2"
-          />
-
-          <button
-            onClick={() => {
-              setFilters({ ...filters, searchText: "GOVIND PURI", brand: '', department: '', salesman: '' });
-              setCurrentPage(1);
-            }}
-            className="px-4 py-2 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 flex items-center justify-center space-x-2 font-medium"
-          >
-            ✅ Check GOVIND PURI
-          </button>
-
-          <button
-            onClick={() => {
-              setFilters({ ...filters, department: '', salesman: '', brand: '', searchText: '' });
-              setCurrentPage(1);
-            }}
-            className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 flex items-center justify-center space-x-2"
-          >
-            <X className="w-4 h-4" />
-            <span>Clear</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Alert Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <div className="bg-red-50 border border-red-200 p-6 rounded-lg">
-          <div className="flex items-center">
-            <AlertTriangle className="w-8 h-8 text-red-600" />
-            <div className="ml-4">
-              <div className="text-2xl font-bold text-red-600">{filteredOutOfStock.length}</div>
-              <div className="text-sm text-red-700">Out of Stock Items</div>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-blue-50 border border-blue-200 p-6 rounded-lg">
-          <div className="flex items-center">
-            <Truck className="w-8 h-8 text-blue-600" />
-            <div className="ml-4">
-              <div className="text-2xl font-bold text-blue-600">
-                {filteredOutOfStock.filter((item: any) => 
-                  item.suppliedAfterOutOfStock || (item as any).advancedSupplyStatus?.includes('Restocked')
-                ).length}
-              </div>
-              <div className="text-sm text-blue-700">Recently Restocked</div>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-yellow-50 border border-yellow-200 p-6 rounded-lg">
-          <div className="flex items-center">
-            <Clock className="w-8 h-8 text-yellow-600" />
-            <div className="ml-4">
-              <div className="text-2xl font-bold text-yellow-600">
-                {filteredOutOfStock.filter((item: any) => 
-                  !item.suppliedAfterOutOfStock && !(item as any).advancedSupplyStatus?.includes('Restocked')
-                ).length}
-              </div>
-              <div className="text-sm text-yellow-700">Still Awaiting Supply</div>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-green-50 border border-green-200 p-6 rounded-lg">
-          <div className="flex items-center">
-            <TrendingUp className="w-8 h-8 text-green-600" />
-            <div className="ml-4">
-              <div className="text-2xl font-bold text-green-600">
-                {filteredOutOfStock.length > 0 ? Math.round((filteredOutOfStock.filter((item: any) => 
-                  item.suppliedAfterOutOfStock || (item as any).advancedSupplyStatus?.includes('Restocked')
-                ).length / filteredOutOfStock.length) * 100) : 0}%
-              </div>
-              <div className="text-sm text-green-700">Response Rate</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Enhanced Out of Stock Analysis with Pagination */}
-      <div className="bg-white rounded-lg shadow">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">Out of Stock Intelligence</h3>
-          <p className="text-sm text-gray-500">
-            Complete out-of-stock analysis with CORRECTED data. Showing {startIndex + 1}-{Math.min(endIndex, filteredOutOfStock.length)} of {filteredOutOfStock.length} items
-          </p>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">SKU</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shop</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Salesman</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Reason</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Visit Date</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Supply Status</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {currentItems.map((item: any, index: number) => (
-                <tr key={`${item.shopName}-${item.sku}-${index}`} className={
-                  (item as any).advancedSupplyStatus?.includes('Restocked') ? 'bg-green-50' : 
-                  item.suppliedAfterOutOfStock ? 'bg-blue-50' : ''
-                }>
-                  <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{item.sku}</td>
-                  <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{item.shopName}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{item.department}</td>
-                  <td className="px-6 py-4 text-sm text-gray-900 max-w-xs truncate">{item.salesman}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{item.reasonNoStock}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">{item.visitDate.toLocaleDateString('en-GB')}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <span className={`inline-flex items-center px-2 py-1 text-xs font-semibold rounded-full ${
-                      (item as any).advancedSupplyStatus?.includes('Restocked') ? 'bg-green-100 text-green-800' :
-                      (item as any).advancedSupplyStatus?.includes('Awaiting Supply') ? 'bg-red-100 text-red-800' :
-                      (item as any).advancedSupplyStatus?.includes('In Stock') ? 'bg-blue-100 text-blue-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {(item as any).advancedSupplyStatus?.includes('Restocked') && <Truck className="w-3 h-3 mr-1" />}
-                      {(item as any).advancedSupplyStatus?.includes('Awaiting Supply') && <AlertTriangle className="w-3 h-3 mr-1" />}
-                      {(item as any).advancedSupplyStatus || 'Unknown Status'}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* Enhanced Pagination for Stock Intelligence */}
-        <div className="px-6 py-3 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center">
-          <div className="text-sm text-gray-700 mb-2 sm:mb-0">
-            Showing {startIndex + 1} to {Math.min(endIndex, filteredOutOfStock.length)} of {filteredOutOfStock.length} out-of-stock items
-          </div>
-          <div className="flex space-x-2">
-            <button
-              onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
-              disabled={currentPage === 1}
-              className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <span className="px-3 py-1 text-sm text-gray-700">
-              Page {currentPage} of {totalPages}
-            </span>
-            <button
-              onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
-              disabled={currentPage === totalPages}
-              className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Success Banner */}
-      <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 p-6 rounded-lg">
-        <h3 className="text-lg font-medium text-green-900 mb-4 flex items-center">
-          <Eye className="w-5 h-5 mr-2" />
-          ✅ HIERARCHICAL PROCESSING FIXED - All Shop-Brand Associations Now Accurate!
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="space-y-3">
-            <div className="flex items-start space-x-3">
-              <div className="w-2 h-2 bg-green-600 rounded-full mt-2"></div>
-              <div>
-                <div className="text-sm font-medium text-green-900">FIXED: FORWARD PROCESSING</div>
-                <div className="text-sm text-green-700">
-                  Brand rows now correctly assigned to preceding shop (not following shop)
-                </div>
-              </div>
-            </div>
-            <div className="flex items-start space-x-3">
-              <div className="w-2 h-2 bg-blue-600 rounded-full mt-2"></div>
-              <div>
-                <div className="text-sm font-medium text-green-900">FIXED: 8 PM BLACK MAPPING</div>
-                <div className="text-sm text-green-700">
-                  180P and 60P variants now correctly map to supply data
-                </div>
-              </div>
-            </div>
-          </div>
-          <div className="space-y-3">
-            <div className="flex items-start space-x-3">
-              <div className="w-2 h-2 bg-purple-600 rounded-full mt-2"></div>
-              <div>
-                <div className="text-sm font-medium text-green-900">GOVIND PURI CORRECTED</div>
-                <div className="text-sm text-green-700">
-                  Now shows correct products with accurate restocking status
-                </div>
-              </div>
-            </div>
-            <div className="flex items-start space-x-3">
-              <div className="w-2 h-2 bg-orange-600 rounded-full mt-2"></div>
-              <div>
-                <div className="text-sm font-medium text-green-900">ALL METRICS ACCURATE</div>
-                <div className="text-sm text-green-700">
-                  SKU performance, aging analysis, and supply intelligence now reliable
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        
-        {/* Expected Results Summary */}
-        <div className="mt-6 p-4 bg-white rounded-lg border border-green-200">
-          <h4 className="text-sm font-medium text-green-900 mb-2">🎯 TRANSFORMATION COMPLETE:</h4>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs text-green-700">
-            <div><strong>Before Fix:</strong></div>
-            <div><strong>After Fix:</strong></div>
-            <div>❌ 8 PM BLACK 180 P → TIMARPUR (wrong)</div>
-            <div>✅ 8 PM BLACK 180 P → GOVIND PURI (correct)</div>
-            <div>❌ Wrong shop-brand associations</div>
-            <div>✅ Accurate hierarchical data processing</div>
-            <div>❌ Questionable dashboard metrics</div>
-            <div>✅ Reliable business intelligence</div>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-export default InventoryDashboard;
