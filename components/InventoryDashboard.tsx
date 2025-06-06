@@ -1090,7 +1090,23 @@ const InventoryDashboard = () => {
       const matchesDepartment = !filters.department || item.department === filters.department;
       const matchesSalesman = !filters.salesman || item.salesman === filters.salesman;
       const matchesBrand = !filters.brand || item.sku?.includes(filters.brand) || item.brand?.includes(filters.brand);
-      const matchesSupplyStatus = !filters.supplyStatus || item.supplyStatus === filters.supplyStatus;
+      
+      // Enhanced supply status matching for out-of-stock items
+      let matchesSupplyStatus = true;
+      if (filters.supplyStatus) {
+        if (filters.supplyStatus === 'recently_restocked') {
+          matchesSupplyStatus = item.suppliedAfterOutOfStock === true || 
+            (item as any).advancedSupplyStatus?.includes('Restocked');
+        } else if (filters.supplyStatus === 'awaiting_supply') {
+          matchesSupplyStatus = (item.suppliedAfterOutOfStock !== true && 
+            !(item as any).advancedSupplyStatus?.includes('Restocked')) ||
+            item.supplyStatus === 'awaiting_supply' ||
+            (item as any).advancedSupplyStatus?.includes('Awaiting Supply');
+        } else {
+          matchesSupplyStatus = item.supplyStatus === filters.supplyStatus;
+        }
+      }
+      
       const matchesSearch = !filters.searchText || 
         item.shopName?.toLowerCase().includes(filters.searchText.toLowerCase()) ||
         item.sku?.toLowerCase().includes(filters.searchText.toLowerCase()) ||
@@ -1164,6 +1180,13 @@ const InventoryDashboard = () => {
       'aging_60_75',
       'aging_75_90',
       'aging_critical',
+      'awaiting_supply'
+    ];
+  };
+
+  const getStockIntelligenceSupplyStatuses = () => {
+    return [
+      'recently_restocked',
       'awaiting_supply'
     ];
   };
@@ -1477,7 +1500,7 @@ const InventoryDashboard = () => {
             departments={getDepartments()}
             salesmen={getSalesmen()}
             brands={getBrands()}
-            supplyStatuses={getSupplyStatuses()}
+            supplyStatuses={getStockIntelligenceSupplyStatuses()}
             currentPage={currentPage}
             setCurrentPage={setCurrentPage}
             itemsPerPage={itemsPerPage}
@@ -2120,9 +2143,8 @@ const CleanStockIntelligenceTab = ({ data, filters, setFilters, getFilteredItems
             className="border border-gray-300 rounded-lg px-3 py-2"
           >
             <option value="">All Supply Status</option>
-            {supplyStatuses.map((status: string) => (
-              <option key={status} value={status}>{status.replace(/_/g, ' ')}</option>
-            ))}
+            <option value="recently_restocked">Recently Restocked</option>
+            <option value="awaiting_supply">Awaiting Supply</option>
           </select>
 
           <input
