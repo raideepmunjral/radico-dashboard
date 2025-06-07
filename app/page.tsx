@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import Link from 'next/link'; // ← ADDED THIS IMPORT
 import { Download, RefreshCw, MapPin, TrendingUp, Users, ShoppingBag, BarChart3, Calendar, Trophy, Building, Target, Activity, FileText, Table, X, ChevronLeft, ChevronRight, Star, AlertTriangle, TrendingDown, UserPlus, Search, Filter, History, Package } from 'lucide-react';
 import InventoryDashboard from '../components/InventoryDashboard';
 
@@ -1176,9 +1175,6 @@ const RadicoDashboard = () => {
           </div>
         </div>
       </header>
-
-      {/* ← ADDED HIDDEN PWA LINK HERE */}
-      <Link href="/pwa" className="sr-only">PWA Access</Link>
 
       {showInventory ? (
       <InventoryDashboard />
