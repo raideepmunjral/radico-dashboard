@@ -54,18 +54,6 @@ jobs:
           NEXT_PUBLIC_MASTER_SHEET_ID: 1pRz9CgOoamTrfpnmF-XuBCg9IZON9br5avgRlKYtxM
           NEXT_PUBLIC_VISIT_SHEET_ID: 1XG4c_Lrpk-YglTq3G3ZY9Qjt7wSnUq0UZWDSYT61eWt
           
-      - name: Copy PWA file to output
-        run: |
-          echo "=== Copying PWA file ==="
-          if [ -f "public/pwa.html" ]; then
-            cp public/pwa.html ./out/pwa.html
-            echo "✅ PWA file copied successfully!"
-            echo "Files in out directory:"
-            ls -la ./out/
-          else
-            echo "❌ PWA file not found in public/"
-          fi
-          
       - name: Add .nojekyll file
         run: touch ./out/.nojekyll
         
