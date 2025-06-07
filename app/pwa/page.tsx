@@ -4,6 +4,9 @@ import React, { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Users, BarChart3, MapPin, Smartphone } from 'lucide-react';
 
+// Force static generation
+export const dynamic = 'force-static';
+
 export default function PWALanding() {
   const [selectedSalesman, setSelectedSalesman] = useState('');
   const router = useRouter();
