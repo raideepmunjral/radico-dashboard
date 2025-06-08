@@ -47,10 +47,11 @@ interface DashboardData {
   currentYear?: string;
 }
 
-// 🎯 UPDATED FOCUS SHOPS CONFIGURATION - New Focus Shops List (29 shops)
+// 🎯 UPDATED FOCUS SHOPS CONFIGURATION - Updated Focus Shops List (29 shops)
+// REMOVED: '01/2024/1521' | ADDED: '01/2024/1397'
 const FOCUS_SHOP_CODES = [
   '01/2024/1554', '01/2024/0213', '01/2024/0249', '01/2024/1223', '01/2024/1172',
-  '01/2024/0859', '01/2024/1826', '01/2024/0323', '01/2024/1521', '01/2024/1336',
+  '01/2024/0859', '01/2024/1826', '01/2024/0323', '01/2024/1397', '01/2024/1336',
   '01/2024/1247', '01/2024/0892', '01/2024/0913', '01/2024/1499', '01/2024/1510',
   '01/2024/0927', '01/2024/1789', '01/2024/1627', '01/2024/0237', '01/2024/0611',
   '01/2024/1262', '01/2024/0440', '01/2024/1923', '01/2024/0689', '01/2024/0271',
@@ -58,40 +59,41 @@ const FOCUS_SHOP_CODES = [
 ];
 
 // 🎯 8PM TARGETS FOR JUNE & JULY 2025 - All 29 Focus Shops
-const SHOP_TARGETS: Record<string, { juneTarget8PM: number; julyTarget8PM: number; shopName: string; department: string; salesman: string }> = {
-  '01/2024/1554': { juneTarget8PM: 70, julyTarget8PM: 100, shopName: 'DWARKA VARDHMAN CROWN MALL', department: 'DSIIDC', salesman: 'Deepanshu' },
-  '01/2024/0213': { juneTarget8PM: 70, julyTarget8PM: 100, shopName: 'DWARKA SECTOR 19', department: 'DSIIDC', salesman: 'Deepanshu' },
-  '01/2024/0249': { juneTarget8PM: 30, julyTarget8PM: 70, shopName: 'KAKROLA MODE', department: 'DSCSC', salesman: 'Deepanshu' },
-  '01/2024/1223': { juneTarget8PM: 30, julyTarget8PM: 70, shopName: 'ROSHANPURA, NAJAFGARH', department: 'DSCSC', salesman: 'Deepanshu' },
-  '01/2024/1172': { juneTarget8PM: 40, julyTarget8PM: 60, shopName: 'UTTAM NAGAR WEST', department: 'DTTDC', salesman: 'Deepanshu' },
-  '01/2024/0859': { juneTarget8PM: 50, julyTarget8PM: 90, shopName: 'GOPAL NAGAR, NAJAFGARH', department: 'DTTDC', salesman: 'Deepanshu' },
-  '01/2024/1826': { juneTarget8PM: 50, julyTarget8PM: 100, shopName: 'LAJWANTI CHOWK', department: 'DTTDC', salesman: 'Surjit Singh' },
-  '01/2024/0323': { juneTarget8PM: 50, julyTarget8PM: 100, shopName: 'LAJWANTI CHOWK', department: 'DCCWS', salesman: 'Surjit Singh' },
-  '01/2024/1521': { juneTarget8PM: 50, julyTarget8PM: 90, shopName: 'DMRC RAJOURI GARDEN', department: 'DCCWS', salesman: 'Surjit Singh' },
-  '01/2024/1336': { juneTarget8PM: 50, julyTarget8PM: 100, shopName: 'CHAUKHANDI ROAD, TILAKKI', department: 'DSCSC', salesman: 'Surjit Singh' },
-  '01/2024/1247': { juneTarget8PM: 50, julyTarget8PM: 100, shopName: 'HARI NAGAR', department: 'DSCSC', salesman: 'Surjit Singh' },
-  '01/2024/0892': { juneTarget8PM: 25, julyTarget8PM: 50, shopName: 'CONNAUGHT PLACE A BLOCK', department: 'DSIIDC', salesman: 'Manish' },
-  '01/2024/0913': { juneTarget8PM: 25, julyTarget8PM: 50, shopName: 'N-BLOCK', department: 'DSIIDC', salesman: 'Manish' },
-  '01/2024/1499': { juneTarget8PM: 50, julyTarget8PM: 100, shopName: 'ASAF ALI ROAD', department: 'DSIIDC', salesman: 'Manish' },
-  '01/2024/1510': { juneTarget8PM: 50, julyTarget8PM: 100, shopName: 'QUTAB ROAD', department: 'DSIIDC', salesman: 'Manish' },
-  '01/2024/0927': { juneTarget8PM: 30, julyTarget8PM: 75, shopName: 'PAHARGANJ MULTANI DHANDA', department: 'DSIIDC', salesman: 'Manish' },
-  '01/2024/1789': { juneTarget8PM: 50, julyTarget8PM: 100, shopName: 'GOKALPURI', department: 'DSIIDC', salesman: 'Akshay Kumar Gill' },
-  '01/2024/1627': { juneTarget8PM: 50, julyTarget8PM: 60, shopName: 'TAHIR PUR', department: 'DSIIDC', salesman: 'Akshay Kumar Gill' },
-  '01/2024/0237': { juneTarget8PM: 50, julyTarget8PM: 60, shopName: 'BHAJANPURA A1', department: 'DSCSC', salesman: 'Akshay Kumar Gill' },
-  '01/2024/0611': { juneTarget8PM: 50, julyTarget8PM: 60, shopName: 'GOKUL PUR LONI RD', department: 'DTTDC', salesman: 'Akshay Kumar Gill' },
-  '01/2024/1262': { juneTarget8PM: 40, julyTarget8PM: 50, shopName: 'JHILMIL, TAHIRPUR', department: 'DSCSC', salesman: 'Akshay Kumar Gill' },
-  '01/2024/0440': { juneTarget8PM: 40, julyTarget8PM: 80, shopName: 'MAHIPALPUR E-14', department: 'DSCSC', salesman: 'Ankit Singh' },
-  '01/2024/1923': { juneTarget8PM: 50, julyTarget8PM: 100, shopName: 'SAFDARJUNG ENCLV II (YS)', department: 'DTTDC', salesman: 'Ankit Singh' },
-  '01/2024/0689': { juneTarget8PM: 40, julyTarget8PM: 75, shopName: 'MAHIPAL PUR 1', department: 'DTTDC', salesman: 'Ankit Singh' },
-  '01/2024/0271': { juneTarget8PM: 50, julyTarget8PM: 100, shopName: 'GOVIND PURI', department: 'DSCSC', salesman: 'Ankit Singh' },
-  '01/2024/0649': { juneTarget8PM: 40, julyTarget8PM: 80, shopName: 'ROHTAK ROAD -II', department: 'DTTDC', salesman: 'Rajesh Tank' },
-  '01/2024/0345': { juneTarget8PM: 50, julyTarget8PM: 100, shopName: 'NARELA, L-6 (DCCWS)', department: 'DCCWS', salesman: 'Sandeep kumar singh' },
-  '01/2024/0318': { juneTarget8PM: 50, julyTarget8PM: 100, shopName: 'BAWANA ROAD INDUSTRIAL', department: 'DCCWS', salesman: 'sandeep kumar singh' },
-  '01/2024/1612': { juneTarget8PM: 50, julyTarget8PM: 60, shopName: 'shadahra', department: 'DCCWS', salesman: 'Akshay Kumar Gill' }
+// Shop details (name, department, salesman) automatically come from master sales data
+const SHOP_TARGETS: Record<string, { juneTarget8PM: number; julyTarget8PM: number }> = {
+  '01/2024/1554': { juneTarget8PM: 70, julyTarget8PM: 100 },
+  '01/2024/0213': { juneTarget8PM: 70, julyTarget8PM: 100 },
+  '01/2024/0249': { juneTarget8PM: 30, julyTarget8PM: 70 },
+  '01/2024/1223': { juneTarget8PM: 30, julyTarget8PM: 70 },
+  '01/2024/1172': { juneTarget8PM: 40, julyTarget8PM: 60 },
+  '01/2024/0859': { juneTarget8PM: 50, julyTarget8PM: 90 },
+  '01/2024/1826': { juneTarget8PM: 50, julyTarget8PM: 100 },
+  '01/2024/0323': { juneTarget8PM: 50, julyTarget8PM: 100 },
+  '01/2024/1397': { juneTarget8PM: 40, julyTarget8PM: 70 },
+  '01/2024/1336': { juneTarget8PM: 50, julyTarget8PM: 100 },
+  '01/2024/1247': { juneTarget8PM: 50, julyTarget8PM: 100 },
+  '01/2024/0892': { juneTarget8PM: 25, julyTarget8PM: 50 },
+  '01/2024/0913': { juneTarget8PM: 25, julyTarget8PM: 50 },
+  '01/2024/1499': { juneTarget8PM: 50, julyTarget8PM: 100 },
+  '01/2024/1510': { juneTarget8PM: 50, julyTarget8PM: 100 },
+  '01/2024/0927': { juneTarget8PM: 30, julyTarget8PM: 75 },
+  '01/2024/1789': { juneTarget8PM: 50, julyTarget8PM: 100 },
+  '01/2024/1627': { juneTarget8PM: 50, julyTarget8PM: 60 },
+  '01/2024/0237': { juneTarget8PM: 50, julyTarget8PM: 60 },
+  '01/2024/0611': { juneTarget8PM: 50, julyTarget8PM: 60 },
+  '01/2024/1262': { juneTarget8PM: 40, julyTarget8PM: 50 },
+  '01/2024/0440': { juneTarget8PM: 40, julyTarget8PM: 80 },
+  '01/2024/1923': { juneTarget8PM: 50, julyTarget8PM: 100 },
+  '01/2024/0689': { juneTarget8PM: 40, julyTarget8PM: 75 },
+  '01/2024/0271': { juneTarget8PM: 50, julyTarget8PM: 100 },
+  '01/2024/0649': { juneTarget8PM: 40, julyTarget8PM: 80 },
+  '01/2024/0345': { juneTarget8PM: 50, julyTarget8PM: 100 },
+  '01/2024/0318': { juneTarget8PM: 50, julyTarget8PM: 100 },
+  '01/2024/1612': { juneTarget8PM: 50, julyTarget8PM: 60 }
 };
 
-// 📝 NOTE: One shop "shadahra" (DCCWS, Akshay Kumar Gill) missing shop code - needs manual matching
-// Target: June: 50, July: 60
+// 📝 NOTE: Shop details automatically populated from master sales data
+// 📝 TODO: Find actual shop code for "shadahra" shop (DCCWS, Akshay Kumar Gill) to replace '01/2024/1612' if needed
 
 const FocusShopsTab = ({ data }: { data: DashboardData }) => {
   const [searchFilter, setSearchFilter] = useState('');
@@ -486,7 +488,9 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <h4 className="font-medium text-yellow-900 mb-2">📝 Focus Shops & Targets Configuration:</h4>
           <div className="text-sm text-yellow-800 space-y-1">
-            <p>✅ <strong>Complete:</strong> {FOCUS_SHOP_CODES.length} shops with June/July 8PM targets</p>
+            <p>✅ <strong>Updated:</strong> {FOCUS_SHOP_CODES.length} shops with June/July 8PM targets</p>
+            <p>🔄 <strong>Recent Changes:</strong> ➕ Added: 01/2024/1397 | ➖ Removed: 01/2024/1521</p>
+            <p>🔍 <strong>Auto-Detection:</strong> Shop details populated from master sales data automatically</p>
             <p>📊 <strong>Target totals:</strong> June: {focusMetrics?.totalJuneTarget8PM} | July: {focusMetrics?.totalJulyTarget8PM}</p>
             <p>🎯 <strong>Achievement:</strong> June: {focusMetrics?.juneTargetAchievement.toFixed(1)}% | July: {focusMetrics?.julyTargetAchievement.toFixed(1)}%</p>
           </div>
