@@ -224,7 +224,7 @@ const InventoryDashboard = () => {
   };
 
   // ==========================================
-  // NEW: SEPARATE AGE CALCULATION FUNCTION
+  // UPDATED: IMPROVED AGE CALCULATION FUNCTION
   // ==========================================
 
   const getLatestSupplyDateForAging = (
@@ -234,11 +234,11 @@ const InventoryDashboard = () => {
     supplyHistory: Record<string, Date>
   ): { lastSupplyDate: Date | null, isEstimatedAge: boolean, source: string } => {
     
-    // Priority 1: Recent supplies (regardless of visit date)
+    // Priority 1: Recent supplies (Pending Challans)
     const possibleKeys = createMultipleBrandKeys(shopId, brandName);
     
     let latestSupplyDate: Date | null = null;
-    let matchedSource = 'fallback';
+    let matchedSource = 'no_supply_data';
     
     // Check recent supplies first
     for (const key of possibleKeys) {
@@ -264,15 +264,17 @@ const InventoryDashboard = () => {
       }
     }
     
-    // Priority 3: Fallback date
+    // Priority 3: Fallback to start of data availability (UPDATED TO 2024)
     if (!latestSupplyDate) {
-      latestSupplyDate = new Date('2025-04-01');
-      matchedSource = 'fallback';
+      latestSupplyDate = new Date('2024-04-01'); // CHANGED FROM 2025-04-01
+      matchedSource = 'no_supply_data';
     }
+    
+    // REMOVED: LS Date override logic - rely only on supply data
     
     return {
       lastSupplyDate: latestSupplyDate,
-      isEstimatedAge: matchedSource === 'fallback',
+      isEstimatedAge: matchedSource === 'no_supply_data',
       source: matchedSource
     };
   };
@@ -767,7 +769,6 @@ const InventoryDashboard = () => {
         const brand = row[columnIndices.invBrand]?.toString().trim();
         const quantity = parseFloat(row[columnIndices.invQuantity]) || 0;
         const reasonNoStock = row[columnIndices.reasonNoStock]?.toString().trim() || '';
-        const lsDate = row[columnIndices.lsDate];
 
         if (!brand) return;
         
@@ -781,7 +782,7 @@ const InventoryDashboard = () => {
           recentSupplies
         );
 
-        // NEW: USE SEPARATE FUNCTION FOR AGE CALCULATION
+        // UPDATED: USE IMPROVED FUNCTION FOR AGE CALCULATION (NO LS DATE OVERRIDE)
         const agingResult = getLatestSupplyDateForAging(
           shopVisit.shopId,
           brand,
@@ -793,15 +794,7 @@ const InventoryDashboard = () => {
         let isEstimatedAge = agingResult.isEstimatedAge;
         let ageInDays = Math.floor((shopVisit.visitDate.getTime() - lastSupplyDate.getTime()) / (1000 * 60 * 60 * 24));
 
-        // Handle LS Date fallback if available
-        if (isEstimatedAge && lsDate) {
-          const lastSupplyFromLS = parseDate(lsDate);
-          if (lastSupplyFromLS && lastSupplyFromLS < shopVisit.visitDate) {
-            lastSupplyDate = lastSupplyFromLS;
-            isEstimatedAge = false;
-            ageInDays = Math.floor((shopVisit.visitDate.getTime() - lastSupplyDate.getTime()) / (1000 * 60 * 60 * 24));
-          }
-        }
+        // REMOVED: LS Date fallback override logic
 
         if (ageInDays < 0) {
           ageInDays = Math.abs(ageInDays);
@@ -1393,7 +1386,7 @@ const InventoryDashboard = () => {
   };
 
   // ==========================================
-  // DOWNLOAD FUNCTIONALITY (UNCHANGED)
+  // ENHANCED DOWNLOAD FUNCTIONALITY
   // ==========================================
 
   const generatePDFReport = async () => {
@@ -1418,7 +1411,8 @@ const InventoryDashboard = () => {
         ['Aging Items (30+ days)', inventoryData.summary.totalAging.toString()],
         ['Recently Restocked', inventoryData.summary.recentlyRestockedItems.toString()],
         ['Average Age (days)', inventoryData.summary.avgAge.toString()],
-        ['Rolling Period', `${rollingPeriodDays} days`]
+        ['Rolling Period', `${rollingPeriodDays} days`],
+        ['Fallback Date Updated', 'April 1, 2024 (Historical data alignment)']
       ];
 
       (doc as any).autoTable({
@@ -1435,6 +1429,7 @@ const InventoryDashboard = () => {
     }
   };
 
+  // ENHANCED CSV EXPORT WITH ALL DETAILED INFORMATION
   const exportToCSV = async () => {
     if (!inventoryData) return;
 
@@ -1442,6 +1437,7 @@ const InventoryDashboard = () => {
       let csvContent = "data:text/csv;charset=utf-8,";
       csvContent += `Enhanced ${rollingPeriodDays}-Day Rolling Inventory Analytics Report - ` + new Date().toLocaleDateString() + "\n";
       csvContent += `Period: ${inventoryData.summary.periodStartDate.toLocaleDateString()} - ${inventoryData.summary.periodEndDate.toLocaleDateString()}\n`;
+      csvContent += `Fallback Date: April 1, 2024 (Updated for historical data alignment)\n`;
       csvContent += "Filters Applied: " + JSON.stringify(filters) + "\n\n";
       
       // Export based on active tab
@@ -1455,26 +1451,49 @@ const InventoryDashboard = () => {
           csvContent += `"${sku.name}","${sku.trackedShops}","${sku.inStockCount}","${sku.outOfStockCount}","${stockRate}","${sku.agingLocations.length}"\n`;
         });
       } else if (activeTab === 'shops') {
-        // Shop Inventory
-        csvContent += "SHOP INVENTORY ANALYSIS\n";
-        csvContent += "Shop Name,Shop ID,Department,Salesman,Total Items,In Stock,Out of Stock,Low Stock,Aging,Last Visit Days\n";
+        // ENHANCED DETAILED SHOP INVENTORY EXPORT - MATCHING DASHBOARD DETAILS
+        csvContent += "ENHANCED SHOP INVENTORY ANALYSIS - COMPLETE DETAILS\n";
+        csvContent += "Shop Name,Shop ID,Department,Salesman,Visit Date,Last Visit Days,Brand,Quantity,Stock Status,Age Days,Age Estimated,Last Supply Date,Supply Source,Supply Status,Reason No Stock,Advanced Supply Status,Days Since Supply,Days Out of Stock,Recently Restocked\n";
         
         const filteredShops = getFilteredShops();
         filteredShops.forEach(shop => {
-          csvContent += `"${shop.shopName}","${shop.shopId}","${shop.department}","${shop.salesman}","${shop.totalItems}","${shop.inStockCount}","${shop.outOfStockCount}","${shop.lowStockCount}","${shop.agingInventoryCount}","${shop.lastVisitDays}"\n`;
+          Object.values(shop.items).forEach((item: any) => {
+            const stockStatus = item.isInStock ? 'In Stock' : 
+                               item.isOutOfStock ? 'Out of Stock' : 
+                               item.isLowStock ? 'Low Stock' : 'Unknown';
+            
+            const lastSupplyStr = item.lastSupplyDate ? 
+              item.lastSupplyDate.toLocaleDateString('en-GB') : 'No Supply Data';
+            
+            const supplySource = item.agingDataSource === 'recent_supply' ? 'Recent Supply' :
+                               item.agingDataSource === 'historical_supply' ? 'Historical Supply' :
+                               'No Supply Data';
+            
+            const advancedStatus = item.advancedSupplyStatus || 
+                                 getEnhancedSupplyStatusDisplay(item);
+            
+            csvContent += `"${shop.shopName}","${shop.shopId}","${shop.department}","${shop.salesman}","${shop.visitDate.toLocaleDateString('en-GB')}","${shop.lastVisitDays}","${item.brand}","${item.quantity}","${stockStatus}","${item.ageInDays}","${item.isEstimatedAge ? 'Yes' : 'No'}","${lastSupplyStr}","${supplySource}","${item.supplyStatus.replace(/_/g, ' ')}","${item.reasonNoStock || 'N/A'}","${advancedStatus}","${item.daysSinceSupply || 'N/A'}","${item.daysOutOfStock || 'N/A'}","${item.suppliedAfterOutOfStock ? 'Yes' : 'No'}"\n`;
+          });
         });
       } else if (activeTab === 'aging') {
-        // Aging Analysis
-        csvContent += "ENHANCED AGING INVENTORY ANALYSIS\n";
-        csvContent += "Rank,Product,Shop Name,Department,Salesman,Age Days,Quantity,Last Supply Date,Status,Data Source\n";
+        // Enhanced Aging Analysis
+        csvContent += "ENHANCED AGING INVENTORY ANALYSIS - COMPLETE DETAILS\n";
+        csvContent += "Rank,Product,Shop Name,Shop ID,Department,Salesman,Age Days,Age Estimated,Quantity,Last Supply Date,Supply Source,Status,Data Source,Visit Date,Supply Status Message\n";
         
         const filteredAging = getFilteredItems(inventoryData.allAgingLocations);
         filteredAging.forEach((location, index) => {
-          const lastSupplyStr = location.lastSupplyDate ? location.lastSupplyDate.toLocaleDateString('en-GB') : 'Apr 1 (fallback)';
+          const lastSupplyStr = location.lastSupplyDate ? 
+            location.lastSupplyDate.toLocaleDateString('en-GB') : 'No Data';
+          
+          const supplySource = location.agingDataSource === 'recent_supply' ? 'Recent Supply' :
+                             location.agingDataSource === 'historical_supply' ? 'Historical Supply' :
+                             'No Supply Data';
+          
           const status = getEnhancedSupplyStatusDisplay(location);
           const dataSource = location.agingDataSource || 'unknown';
+          const visitDateStr = location.visitDate ? location.visitDate.toLocaleDateString('en-GB') : 'N/A';
           
-          csvContent += `"${index + 1}","${location.sku}","${location.shopName}","${location.department}","${location.salesman}","${location.ageInDays}","${location.quantity}","${lastSupplyStr}","${status}","${dataSource}"\n`;
+          csvContent += `"${index + 1}","${location.sku}","${location.shopName}","","${location.department}","${location.salesman}","${location.ageInDays}","${location.isEstimatedAge ? 'Yes' : 'No'}","${location.quantity}","${lastSupplyStr}","${supplySource}","${status}","${dataSource}","${visitDateStr}","${status}"\n`;
         });
       } else if (activeTab === 'visits') {
         // Visit Compliance
@@ -1485,23 +1504,25 @@ const InventoryDashboard = () => {
           csvContent += `"${salesman.name}","${salesman.rollingPeriodVisits}","${salesman.uniqueShops}","${salesman.yesterdayVisits}","${salesman.lastWeekVisits}"\n`;
         });
       } else if (activeTab === 'alerts') {
-        // Stock Intelligence
-        csvContent += "ENHANCED STOCK INTELLIGENCE ANALYSIS\n";
-        csvContent += "SKU,Shop Name,Department,Salesman,Reason,Visit Date,Supply Status,Days Since Supply\n";
+        // Enhanced Stock Intelligence
+        csvContent += "ENHANCED STOCK INTELLIGENCE ANALYSIS - COMPLETE DETAILS\n";
+        csvContent += "SKU,Shop Name,Shop ID,Department,Salesman,Reason,Visit Date,Supply Status,Days Since Supply,Advanced Status,Recently Restocked,Days Out of Stock,Supply Date After Visit,Grace Period\n";
         
         const filteredOutOfStock = getFilteredItems(inventoryData.outOfStockItems);
         filteredOutOfStock.forEach(item => {
           const status = (item as any).advancedSupplyStatus || 'Unknown Status';
           const daysSinceSupply = (item as any).daysSinceSupply || 'N/A';
+          const supplyDateStr = (item as any).supplyDateAfterVisit ? 
+            (item as any).supplyDateAfterVisit.toLocaleDateString('en-GB') : 'N/A';
           
-          csvContent += `"${item.sku}","${item.shopName}","${item.department}","${item.salesman}","${item.reasonNoStock}","${item.visitDate.toLocaleDateString()}","${status}","${daysSinceSupply}"\n`;
+          csvContent += `"${item.sku}","${item.shopName}","","${item.department}","${item.salesman}","${item.reasonNoStock}","${item.visitDate.toLocaleDateString('en-GB')}","${status}","${daysSinceSupply}","${status}","${item.suppliedAfterOutOfStock ? 'Yes' : 'No'}","${item.daysOutOfStock || 'N/A'}","${supplyDateStr}","${(item as any).isInGracePeriod ? 'Yes' : 'No'}"\n`;
         });
       }
 
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement("a");
       link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `Enhanced_Rolling_${rollingPeriodDays}Day_Inventory_${activeTab}_${new Date().toISOString().split('T')[0]}.csv`);
+      link.setAttribute("download", `Enhanced_Rolling_${rollingPeriodDays}Day_Inventory_${activeTab}_Complete_Details_${new Date().toISOString().split('T')[0]}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -1535,7 +1556,7 @@ const InventoryDashboard = () => {
         <div className="text-center">
           <Package className="w-12 h-12 animate-pulse mx-auto mb-4 text-purple-600" />
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Loading Enhanced Inventory Dashboard</h2>
-          <p className="text-gray-600">Processing inventory data with smart archive integration...</p>
+          <p className="text-gray-600">Processing inventory data with updated fallback (2024-04-01) and archive integration...</p>
         </div>
       </div>
     );
@@ -1582,7 +1603,7 @@ const InventoryDashboard = () => {
             <div className="flex items-center mb-4 sm:mb-0">
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Enhanced Inventory Analytics Dashboard</h1>
               <span className="ml-3 px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
-                Smart Archive Integration
+                Updated Fallback: 2024-04-01
               </span>
             </div>
             <div className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4">
@@ -1624,9 +1645,10 @@ const InventoryDashboard = () => {
                 <button
                   onClick={exportToCSV}
                   className="bg-green-600 hover:bg-green-700 text-white px-3 sm:px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors text-sm"
+                  title="Export complete details matching dashboard"
                 >
                   <Table className="w-4 h-4" />
-                  <span>CSV</span>
+                  <span>Enhanced CSV</span>
                 </button>
               </div>
             </div>
@@ -1725,10 +1747,13 @@ const EnhancedInventoryOverviewTab = ({ data }: { data: InventoryData }) => (
     <div className="text-center">
       <h2 className="text-2xl font-bold text-gray-900 mb-2">Enhanced Inventory Overview</h2>
       <p className="text-gray-600">
-        Real-time inventory status with archive integration ({data.summary.rollingPeriodDays}-Day Rolling Period)
+        Real-time inventory status with improved fallback date ({data.summary.rollingPeriodDays}-Day Rolling Period)
       </p>
       <p className="text-sm text-gray-500">
         Period: {data.summary.periodStartDate.toLocaleDateString()} - {data.summary.periodEndDate.toLocaleDateString()}
+      </p>
+      <p className="text-xs text-blue-600">
+        Fallback Date: April 1, 2024 (Updated for historical data alignment)
       </p>
     </div>
 
@@ -1799,7 +1824,7 @@ const EnhancedInventoryOverviewTab = ({ data }: { data: InventoryData }) => (
     <div className="bg-white rounded-lg shadow">
       <div className="px-6 py-4 border-b border-gray-200">
         <h3 className="text-lg font-medium text-gray-900">SKU Stock Status</h3>
-        <p className="text-sm text-gray-500">Complete inventory status with enhanced aging calculation and smart archive integration ({data.summary.rollingPeriodDays}-day rolling period)</p>
+        <p className="text-sm text-gray-500">Complete inventory status with improved fallback date (April 1, 2024) ({data.summary.rollingPeriodDays}-day rolling period)</p>
       </div>
       <div className="overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-200">
@@ -1902,7 +1927,7 @@ const EnhancedShopInventoryTab = ({ data, filteredShops, filters, setFilters, ge
     <div className="bg-white rounded-lg shadow">
       <div className="px-6 py-4 border-b border-gray-200">
         <h3 className="text-lg font-medium text-gray-900">Shop Inventory Status</h3>
-        <p className="text-sm text-gray-500">Showing {filteredShops.length} shops with enhanced aging calculation ({data.summary.rollingPeriodDays}-day rolling period)</p>
+        <p className="text-sm text-gray-500">Showing {filteredShops.length} shops with updated fallback date (April 1, 2024) ({data.summary.rollingPeriodDays}-day rolling period)</p>
       </div>
       <div className="divide-y divide-gray-200">
         {filteredShops.map((shop: ShopInventory) => (
@@ -1915,6 +1940,7 @@ const EnhancedShopInventoryTab = ({ data, filteredShops, filters, setFilters, ge
                 <div>
                   <h4 className="text-lg font-medium text-gray-900">{shop.shopName}</h4>
                   <p className="text-sm text-gray-500">{shop.department} • {shop.salesman} • ID: {shop.shopId}</p>
+                  <p className="text-xs text-blue-600">Visit Date: {shop.visitDate.toLocaleDateString('en-GB')} ({shop.lastVisitDays} days ago)</p>
                 </div>
                 <div className="flex space-x-4">
                   <div className="text-center">
@@ -2018,7 +2044,7 @@ const EnhancedAgingAnalysisTab = ({ data, filters, setFilters, getFilteredItems,
     <div className="space-y-6">
       <div className="text-center">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Enhanced Aging Inventory Analysis</h2>
-        <p className="text-gray-600">All aging products (30+ days) with improved data sources ({data.summary.rollingPeriodDays}-day rolling period)</p>
+        <p className="text-gray-600">All aging products (30+ days) with updated fallback date (April 1, 2024) ({data.summary.rollingPeriodDays}-day rolling period)</p>
         <p className="text-sm text-gray-500">
           Period: {data.summary.periodStartDate.toLocaleDateString()} - {data.summary.periodEndDate.toLocaleDateString()}
         </p>
@@ -2129,7 +2155,7 @@ const EnhancedAgingAnalysisTab = ({ data, filters, setFilters, getFilteredItems,
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900">Enhanced Aging Inventory Locations (30+ Days)</h3>
           <p className="text-sm text-gray-500">
-            Showing {startIndex + 1}-{Math.min(endIndex, filteredAging.length)} of {filteredAging.length} aging items with improved data sources
+            Showing {startIndex + 1}-{Math.min(endIndex, filteredAging.length)} of {filteredAging.length} aging items with updated fallback (April 1, 2024)
           </p>
         </div>
         <div className="overflow-x-auto">
@@ -2171,7 +2197,7 @@ const EnhancedAgingAnalysisTab = ({ data, filters, setFilters, getFilteredItems,
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{location.quantity}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                    {location.lastSupplyDate ? location.lastSupplyDate.toLocaleDateString('en-GB') : 'Apr 1 (fallback)'}
+                    {location.lastSupplyDate ? location.lastSupplyDate.toLocaleDateString('en-GB') : 'Apr 1, 2024 (fallback)'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
@@ -2190,7 +2216,7 @@ const EnhancedAgingAnalysisTab = ({ data, filters, setFilters, getFilteredItems,
                       location.agingDataSource === 'historical_supply' ? 'bg-blue-100 text-blue-800' :
                       'bg-gray-100 text-gray-800'
                     }`}>
-                      {location.agingDataSource?.replace(/_/g, ' ') || 'fallback'}
+                      {location.agingDataSource?.replace(/_/g, ' ') || 'no_supply_data'}
                     </span>
                   </td>
                 </tr>
@@ -2309,7 +2335,7 @@ const CleanStockIntelligenceTab = ({ data, filters, setFilters, getFilteredItems
     <div className="space-y-6">
       <div className="text-center">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Enhanced Stock Intelligence & Supply Chain Analysis</h2>
-        <p className="text-gray-600">Advanced out-of-stock analysis with archive integration ({data.summary.rollingPeriodDays}-day rolling period)</p>
+        <p className="text-gray-600">Advanced out-of-stock analysis with updated fallback date (April 1, 2024) ({data.summary.rollingPeriodDays}-day rolling period)</p>
         <p className="text-sm text-gray-500">
           Period: {data.summary.periodStartDate.toLocaleDateString()} - {data.summary.periodEndDate.toLocaleDateString()}
         </p>
@@ -2457,7 +2483,7 @@ const CleanStockIntelligenceTab = ({ data, filters, setFilters, getFilteredItems
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900">Enhanced Out of Stock Intelligence</h3>
           <p className="text-sm text-gray-500">
-            Complete out-of-stock analysis with archive data. Showing {startIndex + 1}-{Math.min(endIndex, filteredOutOfStock.length)} of {filteredOutOfStock.length} items
+            Complete out-of-stock analysis with updated fallback (April 1, 2024). Showing {startIndex + 1}-{Math.min(endIndex, filteredOutOfStock.length)} of {filteredOutOfStock.length} items
           </p>
         </div>
         <div className="overflow-x-auto">
