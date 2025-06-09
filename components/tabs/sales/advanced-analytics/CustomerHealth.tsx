@@ -244,7 +244,7 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
   }, [analyzedShops]);
 
   // ==========================================
-  // FILTERED DATA
+  // FILTERED DATA - FIXED FILTERING LOGIC
   // ==========================================
 
   const filteredShops = useMemo(() => {
@@ -257,16 +257,19 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
       const matchesDepartment = !departmentFilter || shop.department === departmentFilter;
       const matchesSalesman = !salesmanFilter || shop.salesman === salesmanFilter;
 
-      // Section-specific filtering
+      // Section-specific filtering - FIXED VERSION
       if (activeSection === 'unbilled') {
-        return matchesSearch && matchesDepartment && matchesSalesman && shop.customerStatus === 'unbilled';
+        return matchesSearch && matchesDepartment && matchesSalesman && 
+               shop.customerStatus === 'unbilled';
       } else if (activeSection === 'lost') {
         const monthsBack = lookbackMonths * 30;
+        // FIX: Proper grouping of conditions with parentheses
         return matchesSearch && matchesDepartment && matchesSalesman && 
-               (shop.daysSinceLastOrder! >= 60 && shop.daysSinceLastOrder! <= monthsBack) ||
-               shop.customerStatus === 'never-ordered';
+               ((shop.daysSinceLastOrder! >= 60 && shop.daysSinceLastOrder! <= monthsBack) ||
+                shop.customerStatus === 'never-ordered');
       } else if (activeSection === 'quarterly') {
-        return matchesSearch && matchesDepartment && matchesSalesman && shop.quarterlyDecline! > 10;
+        return matchesSearch && matchesDepartment && matchesSalesman && 
+               shop.quarterlyDecline! > 10;
       }
 
       return matchesSearch && matchesDepartment && matchesSalesman;
