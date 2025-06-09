@@ -47,18 +47,18 @@ interface DashboardData {
   currentYear?: string;
 }
 
-// 🎯 UPDATED FOCUS SHOPS CONFIGURATION - Updated Focus Shops List (29 shops)
-// REMOVED: '01/2024/1521' | ADDED: '01/2024/1397'
+// 🎯 UPDATED FOCUS SHOPS CONFIGURATION - Updated Focus Shops List (28 shops)
+// REMOVED: '01/2024/1521', '01/2024/0440' | ADDED: '01/2024/1397'
 const FOCUS_SHOP_CODES = [
   '01/2024/1554', '01/2024/0213', '01/2024/0249', '01/2024/1223', '01/2024/1172',
   '01/2024/0859', '01/2024/1826', '01/2024/0323', '01/2024/1397', '01/2024/1336',
   '01/2024/1247', '01/2024/0892', '01/2024/0913', '01/2024/1499', '01/2024/1510',
   '01/2024/0927', '01/2024/1789', '01/2024/1627', '01/2024/0237', '01/2024/0611',
-  '01/2024/1262', '01/2024/0440', '01/2024/1923', '01/2024/0689', '01/2024/0271',
-  '01/2024/0649', '01/2024/0345', '01/2024/0318', '01/2024/1612'
+  '01/2024/1262', '01/2024/1923', '01/2024/0689', '01/2024/0271', '01/2024/0649',
+  '01/2024/0345', '01/2024/0318', '01/2024/1612'
 ];
 
-// 🎯 8PM TARGETS FOR JUNE & JULY 2025 - All 29 Focus Shops
+// 🎯 8PM TARGETS FOR JUNE & JULY 2025 - All 28 Focus Shops
 // Shop details (name, department, salesman) automatically come from master sales data
 const SHOP_TARGETS: Record<string, { juneTarget8PM: number; julyTarget8PM: number }> = {
   '01/2024/1554': { juneTarget8PM: 70, julyTarget8PM: 100 },
@@ -82,7 +82,6 @@ const SHOP_TARGETS: Record<string, { juneTarget8PM: number; julyTarget8PM: numbe
   '01/2024/0237': { juneTarget8PM: 50, julyTarget8PM: 60 },
   '01/2024/0611': { juneTarget8PM: 50, julyTarget8PM: 60 },
   '01/2024/1262': { juneTarget8PM: 40, julyTarget8PM: 50 },
-  '01/2024/0440': { juneTarget8PM: 40, julyTarget8PM: 80 },
   '01/2024/1923': { juneTarget8PM: 50, julyTarget8PM: 100 },
   '01/2024/0689': { juneTarget8PM: 40, julyTarget8PM: 75 },
   '01/2024/0271': { juneTarget8PM: 50, julyTarget8PM: 100 },
@@ -489,7 +488,7 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
           <h4 className="font-medium text-yellow-900 mb-2">📝 Focus Shops & Targets Configuration:</h4>
           <div className="text-sm text-yellow-800 space-y-1">
             <p>✅ <strong>Updated:</strong> {FOCUS_SHOP_CODES.length} shops with June/July 8PM targets</p>
-            <p>🔄 <strong>Recent Changes:</strong> ➕ Added: 01/2024/1397 | ➖ Removed: 01/2024/1521</p>
+            <p>🔄 <strong>Recent Changes:</strong> ➕ Added: 01/2024/1397 | ➖ Removed: 01/2024/1521, 01/2024/0440</p>
             <p>🔍 <strong>Auto-Detection:</strong> Shop details populated from master sales data automatically</p>
             <p>📊 <strong>Target totals:</strong> June: {focusMetrics?.totalJuneTarget8PM} | July: {focusMetrics?.totalJulyTarget8PM}</p>
             <p>🎯 <strong>Achievement:</strong> June: {focusMetrics?.juneTargetAchievement.toFixed(1)}% | July: {focusMetrics?.julyTargetAchievement.toFixed(1)}%</p>
