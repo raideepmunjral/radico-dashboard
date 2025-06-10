@@ -113,6 +113,7 @@ interface InventoryStatus {
   quantity?: number;
   isInStock?: boolean;
   isOutOfStock?: boolean;
+  stockStatus: 'IN_STOCK' | 'OUT_OF_STOCK' | 'LOW_STOCK' | 'NO_DATA';
   lastVisitDays?: number;
   reasonNoStock?: string;
   recentlyRestocked?: boolean;
