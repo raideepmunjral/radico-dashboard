@@ -473,7 +473,7 @@ const processSKULevelLostCustomers = (data: DashboardData, inventoryData?: Inven
     const bPriority = priorityOrder[b.priorityLevel];
     
     if (aPriority !== bPriority) return bPriority - aPriority;
-    return b.recoveryPotential - a.recoveryPotential;
+    return b.recoveryCasesPotential - a.recoveryCasesPotential;
   });
 };
 
