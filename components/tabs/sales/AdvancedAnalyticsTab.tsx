@@ -1,11 +1,12 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Brain, BarChart3, Heart, Zap } from 'lucide-react';
+import { Brain, BarChart3, Heart, Zap, Target } from 'lucide-react';
 
 // REGULAR IMPORTS - NO LAZY LOADING
 import CurrentAnalytics from './advanced-analytics/CurrentAnalytics';
 import CustomerHealth from './advanced-analytics/CustomerHealth';
+import SKURecoveryIntelligence from './advanced-analytics/SKURecoveryIntelligence';
 import SKUIntelligence from './advanced-analytics/SKUIntelligence';
 
 // Sub-tab configuration
@@ -23,6 +24,12 @@ const subTabs = [
     description: 'Unbilled, lost customers & lifecycle analysis'
   },
   { 
+    id: 'sku-recovery', 
+    label: 'SKU Recovery Intelligence', 
+    icon: Target,
+    description: 'Advanced SKU-level customer recovery with real historical data'
+  },
+  { 
     id: 'sku-intelligence', 
     label: 'SKU Intelligence', 
     icon: Zap,
@@ -35,9 +42,34 @@ interface DashboardData {
   customerInsights: any;
   currentMonth: string;
   currentYear: string;
+  historicalData?: any;
 }
 
-const AdvancedAnalyticsTab = ({ data }: { data: DashboardData }) => {
+interface InventoryData {
+  shops: Record<string, {
+    shopId: string;
+    shopName: string;
+    department: string;
+    salesman: string;
+    visitDate: Date;
+    items: Record<string, {
+      brand: string;
+      quantity: number;
+      isInStock: boolean;
+      isOutOfStock: boolean;
+      reasonNoStock?: string;
+      suppliedAfterOutOfStock?: boolean;
+      ageInDays?: number;
+      lastSupplyDate?: Date;
+    }>;
+    lastVisitDays: number;
+  }>;
+}
+
+const AdvancedAnalyticsTab = ({ data, inventoryData }: { 
+  data: DashboardData; 
+  inventoryData?: InventoryData;
+}) => {
   const [activeSubTab, setActiveSubTab] = useState('current');
 
   // Render active sub-tab content - NO SUSPENSE NEEDED
@@ -47,6 +79,8 @@ const AdvancedAnalyticsTab = ({ data }: { data: DashboardData }) => {
         return <CurrentAnalytics data={data} />;
       case 'customer-health':
         return <CustomerHealth data={data} />;
+      case 'sku-recovery':
+        return <SKURecoveryIntelligence data={data} inventoryData={inventoryData} />;
       case 'sku-intelligence':
         return <SKUIntelligence data={data} />;
       default:
@@ -74,6 +108,12 @@ const AdvancedAnalyticsTab = ({ data }: { data: DashboardData }) => {
                 {data?.currentMonth ? `${data.currentMonth}/${data.currentYear}` : 'Live Data'}
               </span>
               <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" title="Live Data"></div>
+              {inventoryData && activeSubTab === 'sku-recovery' && (
+                <div className="flex items-center space-x-1 text-xs text-green-600">
+                  <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                  <span>Inventory Connected</span>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -95,6 +135,11 @@ const AdvancedAnalyticsTab = ({ data }: { data: DashboardData }) => {
               {tab.id === 'customer-health' && data?.customerInsights?.lostCustomers && (
                 <span className="bg-red-100 text-red-800 text-xs px-2 py-1 rounded-full">
                   {data.customerInsights.lostCustomers}
+                </span>
+              )}
+              {tab.id === 'sku-recovery' && (
+                <span className="bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded-full">
+                  NEW
                 </span>
               )}
             </button>
