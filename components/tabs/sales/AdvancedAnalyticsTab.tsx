@@ -42,7 +42,7 @@ interface DashboardData {
   customerInsights: any;
   currentMonth: string;
   currentYear: string;
-  historicalData?: any;
+  historicalData?: any; // ENHANCED: Include historical data for extended lookback periods
 }
 
 interface InventoryData {
@@ -108,10 +108,20 @@ const AdvancedAnalyticsTab = ({ data, inventoryData }: {
                 {data?.currentMonth ? `${data.currentMonth}/${data.currentYear}` : 'Live Data'}
               </span>
               <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" title="Live Data"></div>
+              
+              {/* ENHANCED: Show inventory connection status */}
               {inventoryData && activeSubTab === 'sku-recovery' && (
                 <div className="flex items-center space-x-1 text-xs text-green-600">
                   <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                   <span>Inventory Connected</span>
+                </div>
+              )}
+              
+              {/* NEW: Show extended historical data availability */}
+              {data?.historicalData && activeSubTab === 'sku-recovery' && (
+                <div className="flex items-center space-x-1 text-xs text-blue-600">
+                  <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                  <span>Extended Historical Data</span>
                 </div>
               )}
             </div>
@@ -137,9 +147,10 @@ const AdvancedAnalyticsTab = ({ data, inventoryData }: {
                   {data.customerInsights.lostCustomers}
                 </span>
               )}
+              {/* ENHANCED: Updated badge for SKU Recovery */}
               {tab.id === 'sku-recovery' && (
                 <span className="bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded-full">
-                  NEW
+                  ENHANCED
                 </span>
               )}
             </button>
