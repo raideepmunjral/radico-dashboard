@@ -4,6 +4,28 @@ import React, { useState, useMemo } from 'react';
 import { Heart, AlertTriangle, Calendar, TrendingDown, Filter, Download, Search, X, ChevronLeft, ChevronRight, Clock, Users, BarChart3, Target, Package, Truck, CheckCircle, XCircle, Eye, TrendingUp, AlertCircle } from 'lucide-react';
 
 // ==========================================
+// ENHANCED LOOKBACK & BUSINESS LOGIC
+// ==========================================
+
+const LOOKBACK_OPTIONS = [
+  { value: 30, label: "Immediate Issues (0-30 days)", color: "red", category: "urgent" },
+  { value: 60, label: "Short-term Gaps (31-60 days)", color: "orange", category: "relationship" },  
+  { value: 120, label: "Competitive Threats (61-120 days)", color: "yellow", category: "competitive" },
+  { value: 180, label: "Seasonal Analysis (121-180 days)", color: "blue", category: "seasonal" },
+  { value: 270, label: "Long-term Breakdown (181-270 days)", color: "purple", category: "longterm" },
+  { value: 365, label: "Annual Cycle Review (271-365 days)", color: "green", category: "annual" }
+];
+
+const getBusinessContext = (daysSinceLastOrder: number) => {
+  if (daysSinceLastOrder <= 30) return { type: "IMMEDIATE", priority: "CRITICAL", action: "Urgent intervention required" };
+  if (daysSinceLastOrder <= 60) return { type: "SHORT_TERM", priority: "HIGH", action: "Relationship building needed" };
+  if (daysSinceLastOrder <= 120) return { type: "COMPETITIVE", priority: "MEDIUM", action: "Competitive analysis required" };
+  if (daysSinceLastOrder <= 180) return { type: "SEASONAL", priority: "MEDIUM", action: "Check seasonal patterns" };
+  if (daysSinceLastOrder <= 270) return { type: "LONG_TERM", priority: "LOW", action: "Major relationship repair needed" };
+  return { type: "ANNUAL", priority: "LOW", action: "Annual cycle analysis" };
+};
+
+// ==========================================
 // ENHANCED TYPE DEFINITIONS & INTERFACES
 // ==========================================
 
@@ -133,12 +155,33 @@ interface EnhancedLostCustomer extends SKUOrderHistory {
   priorityLevel: 'HIGH' | 'MEDIUM' | 'LOW';
   recoveryScore: number; // 0-100
   recommendedAction: string;
-  estimatedRecoveryValue: number;
   
-  // Financial Impact
-  lostRevenuePerMonth: number;
-  totalLostRevenue: number;
-  recoveryPotential: number;
+  // Cases-Focused Impact (Replacing Financial)
+  casesLostPerMonth: number;
+  totalCasesAtRisk: number;
+  recoveryCasesPotential: number;
+  
+  // Dynamic Historical Context
+  dynamicHistoricalPeriod: {
+    startMonth: string;
+    endMonth: string;
+    year: string;
+    pattern: Array<{
+      month: string;
+      year: string;
+      cases: number;
+    }>;
+  };
+  
+  // Enhanced Intelligence
+  orderingPattern?: string; // "Typically orders every 45 days"
+  seasonalIndicator?: string; // "December customer - broken pattern"
+  trendContext?: string; // "Was growing 15% monthly until stopped"
+  businessContext: {
+    type: string;
+    priority: string;
+    action: string;
+  };
 }
 
 interface InventoryData {
@@ -158,6 +201,12 @@ interface InventoryData {
     }>;
     lastVisitDays: number;
   }>;
+  // Enhanced debugging info
+  skuMappingDebug?: {
+    totalSKUsFound: number;
+    mappingSuccess: number;
+    mappingFailures: string[];
+  };
 }
 
 // ==========================================
@@ -186,24 +235,46 @@ const calculateDaysBetween = (month1: string, year1: string, month2: string, yea
 };
 
 // ==========================================
-// NEW: SKU BRAND MAPPING & NORMALIZATION
+// ENHANCED SKU BRAND MAPPING & NORMALIZATION
 // ==========================================
 
 const SKU_BRAND_MAPPING: Record<string, string[]> = {
-  '8PM_750': ['8 PM BLACK', '8 PM BLACK 750', '8 PM PREMIUM BLACK BLENDED WHISKY'],
-  '8PM_375': ['8 PM BLACK 375', '8 PM PREMIUM BLACK BLENDED WHISKY 375'],
-  '8PM_180': ['8 PM BLACK 180', '8 PM BLACK 180 P', '8 PM PREMIUM BLACK BLENDED WHISKY Pet'],
-  '8PM_90': ['8 PM BLACK 90', '8 PM BLACK 60', '8 PM BLACK 60 P'],
-  'VERVE_CRANBERRY_750': ['VERVE CRANBERRY', 'VERVE CRANBERRY 750', 'M2M VERVE CRANBERRY TEASE SP FL VODKA'],
+  '8PM_750': [
+    '8 PM BLACK', '8 PM BLACK 750', '8PM BLACK 750', 
+    '8 PM PREMIUM BLACK BLENDED WHISKY', '8PM PREMIUM BLACK BLENDED WHISKY',
+    '8PM BLACK', '8 PM', '8PM'
+  ],
+  '8PM_375': [
+    '8 PM BLACK 375', '8PM BLACK 375', 
+    '8 PM PREMIUM BLACK BLENDED WHISKY 375', '8PM PREMIUM BLACK BLENDED WHISKY 375'
+  ],
+  '8PM_180': [
+    '8 PM BLACK 180', '8PM BLACK 180', '8 PM BLACK 180 P', '8PM BLACK 180P',
+    '8 PM PREMIUM BLACK BLENDED WHISKY Pet', '8PM PREMIUM BLACK BLENDED WHISKY Pet'
+  ],
+  '8PM_90': ['8 PM BLACK 90', '8PM BLACK 90', '8 PM BLACK 60', '8PM BLACK 60', '8 PM BLACK 60 P', '8PM BLACK 60P'],
+  'VERVE_CRANBERRY_750': [
+    'VERVE CRANBERRY', 'VERVE CRANBERRY 750', 
+    'M2M VERVE CRANBERRY TEASE SP FL VODKA', 'M2M VERVE CRANBERRY TEASE SUPERIOR FLAVOURED VODKA'
+  ],
   'VERVE_CRANBERRY_375': ['VERVE CRANBERRY 375'],
   'VERVE_CRANBERRY_180': ['VERVE CRANBERRY 180'],
-  'VERVE_GREEN_APPLE_750': ['VERVE GREEN APPLE', 'VERVE GREEN APPLE 750', 'M2M VERVE GREEN APPLE SUPERIOR FL VODKA'],
+  'VERVE_GREEN_APPLE_750': [
+    'VERVE GREEN APPLE', 'VERVE GREEN APPLE 750', 
+    'M2M VERVE GREEN APPLE SUPERIOR FL VODKA', 'M2M VERVE GREEN APPLE SUPERIOR FLAVOURED VODKA'
+  ],
   'VERVE_GREEN_APPLE_375': ['VERVE GREEN APPLE 375'],
   'VERVE_GREEN_APPLE_180': ['VERVE GREEN APPLE 180'],
-  'VERVE_LEMON_LUSH_750': ['VERVE LEMON LUSH', 'VERVE LEMON LUSH 750', 'M2M VERVE LEMON LUSH SUP FL VODKA'],
+  'VERVE_LEMON_LUSH_750': [
+    'VERVE LEMON LUSH', 'VERVE LEMON LUSH 750', 
+    'M2M VERVE LEMON LUSH SUP FL VODKA', 'M2M VERVE LEMON LUSH SUPERIOR FLAVOURED VODKA'
+  ],
   'VERVE_LEMON_LUSH_375': ['VERVE LEMON LUSH 375'],
   'VERVE_LEMON_LUSH_180': ['VERVE LEMON LUSH 180'],
-  'VERVE_GRAIN_750': ['VERVE GRAIN', 'VERVE GRAIN 750', 'M2M VERVE SUPERIOR GRAIN VODKA'],
+  'VERVE_GRAIN_750': [
+    'VERVE GRAIN', 'VERVE GRAIN 750', 
+    'M2M VERVE SUPERIOR GRAIN VODKA', 'M2M VERVE GRAIN VODKA'
+  ],
   'VERVE_GRAIN_375': ['VERVE GRAIN 375'],
   'VERVE_GRAIN_180': ['VERVE GRAIN 180']
 };
@@ -212,7 +283,10 @@ const normalizeSKUName = (brandName: string): string => {
   const cleanBrand = brandName?.toString().trim().toUpperCase();
   
   for (const [skuKey, variants] of Object.entries(SKU_BRAND_MAPPING)) {
-    if (variants.some(variant => cleanBrand.includes(variant.toUpperCase()))) {
+    if (variants.some(variant => {
+      const cleanVariant = variant.toUpperCase();
+      return cleanBrand.includes(cleanVariant) || cleanVariant.includes(cleanBrand);
+    })) {
       return skuKey;
     }
   }
@@ -241,6 +315,57 @@ const getSKUDisplayName = (skuKey: string): string => {
   };
   
   return displayNames[skuKey] || skuKey;
+};
+
+// Enhanced inventory status lookup with debugging
+const getInventoryStatusEnhanced = (shopId: string, skuKey: string, inventoryData?: InventoryData): InventoryStatus & { debugInfo?: string } => {
+  if (!inventoryData || !inventoryData.shops[shopId]) {
+    return { 
+      stockStatus: 'NO_DATA',
+      debugInfo: `No inventory data for shop ${shopId}`
+    };
+  }
+  
+  const shopInventory = inventoryData.shops[shopId];
+  const skuVariants = SKU_BRAND_MAPPING[skuKey] || [skuKey];
+  
+  console.log(`🔍 Searching inventory for shop ${shopId}, SKU ${skuKey}`);
+  console.log(`📋 Available inventory items:`, Object.keys(shopInventory.items));
+  console.log(`🎯 Trying to match variants:`, skuVariants);
+  
+  for (const variant of skuVariants) {
+    for (const [brandKey, item] of Object.entries(shopInventory.items)) {
+      const cleanBrandKey = brandKey.toUpperCase();
+      const cleanVariant = variant.toUpperCase();
+      
+      if (cleanBrandKey.includes(cleanVariant) || cleanVariant.includes(cleanBrandKey) ||
+          cleanBrandKey.replace(/\s/g, '').includes(cleanVariant.replace(/\s/g, '')) ||
+          cleanVariant.replace(/\s/g, '').includes(cleanBrandKey.replace(/\s/g, ''))) {
+        
+        console.log(`✅ Match found: ${brandKey} matches ${variant}`);
+        
+        return {
+          quantity: item.quantity,
+          isInStock: item.isInStock,
+          isOutOfStock: item.isOutOfStock,
+          stockStatus: item.isOutOfStock ? 'OUT_OF_STOCK' : 
+                      item.quantity < 5 ? 'LOW_STOCK' : 'IN_STOCK',
+          lastVisitDays: shopInventory.lastVisitDays,
+          reasonNoStock: item.reasonNoStock,
+          recentlyRestocked: item.suppliedAfterOutOfStock,
+          visitDate: shopInventory.visitDate,
+          debugInfo: `Matched ${brandKey} with ${variant}`
+        };
+      }
+    }
+  }
+  
+  console.log(`❌ No match found for ${skuKey} in shop ${shopId}`);
+  
+  return { 
+    stockStatus: 'NO_DATA',
+    debugInfo: `No match found for ${skuKey}. Available: ${Object.keys(shopInventory.items).join(', ')}`
+  };
 };
 
 // ==========================================
@@ -334,8 +459,8 @@ const processSKULevelLostCustomers = (data: DashboardData, inventoryData?: Inven
     Object.entries(skuHistory).forEach(([skuKey, history]) => {
       if (history.juneCases === 0 && (history.marchCases > 0 || history.aprilCases > 0 || history.mayCases > 0)) {
         // This SKU was lost
-        const inventoryStatus = getInventoryStatus(shop.shopId, skuKey, inventoryData);
-        const lostCustomer = createEnhancedLostCustomer(shop, skuKey, history, inventoryStatus);
+        const inventoryStatus = getInventoryStatusEnhanced(shop.shopId, skuKey, inventoryData);
+        const lostCustomer = createEnhancedLostCustomer(shop, skuKey, history, inventoryStatus, inventoryData);
         skuLostCustomers.push(lostCustomer);
       }
     });
@@ -470,12 +595,16 @@ const createEnhancedLostCustomer = (
   shop: ShopData, 
   skuKey: string, 
   history: any, 
-  inventoryStatus: InventoryStatus
+  inventoryStatus: InventoryStatus,
+  inventoryData?: InventoryData
 ): EnhancedLostCustomer => {
   const averageMonthlyOrders = (history.marchCases + history.aprilCases + history.mayCases) / 3;
   const daysSinceLastOrder = history.mayCases > 0 ? 30 : 
                            history.aprilCases > 0 ? 60 : 
                            history.marchCases > 0 ? 90 : 120;
+  
+  // Enhanced business context
+  const businessContext = getBusinessContext(daysSinceLastOrder);
   
   // Calculate customer tier based on average monthly volume
   const historicalTier: EnhancedLostCustomer['historicalTier'] = 
@@ -483,43 +612,53 @@ const createEnhancedLostCustomer = (
     averageMonthlyOrders >= 10 ? 'High' :
     averageMonthlyOrders >= 5 ? 'Medium' : 'Low';
   
-  // Determine recovery type based on inventory status
-  const recoveryType: EnhancedLostCustomer['recoveryType'] = 
-    inventoryStatus.stockStatus === 'OUT_OF_STOCK' ? 'SUPPLY_ISSUE' :
-    inventoryStatus.stockStatus === 'IN_STOCK' ? 'COMPETITIVE_THREAT' :
-    !inventoryStatus.lastVisitDays || inventoryStatus.lastVisitDays > 30 ? 'RELATIONSHIP_GAP' :
-    'SEASONAL_PATTERN';
+  // Enhanced inventory status with debugging
+  const enhancedInventoryStatus = getInventoryStatusEnhanced(shop.shopId, skuKey, inventoryData);
   
-  // Calculate recovery score (0-100)
+  // Determine recovery type based on inventory status and business context
+  const recoveryType: EnhancedLostCustomer['recoveryType'] = 
+    enhancedInventoryStatus.stockStatus === 'OUT_OF_STOCK' ? 'SUPPLY_ISSUE' :
+    enhancedInventoryStatus.stockStatus === 'IN_STOCK' && businessContext.type === 'COMPETITIVE' ? 'COMPETITIVE_THREAT' :
+    (!enhancedInventoryStatus.lastVisitDays || enhancedInventoryStatus.lastVisitDays > 30) ? 'RELATIONSHIP_GAP' :
+    businessContext.type === 'SEASONAL' ? 'SEASONAL_PATTERN' : 'COMPETITIVE_THREAT';
+  
+  // Calculate recovery score (0-100) with enhanced logic
   let recoveryScore = 70; // Base score
   if (historicalTier === 'VIP') recoveryScore += 20;
   else if (historicalTier === 'High') recoveryScore += 10;
   if (daysSinceLastOrder <= 30) recoveryScore += 15;
   else if (daysSinceLastOrder <= 60) recoveryScore += 5;
-  else recoveryScore -= 10;
+  else if (daysSinceLastOrder > 180) recoveryScore -= 20;
   if (recoveryType === 'SUPPLY_ISSUE') recoveryScore += 15;
   else if (recoveryType === 'COMPETITIVE_THREAT') recoveryScore -= 5;
-  if (inventoryStatus.recentlyRestocked) recoveryScore += 10;
+  if (enhancedInventoryStatus.recentlyRestocked) recoveryScore += 10;
   
   recoveryScore = Math.max(0, Math.min(100, recoveryScore));
   
-  // Priority level
+  // Priority level based on business context and recovery score
   const priorityLevel: EnhancedLostCustomer['priorityLevel'] = 
-    recoveryScore >= 80 ? 'HIGH' :
-    recoveryScore >= 60 ? 'MEDIUM' : 'LOW';
+    businessContext.priority === 'CRITICAL' || recoveryScore >= 85 ? 'HIGH' :
+    businessContext.priority === 'HIGH' || recoveryScore >= 65 ? 'MEDIUM' : 'LOW';
   
-  // Financial calculations (assuming average case value of 500 INR)
-  const avgCaseValue = 500;
-  const lostRevenuePerMonth = averageMonthlyOrders * avgCaseValue;
-  const totalLostRevenue = lostRevenuePerMonth * (daysSinceLastOrder / 30);
-  const recoveryPotential = lostRevenuePerMonth * (recoveryScore / 100);
+  // Cases-focused calculations (replacing financial metrics)
+  const casesLostPerMonth = averageMonthlyOrders;
+  const monthsLost = Math.ceil(daysSinceLastOrder / 30);
+  const totalCasesAtRisk = casesLostPerMonth * monthsLost;
+  const recoveryCasesPotential = casesLostPerMonth * (recoveryScore / 100);
   
-  // Recommended action
-  const recommendedAction = 
-    recoveryType === 'SUPPLY_ISSUE' ? 'Immediate restocking required - customer ready to buy' :
-    recoveryType === 'COMPETITIVE_THREAT' ? 'Price negotiation & promotional support needed' :
-    recoveryType === 'RELATIONSHIP_GAP' ? 'Schedule relationship-building visit within 7 days' :
-    'Seasonal analysis - contact during typical ordering period';
+  // Dynamic historical context - show 3 months before last order
+  const dynamicHistoricalPeriod = createDynamicHistoricalContext(history, daysSinceLastOrder);
+  
+  // Enhanced intelligence
+  const orderingPattern = averageMonthlyOrders > 0 ? 
+    `Typically orders ${averageMonthlyOrders.toFixed(0)} cases every 30 days` : 
+    'Irregular ordering pattern';
+  
+  const seasonalIndicator = generateSeasonalIndicator(shop, skuKey, history);
+  const trendContext = generateTrendContext(history);
+  
+  // Enhanced recommended action
+  const recommendedAction = generateEnhancedAction(recoveryType, businessContext, enhancedInventoryStatus, historicalTier);
   
   const last3Orders = [
     { month: 'May', cases: history.mayCases, date: 'May 2025' },
@@ -542,25 +681,112 @@ const createEnhancedLostCustomer = (
     historicalTier,
     last3Orders,
     
-    // Inventory Intelligence
-    currentStock: inventoryStatus.quantity,
-    stockStatus: inventoryStatus.stockStatus,
-    lastVisitDays: inventoryStatus.lastVisitDays,
-    reasonNoStock: inventoryStatus.reasonNoStock,
-    recentlyRestocked: inventoryStatus.recentlyRestocked,
+    // Inventory Intelligence (Enhanced)
+    currentStock: enhancedInventoryStatus.quantity,
+    stockStatus: enhancedInventoryStatus.stockStatus,
+    lastVisitDays: enhancedInventoryStatus.lastVisitDays,
+    reasonNoStock: enhancedInventoryStatus.reasonNoStock,
+    recentlyRestocked: enhancedInventoryStatus.recentlyRestocked,
     
     // Recovery Intelligence
     recoveryType,
     priorityLevel,
     recoveryScore,
     recommendedAction,
-    estimatedRecoveryValue: recoveryPotential,
     
-    // Financial Impact
-    lostRevenuePerMonth,
-    totalLostRevenue,
-    recoveryPotential
+    // Cases-Focused Impact (Replacing Financial)
+    casesLostPerMonth,
+    totalCasesAtRisk,
+    recoveryCasesPotential,
+    
+    // Dynamic Historical Context
+    dynamicHistoricalPeriod,
+    
+    // Enhanced Intelligence
+    orderingPattern,
+    seasonalIndicator,
+    trendContext,
+    businessContext
   };
+};
+
+// Helper functions for enhanced intelligence
+const createDynamicHistoricalContext = (history: any, daysSinceLastOrder: number) => {
+  // Determine the reference period based on when they last ordered
+  let startMonth = '03', endMonth = '05', year = '2025';
+  
+  if (daysSinceLastOrder <= 30) {
+    // Last ordered in May - show Feb-Apr pattern
+    startMonth = '02'; endMonth = '04';
+  } else if (daysSinceLastOrder <= 60) {
+    // Last ordered in April - show Jan-Mar pattern  
+    startMonth = '01'; endMonth = '03';
+  } else if (daysSinceLastOrder <= 90) {
+    // Last ordered in March - show Dec-Feb pattern
+    startMonth = '12'; endMonth = '02';
+    if (startMonth === '12') year = '2024'; // Cross-year boundary
+  }
+  
+  return {
+    startMonth,
+    endMonth, 
+    year,
+    pattern: [
+      { month: 'Mar', year: '2025', cases: history.marchCases },
+      { month: 'Apr', year: '2025', cases: history.aprilCases },
+      { month: 'May', year: '2025', cases: history.mayCases }
+    ]
+  };
+};
+
+const generateSeasonalIndicator = (shop: ShopData, skuKey: string, history: any): string => {
+  // Simple seasonal analysis based on available data
+  const monthlyData = [history.marchCases, history.aprilCases, history.mayCases];
+  const hasPattern = monthlyData.some(cases => cases > 0);
+  
+  if (!hasPattern) return 'No established pattern';
+  
+  const maxMonth = monthlyData.indexOf(Math.max(...monthlyData));
+  const monthNames = ['March', 'April', 'May'];
+  
+  return `Peak performance in ${monthNames[maxMonth]} - ${maxMonth === 1 ? 'Spring' : maxMonth === 2 ? 'Late Spring' : 'Early Spring'} customer`;
+};
+
+const generateTrendContext = (history: any): string => {
+  const marchToApril = history.aprilCases - history.marchCases;
+  const aprilToMay = history.mayCases - history.aprilCases;
+  
+  if (marchToApril > 0 && aprilToMay > 0) {
+    return 'Was on positive growth trajectory until stopped ordering';
+  } else if (marchToApril < 0 && aprilToMay < 0) {
+    return 'Was already declining before stopping orders';
+  } else if (history.mayCases > history.marchCases) {
+    return 'Showed improvement in final month before stopping';
+  }
+  
+  return 'Stable ordering pattern before stopping';
+};
+
+const generateEnhancedAction = (
+  recoveryType: string, 
+  businessContext: any, 
+  inventoryStatus: any, 
+  tier: string
+): string => {
+  const urgency = businessContext.priority === 'CRITICAL' ? 'URGENT: ' : 
+                 businessContext.priority === 'HIGH' ? 'HIGH PRIORITY: ' : '';
+  
+  const tierAction = tier === 'VIP' ? '(VIP customer - senior management involvement recommended) ' : '';
+  
+  if (recoveryType === 'SUPPLY_ISSUE') {
+    return `${urgency}Immediate restocking required - customer ready to buy. ${tierAction}Stock status: ${inventoryStatus.debugInfo || 'Out of stock'}.`;
+  } else if (recoveryType === 'COMPETITIVE_THREAT') {
+    return `${urgency}Competitive analysis needed - has stock but not ordering. ${tierAction}Consider pricing review and promotional support.`;
+  } else if (recoveryType === 'RELATIONSHIP_GAP') {
+    return `${urgency}Schedule relationship-building visit within 7 days. ${tierAction}Last visit: ${inventoryStatus.lastVisitDays || 'Unknown'} days ago.`;
+  } else {
+    return `${urgency}Seasonal pattern analysis required. ${tierAction}Check historical ordering cycles and market trends.`;
+  }
 };
 
 const calculateEnhancedMetrics = (analyzedShops: AnalyzedShop[], skuLostCustomers: EnhancedLostCustomer[]) => {
@@ -573,11 +799,12 @@ const calculateEnhancedMetrics = (analyzedShops: AnalyzedShop[], skuLostCustomer
   const neverOrdered = analyzedShops.filter(s => s.customerStatus === 'never-ordered').length;
   const quarterlyDeclining = analyzedShops.filter(s => s.quarterlyDecline! > 10).length;
   
-  // Enhanced SKU metrics
+  // Enhanced SKU metrics (cases-focused)
   const skuHighPriority = skuLostCustomers.filter(c => c.priorityLevel === 'HIGH').length;
   const skuSupplyIssues = skuLostCustomers.filter(c => c.recoveryType === 'SUPPLY_ISSUE').length;
   const skuCompetitiveThreats = skuLostCustomers.filter(c => c.recoveryType === 'COMPETITIVE_THREAT').length;
-  const totalRecoveryPotential = skuLostCustomers.reduce((sum, c) => sum + c.recoveryPotential, 0);
+  const totalCasesAtRisk = skuLostCustomers.reduce((sum, c) => sum + c.totalCasesAtRisk, 0);
+  const totalRecoveryCases = skuLostCustomers.reduce((sum, c) => sum + c.recoveryCasesPotential, 0);
   
   return {
     unbilledCount,
@@ -589,12 +816,13 @@ const calculateEnhancedMetrics = (analyzedShops: AnalyzedShop[], skuLostCustomer
     neverOrderedCount: neverOrdered,
     quarterlyDeclining,
     
-    // Enhanced metrics
+    // Enhanced metrics (cases-focused)
     skuLostCount: skuLostCustomers.length,
     skuHighPriority,
     skuSupplyIssues,
     skuCompetitiveThreats,
-    totalRecoveryPotential: Math.round(totalRecoveryPotential),
+    totalCasesAtRisk: Math.round(totalCasesAtRisk),
+    totalRecoveryCases: Math.round(totalRecoveryCases),
     avgRecoveryScore: skuLostCustomers.length > 0 ? 
       Math.round(skuLostCustomers.reduce((sum, c) => sum + c.recoveryScore, 0) / skuLostCustomers.length) : 0
   };
@@ -610,7 +838,7 @@ const CustomerHealth = ({ data, inventoryData }: { data: DashboardData, inventor
   // ==========================================
   
   const [activeBrand, setActiveBrand] = useState<'all' | '8PM' | 'VERVE'>('all');
-  const [lookbackMonths, setLookbackMonths] = useState(3);
+  const [lookbackDays, setLookbackDays] = useState(60);
   const [activeSection, setActiveSection] = useState<'unbilled' | 'lost' | 'sku-recovery' | 'quarterly'>('unbilled');
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(15);
@@ -648,9 +876,8 @@ const CustomerHealth = ({ data, inventoryData }: { data: DashboardData, inventor
         return matchesSearch && matchesDepartment && matchesSalesman && 
                shop.customerStatus === 'unbilled';
       } else if (activeSection === 'lost') {
-        const monthsBack = lookbackMonths * 30;
         return matchesSearch && matchesDepartment && matchesSalesman && 
-               ((shop.daysSinceLastOrder! >= 60 && shop.daysSinceLastOrder! <= monthsBack) ||
+               ((shop.daysSinceLastOrder! >= 60 && shop.daysSinceLastOrder! <= lookbackDays) ||
                 shop.customerStatus === 'never-ordered');
       } else if (activeSection === 'quarterly') {
         return matchesSearch && matchesDepartment && matchesSalesman && 
@@ -709,15 +936,15 @@ const CustomerHealth = ({ data, inventoryData }: { data: DashboardData, inventor
   const exportToCSV = () => {
     let csvContent = "data:text/csv;charset=utf-8,";
     csvContent += `Radico Customer Health Analysis - ${activeSection.toUpperCase()} - ${new Date().toLocaleDateString()}\n`;
-    csvContent += `Brand Filter: ${activeBrand}, Lookback: ${lookbackMonths} months\n`;
+    csvContent += `Brand Filter: ${activeBrand}, Lookback: ${lookbackDays} days\n`;
     csvContent += `Generated: ${new Date().toLocaleString()}\n\n`;
 
     if (activeSection === 'sku-recovery') {
       csvContent += `SKU RECOVERY INTELLIGENCE ANALYSIS\n`;
-      csvContent += `Shop Name,SKU,Department,Salesman,Historical Tier,Avg Monthly Orders,Days Since Last,Recovery Type,Priority,Recovery Score,Current Stock,Stock Status,Last Visit Days,Recommended Action,Recovery Potential INR,Lost Revenue/Month INR,Total Lost Revenue INR\n`;
+      csvContent += `Shop Name,SKU,Department,Salesman,Historical Tier,Avg Monthly Orders,Days Since Last,Recovery Type,Priority,Recovery Score,Current Stock,Stock Status,Last Visit Days,Ordering Pattern,Trend Context,Recommended Action,Cases Lost/Month,Total Cases at Risk,Recovery Cases Potential\n`;
       
       filteredSKULostCustomers.forEach(customer => {
-        csvContent += `"${customer.shopName}","${getSKUDisplayName(customer.sku)}","${customer.department}","${customer.salesman}","${customer.historicalTier}","${customer.averageMonthlyOrders.toFixed(1)}","${customer.daysSinceLastOrder}","${customer.recoveryType}","${customer.priorityLevel}","${customer.recoveryScore}","${customer.currentStock || 'N/A'}","${customer.stockStatus}","${customer.lastVisitDays || 'N/A'}","${customer.recommendedAction}","${customer.recoveryPotential.toFixed(0)}","${customer.lostRevenuePerMonth.toFixed(0)}","${customer.totalLostRevenue.toFixed(0)}"\n`;
+        csvContent += `"${customer.shopName}","${getSKUDisplayName(customer.sku)}","${customer.department}","${customer.salesman}","${customer.historicalTier}","${customer.averageMonthlyOrders.toFixed(1)}","${customer.daysSinceLastOrder}","${customer.recoveryType}","${customer.priorityLevel}","${customer.recoveryScore}","${customer.currentStock || 'N/A'}","${customer.stockStatus}","${customer.lastVisitDays || 'N/A'}","${customer.orderingPattern || 'N/A'}","${customer.trendContext || 'N/A'}","${customer.recommendedAction}","${customer.casesLostPerMonth.toFixed(0)}","${customer.totalCasesAtRisk.toFixed(0)}","${customer.recoveryCasesPotential.toFixed(0)}"\n`;
       });
     } else if (activeSection === 'unbilled') {
       csvContent += `UNBILLED THIS MONTH (${getMonthName(data.currentMonth)} ${data.currentYear})\n`;
@@ -727,7 +954,7 @@ const CustomerHealth = ({ data, inventoryData }: { data: DashboardData, inventor
         csvContent += `"${shop.shopName}","${shop.department}","${shop.salesman}",${shop.mayTotal || 0},${shop.daysSinceLastOrder},"${shop.riskLevel}"\n`;
       });
     } else if (activeSection === 'lost') {
-      csvContent += `LOST CUSTOMERS ANALYSIS (${lookbackMonths} month lookback)\n`;
+      csvContent += `LOST CUSTOMERS ANALYSIS (${lookbackDays} day lookback)\n`;
       csvContent += `Shop Name,Department,Salesman,Last Order Date,Days Since Order,Customer Status,Risk Level\n`;
       
       filteredShops.forEach(shop => {
@@ -896,10 +1123,10 @@ const CustomerHealth = ({ data, inventoryData }: { data: DashboardData, inventor
           <div className="bg-yellow-50 p-4 rounded-lg">
             <div className="flex items-center mb-2">
               <BarChart3 className="w-5 h-5 text-yellow-600 mr-2" />
-              <h4 className="font-medium text-yellow-800">Value at Risk</h4>
+              <h4 className="font-medium text-yellow-800">Cases at Risk</h4>
             </div>
-            <div className="text-2xl font-bold text-yellow-600">₹{(enhancedMetrics.totalRecoveryPotential / 1000).toFixed(0)}K</div>
-            <p className="text-sm text-yellow-600">Recovery potential</p>
+            <div className="text-2xl font-bold text-yellow-600">{enhancedMetrics.totalCasesAtRisk}</div>
+            <p className="text-sm text-yellow-600">Cases lost potential</p>
           </div>
         </div>
       </div>
@@ -939,17 +1166,17 @@ const CustomerHealth = ({ data, inventoryData }: { data: DashboardData, inventor
             
             {activeSection === 'lost' && (
               <div className="flex items-center space-x-2">
-                <span className="text-sm text-gray-600">Lookback:</span>
+                <span className="text-sm text-gray-600">Business Context:</span>
                 <select
-                  value={lookbackMonths}
-                  onChange={(e) => setLookbackMonths(parseInt(e.target.value))}
+                  value={lookbackDays}
+                  onChange={(e) => setLookbackDays(parseInt(e.target.value))}
                   className="border border-gray-300 rounded px-3 py-1 text-sm"
                 >
-                  <option value={2}>2 months</option>
-                  <option value={3}>3 months</option>
-                  <option value={4}>4 months</option>
-                  <option value={5}>5 months</option>
-                  <option value={6}>6 months</option>
+                  {LOOKBACK_OPTIONS.map(option => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
                 </select>
               </div>
             )}
@@ -1116,12 +1343,13 @@ const CustomerHealth = ({ data, inventoryData }: { data: DashboardData, inventor
         <h3 className="text-lg font-medium text-gray-900 mb-4">Enhanced Intelligence Summary</h3>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           <div>
-            <h4 className="font-medium text-gray-900 mb-2">Broad vs SKU-Level Analysis:</h4>
+            <h4 className="font-medium text-gray-900 mb-2">Smart Lookback System:</h4>
             <div className="space-y-1 text-sm">
-              <div>• <strong>Lost Customer Overview:</strong> Brand family level (all 8PM variants combined)</div>
-              <div>• <strong>SKU Recovery Intelligence:</strong> Individual product level (8PM 750ml, 375ml, etc.)</div>
-              <div>• <strong>Inventory Integration:</strong> Current stock status from last visits</div>
-              <div>• <strong>Recovery Prioritization:</strong> Supply vs competitive vs relationship issues</div>
+              <div>• <strong>Business-Focused:</strong> Immediate (30d) → Competitive (120d) → Seasonal (180d)</div>
+              <div>• <strong>Dynamic Historical Context:</strong> Shows 3 months before last order</div>
+              <div>• <strong>Cases-Focused Metrics:</strong> Cases at risk, recovery potential in units</div>
+              <div>• <strong>Enhanced Stock Integration:</strong> Real-time inventory status debugging</div>
+              <div>• <strong>Ordering Pattern Analysis:</strong> Typical order frequency and trends</div>
             </div>
           </div>
           <div>
@@ -1129,20 +1357,31 @@ const CustomerHealth = ({ data, inventoryData }: { data: DashboardData, inventor
             <div className="space-y-1 text-sm">
               <div className="flex items-center space-x-2">
                 <div className="w-4 h-4 bg-purple-100 rounded"></div>
-                <span><strong>Supply Issue:</strong> Out of stock - immediate restocking needed</span>
+                <span><strong>Supply Issue:</strong> Out of stock - immediate restocking (Quick wins)</span>
               </div>
               <div className="flex items-center space-x-2">
                 <div className="w-4 h-4 bg-red-100 rounded"></div>
-                <span><strong>Competitive Threat:</strong> Has stock but not ordering - pricing/promotion needed</span>
+                <span><strong>Competitive Threat:</strong> Has stock but not ordering - strategic intervention</span>
               </div>
               <div className="flex items-center space-x-2">
                 <div className="w-4 h-4 bg-blue-100 rounded"></div>
-                <span><strong>Relationship Gap:</strong> No recent visits - relationship building required</span>
+                <span><strong>Relationship Gap:</strong> No recent visits - relationship building</span>
               </div>
               <div className="flex items-center space-x-2">
                 <div className="w-4 h-4 bg-green-100 rounded"></div>
-                <span><strong>Seasonal Pattern:</strong> Predictable ordering cycles</span>
+                <span><strong>Seasonal Pattern:</strong> Predictable cycles - timing optimization</span>
               </div>
+            </div>
+          </div>
+          <div className="lg:col-span-2">
+            <h4 className="font-medium text-gray-900 mb-2">Enhanced Intelligence Features:</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm">
+              <div>• <strong>Dynamic Historical:</strong> Context relative to last order</div>
+              <div>• <strong>Ordering Patterns:</strong> "Typically orders 25 cases every 30 days"</div>
+              <div>• <strong>Seasonal Indicators:</strong> Peak performance months identified</div>
+              <div>• <strong>Trend Context:</strong> Growth trajectory before stopping</div>
+              <div>• <strong>Business Priority:</strong> Urgent/High/Medium based on multiple factors</div>
+              <div>• <strong>Stock Debugging:</strong> SKU mapping success/failure tracking</div>
             </div>
           </div>
         </div>
@@ -1180,7 +1419,7 @@ const SkuRecoveryIntelligenceTable = ({
         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Current Stock</th>
         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Recovery Type</th>
         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Recovery Score</th>
-        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Value at Risk</th>
+        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Cases at Risk</th>
         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Action Required</th>
       </tr>
     </thead>
@@ -1203,9 +1442,11 @@ const SkuRecoveryIntelligenceTable = ({
           <td className="px-6 py-4 text-sm text-gray-900">
             <div className="text-sm font-medium">{customer.averageMonthlyOrders.toFixed(1)} cases/month</div>
             <div className="text-xs text-gray-500">
-              Last 3: {customer.last3Orders.map(o => `${o.month}(${o.cases})`).join(', ')}
+              {customer.last3Orders.map(o => `${o.month}(${o.cases})`).join(', ')}
             </div>
             <div className="text-xs text-red-600">{customer.daysSinceLastOrder} days since last order</div>
+            <div className="text-xs text-blue-600">{customer.orderingPattern}</div>
+            <div className="text-xs text-purple-600">{customer.trendContext}</div>
           </td>
           <td className="px-6 py-4 text-sm">
             <div className="flex flex-col space-y-1">
@@ -1241,8 +1482,9 @@ const SkuRecoveryIntelligenceTable = ({
             </div>
           </td>
           <td className="px-6 py-4 text-sm text-gray-900">
-            <div className="font-medium text-green-600">₹{customer.recoveryPotential.toFixed(0)}</div>
-            <div className="text-xs text-gray-500">₹{customer.lostRevenuePerMonth.toFixed(0)}/month lost</div>
+            <div className="font-medium text-red-600">{customer.totalCasesAtRisk.toFixed(0)} cases</div>
+            <div className="text-xs text-gray-500">{customer.casesLostPerMonth.toFixed(0)} cases/month lost</div>
+            <div className="text-xs text-green-600">{customer.recoveryCasesPotential.toFixed(0)} cases recoverable</div>
           </td>
           <td className="px-6 py-4 text-sm text-gray-900">
             <div className="max-w-xs text-xs">{customer.recommendedAction}</div>
