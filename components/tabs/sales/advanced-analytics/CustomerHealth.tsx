@@ -896,7 +896,7 @@ const CustomerHealth = ({ data, inventoryData }: { data: DashboardData, inventor
     }
 
     return filtered;
-  }, [analyzedShops, searchText, departmentFilter, salesmanFilter, activeSection, lookbackMonths]);
+  }, [analyzedShops, searchText, departmentFilter, salesmanFilter, activeSection, lookbackDays]);
 
   const filteredSKULostCustomers = useMemo(() => {
     return skuLostCustomers.filter(customer => {
