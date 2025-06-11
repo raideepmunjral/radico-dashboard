@@ -162,6 +162,11 @@ interface Filters {
 // ENHANCED BRAND NORMALIZATION & MATCHING
 // ==========================================
 
+// Helper function for consistent date formatting (DD/MM/YYYY)
+const formatDate = (date: Date): string => {
+  return date.toLocaleDateString('en-GB'); // DD/MM/YYYY format
+};
+
 const BRAND_MAPPING: { [key: string]: string } = {
   // 8PM Family
   '8 PM BLACK': '8PM BLACK',
@@ -318,7 +323,7 @@ const analyzeEnhancedRecoveryOpportunities = (
       const historicalAnalysis = getFixedHistoricalAnalysis(shop, skuInfo, skuData, lookbackPeriod, historicalData);
       
       // Skip if no meaningful historical data
-      if (historicalAnalysis.totalHistoricalVolume < 5) {
+      if (historicalAnalysis.totalHistoricalVolume < 1) { // FIXED: Reduced from 5 to 1
         console.log(`❌ Skipping ${skuData.displayName} - insufficient historical data (${historicalAnalysis.totalHistoricalVolume} total cases)`);
         return;
       }
@@ -513,9 +518,9 @@ const getFixedHistoricalAnalysis = (shop: ShopData, skuInfo: any, skuData: any, 
   // Use both direct shop properties AND extended historical data
   const allMonthsData: any[] = [];
   
-  // Current year months (from shop properties) - now with TRUE SKU-specific volumes
+  // FIXED: Skip current month from historical analysis (current month = ongoing, not historical)
   const currentMonths = [
-    { name: 'June 2025', key: 'june', eightPM: shop.juneEightPM || 0, verve: shop.juneVerve || 0, year: 2025, month: 6 },
+    // { name: 'June 2025', key: 'june', eightPM: shop.juneEightPM || 0, verve: shop.juneVerve || 0, year: 2025, month: 6 }, // Skip current month
     { name: 'May 2025', key: 'may', eightPM: shop.mayEightPM || 0, verve: shop.mayVerve || 0, year: 2025, month: 5 },
     { name: 'April 2025', key: 'april', eightPM: shop.aprilEightPM || 0, verve: shop.aprilVerve || 0, year: 2025, month: 4 },
     { name: 'March 2025', key: 'march', eightPM: shop.marchEightPM || 0, verve: shop.marchVerve || 0, year: 2025, month: 3 }
@@ -563,6 +568,12 @@ const getFixedHistoricalAnalysis = (shop: ShopData, skuInfo: any, skuData: any, 
   const monthsToLookback = Math.ceil(lookbackPeriod / 30);
   const relevantMonths = allMonthsData.slice(0, Math.min(monthsToLookback, allMonthsData.length));
   
+  console.log(`📊 Historical months for ${skuInfo.displayName}:`, {
+    totalMonths: allMonthsData.length,
+    relevantMonths: relevantMonths.length,
+    monthNames: relevantMonths.map(m => m.name)
+  });
+  
   // Get SKU-specific volumes instead of family totals
   const volumes = relevantMonths.map(month => {
     return { 
@@ -591,7 +602,14 @@ const getFixedHistoricalAnalysis = (shop: ShopData, skuInfo: any, skuData: any, 
   if (lastActiveMonth && lastActiveMonth.monthData && lastActiveMonth.monthData.year > 0) {
     const today = new Date();
     const lastOrderDate = new Date(lastActiveMonth.monthData.year, lastActiveMonth.monthData.month - 1, 15); // Mid-month estimate
-    daysSinceLastOrder = Math.floor((today.getTime() - lastOrderDate.getTime()) / (1000 * 60 * 60 * 24));
+    const timeDiff = today.getTime() - lastOrderDate.getTime();
+    daysSinceLastOrder = Math.max(0, Math.floor(timeDiff / (1000 * 60 * 60 * 24))); // FIXED: Ensure non-negative
+    
+    console.log(`📅 Date calculation for ${skuInfo.displayName}:`, {
+      today: formatDate(today),
+      lastOrderDate: formatDate(lastOrderDate),
+      daysSinceLastOrder
+    });
   }
   
   // Determine ordering pattern based on extended data
@@ -700,18 +718,19 @@ const getCurrentInventoryStatus = (shopId: string, skuInfo: any, inventoryData?:
 };
 
 const determineRecoveryOpportunity = (historical: any, inventory: any, lookbackPeriod: number) => {
+  // FIXED: More lenient recovery opportunity detection
   // Recovery opportunity if:
-  // 1. Had historical volume but current volume is 0
+  // 1. Had historical volume but current volume is 0 or very low
   // 2. Currently out of stock but used to order
   // 3. Significant decline from peak
   // 4. No orders for extended period but previously active
   
   return (
-    historical.historicalAverage > 5 && 
+    historical.historicalAverage > 1 && // FIXED: Reduced from 5 to 1
     (historical.currentVolume === 0 || 
      inventory.isOutOfStock || 
-     historical.currentVolume < historical.historicalAverage * 0.3 ||
-     historical.daysSinceLastOrder > 60)
+     historical.currentVolume < historical.historicalAverage * 0.5 || // FIXED: Increased from 0.3 to 0.5
+     historical.daysSinceLastOrder > 30) // FIXED: Reduced from 60 to 30
   );
 };
 
@@ -805,9 +824,9 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
     searchText: '',
     lookbackPeriod: 180, // 6 months default
     showOnlyOutOfStock: false,
-    minimumRecoveryPotential: 10,
+    minimumRecoveryPotential: 1, // FIXED: Reduced from 10 to 1
     showOnlyWithSupplyData: false,
-    minimumHistoricalAverage: 5
+    minimumHistoricalAverage: 1 // FIXED: Reduced from 5 to 1
   });
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(20);
@@ -936,7 +955,7 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
     csvContent += `Shop Name,Shop ID,Department,Salesman,SKU,SKU Family,Last Order Date,Days Since Last Order,Last Order Volume,Peak Volume,Peak Month,Historical Average,Total Historical,Recovery Potential,Recovery Score,Priority,Category,Current Stock,Out of Stock,Last Visit,Days Since Visit,Last Supply,Days Since Supply,Supply Source,Recent Supply Attempts,Reason No Stock,Action Required,Timeline Analysis,Months Analyzed\n`;
     
     filteredOpportunities.forEach(opp => {
-      csvContent += `"${opp.shopName}","${opp.shopId}","${opp.department}","${opp.salesman}","${opp.sku}","${opp.skuFamily}","${opp.lastOrderDate}",${opp.daysSinceLastOrder},${opp.lastOrderVolume},${opp.peakMonthVolume},"${opp.peakMonth}",${opp.historicalAverage.toFixed(1)},${opp.totalHistoricalVolume},${opp.recoveryPotential.toFixed(1)},${opp.recoveryScore},"${opp.priority}","${opp.category}",${opp.currentStockQuantity},"${opp.isCurrentlyOutOfStock ? 'Yes' : 'No'}","${opp.lastVisitDate ? opp.lastVisitDate.toLocaleDateString() : 'N/A'}",${opp.daysSinceLastVisit},"${opp.lastSupplyDate ? opp.lastSupplyDate.toLocaleDateString() : 'N/A'}",${opp.daysSinceLastSupply},"${opp.supplyDataSource}","${opp.recentSupplyAttempts ? 'Yes' : 'No'}","${opp.reasonNoStock || 'N/A'}","${opp.actionRequired}","${opp.timelineAnalysis}",${opp.totalMonthsAnalyzed}\n`;
+      csvContent += `"${opp.shopName}","${opp.shopId}","${opp.department}","${opp.salesman}","${opp.sku}","${opp.skuFamily}","${opp.lastOrderDate}",${opp.daysSinceLastOrder},${opp.lastOrderVolume},${opp.peakMonthVolume},"${opp.peakMonth}",${opp.historicalAverage.toFixed(1)},${opp.totalHistoricalVolume},${opp.recoveryPotential.toFixed(1)},${opp.recoveryScore},"${opp.priority}","${opp.category}",${opp.currentStockQuantity},"${opp.isCurrentlyOutOfStock ? 'Yes' : 'No'}","${opp.lastVisitDate ? formatDate(opp.lastVisitDate) : 'N/A'}",${opp.daysSinceLastVisit},"${opp.lastSupplyDate ? formatDate(opp.lastSupplyDate) : 'N/A'}",${opp.daysSinceLastSupply},"${opp.supplyDataSource}","${opp.recentSupplyAttempts ? 'Yes' : 'No'}","${opp.reasonNoStock || 'N/A'}","${opp.actionRequired}","${opp.timelineAnalysis}",${opp.totalMonthsAnalyzed}\n`;
     });
 
     const encodedUri = encodeURI(csvContent);
@@ -980,9 +999,9 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
       searchText: '',
       lookbackPeriod: 180,
       showOnlyOutOfStock: false,
-      minimumRecoveryPotential: 10,
+      minimumRecoveryPotential: 1, // FIXED: Reduced default
       showOnlyWithSupplyData: false,
-      minimumHistoricalAverage: 5
+      minimumHistoricalAverage: 1 // FIXED: Reduced default
     });
     setSelectedBrand('');
     setCurrentPage(1);
@@ -1248,6 +1267,7 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
               className="border border-gray-300 rounded px-3 py-1 w-20 text-sm"
               min="0"
               max="1000"
+              placeholder="1"
             />
             <span className="text-sm text-gray-600">cases</span>
           </div>
@@ -1261,6 +1281,7 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
               className="border border-gray-300 rounded px-3 py-1 w-20 text-sm"
               min="0"
               max="500"
+              placeholder="1"
             />
             <span className="text-sm text-gray-600">cases/month</span>
           </div>
@@ -1360,13 +1381,13 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
                       
                       {opportunity.lastVisitDate && (
                         <div className="text-xs text-gray-500">
-                          Last Visit: {opportunity.lastVisitDate.toLocaleDateString()} ({opportunity.daysSinceLastVisit}d ago)
+                          Last Visit: {formatDate(opportunity.lastVisitDate)} ({opportunity.daysSinceLastVisit}d ago)
                         </div>
                       )}
                       
                       {opportunity.lastSupplyDate && (
                         <div className="text-xs text-blue-600">
-                          Last Supply: {opportunity.lastSupplyDate.toLocaleDateString()} ({opportunity.daysSinceLastSupply}d ago)
+                          Last Supply: {formatDate(opportunity.lastSupplyDate)} ({opportunity.daysSinceLastSupply}d ago)
                         </div>
                       )}
                       
