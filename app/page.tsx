@@ -196,6 +196,7 @@ const brandFamily: Record<string, string> = {
   "8 PM": "8PM",
   "8 PM PREMIUM BLACK BLENDED WHISKY": "8PM",
   "8 PM PREMIUM BLACK BLENDED WHISKY Pet": "8PM",
+  "8 PM PREMIUM BLACK BLENDED WHISKY PET": "8PM",
   "8PM PREMIUM BLACK BLENDED WHISKY": "8PM",
   "8PM PREMIUM BLACK SUPERIOR WHISKY": "8PM",
   "M2M VERVE CRANBERRY TEASE SP FL VODKA": "VERVE",
@@ -251,7 +252,7 @@ const RadicoDashboard = () => {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [showInventory, setShowInventory] = useState(false);
-  const [inventoryData, setInventoryData] = useState<any>(null); // ✅ FIXED: Will now be populated
+  const [inventoryData, setInventoryData] = useState<any>(null); // NEW: Add inventory data state
 
   // DYNAMIC DATE DETECTION (UNCHANGED)
   const getCurrentMonthYear = () => {
@@ -272,198 +273,7 @@ const RadicoDashboard = () => {
   };
 
   // ==========================================
-  // 🆕 NEW: INVENTORY DATA FETCHING FUNCTIONS (SAFE ADDITIONS)
-  // ==========================================
-
-  const fetchInventoryData = async () => {
-    try {
-      if (!SHEETS_CONFIG.apiKey) {
-        console.warn('Google API key not configured for inventory data');
-        return null;
-      }
-
-      console.log('🔄 Fetching inventory data for SKU Recovery Intelligence...');
-
-      // Fetch the same data sources as InventoryDashboard
-      const [visitData, masterData] = await Promise.all([
-        fetchVisitSheetDataForInventory(),
-        fetchMasterSheetData()
-      ]);
-
-      // Process the inventory data (simplified version of InventoryDashboard logic)
-      const processedInventoryData = processInventoryDataForSKURecovery(visitData, masterData);
-      
-      console.log('✅ Inventory data processed for SKU Recovery:', {
-        shopsWithInventory: Object.keys(processedInventoryData.shops).length,
-        totalItems: Object.values(processedInventoryData.shops).reduce((sum, shop) => 
-          sum + Object.keys(shop.items).length, 0
-        )
-      });
-
-      return processedInventoryData;
-    } catch (error) {
-      console.error('❌ Error fetching inventory data:', error);
-      return null;
-    }
-  };
-
-  const fetchVisitSheetDataForInventory = async () => {
-    try {
-      const response = await fetch(
-        `https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_CONFIG.visitSheetId}/values/Radico%20Visit%20Final?key=${SHEETS_CONFIG.apiKey}`
-      );
-      
-      if (!response.ok) {
-        console.warn('Visit sheet not accessible for inventory data');
-        return [];
-      }
-      
-      const result = await response.json();
-      console.log('✅ Visit data fetched for inventory:', result.values?.length || 0, 'rows');
-      return result.values || [];
-    } catch (error) {
-      console.warn('❌ Error fetching visit data for inventory:', error);
-      return [];
-    }
-  };
-
-  const processInventoryDataForSKURecovery = (visitData: any[][], masterData: Record<string, any[]>) => {
-    // Simplified version of inventory processing for SKU Recovery Intelligence
-    const shops: Record<string, any> = {};
-    
-    if (visitData.length === 0) {
-      return { shops };
-    }
-
-    const headers = visitData[0];
-    const rows = visitData.slice(1);
-
-    console.log('📋 Processing inventory data for SKU Recovery - Headers found:', headers);
-
-    const getColumnIndex = (searchTerms: string[]) => {
-      for (const term of searchTerms) {
-        const index = headers.findIndex(header => 
-          header && header.toString().toLowerCase().includes(term.toLowerCase())
-        );
-        if (index !== -1) {
-          return index;
-        }
-      }
-      return -1;
-    };
-
-    const columnIndices = {
-      shopId: getColumnIndex(['shop id', 'shop_id']),
-      shopName: getColumnIndex(['shop name', 'shop_name']),
-      department: getColumnIndex(['department']),
-      salesman: getColumnIndex(['salesman']),
-      checkInDateTime: getColumnIndex(['check in date', 'check_in', 'datetime']),
-      invBrand: getColumnIndex(['inv brand', 'inv_brand', 'brand', 'tva brand']),
-      invQuantity: getColumnIndex(['inv quantity', 'inv_quantity', 'quantity', 'tva target', 'bottles']),
-      reasonNoStock: getColumnIndex(['reason', 'no stock', 'reason for no stock']),
-      lsDate: getColumnIndex(['ls date', 'ls_date'])
-    };
-
-    // Process recent visits (last 30 days)
-    const today = new Date();
-    const thirtyDaysAgo = new Date(today.getTime() - (30 * 24 * 60 * 60 * 1000));
-
-    // Find latest visits for each shop
-    const shopLatestVisits: Record<string, any> = {};
-    
-    rows.forEach(row => {
-      const shopId = row[columnIndices.shopId];
-      const shopName = row[columnIndices.shopName];
-      const checkInDateTime = row[columnIndices.checkInDateTime];
-      
-      if (!shopId || !checkInDateTime) return;
-      
-      try {
-        const visitDate = new Date(checkInDateTime);
-        if (!visitDate || visitDate < thirtyDaysAgo) return;
-        
-        if (!shopLatestVisits[shopId] || visitDate > shopLatestVisits[shopId].visitDate) {
-          shopLatestVisits[shopId] = {
-            shopId,
-            shopName: shopName || 'Unknown Shop',
-            department: row[columnIndices.department] || 'Unknown',
-            salesman: row[columnIndices.salesman] || 'Unknown',
-            visitDate
-          };
-        }
-      } catch (error) {
-        // Skip invalid dates
-      }
-    });
-
-    // Process inventory for each shop
-    Object.values(shopLatestVisits).forEach((shopVisit: any) => {
-      const shopInventory = {
-        shopId: shopVisit.shopId,
-        shopName: shopVisit.shopName,
-        department: shopVisit.department,
-        salesman: shopVisit.salesman,
-        visitDate: shopVisit.visitDate,
-        items: {} as Record<string, any>,
-        lastVisitDays: Math.floor((today.getTime() - shopVisit.visitDate.getTime()) / (1000 * 60 * 60 * 24))
-      };
-
-      // Find all rows for this shop's latest visit
-      const shopRows = rows.filter(row => {
-        const rowShopId = row[columnIndices.shopId];
-        const rowDateTime = row[columnIndices.checkInDateTime];
-        
-        if (!rowShopId || !rowDateTime) return false;
-        
-        try {
-          const rowVisitDate = new Date(rowDateTime);
-          return rowShopId === shopVisit.shopId && 
-                 rowVisitDate.getTime() === shopVisit.visitDate.getTime();
-        } catch {
-          return false;
-        }
-      });
-
-      shopRows.forEach((row: any[]) => {
-        const brand = row[columnIndices.invBrand]?.toString().trim();
-        const quantity = parseFloat(row[columnIndices.invQuantity]) || 0;
-        const reasonNoStock = row[columnIndices.reasonNoStock]?.toString().trim() || '';
-
-        if (!brand) return;
-
-        const isOutOfStock = quantity === 0;
-        const isInStock = quantity > 0;
-
-        shopInventory.items[brand] = {
-          brand,
-          quantity,
-          isInStock,
-          isOutOfStock,
-          reasonNoStock,
-          // Add placeholder values for other properties expected by SKU Recovery Intelligence
-          suppliedAfterOutOfStock: false,
-          ageInDays: 0,
-          lastSupplyDate: undefined,
-          agingDataSource: 'no_data',
-          supplyStatus: isOutOfStock ? 'awaiting_supply' : 'current'
-        };
-      });
-
-      shops[shopVisit.shopId] = shopInventory;
-    });
-
-    console.log('✅ Inventory data processed for SKU Recovery:', {
-      shopsProcessed: Object.keys(shops).length,
-      totalItems: Object.values(shops).reduce((sum: number, shop: any) => 
-        sum + Object.keys(shop.items).length, 0
-      )
-    });
-
-    return { shops };
-  };
-
-  // ==========================================
-  // PART 4: EXISTING DATA FETCHING FUNCTIONS (UNCHANGED)
+  // PART 4: DATA FETCHING FUNCTIONS (UNCHANGED)
   // ==========================================
 
   const fetchDashboardData = async () => {
@@ -475,25 +285,14 @@ const RadicoDashboard = () => {
         throw new Error('Google API key not configured. Please set NEXT_PUBLIC_GOOGLE_API_KEY environment variable.');
       }
 
-      // ✅ ENHANCED: Fetch both sales and inventory data in parallel (SAFE - doesn't affect existing flow)
-      const [masterData, visitData, historicalData, inventoryDataResult] = await Promise.all([
+      const [masterData, visitData, historicalData] = await Promise.all([
         fetchMasterSheetData(),
         fetchVisitSheetData(),
-        fetchHistoricalSheetData(),
-        fetchInventoryData() // ✅ NEW: Fetch inventory data (doesn't block existing functionality)
+        fetchHistoricalSheetData()
       ]);
       
       const processedData = processEnhancedRadicoData(masterData, visitData, historicalData);
       setDashboardData(processedData);
-      
-      // ✅ NEW: Set inventory data state (SAFE - only adds functionality)
-      if (inventoryDataResult) {
-        setInventoryData(inventoryDataResult);
-        console.log('✅ Inventory data connected to SKU Recovery Intelligence');
-      } else {
-        console.log('⚠️ No inventory data available - SKU Recovery will show "no data" for current stock status');
-      }
-      
       setLastUpdated(new Date());
     } catch (error: any) {
       console.error('Error fetching data:', error);
@@ -1461,12 +1260,6 @@ const RadicoDashboard = () => {
                   YoY: {parseFloat(dashboardData.summary.yoy8PMGrowth) >= 0 ? '+' : ''}{dashboardData.summary.yoy8PMGrowth}%
                 </span>
               )}
-              {/* ✅ NEW: Show inventory connection status in header */}
-              {inventoryData && (
-                <span className="ml-2 px-3 py-1 text-xs font-medium rounded-full bg-blue-100 text-blue-800">
-                  Inventory Connected
-                </span>
-              )}
             </div>
             <div className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-4">
               <span className="text-sm text-gray-500">
@@ -1546,7 +1339,6 @@ const RadicoDashboard = () => {
                 {activeTab === 'focus-shops' && <FocusShopsTab data={dashboardData} />}
                 {activeTab === 'department' && <DepartmentTab data={dashboardData} />}
                 {activeTab === 'salesman' && <SalesmanPerformanceTab data={dashboardData} />}
-                {/* ✅ FIXED: Now passes populated inventoryData instead of null */}
                 {activeTab === 'analytics' && <AdvancedAnalyticsTab data={dashboardData} inventoryData={inventoryData} />}
                 {activeTab === 'historical' && <HistoricalAnalysisTab data={dashboardData} />}
               </>
