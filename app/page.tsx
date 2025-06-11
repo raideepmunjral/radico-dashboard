@@ -123,6 +123,7 @@ interface DashboardData {
   historicalData?: any;
   currentMonth: string;
   currentYear: string;
+  masterData?: Record<string, any[]>; // ✅ NEW: Added for SimpleSkuSupplyTracker
 }
 
 // ==========================================
@@ -1331,6 +1332,7 @@ const RadicoDashboard = () => {
       allShopsComparison,
       currentMonth: currentMonth,
       currentYear: currentYear,
+      masterData, // ✅ ADDED: For SimpleSkuSupplyTracker (no disruption to existing dashboard)
       historicalData: {
         // Current rolling window (4 months) - UNCHANGED
         june: juneData,
