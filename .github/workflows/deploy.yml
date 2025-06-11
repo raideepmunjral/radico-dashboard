@@ -1,22 +1,32 @@
 name: Deploy Radico Dashboard to GitHub Pages
+
 on:
   push:
     branches: [ main ]
   workflow_dispatch:
+
 permissions:
   contents: read
   pages: write
   id-token: write
+
 concurrency:
   group: "pages"
   cancel-in-progress: false
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
       - name: Debug - List repository contents
         run: |
           echo "=== Repository root contents ==="
@@ -24,43 +34,39 @@ jobs:
           echo "=== Check for app directory ==="
           if [ -d "app" ]; then
             echo "✅ app directory found!"
-            ls -la app/
           else
             echo "❌ app directory NOT found!"
           fi
-          echo "=== Check for pages directory ==="
-          if [ -d "pages" ]; then
-            echo "✅ pages directory found!"
-            ls -la pages/
-          else
-            echo "❌ pages directory NOT found!"
-          fi
-        
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-          
+
+      - name: Clean npm cache and install dependencies (safe mode)
+        run: |
+          npm cache clean --force
+          npm ci --no-optional --ignore-scripts || npm install --no-optional --force
+
       - name: Setup Pages
         uses: actions/configure-pages@v4
-        
-      - name: Install dependencies
-        run: npm install
-        
-      - name: Build application
+        with:
+          static_site_generator: next
+
+      - name: Restore cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            .next/cache
+          key: ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-${{ hashFiles('**.[jt]s', '**.[jt]sx') }}
+          restore-keys: |
+            ${{ runner.os }}-nextjs-${{ hashFiles('**/package-lock.json') }}-
+
+      - name: Build with Next.js
         run: npm run build
         env:
-          NEXT_PUBLIC_GOOGLE_API_KEY: ${{ secrets.GOOGLE_API_KEY }}
-          NEXT_PUBLIC_MASTER_SHEET_ID: 1pRz9CgOoamTrfpnmF-XuBCg9IZON9br5avgRlKYtxM
-          NEXT_PUBLIC_VISIT_SHEET_ID: 1XG4c_Lrpk-YglTq3G3ZY9Qjt7wSnUq0UZWDSYT61eWt
-          
-      - name: Add .nojekyll file
-        run: touch ./out/.nojekyll
-        
+          NODE_ENV: production
+
       - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
+        uses: actions/upload-pages-artifact@v2
         with:
           path: ./out
+
   deploy:
     environment:
       name: github-pages
@@ -70,4 +76,4 @@ jobs:
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v3
