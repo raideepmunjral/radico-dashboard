@@ -6,7 +6,7 @@ import { Brain, BarChart3, Heart, Zap, Target } from 'lucide-react';
 // REGULAR IMPORTS - NO LAZY LOADING
 import CurrentAnalytics from './advanced-analytics/CurrentAnalytics';
 import CustomerHealth from './advanced-analytics/CustomerHealth';
-import SKURecoveryIntelligence from './advanced-analytics/SKURecoveryIntelligence';
+import SimpleSkuSupplyTracker from './advanced-analytics/SimpleSkuSupplyTracker'; // REPLACES COMPLEX SKURecoveryIntelligence
 import SKUIntelligence from './advanced-analytics/SKUIntelligence';
 
 // Sub-tab configuration
@@ -24,10 +24,10 @@ const subTabs = [
     description: 'Unbilled, lost customers & lifecycle analysis'
   },
   { 
-    id: 'sku-recovery', 
-    label: 'SKU Recovery Intelligence', 
+    id: 'sku-supply', 
+    label: 'SKU Supply Gaps', 
     icon: Target,
-    description: 'Advanced SKU-level customer recovery with real historical data'
+    description: 'Simple tracker: which shops haven\'t received specific SKUs in months/years'
   },
   { 
     id: 'sku-intelligence', 
@@ -42,7 +42,8 @@ interface DashboardData {
   customerInsights: any;
   currentMonth: string;
   currentYear: string;
-  historicalData?: any; // ENHANCED: Include historical data for extended lookback periods
+  historicalData?: any;
+  masterData?: any; // ADD masterData for supply tracking
 }
 
 interface InventoryData {
@@ -70,7 +71,7 @@ const AdvancedAnalyticsTab = ({ data, inventoryData }: {
   data: DashboardData; 
   inventoryData?: InventoryData;
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState('current');
+  const [activeSubTab, setActiveSubTab] = useState('sku-supply'); // DEFAULT TO SIMPLE TRACKER
 
   // Render active sub-tab content - NO SUSPENSE NEEDED
   const renderSubTabContent = () => {
@@ -79,12 +80,12 @@ const AdvancedAnalyticsTab = ({ data, inventoryData }: {
         return <CurrentAnalytics data={data} />;
       case 'customer-health':
         return <CustomerHealth data={data} />;
-      case 'sku-recovery':
-        return <SKURecoveryIntelligence data={data} inventoryData={inventoryData} />;
+      case 'sku-supply':
+        return <SimpleSkuSupplyTracker data={data} inventoryData={inventoryData} />; // SIMPLE VERSION
       case 'sku-intelligence':
         return <SKUIntelligence data={data} />;
       default:
-        return <CurrentAnalytics data={data} />;
+        return <SimpleSkuSupplyTracker data={data} inventoryData={inventoryData} />;
     }
   };
 
@@ -110,18 +111,18 @@ const AdvancedAnalyticsTab = ({ data, inventoryData }: {
               <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" title="Live Data"></div>
               
               {/* ENHANCED: Show inventory connection status */}
-              {inventoryData && activeSubTab === 'sku-recovery' && (
+              {inventoryData && activeSubTab === 'sku-supply' && (
                 <div className="flex items-center space-x-1 text-xs text-green-600">
                   <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span>Inventory Connected</span>
+                  <span>Supply Data Connected</span>
                 </div>
               )}
               
-              {/* NEW: Show extended historical data availability */}
-              {data?.historicalData && activeSubTab === 'sku-recovery' && (
+              {/* NEW: Show simple tracker status */}
+              {activeSubTab === 'sku-supply' && (
                 <div className="flex items-center space-x-1 text-xs text-blue-600">
                   <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-                  <span>Extended Historical Data</span>
+                  <span>Simple & Fast</span>
                 </div>
               )}
             </div>
@@ -147,10 +148,10 @@ const AdvancedAnalyticsTab = ({ data, inventoryData }: {
                   {data.customerInsights.lostCustomers}
                 </span>
               )}
-              {/* ENHANCED: Updated badge for SKU Recovery */}
-              {tab.id === 'sku-recovery' && (
-                <span className="bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded-full">
-                  ENHANCED
+              {/* SIMPLE TRACKER BADGE */}
+              {tab.id === 'sku-supply' && (
+                <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
+                  SIMPLE
                 </span>
               )}
             </button>
