@@ -534,7 +534,7 @@ const getFixedHistoricalAnalysis = (shop: ShopData, skuInfo: any, skuData: any, 
     });
   });
   
-  // Extended historical data if available
+  // FIXED: Ensure extended historical data is being used
   if (historicalData) {
     const extendedMonths = [
       { name: 'February 2025', key: 'february', data: historicalData.february, year: 2025, month: 2 },
@@ -548,20 +548,33 @@ const getFixedHistoricalAnalysis = (shop: ShopData, skuInfo: any, skuData: any, 
       { name: 'June 2024', key: 'juneLastYear', data: historicalData.juneLastYear, year: 2024, month: 6 }
     ];
     
-    extendedMonths.forEach(monthInfo => {
-      const skuVolume = getHistoricalSKUVolume(monthInfo, skuInfo);
-      const shopData = monthInfo.data?.shopSales?.[shop.shopId];
-      
-      allMonthsData.push({
-        name: monthInfo.name,
-        key: monthInfo.key,
-        eightPM: shopData?.eightPM || 0,
-        verve: shopData?.verve || 0,
-        year: monthInfo.year,
-        month: monthInfo.month,
-        skuSpecificVolume: skuVolume
-      });
+    console.log(`📊 Extended historical data available for ${skuInfo.displayName}:`, {
+      availableMonths: extendedMonths.filter(m => m.data).map(m => m.name),
+      totalExtendedMonths: extendedMonths.length
     });
+    
+    extendedMonths.forEach(monthInfo => {
+      if (monthInfo.data) { // Only process if data exists
+        const skuVolume = getHistoricalSKUVolume(monthInfo, skuInfo);
+        const shopData = monthInfo.data.shopSales?.[shop.shopId];
+        
+        console.log(`📅 Processing ${monthInfo.name} for ${skuInfo.displayName}: ${skuVolume} cases`);
+        
+        allMonthsData.push({
+          name: monthInfo.name,
+          key: monthInfo.key,
+          eightPM: shopData?.eightPM || 0,
+          verve: shopData?.verve || 0,
+          year: monthInfo.year,
+          month: monthInfo.month,
+          skuSpecificVolume: skuVolume
+        });
+      } else {
+        console.log(`⚠️ No data available for ${monthInfo.name}`);
+      }
+    });
+  } else {
+    console.log(`⚠️ No extended historical data available for analysis`);
   }
   
   // Filter months based on lookback period
