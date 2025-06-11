@@ -447,12 +447,20 @@ const getExtendedHistoricalAnalysis = (shop: ShopData, skuInfo: any, lookbackPer
   
   // Get volume for this SKU family
   const volumes = relevantMonths.map(month => {
-    if (skuInfo.family === '8PM' || skuInfo.family === '8PM BLACK') {
-      return { month: month.name, volume: month.eightPM, monthData: month };
-    } else if (skuInfo.family.includes('VERVE')) {
-      return { month: month.name, volume: month.verve, monthData: month };
-    }
-    return { month: month.name, volume: 0, monthData: month };
+    const volume = (() => {
+      if (skuInfo.family === '8PM' || skuInfo.family === '8PM BLACK') {
+        return month.eightPM;
+      } else if (skuInfo.family.includes('VERVE')) {
+        return month.verve;
+      }
+      return 0;
+    })();
+    
+    return { 
+      month: month.name, 
+      volume: volume, 
+      monthData: month
+    };
   });
   
   const nonZeroVolumes = volumes.filter(v => v.volume > 0);
@@ -461,14 +469,16 @@ const getExtendedHistoricalAnalysis = (shop: ShopData, skuInfo: any, lookbackPer
   
   // Find peak month
   const peakMonth = volumes.reduce((peak, current) => 
-    current.volume > peak.volume ? current : peak, { month: '', volume: 0, monthData: null });
+    current.volume > peak.volume ? current : peak, 
+    { month: '', volume: 0, monthData: { name: '', key: '', eightPM: 0, verve: 0, year: 0, month: 0 } }
+  );
   
   // Find last active month
   const lastActiveMonth = volumes.find(v => v.volume > 0);
   
   // Calculate actual days since last order using dates
   let daysSinceLastOrder = 999;
-  if (lastActiveMonth && lastActiveMonth.monthData) {
+  if (lastActiveMonth && lastActiveMonth.monthData && lastActiveMonth.monthData.year > 0) {
     const today = new Date();
     const lastOrderDate = new Date(lastActiveMonth.monthData.year, lastActiveMonth.monthData.month - 1, 15); // Mid-month estimate
     daysSinceLastOrder = Math.floor((today.getTime() - lastOrderDate.getTime()) / (1000 * 60 * 60 * 24));
@@ -488,7 +498,7 @@ const getExtendedHistoricalAnalysis = (shop: ShopData, skuInfo: any, lookbackPer
     daysSinceLastOrder,
     lastOrderVolume: lastActiveMonth?.volume || 0,
     peakMonthVolume: peakMonth.volume,
-    peakMonth: peakMonth.month,
+    peakMonth: peakMonth.month || 'Unknown',
     historicalAverage: avgVolume,
     totalHistoricalVolume: totalVolume,
     monthsActive: nonZeroVolumes.length,
