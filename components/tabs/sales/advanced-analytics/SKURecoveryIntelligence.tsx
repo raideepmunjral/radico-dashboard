@@ -15,7 +15,7 @@ interface ShopData {
   total: number;
   eightPM: number;
   verve: number;
-  // Extended historical data
+  // Extended historical data (matching app/page.tsx interface)
   marchTotal?: number;
   marchEightPM?: number;
   marchVerve?: number;
@@ -28,13 +28,6 @@ interface ShopData {
   juneTotal?: number;
   juneEightPM?: number;
   juneVerve?: number;
-  // Additional months from extended historical data
-  februaryTotal?: number;
-  februaryEightPM?: number;
-  februaryVerve?: number;
-  januaryTotal?: number;
-  januaryEightPM?: number;
-  januaryVerve?: number;
   skuBreakdown?: SKUData[];
   detailedSKUBreakdown?: DetailedSKUData[];
   threeMonthAvgTotal?: number;
@@ -148,6 +141,7 @@ interface EnhancedSKURecoveryOpportunity {
   orderingPattern: 'CONSISTENT' | 'SEASONAL' | 'DECLINING' | 'STOPPED';
   dropOffMonth?: string;
   timelineAnalysis: string;
+  totalMonthsAnalyzed: number;
 }
 
 interface Filters {
@@ -296,7 +290,7 @@ const analyzeEnhancedRecoveryOpportunities = (
       const skuInfo = getEnhancedSKUInfo(skuData.brand);
       
       // Get extended historical analysis
-      const historicalAnalysis = getExtendedHistoricalAnalysis(shop, skuInfo, lookbackPeriod);
+      const historicalAnalysis = getExtendedHistoricalAnalysis(shop, skuInfo, lookbackPeriod, historicalData);
       
       // Skip if no meaningful historical data
       if (historicalAnalysis.totalHistoricalVolume < 5) return;
@@ -370,7 +364,8 @@ const analyzeEnhancedRecoveryOpportunities = (
           // Timeline Analysis
           orderingPattern: historicalAnalysis.orderingPattern,
           dropOffMonth: historicalAnalysis.dropOffMonth,
-          timelineAnalysis
+          timelineAnalysis,
+          totalMonthsAnalyzed: historicalAnalysis.totalMonthsAnalyzed || 4
         };
         
         opportunities.push(opportunity);
@@ -395,27 +390,69 @@ const analyzeEnhancedRecoveryOpportunities = (
 // ENHANCED HELPER FUNCTIONS
 // ==========================================
 
-const getExtendedHistoricalAnalysis = (shop: ShopData, skuInfo: any, lookbackPeriod: number) => {
-  const months = [
-    { name: 'June', key: 'june', eightPM: shop.juneEightPM || 0, verve: shop.juneVerve || 0 },
-    { name: 'May', key: 'may', eightPM: shop.mayEightPM || 0, verve: shop.mayVerve || 0 },
-    { name: 'April', key: 'april', eightPM: shop.aprilEightPM || 0, verve: shop.aprilVerve || 0 },
-    { name: 'March', key: 'march', eightPM: shop.marchEightPM || 0, verve: shop.marchVerve || 0 },
-    { name: 'February', key: 'february', eightPM: shop.februaryEightPM || 0, verve: shop.februaryVerve || 0 },
-    { name: 'January', key: 'january', eightPM: shop.januaryEightPM || 0, verve: shop.januaryVerve || 0 }
-  ];
+const getExtendedHistoricalAnalysis = (shop: ShopData, skuInfo: any, lookbackPeriod: number, historicalData?: any) => {
+  // Use both direct shop properties AND extended historical data
+  const allMonthsData = [];
   
-  // Filter months based on lookback period
-  const relevantMonths = months.slice(0, Math.ceil(lookbackPeriod / 30));
+  // Current year months (from shop properties)
+  allMonthsData.push(
+    { name: 'June 2025', key: 'june', eightPM: shop.juneEightPM || 0, verve: shop.juneVerve || 0, year: 2025, month: 6 },
+    { name: 'May 2025', key: 'may', eightPM: shop.mayEightPM || 0, verve: shop.mayVerve || 0, year: 2025, month: 5 },
+    { name: 'April 2025', key: 'april', eightPM: shop.aprilEightPM || 0, verve: shop.aprilVerve || 0, year: 2025, month: 4 },
+    { name: 'March 2025', key: 'march', eightPM: shop.marchEightPM || 0, verve: shop.marchVerve || 0, year: 2025, month: 3 }
+  );
+  
+  // Extended historical data if available
+  if (historicalData) {
+    // Add additional months from historical data
+    const extendedMonths = [
+      { name: 'February 2025', key: 'february', data: historicalData.february, year: 2025, month: 2 },
+      { name: 'January 2025', key: 'january', data: historicalData.january, year: 2025, month: 1 },
+      { name: 'December 2024', key: 'december2024', data: historicalData.december2024, year: 2024, month: 12 },
+      { name: 'November 2024', key: 'november2024', data: historicalData.november2024, year: 2024, month: 11 },
+      { name: 'October 2024', key: 'october2024', data: historicalData.october2024, year: 2024, month: 10 },
+      { name: 'September 2024', key: 'september2024', data: historicalData.september2024, year: 2024, month: 9 },
+      { name: 'August 2024', key: 'august2024', data: historicalData.august2024, year: 2024, month: 8 },
+      { name: 'July 2024', key: 'july2024', data: historicalData.july2024, year: 2024, month: 7 },
+      { name: 'June 2024', key: 'juneLastYear', data: historicalData.juneLastYear, year: 2024, month: 6 }
+    ];
+    
+    extendedMonths.forEach(monthInfo => {
+      if (monthInfo.data && monthInfo.data.shopSales && monthInfo.data.shopSales[shop.shopId]) {
+        const shopData = monthInfo.data.shopSales[shop.shopId];
+        allMonthsData.push({
+          name: monthInfo.name,
+          key: monthInfo.key,
+          eightPM: shopData.eightPM || 0,
+          verve: shopData.verve || 0,
+          year: monthInfo.year,
+          month: monthInfo.month
+        });
+      } else {
+        allMonthsData.push({
+          name: monthInfo.name,
+          key: monthInfo.key,
+          eightPM: 0,
+          verve: 0,
+          year: monthInfo.year,
+          month: monthInfo.month
+        });
+      }
+    });
+  }
+  
+  // Filter months based on lookback period (convert days to months approximately)
+  const monthsToLookback = Math.ceil(lookbackPeriod / 30);
+  const relevantMonths = allMonthsData.slice(0, Math.min(monthsToLookback, allMonthsData.length));
   
   // Get volume for this SKU family
   const volumes = relevantMonths.map(month => {
     if (skuInfo.family === '8PM' || skuInfo.family === '8PM BLACK') {
-      return { month: month.name, volume: month.eightPM };
+      return { month: month.name, volume: month.eightPM, monthData: month };
     } else if (skuInfo.family.includes('VERVE')) {
-      return { month: month.name, volume: month.verve };
+      return { month: month.name, volume: month.verve, monthData: month };
     }
-    return { month: month.name, volume: 0 };
+    return { month: month.name, volume: 0, monthData: month };
   });
   
   const nonZeroVolumes = volumes.filter(v => v.volume > 0);
@@ -424,21 +461,27 @@ const getExtendedHistoricalAnalysis = (shop: ShopData, skuInfo: any, lookbackPer
   
   // Find peak month
   const peakMonth = volumes.reduce((peak, current) => 
-    current.volume > peak.volume ? current : peak, { month: '', volume: 0 });
+    current.volume > peak.volume ? current : peak, { month: '', volume: 0, monthData: null });
   
   // Find last active month
   const lastActiveMonth = volumes.find(v => v.volume > 0);
   
-  // Calculate days since last order
-  const currentMonth = volumes[0];
-  const daysSinceLastOrder = lastActiveMonth ? 
-    (volumes.indexOf(currentMonth) - volumes.indexOf(lastActiveMonth)) * 30 : 999;
+  // Calculate actual days since last order using dates
+  let daysSinceLastOrder = 999;
+  if (lastActiveMonth && lastActiveMonth.monthData) {
+    const today = new Date();
+    const lastOrderDate = new Date(lastActiveMonth.monthData.year, lastActiveMonth.monthData.month - 1, 15); // Mid-month estimate
+    daysSinceLastOrder = Math.floor((today.getTime() - lastOrderDate.getTime()) / (1000 * 60 * 60 * 24));
+  }
   
-  // Determine ordering pattern
+  // Determine ordering pattern based on extended data
   let orderingPattern: 'CONSISTENT' | 'SEASONAL' | 'DECLINING' | 'STOPPED' = 'STOPPED';
-  if (nonZeroVolumes.length >= 3) orderingPattern = 'CONSISTENT';
-  else if (nonZeroVolumes.length >= 2) orderingPattern = 'DECLINING';
-  else if (nonZeroVolumes.length === 1) orderingPattern = 'STOPPED';
+  if (nonZeroVolumes.length >= 6) orderingPattern = 'CONSISTENT';
+  else if (nonZeroVolumes.length >= 3) orderingPattern = 'DECLINING';
+  else if (nonZeroVolumes.length >= 1) orderingPattern = 'STOPPED';
+  
+  // Find drop-off month
+  const dropOffMonth = volumes.find((v, i) => i > 0 && v.volume === 0 && volumes[i-1].volume > 0);
   
   return {
     lastOrderDate: lastActiveMonth?.month || 'Unknown',
@@ -449,9 +492,10 @@ const getExtendedHistoricalAnalysis = (shop: ShopData, skuInfo: any, lookbackPer
     historicalAverage: avgVolume,
     totalHistoricalVolume: totalVolume,
     monthsActive: nonZeroVolumes.length,
-    currentVolume: currentMonth.volume,
+    currentVolume: volumes[0]?.volume || 0,
     orderingPattern,
-    dropOffMonth: volumes.find((v, i) => i > 0 && v.volume === 0 && volumes[i-1].volume > 0)?.month
+    dropOffMonth: dropOffMonth?.month,
+    totalMonthsAnalyzed: relevantMonths.length
   };
 };
 
@@ -474,13 +518,26 @@ const getCurrentInventoryStatus = (shopId: string, skuInfo: any, inventoryData?:
   const today = new Date();
   
   // Find matching SKU in inventory
-  let matchingItem = null;
+  type InventoryItem = {
+    brand: string;
+    quantity: number;
+    isInStock: boolean;
+    isOutOfStock: boolean;
+    reasonNoStock?: string;
+    suppliedAfterOutOfStock?: boolean;
+    ageInDays?: number;
+    lastSupplyDate?: Date;
+    agingDataSource?: string;
+    supplyStatus?: string;
+  };
+  
+  let matchingItem: InventoryItem | null = null;
   Object.values(shop.items).forEach(item => {
     const itemSKUInfo = getEnhancedSKUInfo(item.brand);
     if (itemSKUInfo.family === skuInfo.family || 
         itemSKUInfo.displayName === skuInfo.displayName ||
         itemSKUInfo.variant === skuInfo.variant) {
-      matchingItem = item;
+      matchingItem = item as InventoryItem;
     }
   });
   
@@ -733,10 +790,10 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
     }
     
     csvContent += "\n";
-    csvContent += `Shop Name,Shop ID,Department,Salesman,SKU,SKU Family,Last Order Date,Days Since Last Order,Last Order Volume,Peak Volume,Peak Month,Historical Average,Total Historical,Recovery Potential,Recovery Score,Priority,Category,Current Stock,Out of Stock,Last Visit,Days Since Visit,Last Supply,Days Since Supply,Supply Source,Recent Supply Attempts,Reason No Stock,Action Required,Timeline Analysis\n`;
+    csvContent += `Shop Name,Shop ID,Department,Salesman,SKU,SKU Family,Last Order Date,Days Since Last Order,Last Order Volume,Peak Volume,Peak Month,Historical Average,Total Historical,Recovery Potential,Recovery Score,Priority,Category,Current Stock,Out of Stock,Last Visit,Days Since Visit,Last Supply,Days Since Supply,Supply Source,Recent Supply Attempts,Reason No Stock,Action Required,Timeline Analysis,Months Analyzed\n`;
     
     filteredOpportunities.forEach(opp => {
-      csvContent += `"${opp.shopName}","${opp.shopId}","${opp.department}","${opp.salesman}","${opp.sku}","${opp.skuFamily}","${opp.lastOrderDate}",${opp.daysSinceLastOrder},${opp.lastOrderVolume},${opp.peakMonthVolume},"${opp.peakMonth}",${opp.historicalAverage.toFixed(1)},${opp.totalHistoricalVolume},${opp.recoveryPotential.toFixed(1)},${opp.recoveryScore},"${opp.priority}","${opp.category}",${opp.currentStockQuantity},"${opp.isCurrentlyOutOfStock ? 'Yes' : 'No'}","${opp.lastVisitDate ? opp.lastVisitDate.toLocaleDateString() : 'N/A'}",${opp.daysSinceLastVisit},"${opp.lastSupplyDate ? opp.lastSupplyDate.toLocaleDateString() : 'N/A'}",${opp.daysSinceLastSupply},"${opp.supplyDataSource}","${opp.recentSupplyAttempts ? 'Yes' : 'No'}","${opp.reasonNoStock || 'N/A'}","${opp.actionRequired}","${opp.timelineAnalysis}"\n`;
+      csvContent += `"${opp.shopName}","${opp.shopId}","${opp.department}","${opp.salesman}","${opp.sku}","${opp.skuFamily}","${opp.lastOrderDate}",${opp.daysSinceLastOrder},${opp.lastOrderVolume},${opp.peakMonthVolume},"${opp.peakMonth}",${opp.historicalAverage.toFixed(1)},${opp.totalHistoricalVolume},${opp.recoveryPotential.toFixed(1)},${opp.recoveryScore},"${opp.priority}","${opp.category}",${opp.currentStockQuantity},"${opp.isCurrentlyOutOfStock ? 'Yes' : 'No'}","${opp.lastVisitDate ? opp.lastVisitDate.toLocaleDateString() : 'N/A'}",${opp.daysSinceLastVisit},"${opp.lastSupplyDate ? opp.lastSupplyDate.toLocaleDateString() : 'N/A'}",${opp.daysSinceLastSupply},"${opp.supplyDataSource}","${opp.recentSupplyAttempts ? 'Yes' : 'No'}","${opp.reasonNoStock || 'N/A'}","${opp.actionRequired}","${opp.timelineAnalysis}",${opp.totalMonthsAnalyzed}\n`;
     });
 
     const encodedUri = encodeURI(csvContent);
@@ -798,7 +855,7 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
               <Target className="w-6 h-6 mr-2 text-purple-600" />
               Enhanced SKU Recovery Intelligence
             </h2>
-            <p className="text-gray-600">Advanced SKU-level customer recovery with extended historical analysis & real inventory integration</p>
+            <p className="text-gray-600">Advanced SKU-level customer recovery with extended historical analysis (up to 18 months) & real inventory integration</p>
             {inventoryData && (
               <div className="flex items-center mt-2 text-sm text-green-600">
                 <CheckCircle className="w-4 h-4 mr-2" />
@@ -824,8 +881,8 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
                 <option value={180}>180 Days (6 Months)</option>
                 <option value={270}>270 Days (9 Months)</option>
                 <option value={365}>365 Days (12 Months)</option>
+                <option value={450}>450 Days (15 Months)</option>
                 <option value={545}>545 Days (18 Months)</option>
-                <option value={730}>730 Days (24 Months)</option>
               </select>
             </div>
           </div>
@@ -1186,6 +1243,9 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
                       </div>
                       <div className="text-xs text-gray-500">
                         {opportunity.daysSinceLastOrder} days since last order
+                        {opportunity.totalMonthsAnalyzed && 
+                          ` (analyzed ${opportunity.totalMonthsAnalyzed} months)`
+                        }
                       </div>
                     </div>
                   </td>
