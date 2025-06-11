@@ -511,7 +511,7 @@ const getFixedHistoricalAnalysis = (shop: ShopData, skuInfo: any, skuData: any, 
   };
   
   // Use both direct shop properties AND extended historical data
-  const allMonthsData = [];
+  const allMonthsData: any[] = [];
   
   // Current year months (from shop properties) - now with TRUE SKU-specific volumes
   const currentMonths = [
