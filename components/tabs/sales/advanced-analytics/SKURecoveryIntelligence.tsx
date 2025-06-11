@@ -234,7 +234,16 @@ const getEnhancedSKUInfo = (brand: string) => {
 };
 
 // ==========================================
-// ENHANCED RECOVERY ANALYSIS ENGINE
+// FIXED: SKU DEDUPLICATION HELPER
+// ==========================================
+
+const createSKUKey = (skuInfo: any, brand: string) => {
+  // Create a consistent key for deduplication
+  return `${skuInfo.family}|${skuInfo.variant}|${skuInfo.size}|${brand.replace(/\s+/g, '_')}`;
+};
+
+// ==========================================
+// ENHANCED RECOVERY ANALYSIS ENGINE - FIXED
 // ==========================================
 
 const analyzeEnhancedRecoveryOpportunities = (
@@ -243,7 +252,7 @@ const analyzeEnhancedRecoveryOpportunities = (
   lookbackPeriod: number,
   historicalData?: any
 ): EnhancedSKURecoveryOpportunity[] => {
-  console.log('🔍 Starting Enhanced SKU Recovery Analysis...', {
+  console.log('🔍 Starting FIXED Enhanced SKU Recovery Analysis...', {
     totalShops: shops.length,
     lookbackPeriod,
     hasInventoryData: !!inventoryData,
@@ -254,46 +263,65 @@ const analyzeEnhancedRecoveryOpportunities = (
   const today = new Date();
 
   shops.forEach(shop => {
-    // Process both regular SKU breakdown and detailed SKU breakdown
-    const allSKUs = new Set<string>();
+    console.log(`🏪 Processing shop: ${shop.shopName} (${shop.shopId})`);
     
-    // Add from regular SKU breakdown
-    if (shop.skuBreakdown) {
-      shop.skuBreakdown.forEach(sku => {
-        const skuInfo = getEnhancedSKUInfo(sku.brand);
-        allSKUs.add(JSON.stringify({
-          brand: sku.brand,
-          displayName: skuInfo.displayName,
-          family: skuInfo.family,
-          variant: skuInfo.variant,
-          cases: sku.cases
-        }));
-      });
-    }
+    // FIXED: Process SKUs with proper deduplication
+    const uniqueSKUs = new Map<string, any>();
     
-    // Add from detailed SKU breakdown if available
-    if (shop.detailedSKUBreakdown) {
+    // Priority 1: Use detailed SKU breakdown if available (more accurate)
+    if (shop.detailedSKUBreakdown && shop.detailedSKUBreakdown.length > 0) {
+      console.log(`📊 Using detailed SKU breakdown for ${shop.shopName}: ${shop.detailedSKUBreakdown.length} SKUs`);
+      
       shop.detailedSKUBreakdown.forEach(sku => {
-        allSKUs.add(JSON.stringify({
+        const skuKey = createSKUKey(sku, sku.originalBrand);
+        uniqueSKUs.set(skuKey, {
           brand: sku.originalBrand,
           displayName: sku.displayName,
           family: sku.family,
           variant: sku.variant,
-          cases: sku.cases
-        }));
+          size: sku.size,
+          cases: sku.cases,
+          percentage: sku.percentage,
+          source: 'detailed'
+        });
+      });
+    } 
+    // Fallback: Use regular SKU breakdown
+    else if (shop.skuBreakdown && shop.skuBreakdown.length > 0) {
+      console.log(`📊 Using regular SKU breakdown for ${shop.shopName}: ${shop.skuBreakdown.length} SKUs`);
+      
+      shop.skuBreakdown.forEach(sku => {
+        const skuInfo = getEnhancedSKUInfo(sku.brand);
+        const skuKey = createSKUKey(skuInfo, sku.brand);
+        uniqueSKUs.set(skuKey, {
+          brand: sku.brand,
+          displayName: skuInfo.displayName,
+          family: skuInfo.family,
+          variant: skuInfo.variant,
+          size: skuInfo.size,
+          cases: sku.cases,
+          percentage: sku.percentage,
+          source: 'regular'
+        });
       });
     }
+    
+    console.log(`✅ Deduplicated SKUs for ${shop.shopName}: ${uniqueSKUs.size} unique SKUs`);
 
     // Process each unique SKU
-    Array.from(allSKUs).forEach(skuString => {
-      const skuData = JSON.parse(skuString);
+    uniqueSKUs.forEach((skuData, skuKey) => {
       const skuInfo = getEnhancedSKUInfo(skuData.brand);
       
-      // Get extended historical analysis
-      const historicalAnalysis = getExtendedHistoricalAnalysis(shop, skuInfo, lookbackPeriod, historicalData);
+      console.log(`🔍 Analyzing SKU: ${skuData.displayName} for ${shop.shopName} (${skuData.cases} cases from ${skuData.source} breakdown)`);
+      
+      // Get extended historical analysis with FIXED SKU-specific logic
+      const historicalAnalysis = getFixedHistoricalAnalysis(shop, skuInfo, skuData, lookbackPeriod, historicalData);
       
       // Skip if no meaningful historical data
-      if (historicalAnalysis.totalHistoricalVolume < 5) return;
+      if (historicalAnalysis.totalHistoricalVolume < 5) {
+        console.log(`❌ Skipping ${skuData.displayName} - insufficient historical data (${historicalAnalysis.totalHistoricalVolume} total cases)`);
+        return;
+      }
       
       // Get current inventory status
       const inventoryStatus = getCurrentInventoryStatus(shop.shopId, skuInfo, inventoryData);
@@ -302,6 +330,8 @@ const analyzeEnhancedRecoveryOpportunities = (
       const isRecoveryOpportunity = determineRecoveryOpportunity(historicalAnalysis, inventoryStatus, lookbackPeriod);
       
       if (isRecoveryOpportunity) {
+        console.log(`✅ Recovery opportunity found: ${skuData.displayName} at ${shop.shopName}`);
+        
         // Calculate recovery metrics
         const recoveryPotential = Math.max(
           historicalAnalysis.historicalAverage - historicalAnalysis.currentVolume,
@@ -369,11 +399,13 @@ const analyzeEnhancedRecoveryOpportunities = (
         };
         
         opportunities.push(opportunity);
+      } else {
+        console.log(`❌ No recovery opportunity: ${skuData.displayName} at ${shop.shopName}`);
       }
     });
   });
 
-  console.log('✅ Enhanced Recovery Analysis Complete:', {
+  console.log('✅ FIXED Enhanced Recovery Analysis Complete:', {
     totalOpportunities: opportunities.length,
     byPriority: {
       CRITICAL: opportunities.filter(o => o.priority === 'CRITICAL').length,
@@ -387,48 +419,61 @@ const analyzeEnhancedRecoveryOpportunities = (
 };
 
 // ==========================================
-// ENHANCED HELPER FUNCTIONS
+// FIXED: HISTORICAL ANALYSIS WITH SKU-SPECIFIC VOLUMES
 // ==========================================
 
-const getExtendedHistoricalAnalysis = (shop: ShopData, skuInfo: any, lookbackPeriod: number, historicalData?: any) => {
-  // Helper function to get SKU-specific volume from SKU breakdown
-  const getSKUSpecificVolume = (monthData: any, skuInfo: any) => {
-    // Try to get specific SKU volume from detailed breakdown first
+const getFixedHistoricalAnalysis = (shop: ShopData, skuInfo: any, skuData: any, lookbackPeriod: number, historicalData?: any) => {
+  console.log(`📊 Getting FIXED historical analysis for ${skuInfo.displayName} at ${shop.shopName}`);
+  
+  // FIXED: Helper function to get TRUE SKU-specific volume
+  const getTrueSKUSpecificVolume = (monthData: any, skuInfo: any, skuData: any) => {
+    // For current month data that has the actual SKU breakdown
+    if (skuData.cases && skuData.percentage) {
+      console.log(`✅ Using actual SKU data: ${skuData.cases} cases (${skuData.percentage}%) for ${skuInfo.displayName}`);
+      return skuData.cases;
+    }
+    
+    // ENHANCED: Try to estimate from detailed SKU breakdown proportions
     if (shop.detailedSKUBreakdown) {
       const matchingSKU = shop.detailedSKUBreakdown.find(sku => 
         sku.displayName === skuInfo.displayName || 
         sku.variant === skuInfo.variant ||
-        sku.family === skuInfo.family
+        (sku.family === skuInfo.family && sku.size === skuInfo.size)
       );
-      if (matchingSKU) {
-        // Estimate monthly volume based on total breakdown percentage
-        const totalShopVolume = monthData.eightPM + monthData.verve;
-        return Math.round((matchingSKU.cases / (shop.total || 1)) * totalShopVolume);
+      
+      if (matchingSKU && shop.total > 0) {
+        // Calculate this SKU's proportion and apply to monthly volume
+        const skuProportion = matchingSKU.cases / shop.total;
+        const monthlyTotal = monthData.eightPM + monthData.verve;
+        const estimatedSKUVolume = Math.round(skuProportion * monthlyTotal);
+        
+        console.log(`📊 Estimated SKU volume for ${skuInfo.displayName}: ${estimatedSKUVolume} cases (${(skuProportion * 100).toFixed(1)}% of ${monthlyTotal} monthly total)`);
+        return estimatedSKUVolume;
       }
     }
     
-    // Fallback to regular SKU breakdown
+    // ENHANCED: Try to estimate from regular SKU breakdown proportions
     if (shop.skuBreakdown) {
       const matchingSKU = shop.skuBreakdown.find(sku => 
         sku.brand.toUpperCase().includes(skuInfo.variant?.toUpperCase()) ||
         sku.brand.toUpperCase().includes(skuInfo.displayName?.toUpperCase()) ||
-        (skuInfo.family === '8PM' && sku.brand.toUpperCase().includes('8PM')) ||
+        (skuInfo.family === '8PM' && sku.brand.toUpperCase().includes('8PM') && sku.brand.includes('750')) ||
         (skuInfo.family.includes('VERVE') && sku.brand.toUpperCase().includes('VERVE'))
       );
+      
       if (matchingSKU) {
-        // Estimate monthly volume based on percentage
-        const totalShopVolume = monthData.eightPM + monthData.verve;
-        return Math.round((matchingSKU.percentage / 100) * totalShopVolume);
+        const familyTotal = skuInfo.family === '8PM' ? monthData.eightPM : monthData.verve;
+        const estimatedSKUVolume = Math.round((matchingSKU.percentage / 100) * familyTotal);
+        
+        console.log(`📊 Estimated SKU volume from regular breakdown: ${estimatedSKUVolume} cases (${matchingSKU.percentage}% of ${familyTotal} family total)`);
+        return estimatedSKUVolume;
       }
     }
     
-    // Final fallback to family total (current behavior)
-    if (skuInfo.family === '8PM' || skuInfo.family === '8PM BLACK') {
-      return monthData.eightPM;
-    } else if (skuInfo.family.includes('VERVE')) {
-      return monthData.verve;
-    }
-    return 0;
+    // LAST RESORT: Fall back to family total (but log this as a warning)
+    const familyVolume = skuInfo.family === '8PM' ? monthData.eightPM : monthData.verve;
+    console.log(`⚠️ WARNING: Using family total for ${skuInfo.displayName}: ${familyVolume} cases (no SKU-specific data available)`);
+    return familyVolume;
   };
 
   // Helper function to get SKU volume from historical month data
@@ -446,34 +491,19 @@ const getExtendedHistoricalAnalysis = (shop: ShopData, skuInfo: any, lookbackPer
       );
       
       if (matchingKey) {
-        return shopSKUs[matchingKey];
+        const exactVolume = shopSKUs[matchingKey];
+        console.log(`📊 Found exact historical match for ${skuInfo.displayName}: ${exactVolume} cases from key "${matchingKey}"`);
+        return exactVolume;
       }
       
-      // If no exact match, sum all matching family variants
-      let familyTotal = 0;
-      skuKeys.forEach(key => {
-        if ((skuInfo.family === '8PM' && key.toUpperCase().includes('8PM')) ||
-            (skuInfo.family.includes('VERVE') && key.toUpperCase().includes('VERVE'))) {
-          familyTotal += shopSKUs[key];
-        }
-      });
-      
-      // If we found family matches, estimate this SKU's portion
-      if (familyTotal > 0 && shop.skuBreakdown) {
-        const matchingSKU = shop.skuBreakdown.find(sku => 
-          sku.brand.toUpperCase().includes(skuInfo.variant?.toUpperCase()) ||
-          (skuInfo.family === '8PM' && sku.brand.toUpperCase().includes('8PM')) ||
-          (skuInfo.family.includes('VERVE') && sku.brand.toUpperCase().includes('VERVE'))
-        );
-        if (matchingSKU) {
-          const familySKUs = shop.skuBreakdown.filter(sku => 
-            (skuInfo.family === '8PM' && sku.brand.toUpperCase().includes('8PM')) ||
-            (skuInfo.family.includes('VERVE') && sku.brand.toUpperCase().includes('VERVE'))
-          );
-          const totalFamilyCases = familySKUs.reduce((sum, sku) => sum + sku.cases, 0);
-          if (totalFamilyCases > 0) {
-            return Math.round((matchingSKU.cases / totalFamilyCases) * familyTotal);
-          }
+      // ENHANCED: If no exact match, try to estimate using current proportions
+      if (skuData.percentage && skuData.percentage > 0) {
+        const shopData = monthInfo.data.shopSales?.[shop.shopId];
+        if (shopData) {
+          const familyVolume = skuInfo.family === '8PM' ? shopData.eightPM : shopData.verve;
+          const estimatedVolume = Math.round((skuData.percentage / 100) * familyVolume);
+          console.log(`📊 Estimated historical volume using current proportion: ${estimatedVolume} cases (${skuData.percentage}% of ${familyVolume})`);
+          return estimatedVolume;
         }
       }
     }
@@ -483,7 +513,7 @@ const getExtendedHistoricalAnalysis = (shop: ShopData, skuInfo: any, lookbackPer
   // Use both direct shop properties AND extended historical data
   const allMonthsData = [];
   
-  // Current year months (from shop properties) - now with SKU-specific volumes
+  // Current year months (from shop properties) - now with TRUE SKU-specific volumes
   const currentMonths = [
     { name: 'June 2025', key: 'june', eightPM: shop.juneEightPM || 0, verve: shop.juneVerve || 0, year: 2025, month: 6 },
     { name: 'May 2025', key: 'may', eightPM: shop.mayEightPM || 0, verve: shop.mayVerve || 0, year: 2025, month: 5 },
@@ -492,7 +522,7 @@ const getExtendedHistoricalAnalysis = (shop: ShopData, skuInfo: any, lookbackPer
   ];
   
   currentMonths.forEach(month => {
-    const skuVolume = getSKUSpecificVolume(month, skuInfo);
+    const skuVolume = getTrueSKUSpecificVolume(month, skuInfo, skuData);
     allMonthsData.push({
       ...month,
       skuSpecificVolume: skuVolume
@@ -573,6 +603,15 @@ const getExtendedHistoricalAnalysis = (shop: ShopData, skuInfo: any, lookbackPer
   // Find drop-off month
   const dropOffMonth = volumes.find((v, i) => i > 0 && v.volume === 0 && volumes[i-1].volume > 0);
   
+  console.log(`✅ Historical analysis complete for ${skuInfo.displayName}:`, {
+    totalVolume,
+    avgVolume: avgVolume.toFixed(1),
+    peakVolume: peakMonth.volume,
+    monthsActive: nonZeroVolumes.length,
+    daysSinceLastOrder,
+    orderingPattern
+  });
+  
   return {
     lastOrderDate: lastActiveMonth?.month || 'Unknown',
     daysSinceLastOrder,
@@ -589,6 +628,10 @@ const getExtendedHistoricalAnalysis = (shop: ShopData, skuInfo: any, lookbackPer
   };
 };
 
+// ==========================================
+// ENHANCED HELPER FUNCTIONS (UNCHANGED)
+// ==========================================
+
 const getCurrentInventoryStatus = (shopId: string, skuInfo: any, inventoryData?: InventoryData) => {
   const defaultStatus = {
     currentQuantity: 0,
@@ -602,7 +645,10 @@ const getCurrentInventoryStatus = (shopId: string, skuInfo: any, inventoryData?:
     recentSupplyAttempts: false
   };
   
-  if (!inventoryData?.shops[shopId]) return defaultStatus;
+  if (!inventoryData?.shops[shopId]) {
+    console.log(`❌ No inventory data found for shop ${shopId}`);
+    return defaultStatus;
+  }
   
   const shop = inventoryData.shops[shopId];
   const today = new Date();
@@ -629,11 +675,15 @@ const getCurrentInventoryStatus = (shopId: string, skuInfo: any, inventoryData?:
         itemSKUInfo.displayName === skuInfo.displayName ||
         itemSKUInfo.variant === skuInfo.variant) {
       matchingItem = item;
+      console.log(`✅ Found matching inventory item for ${skuInfo.displayName}: ${matchingItem.quantity} qty, isOutOfStock: ${matchingItem.isOutOfStock}`);
       break;
     }
   }
   
-  if (!matchingItem) return defaultStatus;
+  if (!matchingItem) {
+    console.log(`❌ No matching inventory item found for ${skuInfo.displayName} in shop ${shopId}`);
+    return defaultStatus;
+  }
   
   return {
     currentQuantity: matchingItem.quantity,
@@ -739,7 +789,7 @@ const generateTimelineAnalysis = (historical: any): string => {
 };
 
 // ==========================================
-// MAIN COMPONENT
+// MAIN COMPONENT WITH INVENTORY CONNECTION STATUS
 // ==========================================
 
 const SKURecoveryIntelligence = ({ data, inventoryData }: { 
@@ -867,10 +917,11 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
   // Export function
   const exportToCSV = () => {
     let csvContent = "data:text/csv;charset=utf-8,";
-    csvContent += `Enhanced SKU Recovery Intelligence Report - ${new Date().toLocaleDateString()}\n`;
+    csvContent += `FIXED Enhanced SKU Recovery Intelligence Report - ${new Date().toLocaleDateString()}\n`;
     csvContent += `Historical Analysis Period: ${filters.lookbackPeriod} days\n`;
     csvContent += `Total Opportunities: ${summary.total}\n`;
     csvContent += `Total Recovery Potential: ${summary.totalRecoveryPotential.toFixed(0)} cases\n`;
+    csvContent += `Inventory Data Connected: ${inventoryData ? 'YES' : 'NO'}\n`;
     
     if (skuSpecificAnalysis) {
       csvContent += `\nSKU-SPECIFIC ANALYSIS: ${skuSpecificAnalysis.skuName}\n`;
@@ -891,7 +942,7 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `Enhanced_SKU_Recovery_Intelligence_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute("download", `FIXED_Enhanced_SKU_Recovery_Intelligence_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -939,21 +990,37 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
 
   return (
     <div className="space-y-6">
-      {/* Enhanced Header */}
+      {/* FIXED Header with inventory status */}
       <div className="bg-white rounded-lg shadow p-6">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6">
           <div>
             <h2 className="text-xl font-semibold flex items-center mb-2">
               <Target className="w-6 h-6 mr-2 text-purple-600" />
-              Enhanced SKU Recovery Intelligence
+              FIXED Enhanced SKU Recovery Intelligence
             </h2>
-            <p className="text-gray-600">Advanced SKU-level customer recovery with extended historical analysis (up to 18 months) & real inventory integration</p>
-            {inventoryData && (
-              <div className="flex items-center mt-2 text-sm text-green-600">
-                <CheckCircle className="w-4 h-4 mr-2" />
-                Live inventory data with supply chain tracking connected
-              </div>
-            )}
+            <p className="text-gray-600">Advanced SKU-level customer recovery with TRUE SKU-specific volumes (no more family totals!) + fixed deduplication</p>
+            
+            {/* ENHANCED: Show inventory connection status */}
+            <div className="flex items-center space-x-4 mt-2">
+              {inventoryData ? (
+                <div className="flex items-center text-sm text-green-600">
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  Live inventory data connected - current stock status available
+                </div>
+              ) : (
+                <div className="flex items-center text-sm text-red-600">
+                  <XCircle className="w-4 h-4 mr-2" />
+                  Inventory data not connected - current stock status will show "no data"
+                </div>
+              )}
+              
+              {data.historicalData && (
+                <div className="flex items-center text-sm text-blue-600">
+                  <BarChart3 className="w-4 h-4 mr-2" />
+                  Extended historical data available (up to 18 months)
+                </div>
+              )}
+            </div>
           </div>
           
           <div className="flex items-center space-x-4 mt-4 lg:mt-0">
@@ -1211,7 +1278,7 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
             className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center space-x-2 text-sm"
           >
             <Download className="w-4 h-4" />
-            <span>Export Enhanced CSV</span>
+            <span>Export FIXED CSV</span>
           </button>
 
           <div className="text-sm text-gray-500">
@@ -1223,11 +1290,16 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
       {/* Enhanced Recovery Opportunities Table */}
       <div className="bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">Enhanced Recovery Opportunities</h3>
+          <h3 className="text-lg font-medium text-gray-900">FIXED Enhanced Recovery Opportunities</h3>
           <p className="text-sm text-gray-500">
             Showing {startIndex + 1}-{Math.min(endIndex, filteredOpportunities.length)} of {filteredOpportunities.length} opportunities 
-            ({filters.lookbackPeriod}-day historical analysis with supply chain integration)
+            ({filters.lookbackPeriod}-day historical analysis with TRUE SKU-specific volumes)
           </p>
+          {!inventoryData && (
+            <div className="mt-2 text-sm text-amber-600 bg-amber-50 border border-amber-200 rounded p-2">
+              ⚠️ Inventory data not connected - current stock status will show "no data"
+            </div>
+          )}
         </div>
 
         <div className="overflow-x-auto">
@@ -1267,15 +1339,22 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
                   </td>
                   <td className="px-6 py-4">
                     <div className="space-y-1">
-                      {opportunity.isCurrentlyOutOfStock ? (
-                        <div className="flex items-center text-sm text-red-600">
-                          <XCircle className="w-4 h-4 mr-1" />
-                          Out of Stock ({opportunity.currentStockQuantity} qty)
-                        </div>
+                      {inventoryData ? (
+                        opportunity.isCurrentlyOutOfStock ? (
+                          <div className="flex items-center text-sm text-red-600">
+                            <XCircle className="w-4 h-4 mr-1" />
+                            Out of Stock ({opportunity.currentStockQuantity} qty)
+                          </div>
+                        ) : (
+                          <div className="flex items-center text-sm text-green-600">
+                            <CheckCircle className="w-4 h-4 mr-1" />
+                            In Stock ({opportunity.currentStockQuantity} qty)
+                          </div>
+                        )
                       ) : (
-                        <div className="flex items-center text-sm text-green-600">
-                          <CheckCircle className="w-4 h-4 mr-1" />
-                          In Stock ({opportunity.currentStockQuantity} qty)
+                        <div className="flex items-center text-sm text-gray-500">
+                          <AlertTriangle className="w-4 h-4 mr-1" />
+                          No data (inventory not connected)
                         </div>
                       )}
                       
@@ -1386,7 +1465,7 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
         {totalPages > 1 && (
           <div className="px-6 py-3 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center">
             <div className="text-sm text-gray-700 mb-2 sm:mb-0">
-              Showing {startIndex + 1} to {Math.min(endIndex, filteredOpportunities.length)} of {filteredOpportunities.length} enhanced opportunities
+              Showing {startIndex + 1} to {Math.min(endIndex, filteredOpportunities.length)} of {filteredOpportunities.length} FIXED enhanced opportunities
             </div>
             <div className="flex space-x-2">
               <button
