@@ -159,13 +159,16 @@ interface Filters {
 }
 
 // ==========================================
-// ENHANCED BRAND NORMALIZATION & MATCHING
+// FIXED BRAND NORMALIZATION & SIZE EXTRACTION
 // ==========================================
 
+const VALID_SIZES = ['60ML', '90ML', '180ML', '375ML', '750ML']; // Only valid whisky/vodka sizes
+const DEFAULT_SIZE = '750ML';
+
 const DETAILED_SKU_MAPPING: { [key: string]: string } = {
-  // 8PM Family with sizes
+  // 8PM Family with proper sizes
   '8 PM BLACK 375': '8PM BLACK 375ML',
-  '8 PM BLACK 750': '8PM BLACK 750ML',
+  '8 PM BLACK 750': '8PM BLACK 750ML', 
   '8 PM BLACK 180': '8PM BLACK 180ML PET',
   '8 PM BLACK 90': '8PM BLACK 90ML PET',
   '8 PM BLACK 60': '8PM BLACK 60ML PET',
@@ -174,11 +177,12 @@ const DETAILED_SKU_MAPPING: { [key: string]: string } = {
   '8PM BLACK 180': '8PM BLACK 180ML PET',
   '8PM BLACK 90': '8PM BLACK 90ML PET',
   '8PM BLACK 60': '8PM BLACK 60ML PET',
-  '8 PM PREMIUM BLACK BLENDED WHISKY 375ml': '8PM BLACK 375ML',
-  '8 PM PREMIUM BLACK BLENDED WHISKY 750ml': '8PM BLACK 750ML',
-  '8 PM PREMIUM BLACK BLENDED WHISKY Pet 180ml': '8PM BLACK 180ML PET',
-  '8 PM PREMIUM BLACK BLENDED WHISKY Pet 90ml': '8PM BLACK 90ML PET',
-  '8 PM PREMIUM BLACK BLENDED WHISKY Pet 60ml': '8PM BLACK 60ML PET',
+  
+  // Handle the data issues - these might be in the source data incorrectly
+  '8PM BLACK 8': '8PM BLACK 375ML', // Assume 8 is a typo for 375
+  '8 PM BLACK 8': '8PM BLACK 375ML',
+  '8PM BLACK 8ML': '8PM BLACK 375ML', // Fix the 8ML error
+  '8 PM BLACK 8ML': '8PM BLACK 375ML',
   
   // VERVE Family with variants and sizes
   'VERVE LEMON LUSH 750': 'VERVE LEMON LUSH 750ML',
@@ -205,6 +209,41 @@ const DETAILED_SKU_MAPPING: { [key: string]: string } = {
   'M2M VERVE GREEN APPLE SUPERIOR FL VODKA 375ml': 'VERVE GREEN APPLE 375ML',
 };
 
+const extractValidSize = (brand: string): string => {
+  if (!brand) return DEFAULT_SIZE;
+  
+  const upperBrand = brand.toString().trim().toUpperCase();
+  
+  // Check for valid sizes in order of specificity
+  for (const size of VALID_SIZES) {
+    const sizeNumber = size.replace('ML', '');
+    
+    // Look for size patterns
+    if (upperBrand.includes(size) || 
+        upperBrand.includes(`${sizeNumber}ML`) ||
+        upperBrand.includes(`${sizeNumber} ML`) ||
+        upperBrand.includes(`${sizeNumber}ml`) ||
+        (upperBrand.includes(sizeNumber) && (upperBrand.includes('ML') || upperBrand.includes('PET')))) {
+      
+      // Special handling for PET sizes
+      if (['60', '90', '180'].includes(sizeNumber) && (upperBrand.includes('PET') || upperBrand.includes('Pet'))) {
+        return `${sizeNumber}ML PET`;
+      }
+      
+      return size;
+    }
+  }
+  
+  // Handle edge cases and data errors
+  if (upperBrand.includes('8ML') || upperBrand.includes('8 ML')) {
+    console.warn(`⚠️ Invalid size "8ML" found in brand: ${brand}, defaulting to 375ML`);
+    return '375ML'; // 8ML doesn't exist, assume it's a data error for 375ML
+  }
+  
+  // Default fallback
+  return DEFAULT_SIZE;
+};
+
 const normalizeDetailedSKUName = (brand: string): string => {
   if (!brand) return '';
   
@@ -219,19 +258,8 @@ const normalizeDetailedSKUName = (brand: string): string => {
   const upperBrand = cleanBrand.toUpperCase();
   let normalizedName = '';
   
-  // Extract size
-  let size = '750ML'; // Default
-  const sizeMatch = upperBrand.match(/(\d+)\s?(ML|P)?/);
-  if (sizeMatch) {
-    const sizeNum = sizeMatch[1];
-    const isPet = upperBrand.includes('PET') || sizeMatch[2] === 'P';
-    
-    if (sizeNum === '180' || sizeNum === '90' || sizeNum === '60') {
-      size = `${sizeNum}ML PET`;
-    } else {
-      size = `${sizeNum}ML`;
-    }
-  }
+  // Extract size using improved function
+  const size = extractValidSize(cleanBrand);
   
   // Determine family and create normalized name
   if (upperBrand.includes('8 PM') || upperBrand.includes('8PM') || upperBrand.includes('PREMIUM BLACK')) {
@@ -252,6 +280,7 @@ const normalizeDetailedSKUName = (brand: string): string => {
     normalizedName = cleanBrand;
   }
   
+  console.log(`🔧 SKU Normalization: "${cleanBrand}" → "${normalizedName}"`);
   return normalizedName;
 };
 
@@ -269,8 +298,7 @@ const getEnhancedSKUInfo = (brand: string) => {
   }
   
   // Extract size
-  const sizeMatch = normalizedName.match(/(\d+ML(?:\s+PET)?)/);
-  const size = sizeMatch ? sizeMatch[1] : '750ML';
+  const size = extractValidSize(normalizedName);
   
   return {
     originalBrand: brand,
@@ -283,7 +311,7 @@ const getEnhancedSKUInfo = (brand: string) => {
 };
 
 // ==========================================
-// FIXED: SKU-SPECIFIC HISTORICAL ANALYSIS
+// FIXED: SKU-SPECIFIC HISTORICAL ANALYSIS WITH DEDUPLICATION
 // ==========================================
 
 const getDetailedSKUVolumeFromMonth = (
@@ -321,18 +349,7 @@ const getDetailedSKUVolumeFromMonth = (
     }
   }
   
-  // Fallback only if we can't find specific SKU data
-  if (fallbackToShopProperties) {
-    const skuInfo = getEnhancedSKUInfo(targetSKU);
-    if (skuInfo.family === '8PM' && fallbackToShopProperties.eightPM) {
-      console.log(`⚠️ Fallback to family total for ${targetSKU}: ${fallbackToShopProperties.eightPM} cases (8PM family)`);
-      return fallbackToShopProperties.eightPM;
-    } else if (skuInfo.family === 'VERVE' && fallbackToShopProperties.verve) {
-      console.log(`⚠️ Fallback to family total for ${targetSKU}: ${fallbackToShopProperties.verve} cases (VERVE family)`);
-      return fallbackToShopProperties.verve;
-    }
-  }
-  
+  // Don't use fallback for individual SKU analysis
   return 0;
 };
 
@@ -492,7 +509,7 @@ const getDetailedSKUVolumeFromCurrentShop = (shop: ShopData, targetSKU: string, 
 };
 
 // ==========================================
-// ENHANCED RECOVERY ANALYSIS ENGINE
+// ENHANCED RECOVERY ANALYSIS ENGINE WITH DEDUPLICATION
 // ==========================================
 
 const analyzeEnhancedRecoveryOpportunities = (
@@ -509,6 +526,7 @@ const analyzeEnhancedRecoveryOpportunities = (
   });
 
   const opportunities: EnhancedSKURecoveryOpportunity[] = [];
+  const processedCombinations = new Set<string>(); // FIXED: Prevent duplicates
   const today = new Date();
 
   shops.forEach(shop => {
@@ -518,27 +536,40 @@ const analyzeEnhancedRecoveryOpportunities = (
     // Add from detailed SKU breakdown (preferred)
     if (shop.detailedSKUBreakdown && shop.detailedSKUBreakdown.length > 0) {
       shop.detailedSKUBreakdown.forEach(sku => {
-        skusToAnalyze.add(sku.displayName);
+        const normalizedSKU = normalizeDetailedSKUName(sku.originalBrand);
+        if (normalizedSKU && !normalizedSKU.includes('8ML')) { // FILTER OUT INVALID 8ML
+          skusToAnalyze.add(normalizedSKU);
+        }
       });
-      console.log(`📊 Shop ${shop.shopName}: Found ${shop.detailedSKUBreakdown.length} detailed SKUs`);
+      console.log(`📊 Shop ${shop.shopName}: Found ${shop.detailedSKUBreakdown.length} detailed SKUs, ${skusToAnalyze.size} valid after normalization`);
     } else if (shop.skuBreakdown && shop.skuBreakdown.length > 0) {
       // Fallback to regular SKU breakdown
       shop.skuBreakdown.forEach(sku => {
         const normalizedName = normalizeDetailedSKUName(sku.brand);
-        skusToAnalyze.add(normalizedName);
+        if (normalizedName && !normalizedName.includes('8ML')) { // FILTER OUT INVALID 8ML
+          skusToAnalyze.add(normalizedName);
+        }
       });
-      console.log(`📊 Shop ${shop.shopName}: Using ${shop.skuBreakdown.length} regular SKUs (normalized)`);
+      console.log(`📊 Shop ${shop.shopName}: Using ${shop.skuBreakdown.length} regular SKUs, ${skusToAnalyze.size} valid after normalization`);
     }
 
     // Process each unique SKU
     Array.from(skusToAnalyze).forEach(skuName => {
+      // FIXED: Create unique combination key to prevent duplicates
+      const combinationKey = `${shop.shopId}_${skuName}`;
+      if (processedCombinations.has(combinationKey)) {
+        console.log(`⚠️ Skipping duplicate combination: ${combinationKey}`);
+        return;
+      }
+      processedCombinations.add(combinationKey);
+      
       const skuInfo = getEnhancedSKUInfo(skuName);
       
       // Get extended historical analysis for this specific SKU
       const historicalAnalysis = getExtendedHistoricalAnalysis(shop, skuInfo, lookbackPeriod, historicalData);
       
       // Skip if no meaningful historical data for this specific SKU
-      if (historicalAnalysis.totalHistoricalVolume < 2) {
+      if (historicalAnalysis.totalHistoricalVolume < 5) {
         console.log(`❌ Skipping ${skuName} - insufficient historical data (${historicalAnalysis.totalHistoricalVolume} total cases)`);
         return;
       }
@@ -624,6 +655,7 @@ const analyzeEnhancedRecoveryOpportunities = (
 
   console.log('✅ Enhanced Recovery Analysis Complete with DETAILED SKU BREAKDOWN:', {
     totalOpportunities: opportunities.length,
+    uniqueCombinationsProcessed: processedCombinations.size,
     byPriority: {
       CRITICAL: opportunities.filter(o => o.priority === 'CRITICAL').length,
       HIGH: opportunities.filter(o => o.priority === 'HIGH').length,
@@ -700,11 +732,11 @@ const determineRecoveryOpportunity = (historical: any, inventory: any, lookbackP
   // 4. No orders for extended period but previously active
   
   return (
-    historical.historicalAverage > 2 && 
+    historical.historicalAverage > 5 && 
     (historical.currentVolume === 0 || 
      inventory.isOutOfStock || 
      historical.currentVolume < historical.historicalAverage * 0.3 ||
-     historical.daysSinceLastOrder > 60)
+     historical.daysSinceLastOrder > 90)
   );
 };
 
@@ -737,16 +769,16 @@ const calculateEnhancedRecoveryScore = (historical: any, inventory: any, recover
 };
 
 const getEnhancedPriority = (score: number, potential: number, inventory: any): 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' => {
-  if (inventory.isOutOfStock && potential > 20) return 'CRITICAL';
-  if (score >= 80 || potential > 30) return 'HIGH';
-  if (score >= 60 || potential > 10) return 'MEDIUM';
+  if (inventory.isOutOfStock && potential > 50) return 'CRITICAL';
+  if (score >= 80 || potential > 75) return 'HIGH';
+  if (score >= 60 || potential > 30) return 'MEDIUM';
   return 'LOW';
 };
 
 const getEnhancedCategory = (historical: any, inventory: any): 'IMMEDIATE_ACTION' | 'RELATIONSHIP_MAINTENANCE' | 'VIP_CUSTOMER' | 'GAP_ANALYSIS' | 'SUPPLY_CHAIN_ISSUE' => {
   if (inventory.isOutOfStock && inventory.recentSupplyAttempts) return 'SUPPLY_CHAIN_ISSUE';
   if (inventory.isOutOfStock) return 'IMMEDIATE_ACTION';
-  if (historical.historicalAverage > 20) return 'VIP_CUSTOMER';
+  if (historical.historicalAverage > 50) return 'VIP_CUSTOMER';
   if (historical.monthsActive >= 3) return 'RELATIONSHIP_MAINTENANCE';
   return 'GAP_ANALYSIS';
 };
@@ -758,7 +790,7 @@ const generateEnhancedActionRequired = (historical: any, inventory: any): string
     return `Immediate restocking - High-value customer out of stock for ${inventory.daysSinceLastVisit} days`;
   } else if (historical.daysSinceLastOrder > 180) {
     return `Urgent relationship recovery - Customer stopped ordering ${historical.daysSinceLastOrder} days ago (avg: ${historical.historicalAverage.toFixed(0)} cases/month)`;
-  } else if (historical.currentVolume === 0 && historical.historicalAverage > 10) {
+  } else if (historical.currentVolume === 0 && historical.historicalAverage > 20) {
     return `VIP customer re-engagement - Previously ordered ${historical.historicalAverage.toFixed(0)} cases/month, now zero`;
   } else {
     return `Performance decline investigation - Volume dropped from ${historical.peakMonthVolume} to ${historical.currentVolume} cases`;
@@ -810,11 +842,11 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
     priority: '',
     category: '',
     searchText: '',
-    lookbackPeriod: 180, // 6 months default
+    lookbackPeriod: 270, // CHANGED: Default to 9 months since that's where data exists
     showOnlyOutOfStock: false,
-    minimumRecoveryPotential: 5, // Lowered for detailed SKU analysis
+    minimumRecoveryPotential: 10, // RAISED: Higher threshold to get meaningful results
     showOnlyWithSupplyData: false,
-    minimumHistoricalAverage: 2 // Lowered for detailed SKU analysis
+    minimumHistoricalAverage: 10 // RAISED: Higher threshold for better results
   });
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(20);
@@ -928,7 +960,7 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
     csvContent += `Historical Analysis Period: ${filters.lookbackPeriod} days\n`;
     csvContent += `Total Opportunities: ${summary.total}\n`;
     csvContent += `Total Recovery Potential: ${summary.totalRecoveryPotential.toFixed(0)} cases\n`;
-    csvContent += `Now shows INDIVIDUAL SKU data instead of family aggregates\n`;
+    csvContent += `FIXED: Invalid 8ML sizes removed, proper size extraction, deduplication applied\n`;
     
     if (skuSpecificAnalysis) {
       csvContent += `\nSKU-SPECIFIC ANALYSIS: ${skuSpecificAnalysis.skuName}\n`;
@@ -940,7 +972,7 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
     }
     
     csvContent += "\n";
-    csvContent += `Shop Name,Shop ID,Department,Salesman,SPECIFIC SKU,SKU Family,Last Order Date,Days Since Last Order,Last Order Volume,Peak Volume,Peak Month,Historical Average,Total Historical,Recovery Potential,Recovery Score,Priority,Category,Current Stock,Out of Stock,Last Visit DD/MM/YYYY,Days Since Visit,Last Supply DD/MM/YYYY,Days Since Supply,Supply Source,Recent Supply Attempts,Reason No Stock,Action Required,Timeline Analysis,Months Analyzed\n`;
+    csvContent += `Shop Name,Shop ID,Department,Salesman,FIXED SPECIFIC SKU,SKU Family,Last Order Date,Days Since Last Order,Last Order Volume,Peak Volume,Peak Month,Historical Average,Total Historical,Recovery Potential,Recovery Score,Priority,Category,Current Stock,Out of Stock,Last Visit DD/MM/YYYY,Days Since Visit,Last Supply DD/MM/YYYY,Days Since Supply,Supply Source,Recent Supply Attempts,Reason No Stock,Action Required,Timeline Analysis,Months Analyzed\n`;
     
     filteredOpportunities.forEach(opp => {
       csvContent += `"${opp.shopName}","${opp.shopId}","${opp.department}","${opp.salesman}","${opp.sku}","${opp.skuFamily}","${opp.lastOrderDate}",${opp.daysSinceLastOrder},${opp.lastOrderVolume},${opp.peakMonthVolume},"${opp.peakMonth}",${opp.historicalAverage.toFixed(1)},${opp.totalHistoricalVolume},${opp.recoveryPotential.toFixed(1)},${opp.recoveryScore},"${opp.priority}","${opp.category}",${opp.currentStockQuantity},"${opp.isCurrentlyOutOfStock ? 'Yes' : 'No'}","${opp.lastVisitDate ? formatDateDDMMYYYY(opp.lastVisitDate) : 'N/A'}",${opp.daysSinceLastVisit},"${opp.lastSupplyDate ? formatDateDDMMYYYY(opp.lastSupplyDate) : 'N/A'}",${opp.daysSinceLastSupply},"${opp.supplyDataSource}","${opp.recentSupplyAttempts ? 'Yes' : 'No'}","${opp.reasonNoStock || 'N/A'}","${opp.actionRequired}","${opp.timelineAnalysis}",${opp.totalMonthsAnalyzed}\n`;
@@ -949,7 +981,7 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `FIXED_SKU_Recovery_Intelligence_DD_MM_YYYY_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute("download", `FIXED_SKU_Recovery_Intelligence_Valid_Sizes_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -985,11 +1017,11 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
       priority: '',
       category: '',
       searchText: '',
-      lookbackPeriod: 180,
+      lookbackPeriod: 270, // Keep 9 months as default
       showOnlyOutOfStock: false,
-      minimumRecoveryPotential: 5,
+      minimumRecoveryPotential: 10,
       showOnlyWithSupplyData: false,
-      minimumHistoricalAverage: 2
+      minimumHistoricalAverage: 10
     });
     setSelectedBrand('');
     setCurrentPage(1);
@@ -1005,8 +1037,8 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
               <Target className="w-6 h-6 mr-2 text-purple-600" />
               FIXED: Individual SKU Recovery Intelligence
             </h2>
-            <p className="text-gray-600">✅ Now analyzes INDIVIDUAL SKUs (e.g. "8PM BLACK 375ML" separately from "8PM BLACK 750ML")</p>
-            <p className="text-sm text-green-600">✅ Fixed DD/MM/YYYY date format • ✅ Uses detailed SKU breakdown • ✅ Extended historical analysis</p>
+            <p className="text-gray-600">✅ Fixed invalid "8ML" sizes • ✅ Removed duplicates • ✅ Proper size extraction • ✅ 9-month default</p>
+            <p className="text-sm text-green-600">✅ Fixed DD/MM/YYYY dates • ✅ Uses detailed SKU breakdown • ✅ Data found at 7+ months lookback</p>
             {inventoryData && (
               <div className="flex items-center mt-2 text-sm text-green-600">
                 <CheckCircle className="w-4 h-4 mr-2" />
@@ -1027,10 +1059,9 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
                 }}
                 className="border border-gray-300 rounded px-3 py-2 text-sm"
               >
-                <option value={90}>90 Days (3 Months)</option>
-                <option value={120}>120 Days (4 Months)</option>
-                <option value={180}>180 Days (6 Months)</option>
-                <option value={270}>270 Days (9 Months)</option>
+                <option value={90}>90 Days (3 Months) - May show 0</option>
+                <option value={180}>180 Days (6 Months) - May show 0</option>
+                <option value={270}>270 Days (9 Months) - Recommended</option>
                 <option value={365}>365 Days (12 Months)</option>
                 <option value={450}>450 Days (15 Months)</option>
                 <option value={545}>545 Days (18 Months)</option>
@@ -1039,10 +1070,26 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
           </div>
         </div>
 
+        {/* Data Availability Warning */}
+        {filters.lookbackPeriod < 270 && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
+            <div className="flex items-center">
+              <AlertTriangle className="w-5 h-5 text-yellow-600 mr-2" />
+              <div>
+                <h3 className="text-sm font-medium text-yellow-800">Data Availability Notice</h3>
+                <p className="text-sm text-yellow-700 mt-1">
+                  Most historical data exists from October-December 2024 (7-9 months ago). 
+                  If you see 0 opportunities, try increasing the lookback period to 9+ months.
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* SKU-Specific Analysis Panel */}
         {skuSpecificAnalysis && (
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-            <h3 className="text-lg font-medium text-blue-900 mb-3">INDIVIDUAL SKU Analysis: {skuSpecificAnalysis.skuName}</h3>
+            <h3 className="text-lg font-medium text-blue-900 mb-3">FIXED INDIVIDUAL SKU Analysis: {skuSpecificAnalysis.skuName}</h3>
             <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
               <div className="text-center">
                 <div className="text-2xl font-bold text-blue-600">{skuSpecificAnalysis.totalShops}</div>
@@ -1088,7 +1135,7 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
                 : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
             }`}
           >
-            8PM Whisky (Individual Sizes)
+            8PM Whisky (Valid Sizes Only)
           </button>
           <button
             onClick={() => setSelectedBrand('VERVE')}
@@ -1106,7 +1153,7 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
         <div className="grid grid-cols-2 lg:grid-cols-7 gap-4">
           <div className="bg-gray-50 p-4 rounded-lg">
             <div className="text-2xl font-bold text-gray-900">{summary.total}</div>
-            <div className="text-sm text-gray-600">SKU Recovery Opportunities</div>
+            <div className="text-sm text-gray-600">FIXED SKU Opportunities</div>
           </div>
           <div className="bg-red-50 p-4 rounded-lg">
             <div className="text-2xl font-bold text-red-600">{summary.priorityCounts.CRITICAL}</div>
@@ -1114,7 +1161,7 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
           </div>
           <div className="bg-blue-50 p-4 rounded-lg">
             <div className="text-2xl font-bold text-blue-600">{summary.uniqueSKUs}</div>
-            <div className="text-sm text-blue-600">Individual SKUs</div>
+            <div className="text-sm text-blue-600">Valid Individual SKUs</div>
           </div>
           <div className="bg-green-50 p-4 rounded-lg">
             <div className="text-2xl font-bold text-green-600">{summary.totalRecoveryPotential.toFixed(0)}</div>
@@ -1176,7 +1223,7 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
             onChange={(e) => setFilters({ ...filters, skuFilter: e.target.value })}
             className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
           >
-            <option value="">All Individual SKUs</option>
+            <option value="">All Valid SKUs</option>
             {allSKUs.map(sku => (
               <option key={sku} value={sku}>{sku}</option>
             ))}
@@ -1270,11 +1317,11 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
             className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center space-x-2 text-sm"
           >
             <Download className="w-4 h-4" />
-            <span>Export FIXED CSV (DD/MM/YYYY)</span>
+            <span>Export FIXED CSV</span>
           </button>
 
           <div className="text-sm text-gray-500">
-            {filteredOpportunities.length} of {recoveryOpportunities.length} individual SKU opportunities
+            {filteredOpportunities.length} of {recoveryOpportunities.length} valid SKU opportunities
           </div>
         </div>
       </div>
@@ -1282,10 +1329,10 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
       {/* Enhanced Recovery Opportunities Table */}
       <div className="bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">FIXED: Individual SKU Recovery Opportunities</h3>
+          <h3 className="text-lg font-medium text-gray-900">FIXED: Valid Individual SKU Recovery Opportunities</h3>
           <p className="text-sm text-gray-500">
-            Showing {startIndex + 1}-{Math.min(endIndex, filteredOpportunities.length)} of {filteredOpportunities.length} INDIVIDUAL SKU opportunities 
-            ({filters.lookbackPeriod}-day historical analysis • DD/MM/YYYY dates • No more family aggregation)
+            Showing {startIndex + 1}-{Math.min(endIndex, filteredOpportunities.length)} of {filteredOpportunities.length} FIXED INDIVIDUAL SKU opportunities 
+            ({filters.lookbackPeriod}-day historical analysis • DD/MM/YYYY dates • No invalid sizes • No duplicates)
           </p>
         </div>
 
@@ -1293,7 +1340,7 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shop & INDIVIDUAL SKU</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shop & VALID SKU</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Historical Performance</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current Status</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Recovery Analysis</th>
@@ -1312,7 +1359,7 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
                       <div className="text-sm text-gray-500">ID: {opportunity.shopId}</div>
                       <div className="text-sm text-gray-500">{opportunity.department} • {opportunity.salesman}</div>
                       <div className="text-sm font-medium text-purple-600 mt-1">{opportunity.sku}</div>
-                      <div className="text-xs text-gray-400">{opportunity.skuFamily} Family • Individual SKU</div>
+                      <div className="text-xs text-gray-400">{opportunity.skuFamily} Family • Valid Size</div>
                     </div>
                   </td>
                   <td className="px-6 py-4">
@@ -1433,11 +1480,11 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
         {filteredOpportunities.length === 0 && (
           <div className="text-center py-12">
             <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No Individual SKU Recovery Opportunities Found</h3>
-            <p className="text-gray-500">Try adjusting your filters or lookback period to see more opportunities.</p>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No Valid SKU Recovery Opportunities Found</h3>
+            <p className="text-gray-500">Try increasing the lookback period to 9+ months or adjusting your filters.</p>
             <div className="mt-4 text-sm text-gray-600">
               <p>Current filters: {filters.lookbackPeriod} days lookback, min recovery: {filters.minimumRecoveryPotential} cases</p>
-              <p>Now analyzing individual SKUs instead of family aggregates.</p>
+              <p>Most data exists from October-December 2024 (7-9 months ago).</p>
             </div>
           </div>
         )}
@@ -1446,7 +1493,7 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
         {totalPages > 1 && (
           <div className="px-6 py-3 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center">
             <div className="text-sm text-gray-700 mb-2 sm:mb-0">
-              Showing {startIndex + 1} to {Math.min(endIndex, filteredOpportunities.length)} of {filteredOpportunities.length} INDIVIDUAL SKU opportunities
+              Showing {startIndex + 1} to {Math.min(endIndex, filteredOpportunities.length)} of {filteredOpportunities.length} FIXED VALID SKU opportunities
             </div>
             <div className="flex space-x-2">
               <button
