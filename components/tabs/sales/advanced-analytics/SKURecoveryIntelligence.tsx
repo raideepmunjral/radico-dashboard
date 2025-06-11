@@ -528,7 +528,7 @@ const getCurrentInventoryStatus = (shopId: string, skuInfo: any, inventoryData?:
   const today = new Date();
   
   // Find matching SKU in inventory
-  type InventoryItem = {
+  let matchingItem: {
     brand: string;
     quantity: number;
     isInStock: boolean;
@@ -539,17 +539,19 @@ const getCurrentInventoryStatus = (shopId: string, skuInfo: any, inventoryData?:
     lastSupplyDate?: Date;
     agingDataSource?: string;
     supplyStatus?: string;
-  };
+  } | null = null;
   
-  let matchingItem: InventoryItem | null = null;
-  Object.values(shop.items).forEach(item => {
+  const items = Object.values(shop.items);
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
     const itemSKUInfo = getEnhancedSKUInfo(item.brand);
     if (itemSKUInfo.family === skuInfo.family || 
         itemSKUInfo.displayName === skuInfo.displayName ||
         itemSKUInfo.variant === skuInfo.variant) {
-      matchingItem = item as InventoryItem;
+      matchingItem = item;
+      break;
     }
-  });
+  }
   
   if (!matchingItem) return defaultStatus;
   
