@@ -248,6 +248,295 @@ const createSKUKey = (skuInfo: any, brand: string) => {
 };
 
 // ==========================================
+// FIXED: HISTORICAL ANALYSIS WITH PROPER LAST ORDER DATE DETECTION
+// ==========================================
+
+const getFixedHistoricalAnalysis = (shop: ShopData, skuInfo: any, skuData: any, lookbackPeriod: number, historicalData?: any) => {
+  console.log(`📊 Getting FIXED historical analysis for ${skuInfo.displayName} at ${shop.shopName}`);
+  
+  // FIXED: Helper function to get TRUE SKU-specific volume
+  const getTrueSKUSpecificVolume = (monthData: any, skuInfo: any, skuData: any) => {
+    // For current month data that has the actual SKU breakdown
+    if (skuData.cases && skuData.percentage) {
+      console.log(`✅ Using actual SKU data: ${skuData.cases} cases (${skuData.percentage}%) for ${skuInfo.displayName}`);
+      return skuData.cases;
+    }
+    
+    // ENHANCED: Try to estimate from detailed SKU breakdown proportions
+    if (shop.detailedSKUBreakdown) {
+      const matchingSKU = shop.detailedSKUBreakdown.find(sku => 
+        sku.displayName === skuInfo.displayName || 
+        sku.variant === skuInfo.variant ||
+        (sku.family === skuInfo.family && sku.size === skuInfo.size)
+      );
+      
+      if (matchingSKU && shop.total > 0) {
+        // Calculate this SKU's proportion and apply to monthly volume
+        const skuProportion = matchingSKU.cases / shop.total;
+        const monthlyTotal = monthData.eightPM + monthData.verve;
+        const estimatedSKUVolume = Math.round(skuProportion * monthlyTotal);
+        
+        console.log(`📊 Estimated SKU volume for ${skuInfo.displayName}: ${estimatedSKUVolume} cases (${(skuProportion * 100).toFixed(1)}% of ${monthlyTotal} monthly total)`);
+        return estimatedSKUVolume;
+      }
+    }
+    
+    // ENHANCED: Try to estimate from regular SKU breakdown proportions
+    if (shop.skuBreakdown) {
+      const matchingSKU = shop.skuBreakdown.find(sku => 
+        sku.brand.toUpperCase().includes(skuInfo.variant?.toUpperCase()) ||
+        sku.brand.toUpperCase().includes(skuInfo.displayName?.toUpperCase()) ||
+        (skuInfo.family === '8PM' && sku.brand.toUpperCase().includes('8PM') && sku.brand.includes('750')) ||
+        (skuInfo.family.includes('VERVE') && sku.brand.toUpperCase().includes('VERVE'))
+      );
+      
+      if (matchingSKU) {
+        const familyTotal = skuInfo.family === '8PM' ? monthData.eightPM : monthData.verve;
+        const estimatedSKUVolume = Math.round((matchingSKU.percentage / 100) * familyTotal);
+        
+        console.log(`📊 Estimated SKU volume from regular breakdown: ${estimatedSKUVolume} cases (${matchingSKU.percentage}% of ${familyTotal} family total)`);
+        return estimatedSKUVolume;
+      }
+    }
+    
+    // LAST RESORT: Fall back to family total (but log this as a warning)
+    const familyVolume = skuInfo.family === '8PM' ? monthData.eightPM : monthData.verve;
+    console.log(`⚠️ WARNING: Using family total for ${skuInfo.displayName}: ${familyVolume} cases (no SKU-specific data available)`);
+    return familyVolume;
+  };
+
+  // Helper function to get SKU volume from historical month data
+  const getHistoricalSKUVolume = (monthInfo: any, skuInfo: any) => {
+    if (monthInfo.data && monthInfo.data.shopSKUs && monthInfo.data.shopSKUs[shop.shopId]) {
+      const shopSKUs = monthInfo.data.shopSKUs[shop.shopId];
+      
+      // Look for exact SKU match first
+      const skuKeys = Object.keys(shopSKUs);
+      const matchingKey = skuKeys.find(key => 
+        key.toUpperCase().includes(skuInfo.variant?.toUpperCase()) ||
+        key.toUpperCase().includes(skuInfo.displayName?.toUpperCase()) ||
+        (skuInfo.family === '8PM' && key.toUpperCase().includes('8PM') && key.includes('750')) ||
+        (skuInfo.family.includes('VERVE') && key.toUpperCase().includes('VERVE'))
+      );
+      
+      if (matchingKey) {
+        const exactVolume = shopSKUs[matchingKey];
+        console.log(`📊 Found exact historical match for ${skuInfo.displayName}: ${exactVolume} cases from key "${matchingKey}"`);
+        return exactVolume;
+      }
+      
+      // ENHANCED: If no exact match, try to estimate using current proportions
+      if (skuData.percentage && skuData.percentage > 0) {
+        const shopData = monthInfo.data.shopSales?.[shop.shopId];
+        if (shopData) {
+          const familyVolume = skuInfo.family === '8PM' ? shopData.eightPM : shopData.verve;
+          const estimatedVolume = Math.round((skuData.percentage / 100) * familyVolume);
+          console.log(`📊 Estimated historical volume using current proportion: ${estimatedVolume} cases (${skuData.percentage}% of ${familyVolume})`);
+          return estimatedVolume;
+        }
+      }
+    }
+    return 0;
+  };
+  
+  // Build comprehensive historical data with proper date tracking
+  const allMonthsData: any[] = [];
+  
+  // STEP 1: Recent months (with exact dates for accurate day calculation)
+  const recentMonths = [
+    { 
+      name: 'May 2025', 
+      key: 'may', 
+      eightPM: shop.mayEightPM || 0, 
+      verve: shop.mayVerve || 0, 
+      year: 2025, 
+      month: 5,
+      dateEstimate: new Date(2025, 4, 15) // Mid-month estimate
+    },
+    { 
+      name: 'April 2025', 
+      key: 'april', 
+      eightPM: shop.aprilEightPM || 0, 
+      verve: shop.aprilVerve || 0, 
+      year: 2025, 
+      month: 4,
+      dateEstimate: new Date(2025, 3, 15)
+    },
+    { 
+      name: 'March 2025', 
+      key: 'march', 
+      eightPM: shop.marchEightPM || 0, 
+      verve: shop.marchVerve || 0, 
+      year: 2025, 
+      month: 3,
+      dateEstimate: new Date(2025, 2, 15)
+    }
+  ];
+  
+  recentMonths.forEach(month => {
+    const skuVolume = getTrueSKUSpecificVolume(month, skuInfo, skuData);
+    allMonthsData.push({
+      ...month,
+      skuSpecificVolume: skuVolume
+    });
+  });
+  
+  // STEP 2: Extended historical data with proper date tracking
+  if (historicalData) {
+    const extendedMonths = [
+      { name: 'February 2025', key: 'february', data: historicalData.february, year: 2025, month: 2, dateEstimate: new Date(2025, 1, 15) },
+      { name: 'January 2025', key: 'january', data: historicalData.january, year: 2025, month: 1, dateEstimate: new Date(2025, 0, 15) },
+      { name: 'December 2024', key: 'december2024', data: historicalData.december2024, year: 2024, month: 12, dateEstimate: new Date(2024, 11, 15) },
+      { name: 'November 2024', key: 'november2024', data: historicalData.november2024, year: 2024, month: 11, dateEstimate: new Date(2024, 10, 15) },
+      { name: 'October 2024', key: 'october2024', data: historicalData.october2024, year: 2024, month: 10, dateEstimate: new Date(2024, 9, 15) },
+      { name: 'September 2024', key: 'september2024', data: historicalData.september2024, year: 2024, month: 9, dateEstimate: new Date(2024, 8, 15) },
+      { name: 'August 2024', key: 'august2024', data: historicalData.august2024, year: 2024, month: 8, dateEstimate: new Date(2024, 7, 15) },
+      { name: 'July 2024', key: 'july2024', data: historicalData.july2024, year: 2024, month: 7, dateEstimate: new Date(2024, 6, 15) },
+      { name: 'June 2024', key: 'juneLastYear', data: historicalData.juneLastYear, year: 2024, month: 6, dateEstimate: new Date(2024, 5, 15) }
+    ];
+    
+    console.log(`📊 Processing extended historical data for ${skuInfo.displayName}:`, {
+      availableMonths: extendedMonths.filter(m => m.data).map(m => m.name),
+      totalExtendedMonths: extendedMonths.length
+    });
+    
+    extendedMonths.forEach(monthInfo => {
+      if (monthInfo.data) { // Only process if data exists
+        const skuVolume = getHistoricalSKUVolume(monthInfo, skuInfo);
+        const shopData = monthInfo.data.shopSales?.[shop.shopId];
+        
+        console.log(`📅 Processing ${monthInfo.name} for ${skuInfo.displayName}: ${skuVolume} cases`);
+        
+        allMonthsData.push({
+          name: monthInfo.name,
+          key: monthInfo.key,
+          eightPM: shopData?.eightPM || 0,
+          verve: shopData?.verve || 0,
+          year: monthInfo.year,
+          month: monthInfo.month,
+          dateEstimate: monthInfo.dateEstimate,
+          skuSpecificVolume: skuVolume
+        });
+      } else {
+        console.log(`⚠️ No data available for ${monthInfo.name}`);
+      }
+    });
+  } else {
+    console.log(`⚠️ No extended historical data available for analysis`);
+  }
+  
+  // Filter months based on lookback period
+  const monthsToLookback = Math.ceil(lookbackPeriod / 30);
+  const relevantMonths = allMonthsData.slice(0, Math.min(monthsToLookback, allMonthsData.length));
+  
+  console.log(`📊 Historical months for ${skuInfo.displayName}:`, {
+    totalMonths: allMonthsData.length,
+    relevantMonths: relevantMonths.length,
+    monthNames: relevantMonths.map(m => m.name)
+  });
+  
+  // Get SKU-specific volumes with dates
+  const volumes = relevantMonths.map(month => {
+    return { 
+      month: month.name, 
+      volume: month.skuSpecificVolume || 0, 
+      monthData: month,
+      familyVolume: (skuInfo.family === '8PM' ? month.eightPM : month.verve), // Keep family context
+      dateEstimate: month.dateEstimate
+    };
+  });
+  
+  const nonZeroVolumes = volumes.filter(v => v.volume > 0);
+  const totalVolume = nonZeroVolumes.reduce((sum, v) => sum + v.volume, 0);
+  const avgVolume = nonZeroVolumes.length > 0 ? totalVolume / nonZeroVolumes.length : 0;
+  
+  // Find peak month
+  const peakMonth = volumes.reduce((peak, current) => 
+    current.volume > peak.volume ? current : peak, 
+    { month: '', volume: 0, monthData: { name: '', key: '', eightPM: 0, verve: 0, year: 0, month: 0 }, dateEstimate: new Date() }
+  );
+  
+  // 🔥 FIXED: Find ACTUAL last active month (most recent month with volume > 0)
+  // Sort volumes by date (newest to oldest) and find the first month with volume
+  const volumesByDate = [...volumes].sort((a, b) => {
+    if (!a.dateEstimate || !b.dateEstimate) return 0;
+    return b.dateEstimate.getTime() - a.dateEstimate.getTime(); // Newest first
+  });
+  
+  const lastActiveMonth = volumesByDate.find(v => v.volume > 0);
+  
+  console.log(`🔍 FIXED Last Order Detection for ${skuInfo.displayName}:`, {
+    totalVolumeEntries: volumes.length,
+    nonZeroVolumeEntries: nonZeroVolumes.length,
+    volumesByDateSample: volumesByDate.slice(0, 3).map(v => ({
+      month: v.month,
+      volume: v.volume,
+      date: v.dateEstimate?.toLocaleDateString()
+    })),
+    lastActiveMonth: lastActiveMonth ? {
+      month: lastActiveMonth.month,
+      volume: lastActiveMonth.volume,
+      date: lastActiveMonth.dateEstimate?.toLocaleDateString()
+    } : 'none'
+  });
+  
+  // Calculate actual days since last order using proper dates
+  let daysSinceLastOrder = 999;
+  let lastOrderDateDisplay = 'Unknown';
+  
+  if (lastActiveMonth && lastActiveMonth.dateEstimate) {
+    const today = new Date();
+    const timeDiff = today.getTime() - lastActiveMonth.dateEstimate.getTime();
+    daysSinceLastOrder = Math.max(0, Math.floor(timeDiff / (1000 * 60 * 60 * 24)));
+    lastOrderDateDisplay = lastActiveMonth.month;
+    
+    console.log(`📅 FIXED Date calculation for ${skuInfo.displayName}:`, {
+      today: today.toLocaleDateString('en-GB'),
+      lastOrderDate: lastActiveMonth.dateEstimate.toLocaleDateString('en-GB'),
+      lastOrderMonth: lastActiveMonth.month,
+      daysSinceLastOrder
+    });
+  } else {
+    console.log(`❌ No active months found for ${skuInfo.displayName} - customer may have stopped ordering long ago`);
+  }
+  
+  // Determine ordering pattern based on extended data
+  let orderingPattern: 'CONSISTENT' | 'SEASONAL' | 'DECLINING' | 'STOPPED' = 'STOPPED';
+  if (nonZeroVolumes.length >= 6) orderingPattern = 'CONSISTENT';
+  else if (nonZeroVolumes.length >= 3) orderingPattern = 'DECLINING';
+  else if (nonZeroVolumes.length >= 1) orderingPattern = 'STOPPED';
+  
+  // Find drop-off month (first month with 0 after a month with volume)
+  const dropOffMonth = volumes.find((v, i) => i > 0 && v.volume === 0 && volumes[i-1].volume > 0);
+  
+  console.log(`✅ FIXED Historical analysis complete for ${skuInfo.displayName}:`, {
+    totalVolume,
+    avgVolume: avgVolume.toFixed(1),
+    peakVolume: peakMonth.volume,
+    monthsActive: nonZeroVolumes.length,
+    lastOrderMonth: lastOrderDateDisplay,
+    daysSinceLastOrder,
+    orderingPattern,
+    lastActiveMonth: lastActiveMonth?.month || 'none'
+  });
+  
+  return {
+    lastOrderDate: lastOrderDateDisplay,
+    daysSinceLastOrder,
+    lastOrderVolume: lastActiveMonth?.volume || 0,
+    peakMonthVolume: peakMonth.volume,
+    peakMonth: peakMonth.month || 'Unknown',
+    historicalAverage: avgVolume,
+    totalHistoricalVolume: totalVolume,
+    monthsActive: nonZeroVolumes.length,
+    currentVolume: volumes[0]?.volume || 0,
+    orderingPattern,
+    dropOffMonth: dropOffMonth?.month,
+    totalMonthsAnalyzed: relevantMonths.length
+  };
+};
+
+// ==========================================
 // ENHANCED RECOVERY ANALYSIS ENGINE - FIXED
 // ==========================================
 
@@ -424,243 +713,7 @@ const analyzeEnhancedRecoveryOpportunities = (
 };
 
 // ==========================================
-// FIXED: HISTORICAL ANALYSIS WITH SKU-SPECIFIC VOLUMES
-// ==========================================
-
-const getFixedHistoricalAnalysis = (shop: ShopData, skuInfo: any, skuData: any, lookbackPeriod: number, historicalData?: any) => {
-  console.log(`📊 Getting FIXED historical analysis for ${skuInfo.displayName} at ${shop.shopName}`);
-  
-  // FIXED: Helper function to get TRUE SKU-specific volume
-  const getTrueSKUSpecificVolume = (monthData: any, skuInfo: any, skuData: any) => {
-    // For current month data that has the actual SKU breakdown
-    if (skuData.cases && skuData.percentage) {
-      console.log(`✅ Using actual SKU data: ${skuData.cases} cases (${skuData.percentage}%) for ${skuInfo.displayName}`);
-      return skuData.cases;
-    }
-    
-    // ENHANCED: Try to estimate from detailed SKU breakdown proportions
-    if (shop.detailedSKUBreakdown) {
-      const matchingSKU = shop.detailedSKUBreakdown.find(sku => 
-        sku.displayName === skuInfo.displayName || 
-        sku.variant === skuInfo.variant ||
-        (sku.family === skuInfo.family && sku.size === skuInfo.size)
-      );
-      
-      if (matchingSKU && shop.total > 0) {
-        // Calculate this SKU's proportion and apply to monthly volume
-        const skuProportion = matchingSKU.cases / shop.total;
-        const monthlyTotal = monthData.eightPM + monthData.verve;
-        const estimatedSKUVolume = Math.round(skuProportion * monthlyTotal);
-        
-        console.log(`📊 Estimated SKU volume for ${skuInfo.displayName}: ${estimatedSKUVolume} cases (${(skuProportion * 100).toFixed(1)}% of ${monthlyTotal} monthly total)`);
-        return estimatedSKUVolume;
-      }
-    }
-    
-    // ENHANCED: Try to estimate from regular SKU breakdown proportions
-    if (shop.skuBreakdown) {
-      const matchingSKU = shop.skuBreakdown.find(sku => 
-        sku.brand.toUpperCase().includes(skuInfo.variant?.toUpperCase()) ||
-        sku.brand.toUpperCase().includes(skuInfo.displayName?.toUpperCase()) ||
-        (skuInfo.family === '8PM' && sku.brand.toUpperCase().includes('8PM') && sku.brand.includes('750')) ||
-        (skuInfo.family.includes('VERVE') && sku.brand.toUpperCase().includes('VERVE'))
-      );
-      
-      if (matchingSKU) {
-        const familyTotal = skuInfo.family === '8PM' ? monthData.eightPM : monthData.verve;
-        const estimatedSKUVolume = Math.round((matchingSKU.percentage / 100) * familyTotal);
-        
-        console.log(`📊 Estimated SKU volume from regular breakdown: ${estimatedSKUVolume} cases (${matchingSKU.percentage}% of ${familyTotal} family total)`);
-        return estimatedSKUVolume;
-      }
-    }
-    
-    // LAST RESORT: Fall back to family total (but log this as a warning)
-    const familyVolume = skuInfo.family === '8PM' ? monthData.eightPM : monthData.verve;
-    console.log(`⚠️ WARNING: Using family total for ${skuInfo.displayName}: ${familyVolume} cases (no SKU-specific data available)`);
-    return familyVolume;
-  };
-
-  // Helper function to get SKU volume from historical month data
-  const getHistoricalSKUVolume = (monthInfo: any, skuInfo: any) => {
-    if (monthInfo.data && monthInfo.data.shopSKUs && monthInfo.data.shopSKUs[shop.shopId]) {
-      const shopSKUs = monthInfo.data.shopSKUs[shop.shopId];
-      
-      // Look for exact SKU match first
-      const skuKeys = Object.keys(shopSKUs);
-      const matchingKey = skuKeys.find(key => 
-        key.toUpperCase().includes(skuInfo.variant?.toUpperCase()) ||
-        key.toUpperCase().includes(skuInfo.displayName?.toUpperCase()) ||
-        (skuInfo.family === '8PM' && key.toUpperCase().includes('8PM') && key.includes('750')) ||
-        (skuInfo.family.includes('VERVE') && key.toUpperCase().includes('VERVE'))
-      );
-      
-      if (matchingKey) {
-        const exactVolume = shopSKUs[matchingKey];
-        console.log(`📊 Found exact historical match for ${skuInfo.displayName}: ${exactVolume} cases from key "${matchingKey}"`);
-        return exactVolume;
-      }
-      
-      // ENHANCED: If no exact match, try to estimate using current proportions
-      if (skuData.percentage && skuData.percentage > 0) {
-        const shopData = monthInfo.data.shopSales?.[shop.shopId];
-        if (shopData) {
-          const familyVolume = skuInfo.family === '8PM' ? shopData.eightPM : shopData.verve;
-          const estimatedVolume = Math.round((skuData.percentage / 100) * familyVolume);
-          console.log(`📊 Estimated historical volume using current proportion: ${estimatedVolume} cases (${skuData.percentage}% of ${familyVolume})`);
-          return estimatedVolume;
-        }
-      }
-    }
-    return 0;
-  };
-  
-  // Use both direct shop properties AND extended historical data
-  const allMonthsData: any[] = [];
-  
-  // FIXED: Skip current month from historical analysis (current month = ongoing, not historical)
-  const currentMonths = [
-    // { name: 'June 2025', key: 'june', eightPM: shop.juneEightPM || 0, verve: shop.juneVerve || 0, year: 2025, month: 6 }, // Skip current month
-    { name: 'May 2025', key: 'may', eightPM: shop.mayEightPM || 0, verve: shop.mayVerve || 0, year: 2025, month: 5 },
-    { name: 'April 2025', key: 'april', eightPM: shop.aprilEightPM || 0, verve: shop.aprilVerve || 0, year: 2025, month: 4 },
-    { name: 'March 2025', key: 'march', eightPM: shop.marchEightPM || 0, verve: shop.marchVerve || 0, year: 2025, month: 3 }
-  ];
-  
-  currentMonths.forEach(month => {
-    const skuVolume = getTrueSKUSpecificVolume(month, skuInfo, skuData);
-    allMonthsData.push({
-      ...month,
-      skuSpecificVolume: skuVolume
-    });
-  });
-  
-  // FIXED: Ensure extended historical data is being used
-  if (historicalData) {
-    const extendedMonths = [
-      { name: 'February 2025', key: 'february', data: historicalData.february, year: 2025, month: 2 },
-      { name: 'January 2025', key: 'january', data: historicalData.january, year: 2025, month: 1 },
-      { name: 'December 2024', key: 'december2024', data: historicalData.december2024, year: 2024, month: 12 },
-      { name: 'November 2024', key: 'november2024', data: historicalData.november2024, year: 2024, month: 11 },
-      { name: 'October 2024', key: 'october2024', data: historicalData.october2024, year: 2024, month: 10 },
-      { name: 'September 2024', key: 'september2024', data: historicalData.september2024, year: 2024, month: 9 },
-      { name: 'August 2024', key: 'august2024', data: historicalData.august2024, year: 2024, month: 8 },
-      { name: 'July 2024', key: 'july2024', data: historicalData.july2024, year: 2024, month: 7 },
-      { name: 'June 2024', key: 'juneLastYear', data: historicalData.juneLastYear, year: 2024, month: 6 }
-    ];
-    
-    console.log(`📊 Extended historical data available for ${skuInfo.displayName}:`, {
-      availableMonths: extendedMonths.filter(m => m.data).map(m => m.name),
-      totalExtendedMonths: extendedMonths.length
-    });
-    
-    extendedMonths.forEach(monthInfo => {
-      if (monthInfo.data) { // Only process if data exists
-        const skuVolume = getHistoricalSKUVolume(monthInfo, skuInfo);
-        const shopData = monthInfo.data.shopSales?.[shop.shopId];
-        
-        console.log(`📅 Processing ${monthInfo.name} for ${skuInfo.displayName}: ${skuVolume} cases`);
-        
-        allMonthsData.push({
-          name: monthInfo.name,
-          key: monthInfo.key,
-          eightPM: shopData?.eightPM || 0,
-          verve: shopData?.verve || 0,
-          year: monthInfo.year,
-          month: monthInfo.month,
-          skuSpecificVolume: skuVolume
-        });
-      } else {
-        console.log(`⚠️ No data available for ${monthInfo.name}`);
-      }
-    });
-  } else {
-    console.log(`⚠️ No extended historical data available for analysis`);
-  }
-  
-  // Filter months based on lookback period
-  const monthsToLookback = Math.ceil(lookbackPeriod / 30);
-  const relevantMonths = allMonthsData.slice(0, Math.min(monthsToLookback, allMonthsData.length));
-  
-  console.log(`📊 Historical months for ${skuInfo.displayName}:`, {
-    totalMonths: allMonthsData.length,
-    relevantMonths: relevantMonths.length,
-    monthNames: relevantMonths.map(m => m.name)
-  });
-  
-  // Get SKU-specific volumes instead of family totals
-  const volumes = relevantMonths.map(month => {
-    return { 
-      month: month.name, 
-      volume: month.skuSpecificVolume || 0, 
-      monthData: month,
-      familyVolume: (skuInfo.family === '8PM' ? month.eightPM : month.verve) // Keep family context
-    };
-  });
-  
-  const nonZeroVolumes = volumes.filter(v => v.volume > 0);
-  const totalVolume = nonZeroVolumes.reduce((sum, v) => sum + v.volume, 0);
-  const avgVolume = nonZeroVolumes.length > 0 ? totalVolume / nonZeroVolumes.length : 0;
-  
-  // Find peak month
-  const peakMonth = volumes.reduce((peak, current) => 
-    current.volume > peak.volume ? current : peak, 
-    { month: '', volume: 0, monthData: { name: '', key: '', eightPM: 0, verve: 0, year: 0, month: 0 } }
-  );
-  
-  // Find last active month
-  const lastActiveMonth = volumes.find(v => v.volume > 0);
-  
-  // Calculate actual days since last order using dates
-  let daysSinceLastOrder = 999;
-  if (lastActiveMonth && lastActiveMonth.monthData && lastActiveMonth.monthData.year > 0) {
-    const today = new Date();
-    const lastOrderDate = new Date(lastActiveMonth.monthData.year, lastActiveMonth.monthData.month - 1, 15); // Mid-month estimate
-    const timeDiff = today.getTime() - lastOrderDate.getTime();
-    daysSinceLastOrder = Math.max(0, Math.floor(timeDiff / (1000 * 60 * 60 * 24))); // FIXED: Ensure non-negative
-    
-    console.log(`📅 Date calculation for ${skuInfo.displayName}:`, {
-      today: formatDate(today),
-      lastOrderDate: formatDate(lastOrderDate),
-      daysSinceLastOrder
-    });
-  }
-  
-  // Determine ordering pattern based on extended data
-  let orderingPattern: 'CONSISTENT' | 'SEASONAL' | 'DECLINING' | 'STOPPED' = 'STOPPED';
-  if (nonZeroVolumes.length >= 6) orderingPattern = 'CONSISTENT';
-  else if (nonZeroVolumes.length >= 3) orderingPattern = 'DECLINING';
-  else if (nonZeroVolumes.length >= 1) orderingPattern = 'STOPPED';
-  
-  // Find drop-off month
-  const dropOffMonth = volumes.find((v, i) => i > 0 && v.volume === 0 && volumes[i-1].volume > 0);
-  
-  console.log(`✅ Historical analysis complete for ${skuInfo.displayName}:`, {
-    totalVolume,
-    avgVolume: avgVolume.toFixed(1),
-    peakVolume: peakMonth.volume,
-    monthsActive: nonZeroVolumes.length,
-    daysSinceLastOrder,
-    orderingPattern
-  });
-  
-  return {
-    lastOrderDate: lastActiveMonth?.month || 'Unknown',
-    daysSinceLastOrder,
-    lastOrderVolume: lastActiveMonth?.volume || 0,
-    peakMonthVolume: peakMonth.volume,
-    peakMonth: peakMonth.month || 'Unknown',
-    historicalAverage: avgVolume,
-    totalHistoricalVolume: totalVolume,
-    monthsActive: nonZeroVolumes.length,
-    currentVolume: volumes[0]?.volume || 0,
-    orderingPattern,
-    dropOffMonth: dropOffMonth?.month,
-    totalMonthsAnalyzed: relevantMonths.length
-  };
-};
-
-// ==========================================
-// ENHANCED HELPER FUNCTIONS (UNCHANGED)
+// ENHANCED HELPER FUNCTIONS
 // ==========================================
 
 const getCurrentInventoryStatus = (shopId: string, skuInfo: any, inventoryData?: InventoryData) => {
@@ -835,7 +888,7 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
     priority: '',
     category: '',
     searchText: '',
-    lookbackPeriod: 180, // 6 months default
+    lookbackPeriod: 365, // 12 months default to show historical data
     showOnlyOutOfStock: false,
     minimumRecoveryPotential: 1, // FIXED: Reduced from 10 to 1
     showOnlyWithSupplyData: false,
@@ -1010,7 +1063,7 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
       priority: '',
       category: '',
       searchText: '',
-      lookbackPeriod: 180,
+      lookbackPeriod: 365,
       showOnlyOutOfStock: false,
       minimumRecoveryPotential: 1, // FIXED: Reduced default
       showOnlyWithSupplyData: false,
@@ -1388,7 +1441,7 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
                       ) : (
                         <div className="flex items-center text-sm text-gray-500">
                           <AlertTriangle className="w-4 h-4 mr-1" />
-                          No data (inventory not connected)
+                          no data
                         </div>
                       )}
                       
