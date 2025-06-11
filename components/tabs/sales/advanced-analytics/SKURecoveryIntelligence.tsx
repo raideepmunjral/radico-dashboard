@@ -391,20 +391,116 @@ const analyzeEnhancedRecoveryOpportunities = (
 // ==========================================
 
 const getExtendedHistoricalAnalysis = (shop: ShopData, skuInfo: any, lookbackPeriod: number, historicalData?: any) => {
+  // Helper function to get SKU-specific volume from SKU breakdown
+  const getSKUSpecificVolume = (monthData: any, skuInfo: any) => {
+    // Try to get specific SKU volume from detailed breakdown first
+    if (shop.detailedSKUBreakdown) {
+      const matchingSKU = shop.detailedSKUBreakdown.find(sku => 
+        sku.displayName === skuInfo.displayName || 
+        sku.variant === skuInfo.variant ||
+        sku.family === skuInfo.family
+      );
+      if (matchingSKU) {
+        // Estimate monthly volume based on total breakdown percentage
+        const totalShopVolume = monthData.eightPM + monthData.verve;
+        return Math.round((matchingSKU.cases / (shop.total || 1)) * totalShopVolume);
+      }
+    }
+    
+    // Fallback to regular SKU breakdown
+    if (shop.skuBreakdown) {
+      const matchingSKU = shop.skuBreakdown.find(sku => 
+        sku.brand.toUpperCase().includes(skuInfo.variant?.toUpperCase()) ||
+        sku.brand.toUpperCase().includes(skuInfo.displayName?.toUpperCase()) ||
+        (skuInfo.family === '8PM' && sku.brand.toUpperCase().includes('8PM')) ||
+        (skuInfo.family.includes('VERVE') && sku.brand.toUpperCase().includes('VERVE'))
+      );
+      if (matchingSKU) {
+        // Estimate monthly volume based on percentage
+        const totalShopVolume = monthData.eightPM + monthData.verve;
+        return Math.round((matchingSKU.percentage / 100) * totalShopVolume);
+      }
+    }
+    
+    // Final fallback to family total (current behavior)
+    if (skuInfo.family === '8PM' || skuInfo.family === '8PM BLACK') {
+      return monthData.eightPM;
+    } else if (skuInfo.family.includes('VERVE')) {
+      return monthData.verve;
+    }
+    return 0;
+  };
+
+  // Helper function to get SKU volume from historical month data
+  const getHistoricalSKUVolume = (monthInfo: any, skuInfo: any) => {
+    if (monthInfo.data && monthInfo.data.shopSKUs && monthInfo.data.shopSKUs[shop.shopId]) {
+      const shopSKUs = monthInfo.data.shopSKUs[shop.shopId];
+      
+      // Look for exact SKU match first
+      const skuKeys = Object.keys(shopSKUs);
+      const matchingKey = skuKeys.find(key => 
+        key.toUpperCase().includes(skuInfo.variant?.toUpperCase()) ||
+        key.toUpperCase().includes(skuInfo.displayName?.toUpperCase()) ||
+        (skuInfo.family === '8PM' && key.toUpperCase().includes('8PM') && key.includes('750')) ||
+        (skuInfo.family.includes('VERVE') && key.toUpperCase().includes('VERVE'))
+      );
+      
+      if (matchingKey) {
+        return shopSKUs[matchingKey];
+      }
+      
+      // If no exact match, sum all matching family variants
+      let familyTotal = 0;
+      skuKeys.forEach(key => {
+        if ((skuInfo.family === '8PM' && key.toUpperCase().includes('8PM')) ||
+            (skuInfo.family.includes('VERVE') && key.toUpperCase().includes('VERVE'))) {
+          familyTotal += shopSKUs[key];
+        }
+      });
+      
+      // If we found family matches, estimate this SKU's portion
+      if (familyTotal > 0 && shop.skuBreakdown) {
+        const matchingSKU = shop.skuBreakdown.find(sku => 
+          sku.brand.toUpperCase().includes(skuInfo.variant?.toUpperCase()) ||
+          (skuInfo.family === '8PM' && sku.brand.toUpperCase().includes('8PM')) ||
+          (skuInfo.family.includes('VERVE') && sku.brand.toUpperCase().includes('VERVE'))
+        );
+        if (matchingSKU) {
+          const familySKUs = shop.skuBreakdown.filter(sku => 
+            (skuInfo.family === '8PM' && sku.brand.toUpperCase().includes('8PM')) ||
+            (skuInfo.family.includes('VERVE') && sku.brand.toUpperCase().includes('VERVE'))
+          );
+          const totalFamilyCases = familySKUs.reduce((sum, sku) => sum + sku.cases, 0);
+          if (totalFamilyCases > 0) {
+            return Math.round((matchingSKU.cases / totalFamilyCases) * familyTotal);
+          }
+        }
+      }
+    }
+    return 0;
+  };
+  
   // Use both direct shop properties AND extended historical data
   const allMonthsData = [];
   
-  // Current year months (from shop properties)
-  allMonthsData.push(
+  // Current year months (from shop properties) - now with SKU-specific volumes
+  const currentMonths = [
     { name: 'June 2025', key: 'june', eightPM: shop.juneEightPM || 0, verve: shop.juneVerve || 0, year: 2025, month: 6 },
     { name: 'May 2025', key: 'may', eightPM: shop.mayEightPM || 0, verve: shop.mayVerve || 0, year: 2025, month: 5 },
     { name: 'April 2025', key: 'april', eightPM: shop.aprilEightPM || 0, verve: shop.aprilVerve || 0, year: 2025, month: 4 },
     { name: 'March 2025', key: 'march', eightPM: shop.marchEightPM || 0, verve: shop.marchVerve || 0, year: 2025, month: 3 }
-  );
+  ];
+  
+  currentMonths.forEach(month => {
+    const skuVolume = getSKUSpecificVolume(month, skuInfo);
+    allMonthsData.push({
+      ...month,
+      skuSpecificVolume: skuVolume
+    });
+  });
   
   // Extended historical data if available
   if (historicalData) {
-    // Add additional months from historical data
     const extendedMonths = [
       { name: 'February 2025', key: 'february', data: historicalData.february, year: 2025, month: 2 },
       { name: 'January 2025', key: 'january', data: historicalData.january, year: 2025, month: 1 },
@@ -418,48 +514,32 @@ const getExtendedHistoricalAnalysis = (shop: ShopData, skuInfo: any, lookbackPer
     ];
     
     extendedMonths.forEach(monthInfo => {
-      if (monthInfo.data && monthInfo.data.shopSales && monthInfo.data.shopSales[shop.shopId]) {
-        const shopData = monthInfo.data.shopSales[shop.shopId];
-        allMonthsData.push({
-          name: monthInfo.name,
-          key: monthInfo.key,
-          eightPM: shopData.eightPM || 0,
-          verve: shopData.verve || 0,
-          year: monthInfo.year,
-          month: monthInfo.month
-        });
-      } else {
-        allMonthsData.push({
-          name: monthInfo.name,
-          key: monthInfo.key,
-          eightPM: 0,
-          verve: 0,
-          year: monthInfo.year,
-          month: monthInfo.month
-        });
-      }
+      const skuVolume = getHistoricalSKUVolume(monthInfo, skuInfo);
+      const shopData = monthInfo.data?.shopSales?.[shop.shopId];
+      
+      allMonthsData.push({
+        name: monthInfo.name,
+        key: monthInfo.key,
+        eightPM: shopData?.eightPM || 0,
+        verve: shopData?.verve || 0,
+        year: monthInfo.year,
+        month: monthInfo.month,
+        skuSpecificVolume: skuVolume
+      });
     });
   }
   
-  // Filter months based on lookback period (convert days to months approximately)
+  // Filter months based on lookback period
   const monthsToLookback = Math.ceil(lookbackPeriod / 30);
   const relevantMonths = allMonthsData.slice(0, Math.min(monthsToLookback, allMonthsData.length));
   
-  // Get volume for this SKU family
+  // Get SKU-specific volumes instead of family totals
   const volumes = relevantMonths.map(month => {
-    const volume = (() => {
-      if (skuInfo.family === '8PM' || skuInfo.family === '8PM BLACK') {
-        return month.eightPM;
-      } else if (skuInfo.family.includes('VERVE')) {
-        return month.verve;
-      }
-      return 0;
-    })();
-    
     return { 
       month: month.name, 
-      volume: volume, 
-      monthData: month
+      volume: month.skuSpecificVolume || 0, 
+      monthData: month,
+      familyVolume: (skuInfo.family === '8PM' ? month.eightPM : month.verve) // Keep family context
     };
   });
   
