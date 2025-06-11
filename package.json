@@ -21,9 +21,6 @@
     "@types/react-dom": "^18",
     "jspdf": "^2.5.1",
     "jspdf-autotable": "^3.5.31",
-    "html2canvas": "^1.4.1",
-    "dompurify": "^3.0.5",
-    "canvg": "^4.0.1",
     "lucide-react": "^0.263.1",
     "next": "14.0.0",
     "react": "^18",
@@ -36,10 +33,14 @@
     "eslint-config-next": "14.0.0",
     "postcss": "^8",
     "tailwindcss": "^3.3.0",
-    "typescript": "^5",
-    "@types/dompurify": "^3.0.5"
+    "typescript": "^5"
   },
   "overrides": {
     "unrs-resolver": "npm:@npmcli/package-json@^5.0.0"
+  },
+  "pnpm": {
+    "overrides": {
+      "unrs-resolver": "npm:@npmcli/package-json@^5.0.0"
+    }
   }
 }
