@@ -6,7 +6,7 @@ import { Brain, BarChart3, Heart, Zap, Target } from 'lucide-react';
 // REGULAR IMPORTS - NO LAZY LOADING
 import CurrentAnalytics from './advanced-analytics/CurrentAnalytics';
 import CustomerHealth from './advanced-analytics/CustomerHealth';
-import SimpleSkuSupplyTracker from './advanced-analytics/SimpleSkuSupplyTracker'; // REPLACES COMPLEX SKURecoveryIntelligence
+import SimpleSkuSupplyTracker from './advanced-analytics/SimpleSkuSupplyTracker'; // ✅ REPLACED COMPLEX COMPONENT
 import SKUIntelligence from './advanced-analytics/SKUIntelligence';
 
 // Sub-tab configuration
@@ -43,7 +43,7 @@ interface DashboardData {
   currentMonth: string;
   currentYear: string;
   historicalData?: any;
-  masterData?: any; // ADD masterData for supply tracking
+  masterData?: Record<string, any[]>; // ✅ ADDED: For supply tracking
 }
 
 interface InventoryData {
@@ -71,7 +71,7 @@ const AdvancedAnalyticsTab = ({ data, inventoryData }: {
   data: DashboardData; 
   inventoryData?: InventoryData;
 }) => {
-  const [activeSubTab, setActiveSubTab] = useState('sku-supply'); // DEFAULT TO SIMPLE TRACKER
+  const [activeSubTab, setActiveSubTab] = useState('sku-supply'); // ✅ DEFAULT TO SIMPLE TRACKER
 
   // Render active sub-tab content - NO SUSPENSE NEEDED
   const renderSubTabContent = () => {
@@ -81,7 +81,7 @@ const AdvancedAnalyticsTab = ({ data, inventoryData }: {
       case 'customer-health':
         return <CustomerHealth data={data} />;
       case 'sku-supply':
-        return <SimpleSkuSupplyTracker data={data} inventoryData={inventoryData} />; // SIMPLE VERSION
+        return <SimpleSkuSupplyTracker data={data} inventoryData={inventoryData} />; // ✅ SIMPLE VERSION
       case 'sku-intelligence':
         return <SKUIntelligence data={data} />;
       default:
@@ -110,15 +110,15 @@ const AdvancedAnalyticsTab = ({ data, inventoryData }: {
               </span>
               <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse" title="Live Data"></div>
               
-              {/* ENHANCED: Show inventory connection status */}
-              {inventoryData && activeSubTab === 'sku-supply' && (
+              {/* ✅ ENHANCED: Show supply data connection status */}
+              {data?.masterData && activeSubTab === 'sku-supply' && (
                 <div className="flex items-center space-x-1 text-xs text-green-600">
                   <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                   <span>Supply Data Connected</span>
                 </div>
               )}
               
-              {/* NEW: Show simple tracker status */}
+              {/* ✅ NEW: Show simple tracker status */}
               {activeSubTab === 'sku-supply' && (
                 <div className="flex items-center space-x-1 text-xs text-blue-600">
                   <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
@@ -148,7 +148,7 @@ const AdvancedAnalyticsTab = ({ data, inventoryData }: {
                   {data.customerInsights.lostCustomers}
                 </span>
               )}
-              {/* SIMPLE TRACKER BADGE */}
+              {/* ✅ SIMPLE TRACKER BADGE */}
               {tab.id === 'sku-supply' && (
                 <span className="bg-green-100 text-green-800 text-xs px-2 py-1 rounded-full">
                   SIMPLE
