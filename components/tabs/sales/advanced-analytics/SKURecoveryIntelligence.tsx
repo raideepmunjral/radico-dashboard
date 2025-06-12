@@ -1,10 +1,10 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Target, Search, Filter, Download, X, ChevronLeft, ChevronRight, AlertTriangle, TrendingDown, UserPlus, Package, Calendar, Eye, Clock, RefreshCw, BarChart3, Truck, CheckCircle, XCircle, Users, Timer, Star, Zap } from 'lucide-react';
 
 // ==========================================
-// ENHANCED TYPE DEFINITIONS FOR REAL CSV DATA
+// TYPE DEFINITIONS FOR REAL GOOGLE SHEETS DATA
 // ==========================================
 
 interface ShopData {
@@ -74,15 +74,20 @@ interface InventoryData {
   }>;
 }
 
-interface RealSKUTransaction {
+interface RealSupplyTransaction {
   date: Date;
   dateStr: string;
   cases: number;
   fullBrand: string;
+  brandShort: string;
   size: string;
+  shopId: string;
+  shopName: string;
+  orderNo: string;
+  source: 'pending_challans' | 'historical';
 }
 
-interface EnhancedSKURecoveryOpportunity {
+interface RealSKURecoveryOpportunity {
   shopId: string;
   shopName: string;
   department: string;
@@ -91,9 +96,9 @@ interface EnhancedSKURecoveryOpportunity {
   skuFamily: string;
   skuVariant: string;
   skuSize: string;
-  skuFlavor?: string; // For VERVE variants
+  skuFlavor?: string;
   
-  // Enhanced Historical Analysis from Real CSV
+  // Real Historical Analysis from Google Sheets
   lastOrderDate: string;
   daysSinceLastOrder: number;
   lastOrderVolume: number;
@@ -144,263 +149,559 @@ interface EnhancedFilters {
   minimumRecoveryPotential: number;
   showOnlyWithSupplyData: boolean;
   minimumHistoricalAverage: number;
-  // NEW: Time-based customer segmentation filters
   customerStatus: string;
   timeSegment: string;
-  brandFamily: string; // 8PM vs VERVE
-  skuSize: string; // 375ML, 750ML, 180ML
-  skuFlavor: string; // For VERVE: GREEN APPLE, CRANBERRY, etc.
+  brandFamily: string;
+  skuSize: string;
+  skuFlavor: string;
 }
 
 // ==========================================
-// REAL CSV DATA SIMULATION WITH FULL SKU GRANULARITY
+// GOOGLE SHEETS CONFIGURATION
 // ==========================================
 
-const generateRealSKUSupplyData = () => {
-  // This simulates the structure from real CSV analysis (31,824 transactions)
-  // In production, this would read from actual CSV files
-  const realSupplyData: Record<string, Record<string, RealSKUTransaction[]>> = {};
-  
-  // Sample shops with realistic SKU supply patterns
-  const shops = [
-    { id: '01/2024/0947', name: 'KAROL BAGH KIKARWALA' },
-    { id: '01/2024/1347', name: 'MANGOLPURI-III' },
-    { id: '01/2024/0222', name: 'PITAMPURA FASHION MALL' },
-    { id: '01/2024/1187', name: 'CHATTER PUR' },
-    { id: '01/2024/0913', name: 'N-BLOCK' },
-    { id: '01/2024/1566', name: 'KANTI NAGAR EXTN' },
-    { id: '01/2024/1078', name: 'ROHINI EXTN SECTOR-4' },
-    { id: '01/2024/1420', name: 'KHYALA VISHNU GARDEN' },
-    { id: '01/2024/0331', name: 'JAHANGIR PURI' }
-  ];
-
-  shops.forEach(shop => {
-    realSupplyData[shop.id] = {};
-    
-    // 8PM Variants with realistic supply patterns
-    const eightPMVariants = [
-      { key: '8PM BLACK_375', fullBrand: '8PM PREMIUM BLACK SUPERIOR WHISKY', size: '375' },
-      { key: '8PM BLACK_750', fullBrand: '8 PM PREMIUM BLACK BLENDED WHISKY', size: '750' },
-      { key: '8PM BLACK_180-P', fullBrand: '8 PM PREMIUM BLACK BLENDED WHISKY', size: '180-P' },
-      { key: '8PM BLACK_90A', fullBrand: '8 PM PREMIUM BLACK BLENDED WHISKY', size: '90A' }
-    ];
-    
-    // VERVE Variants with all flavors and sizes
-    const verveVariants = [
-      { key: 'VERVE_GREEN_APPLE_375', fullBrand: 'M2 MAGIC MOMENTS VERVE GREEN APPLE SUPERIOR FLAVOURED VODKA', size: '375' },
-      { key: 'VERVE_GREEN_APPLE_750', fullBrand: 'M2 MAGIC MOMENTS VERVE GREEN APPLE SUPERIOR FLAVOURED VODKA', size: '750' },
-      { key: 'VERVE_CRANBERRY_180', fullBrand: 'M2 MAGIC MOMENTS VERVE CRANBERRY TEASE SUPERIOR FLAVOURED VODKA', size: '180' },
-      { key: 'VERVE_CRANBERRY_375', fullBrand: 'M2 MAGIC MOMENTS VERVE CRANBERRY TEASE SUPERIOR FLAVOURED VODKA', size: '375' },
-      { key: 'VERVE_LEMON_LUSH_375', fullBrand: 'M2M VERVE LEMON LUSH SUP FL VODKA', size: '375' },
-      { key: 'VERVE_LEMON_LUSH_750', fullBrand: 'M2M VERVE LEMON LUSH SUP FL VODKA', size: '750' },
-      { key: 'VERVE_GRAIN_375', fullBrand: 'M2M VERVE SUPERIOR GRAIN VODKA', size: '375' },
-      { key: 'VERVE_GRAIN_750', fullBrand: 'M2M VERVE SUPERIOR GRAIN VODKA', size: '750' }
-    ];
-
-    const allVariants = [...eightPMVariants, ...verveVariants];
-    
-    allVariants.forEach(variant => {
-      const transactions: RealSKUTransaction[] = [];
-      const today = new Date();
-      
-      // Generate realistic supply pattern based on variant
-      const isPopularVariant = ['8PM BLACK_750', 'VERVE_GREEN_APPLE_375', 'VERVE_CRANBERRY_180'].includes(variant.key);
-      const hasRecentStoppedPattern = Math.random() < 0.3; // 30% chance of being a recovery opportunity
-      
-      if (hasRecentStoppedPattern) {
-        // Pattern: Customer stopped this specific variant but may still order others
-        const stoppedDaysAgo = Math.floor(Math.random() * 300) + 60; // Stopped 60-360 days ago
-        const lastSupplyDate = new Date(today.getTime() - (stoppedDaysAgo * 24 * 60 * 60 * 1000));
-        
-        // Generate historical transactions before they stopped
-        for (let i = 0; i < 3 + Math.floor(Math.random() * 8); i++) {
-          const transactionDate = new Date(lastSupplyDate.getTime() - (i * 30 * 24 * 60 * 60 * 1000));
-          if (transactionDate >= new Date('2024-04-01')) {
-            transactions.push({
-              date: transactionDate,
-              dateStr: transactionDate.toLocaleDateString('en-GB'),
-              cases: isPopularVariant ? (2 + Math.floor(Math.random() * 20)) : (1 + Math.floor(Math.random() * 8)),
-              fullBrand: variant.fullBrand,
-              size: variant.size
-            });
-          }
-        }
-      } else {
-        // Pattern: Currently active customer
-        for (let i = 0; i < 2 + Math.floor(Math.random() * 6); i++) {
-          const transactionDate = new Date(today.getTime() - (i * 45 * 24 * 60 * 60 * 1000));
-          if (transactionDate >= new Date('2024-04-01')) {
-            transactions.push({
-              date: transactionDate,
-              dateStr: transactionDate.toLocaleDateString('en-GB'),
-              cases: isPopularVariant ? (3 + Math.floor(Math.random() * 15)) : (1 + Math.floor(Math.random() * 6)),
-              fullBrand: variant.fullBrand,
-              size: variant.size
-            });
-          }
-        }
-      }
-      
-      if (transactions.length > 0) {
-        realSupplyData[shop.id][variant.key] = transactions.sort((a, b) => b.date.getTime() - a.date.getTime());
-      }
-    });
-  });
-  
-  return realSupplyData;
+const SHEETS_CONFIG = {
+  masterSheetId: process.env.NEXT_PUBLIC_MASTER_SHEET_ID || '1pRz9CgOoamTrFipnmF-XuBCg9IZON9br5avgRlKYtxM',
+  historicalSheetId: process.env.NEXT_PUBLIC_HISTORICAL_SHEET_ID || '1yXzEYHJeHlETrEmU4TZ9F2_qv4OE10N4DPdYX0Iqfx0',
+  apiKey: process.env.NEXT_PUBLIC_GOOGLE_API_KEY
 };
 
 // ==========================================
-// SKU PROCESSING FUNCTIONS WITH ENHANCED GRANULARITY
+// BRAND MAPPING & NORMALIZATION FOR REAL DATA
 // ==========================================
 
-const parseEnhancedSKUKey = (skuKey: string) => {
-  const parts = skuKey.split('_');
+const normalizeBrandFromSheets = (brandInput: string, sizeInput: string, source: 'pending_challans' | 'historical'): {
+  family: string;
+  variant: string;
+  size: string;
+  flavor: string;
+  displayName: string;
+  normalizedKey: string;
+} => {
+  const brand = brandInput?.toString().trim().toUpperCase() || '';
+  let size = sizeInput?.toString().trim() || '';
+  
+  // Normalize size variations
+  size = size.replace(/[^0-9A-Z]/g, ''); // Remove special chars
+  if (size === '180P' || size === '180-P' || size === 'PETP' || size === 'PET') size = '180P';
+  if (size === '90A' || size === '90') size = '90A';
+  if (!size || size === '') size = '750'; // Default
+  
   let family = '';
-  let size = '';
+  let variant = '';
   let flavor = '';
   let displayName = '';
-  let variant = '';
   
-  if (skuKey.startsWith('8PM BLACK')) {
+  // 8PM Brand Family Detection
+  if (brand.includes('8 PM') || brand.includes('8PM') || brand.includes('PREMIUM BLACK')) {
     family = '8PM';
-    size = parts[parts.length - 1]; // Last part is size
-    displayName = `8PM BLACK ${size}ML`;
-    variant = `8PM BLACK ${size}ML`;
-    if (size.includes('P')) {
-      displayName += ' PET';
-      variant += ' PET';
+    if (size === '180P' || size === '90A' || size === '60P') {
+      variant = `8PM BLACK ${size} PET`;
+      displayName = `8PM BLACK ${size} PET`;
+    } else {
+      variant = `8PM BLACK ${size}ML`;
+      displayName = `8PM BLACK ${size}ML`;
     }
-  } else if (skuKey.startsWith('VERVE')) {
+  }
+  // VERVE Brand Family Detection
+  else if (brand.includes('VERVE') || brand.includes('M2M') || brand.includes('MAGIC MOMENTS')) {
     family = 'VERVE';
-    size = parts[parts.length - 1]; // Last part is size
     
-    // Extract flavor from middle parts
-    if (skuKey.includes('GREEN_APPLE')) {
+    // Detect flavor
+    if (brand.includes('GREEN APPLE') || brand.includes('APPLE')) {
       flavor = 'GREEN APPLE';
-      displayName = `VERVE GREEN APPLE ${size}ML`;
       variant = `VERVE GREEN APPLE ${size}ML`;
-    } else if (skuKey.includes('CRANBERRY')) {
+      displayName = `VERVE GREEN APPLE ${size}ML`;
+    } else if (brand.includes('CRANBERRY') || brand.includes('TEASE')) {
       flavor = 'CRANBERRY';
-      displayName = `VERVE CRANBERRY ${size}ML`;
       variant = `VERVE CRANBERRY ${size}ML`;
-    } else if (skuKey.includes('LEMON_LUSH')) {
+      displayName = `VERVE CRANBERRY ${size}ML`;
+    } else if (brand.includes('LEMON') || brand.includes('LUSH')) {
       flavor = 'LEMON LUSH';
-      displayName = `VERVE LEMON LUSH ${size}ML`;
       variant = `VERVE LEMON LUSH ${size}ML`;
-    } else if (skuKey.includes('GRAIN')) {
+      displayName = `VERVE LEMON LUSH ${size}ML`;
+    } else if (brand.includes('GRAIN')) {
       flavor = 'GRAIN';
-      displayName = `VERVE GRAIN ${size}ML`;
       variant = `VERVE GRAIN ${size}ML`;
+      displayName = `VERVE GRAIN ${size}ML`;
     } else {
       flavor = 'CLASSIC';
-      displayName = `VERVE ${size}ML`;
       variant = `VERVE ${size}ML`;
+      displayName = `VERVE ${size}ML`;
     }
-  } else {
+  }
+  // Other brands
+  else {
     family = 'OTHER';
-    displayName = skuKey;
-    variant = skuKey;
+    variant = `${brand} ${size}ML`;
+    displayName = `${brand} ${size}ML`;
   }
   
+  const normalizedKey = `${family}_${variant}_${size}`;
+  
   return {
-    originalKey: skuKey,
     family,
+    variant,
     size,
     flavor,
     displayName,
-    variant,
-    normalizedName: displayName
-  };
-};
-
-const analyzeRealSKUHistory = (transactions: RealSKUTransaction[], skuInfo: any, lookbackPeriod: number) => {
-  if (!transactions || transactions.length === 0) {
-    return {
-      lastOrderDate: 'No Data',
-      daysSinceLastOrder: 999,
-      lastOrderVolume: 0,
-      peakMonthVolume: 0,
-      peakMonth: 'No Data',
-      historicalAverage: 0,
-      totalHistoricalVolume: 0,
-      monthsActive: 0,
-      currentVolume: 0,
-      orderingPattern: 'STOPPED' as const,
-      dropOffMonth: undefined,
-      totalMonthsAnalyzed: 0
-    };
-  }
-
-  // Sort transactions by date (most recent first)
-  const sortedTransactions = [...transactions].sort((a, b) => b.date.getTime() - a.date.getTime());
-  
-  // Filter by lookback period
-  const today = new Date();
-  const lookbackStart = new Date(today.getTime() - (lookbackPeriod * 24 * 60 * 60 * 1000));
-  const relevantTransactions = sortedTransactions.filter(t => t.date >= lookbackStart);
-  
-  // Calculate metrics from real supply data
-  const totalVolume = relevantTransactions.reduce((sum, t) => sum + t.cases, 0);
-  const avgVolume = relevantTransactions.length > 0 ? totalVolume / relevantTransactions.length : 0;
-  
-  // Find peak transaction
-  const peakTransaction = relevantTransactions.reduce((peak, current) => 
-    current.cases > peak.cases ? current : peak, 
-    { cases: 0, dateStr: 'No Data', date: new Date(0) }
-  );
-  
-  // Get latest transaction
-  const latestTransaction = sortedTransactions[0];
-  
-  // Calculate days since last order
-  const daysSinceLastOrder = Math.floor((today.getTime() - latestTransaction.date.getTime()) / (1000 * 60 * 60 * 24));
-  
-  // Determine ordering pattern based on transaction frequency and recency
-  let orderingPattern: 'CONSISTENT' | 'SEASONAL' | 'DECLINING' | 'STOPPED' = 'STOPPED';
-  
-  if (daysSinceLastOrder <= 60 && relevantTransactions.length >= 3) {
-    orderingPattern = 'CONSISTENT';
-  } else if (daysSinceLastOrder <= 120 && relevantTransactions.length >= 2) {
-    orderingPattern = 'SEASONAL';
-  } else if (daysSinceLastOrder > 120 && relevantTransactions.length >= 1) {
-    orderingPattern = 'DECLINING';
-  } else {
-    orderingPattern = 'STOPPED';
-  }
-  
-  // Determine drop-off month
-  let dropOffMonth = undefined;
-  if (relevantTransactions.length > 0 && daysSinceLastOrder > 90) {
-    const dropOffDate = latestTransaction.date;
-    dropOffMonth = `${dropOffDate.toLocaleDateString('en-US', { month: 'long' })} ${dropOffDate.getFullYear()}`;
-  }
-  
-  return {
-    lastOrderDate: latestTransaction.dateStr,
-    daysSinceLastOrder,
-    lastOrderVolume: latestTransaction.cases,
-    peakMonthVolume: peakTransaction.cases,
-    peakMonth: peakTransaction.dateStr !== 'No Data' ? 
-      `${peakTransaction.date.toLocaleDateString('en-US', { month: 'long' })} ${peakTransaction.date.getFullYear()}` : 
-      'No Data',
-    historicalAverage: avgVolume,
-    totalHistoricalVolume: totalVolume,
-    monthsActive: relevantTransactions.length,
-    currentVolume: daysSinceLastOrder <= 30 ? latestTransaction.cases : 0,
-    orderingPattern,
-    dropOffMonth,
-    totalMonthsAnalyzed: Math.min(Math.ceil(lookbackPeriod / 30), relevantTransactions.length)
+    normalizedKey
   };
 };
 
 // ==========================================
-// TIME-BASED CUSTOMER SEGMENTATION
+// REAL GOOGLE SHEETS DATA FETCHING
+// ==========================================
+
+const fetchRealSKUData = async (lookbackPeriod: number): Promise<Record<string, RealSupplyTransaction[]>> => {
+  console.log('🔄 Fetching REAL SKU data from Google Sheets...', {
+    lookbackPeriod,
+    sheetsConfig: SHEETS_CONFIG
+  });
+
+  if (!SHEETS_CONFIG.apiKey) {
+    console.error('❌ Google API key not configured');
+    return {};
+  }
+
+  try {
+    // Fetch both Pending Challans and Historical data
+    const [pendingChallansData, historicalData] = await Promise.all([
+      fetchPendingChallansData(),
+      fetchHistoricalData()
+    ]);
+
+    // Process and combine data
+    const combinedSKUData = processCombinedSKUData(pendingChallansData, historicalData, lookbackPeriod);
+    
+    console.log('✅ Real SKU data fetched and processed:', {
+      totalShops: Object.keys(combinedSKUData).length,
+      totalTransactions: Object.values(combinedSKUData).flat().length,
+      dataSource: 'LIVE_GOOGLE_SHEETS'
+    });
+
+    return combinedSKUData;
+  } catch (error) {
+    console.error('❌ Error fetching real SKU data:', error);
+    return {};
+  }
+};
+
+const fetchPendingChallansData = async (): Promise<any[][]> => {
+  try {
+    const response = await fetch(
+      `https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_CONFIG.masterSheetId}/values/Pending%20Challans?key=${SHEETS_CONFIG.apiKey}`
+    );
+    
+    if (!response.ok) {
+      throw new Error('Failed to fetch Pending Challans');
+    }
+    
+    const result = await response.json();
+    console.log('✅ Pending Challans fetched:', result.values?.length || 0, 'rows');
+    return result.values || [];
+  } catch (error) {
+    console.error('❌ Error fetching Pending Challans:', error);
+    return [];
+  }
+};
+
+const fetchHistoricalData = async (): Promise<any[][]> => {
+  try {
+    const possibleSheetNames = ['MASTER', 'radico 24 25', 'Sheet1'];
+    
+    for (const sheetName of possibleSheetNames) {
+      try {
+        const response = await fetch(
+          `https://sheets.googleapis.com/v4/spreadsheets/${SHEETS_CONFIG.historicalSheetId}/values/${encodeURIComponent(sheetName)}?key=${SHEETS_CONFIG.apiKey}`
+        );
+        
+        if (response.ok) {
+          const result = await response.json();
+          console.log(`✅ Historical data fetched from ${sheetName}:`, result.values?.length || 0, 'rows');
+          return result.values || [];
+        }
+      } catch (err) {
+        continue;
+      }
+    }
+    
+    console.warn('❌ No accessible historical sheet found');
+    return [];
+  } catch (error) {
+    console.error('❌ Error fetching historical data:', error);
+    return [];
+  }
+};
+
+const processCombinedSKUData = (
+  pendingChallansData: any[][], 
+  historicalData: any[][], 
+  lookbackPeriod: number
+): Record<string, RealSupplyTransaction[]> => {
+  const shopSKUTransactions: Record<string, RealSupplyTransaction[]> = {};
+  const today = new Date();
+  const cutoffDate = new Date(today.getTime() - (lookbackPeriod * 24 * 60 * 60 * 1000));
+
+  console.log('🔧 Processing combined SKU data from real sheets...', {
+    pendingChallansRows: pendingChallansData.length,
+    historicalRows: historicalData.length,
+    lookbackPeriod,
+    cutoffDate: cutoffDate.toLocaleDateString()
+  });
+
+  // Process Pending Challans (Recent Data)
+  if (pendingChallansData.length > 1) {
+    const headers = pendingChallansData[0];
+    console.log('📋 Pending Challans headers:', headers);
+    
+    // Map column indices based on your sheet structure
+    const columnIndices = {
+      orderDate: headers.findIndex((h: string) => h?.toLowerCase().includes('orderdate')),
+      shopId: headers.findIndex((h: string) => h?.toLowerCase().includes('shop_id')),
+      shopName: headers.findIndex((h: string) => h?.toLowerCase().includes('shop_name')),
+      brand: headers.findIndex((h: string) => h?.toLowerCase().includes('brand') && !h?.toLowerCase().includes('_')),
+      size: headers.findIndex((h: string) => h?.toLowerCase().includes('size')),
+      cases: headers.findIndex((h: string) => h?.toLowerCase().includes('cases')),
+      orderNo: headers.findIndex((h: string) => h?.toLowerCase().includes('order_no'))
+    };
+
+    console.log('📊 Pending Challans column mapping:', columnIndices);
+
+    pendingChallansData.slice(1).forEach((row, index) => {
+      if (row.length >= Math.max(...Object.values(columnIndices).filter(i => i !== -1))) {
+        const dateStr = row[columnIndices.orderDate]?.toString().trim();
+        const shopId = row[columnIndices.shopId]?.toString().trim();
+        const shopName = row[columnIndices.shopName]?.toString().trim();
+        const brand = row[columnIndices.brand]?.toString().trim();
+        const size = row[columnIndices.size]?.toString().trim();
+        const cases = parseFloat(row[columnIndices.cases]) || 0;
+        const orderNo = row[columnIndices.orderNo]?.toString().trim();
+
+        if (shopId && brand && dateStr && cases > 0) {
+          const transactionDate = parseSheetDate(dateStr);
+          
+          if (transactionDate && transactionDate >= cutoffDate) {
+            const normalizedBrand = normalizeBrandFromSheets(brand, size, 'pending_challans');
+            const shopKey = shopId;
+
+            if (!shopSKUTransactions[shopKey]) {
+              shopSKUTransactions[shopKey] = [];
+            }
+
+            shopSKUTransactions[shopKey].push({
+              date: transactionDate,
+              dateStr: dateStr,
+              cases: cases,
+              fullBrand: brand,
+              brandShort: normalizedBrand.family,
+              size: normalizedBrand.size,
+              shopId: shopId,
+              shopName: shopName || 'Unknown Shop',
+              orderNo: orderNo || '',
+              source: 'pending_challans'
+            });
+          }
+        }
+      }
+    });
+  }
+
+  // Process Historical Data
+  if (historicalData.length > 1) {
+    const headers = historicalData[0];
+    console.log('📋 Historical data headers:', headers);
+    
+    const columnIndices = {
+      shopName: headers.findIndex((h: string) => h?.toLowerCase().includes('shop_name')),
+      brandShort: headers.findIndex((h: string) => h?.toLowerCase().includes('brand short') || h?.toLowerCase().includes('brand_short')),
+      brand: headers.findIndex((h: string) => h?.toLowerCase().includes('brand') && !h?.toLowerCase().includes('short')),
+      size: headers.findIndex((h: string) => h?.toLowerCase().includes('size')),
+      cases: headers.findIndex((h: string) => h?.toLowerCase().includes('cases')),
+      date: headers.findIndex((h: string) => h?.toLowerCase().includes('date')),
+      shopId: headers.findIndex((h: string) => h?.toLowerCase().includes('shop_id'))
+    };
+
+    console.log('📊 Historical data column mapping:', columnIndices);
+
+    historicalData.slice(1).forEach((row, index) => {
+      if (row.length >= Math.max(...Object.values(columnIndices).filter(i => i !== -1))) {
+        const dateStr = row[columnIndices.date]?.toString().trim();
+        const shopName = row[columnIndices.shopName]?.toString().trim();
+        const shopId = row[columnIndices.shopId]?.toString().trim();
+        const brandShort = row[columnIndices.brandShort]?.toString().trim();
+        const brand = row[columnIndices.brand]?.toString().trim();
+        const size = row[columnIndices.size]?.toString().trim();
+        const cases = parseFloat(row[columnIndices.cases]) || 0;
+
+        if ((shopId || shopName) && (brandShort || brand) && dateStr && cases > 0) {
+          const transactionDate = parseSheetDate(dateStr);
+          
+          if (transactionDate && transactionDate >= cutoffDate) {
+            const normalizedBrand = normalizeBrandFromSheets(brand || brandShort, size, 'historical');
+            const shopKey = shopId || shopName;
+
+            if (!shopSKUTransactions[shopKey]) {
+              shopSKUTransactions[shopKey] = [];
+            }
+
+            shopSKUTransactions[shopKey].push({
+              date: transactionDate,
+              dateStr: dateStr,
+              cases: cases,
+              fullBrand: brand || brandShort,
+              brandShort: brandShort || normalizedBrand.family,
+              size: normalizedBrand.size,
+              shopId: shopId || '',
+              shopName: shopName || 'Unknown Shop',
+              orderNo: '',
+              source: 'historical'
+            });
+          }
+        }
+      }
+    });
+  }
+
+  // Sort transactions by date for each shop
+  Object.keys(shopSKUTransactions).forEach(shopKey => {
+    shopSKUTransactions[shopKey].sort((a, b) => b.date.getTime() - a.date.getTime());
+  });
+
+  const totalShops = Object.keys(shopSKUTransactions).length;
+  const totalTransactions = Object.values(shopSKUTransactions).flat().length;
+  
+  console.log('✅ Combined SKU data processed:', {
+    totalShops,
+    totalTransactions,
+    sampleShops: Object.keys(shopSKUTransactions).slice(0, 5),
+    cutoffDate: cutoffDate.toLocaleDateString()
+  });
+
+  return shopSKUTransactions;
+};
+
+const parseSheetDate = (dateStr: string): Date | null => {
+  if (!dateStr) return null;
+
+  try {
+    // Handle various date formats from your sheets
+    // DD-MM-YYYY, DD/MM/YYYY, YYYY-MM-DD, etc.
+    if (dateStr.includes('-')) {
+      const parts = dateStr.split('-');
+      if (parts.length === 3) {
+        // Check if DD-MM-YYYY or YYYY-MM-DD
+        if (parts[0].length === 4) {
+          // YYYY-MM-DD
+          return new Date(`${parts[0]}-${parts[1]}-${parts[2]}`);
+        } else {
+          // DD-MM-YYYY
+          return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+        }
+      }
+    } else if (dateStr.includes('/')) {
+      const parts = dateStr.split('/');
+      if (parts.length === 3) {
+        // DD/MM/YYYY
+        return new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
+      }
+    }
+    
+    // Try direct parsing
+    const parsedDate = new Date(dateStr);
+    if (!isNaN(parsedDate.getTime())) {
+      return parsedDate;
+    }
+  } catch (error) {
+    console.warn('Failed to parse date:', dateStr, error);
+  }
+  
+  return null;
+};
+
+// ==========================================
+// SKU RECOVERY ANALYSIS WITH REAL DATA
+// ==========================================
+
+const analyzeRealSKURecovery = (
+  shops: ShopData[],
+  realSKUData: Record<string, RealSupplyTransaction[]>,
+  inventoryData: InventoryData | undefined,
+  lookbackPeriod: number
+): RealSKURecoveryOpportunity[] => {
+  console.log('🔍 Analyzing REAL SKU recovery opportunities...', {
+    totalShops: shops.length,
+    realSKUDataShops: Object.keys(realSKUData).length,
+    lookbackPeriod
+  });
+
+  const opportunities: RealSKURecoveryOpportunity[] = [];
+  const today = new Date();
+
+  // Process each shop's real SKU data
+  Object.entries(realSKUData).forEach(([shopKey, transactions]) => {
+    // Find matching shop from dashboard data
+    const matchingShop = shops.find(shop => 
+      shop.shopId === shopKey || 
+      shop.shopName === shopKey ||
+      shop.shopName.toLowerCase().includes(shopKey.toLowerCase()) ||
+      shopKey.toLowerCase().includes(shop.shopName.toLowerCase())
+    );
+
+    if (!matchingShop && transactions.length > 0) {
+      // Create basic shop info from transaction data
+      const sampleTransaction = transactions[0];
+      const basicShop = {
+        shopId: sampleTransaction.shopId || shopKey,
+        shopName: sampleTransaction.shopName || shopKey,
+        department: 'Unknown',
+        salesman: 'Unknown'
+      };
+      
+      processShopSKUOpportunities(basicShop, transactions, opportunities, inventoryData, lookbackPeriod, today);
+    } else if (matchingShop) {
+      processShopSKUOpportunities(matchingShop, transactions, opportunities, inventoryData, lookbackPeriod, today);
+    }
+  });
+
+  console.log('✅ Real SKU recovery analysis complete:', {
+    totalOpportunities: opportunities.length,
+    dataSource: 'LIVE_GOOGLE_SHEETS',
+    byCustomerStatus: {
+      RECENTLY_STOPPED: opportunities.filter(o => o.customerStatus === 'RECENTLY_STOPPED').length,
+      SHORT_DORMANT: opportunities.filter(o => o.customerStatus === 'SHORT_DORMANT').length,
+      LONG_DORMANT: opportunities.filter(o => o.customerStatus === 'LONG_DORMANT').length,
+      INACTIVE: opportunities.filter(o => o.customerStatus === 'INACTIVE').length
+    }
+  });
+
+  return opportunities.sort((a, b) => b.recoveryScore - a.recoveryScore);
+};
+
+const processShopSKUOpportunities = (
+  shop: any,
+  transactions: RealSupplyTransaction[],
+  opportunities: RealSKURecoveryOpportunity[],
+  inventoryData: InventoryData | undefined,
+  lookbackPeriod: number,
+  today: Date
+) => {
+  // Group transactions by SKU variant
+  const skuGroups: Record<string, RealSupplyTransaction[]> = {};
+  
+  transactions.forEach(transaction => {
+    const skuInfo = normalizeBrandFromSheets(transaction.fullBrand, transaction.size, transaction.source);
+    const skuKey = skuInfo.normalizedKey;
+    
+    if (!skuGroups[skuKey]) {
+      skuGroups[skuKey] = [];
+    }
+    skuGroups[skuKey].push(transaction);
+  });
+
+  // Analyze each SKU variant separately
+  Object.entries(skuGroups).forEach(([skuKey, skuTransactions]) => {
+    const sortedTransactions = skuTransactions.sort((a, b) => b.date.getTime() - a.date.getTime());
+    const latestTransaction = sortedTransactions[0];
+    const skuInfo = normalizeBrandFromSheets(latestTransaction.fullBrand, latestTransaction.size, latestTransaction.source);
+    
+    // Calculate historical metrics
+    const totalVolume = sortedTransactions.reduce((sum, t) => sum + t.cases, 0);
+    const avgVolume = totalVolume / sortedTransactions.length;
+    const daysSinceLastOrder = Math.floor((today.getTime() - latestTransaction.date.getTime()) / (1000 * 60 * 60 * 24));
+    
+    // Find peak transaction
+    const peakTransaction = sortedTransactions.reduce((peak, current) => 
+      current.cases > peak.cases ? current : peak, sortedTransactions[0]
+    );
+
+    // Get customer status based on time since last order
+    const { status: customerStatus, timeSegment } = getCustomerStatusFromDays(daysSinceLastOrder);
+    
+    // Only include recovery opportunities (not current customers)
+    if (customerStatus !== 'CURRENT' && avgVolume >= 1 && sortedTransactions.length >= 2) {
+      // Calculate recovery metrics
+      const recoveryPotential = Math.max(avgVolume * 2, peakTransaction.cases * 0.5);
+      const recoveryScore = calculateRecoveryScore(avgVolume, peakTransaction.cases, daysSinceLastOrder, customerStatus);
+      
+      // Determine priority and category
+      const priority = getPriority(recoveryScore, recoveryPotential, customerStatus);
+      const category = getCategory(avgVolume, customerStatus);
+      
+      // Generate action required
+      const actionRequired = generateActionRequired(avgVolume, daysSinceLastOrder, customerStatus);
+      
+      // Create timeline analysis
+      const timelineAnalysis = generateTimelineAnalysis({
+        peakMonth: peakTransaction.dateStr,
+        peakMonthVolume: peakTransaction.cases,
+        lastOrderDate: latestTransaction.dateStr,
+        lastOrderVolume: latestTransaction.cases,
+        daysSinceLastOrder
+      });
+
+      const opportunity: RealSKURecoveryOpportunity = {
+        shopId: shop.shopId,
+        shopName: shop.shopName,
+        department: shop.department || 'Unknown',
+        salesman: shop.salesman || 'Unknown',
+        sku: skuInfo.displayName,
+        skuFamily: skuInfo.family,
+        skuVariant: skuInfo.variant,
+        skuSize: skuInfo.size,
+        skuFlavor: skuInfo.flavor,
+        
+        // Historical Analysis from Real Google Sheets Data
+        lastOrderDate: latestTransaction.dateStr,
+        daysSinceLastOrder,
+        lastOrderVolume: latestTransaction.cases,
+        peakMonthVolume: peakTransaction.cases,
+        peakMonth: peakTransaction.dateStr,
+        historicalAverage: avgVolume,
+        totalHistoricalVolume: totalVolume,
+        monthsActive: sortedTransactions.length,
+        
+        // Current Status
+        currentStockQuantity: 0, // Would need inventory integration
+        isCurrentlyOutOfStock: false,
+        lastVisitDate: undefined,
+        daysSinceLastVisit: 999,
+        lastSupplyDate: latestTransaction.date,
+        daysSinceLastSupply: daysSinceLastOrder,
+        supplyDataSource: 'google_sheets',
+        reasonNoStock: '',
+        recentSupplyAttempts: false,
+        
+        // Recovery Analysis
+        recoveryPotential,
+        recoveryScore,
+        priority,
+        category,
+        actionRequired,
+        
+        // Time-Based Customer Segmentation
+        customerStatus,
+        timeSegment,
+        
+        // Timeline Analysis
+        orderingPattern: getOrderingPattern(sortedTransactions, daysSinceLastOrder),
+        dropOffMonth: daysSinceLastOrder > 90 ? latestTransaction.dateStr : undefined,
+        timelineAnalysis,
+        totalMonthsAnalyzed: Math.min(Math.ceil(lookbackPeriod / 30), sortedTransactions.length)
+      };
+      
+      opportunities.push(opportunity);
+    }
+  });
+};
+
+// ==========================================
+// HELPER FUNCTIONS FOR ANALYSIS
 // ==========================================
 
 const getCustomerStatusFromDays = (daysSinceLastOrder: number): {
-  status: EnhancedSKURecoveryOpportunity['customerStatus'];
-  timeSegment: EnhancedSKURecoveryOpportunity['timeSegment'];
+  status: RealSKURecoveryOpportunity['customerStatus'];
+  timeSegment: RealSKURecoveryOpportunity['timeSegment'];
 } => {
   if (daysSinceLastOrder <= 30) {
     return { status: 'CURRENT', timeSegment: '0-30d' };
@@ -415,266 +716,70 @@ const getCustomerStatusFromDays = (daysSinceLastOrder: number): {
   }
 };
 
-// ==========================================
-// ENHANCED RECOVERY ANALYSIS ENGINE
-// ==========================================
-
-const analyzeEnhancedRecoveryOpportunities = (
-  shops: ShopData[], 
-  inventoryData: InventoryData | undefined, 
-  lookbackPeriod: number,
-  historicalData?: any
-): EnhancedSKURecoveryOpportunity[] => {
-  console.log('🔍 Starting REAL CSV-Based SKU Recovery Analysis...', {
-    totalShops: shops.length,
-    lookbackPeriod,
-    hasInventoryData: !!inventoryData,
-    analysisType: 'GRANULAR_SKU_LEVEL_WITH_TIME_SEGMENTATION'
-  });
-
-  const opportunities: EnhancedSKURecoveryOpportunity[] = [];
-  const today = new Date();
-  
-  // Get real SKU supply data
-  const realSKUSupplyHistory = generateRealSKUSupplyData();
-
-  shops.forEach(shop => {
-    // Get real SKU-level supply history for this shop
-    const shopSKUHistory = realSKUSupplyHistory[shop.shopId] || {};
-    
-    // Process each SKU variant separately
-    Object.keys(shopSKUHistory).forEach(skuKey => {
-      const skuTransactions = shopSKUHistory[skuKey];
-      const skuInfo = parseEnhancedSKUKey(skuKey);
-      
-      // Get REAL historical analysis from granular supply data
-      const historicalAnalysis = analyzeRealSKUHistory(skuTransactions, skuInfo, lookbackPeriod);
-      
-      // Skip if no meaningful historical data
-      if (historicalAnalysis.totalHistoricalVolume < 3) return;
-      
-      // Get customer status based on time since last order
-      const { status: customerStatus, timeSegment } = getCustomerStatusFromDays(historicalAnalysis.daysSinceLastOrder);
-      
-      // Get current inventory status
-      const inventoryStatus = getCurrentInventoryStatus(shop.shopId, skuInfo, inventoryData);
-      
-      // Determine if this is a recovery opportunity
-      const isRecoveryOpportunity = determineRecoveryOpportunity(historicalAnalysis, inventoryStatus, customerStatus);
-      
-      if (isRecoveryOpportunity) {
-        // Calculate recovery metrics
-        const recoveryPotential = Math.max(
-          historicalAnalysis.historicalAverage * 2, // Estimate 2 months potential
-          historicalAnalysis.peakMonthVolume * 0.5
-        );
-        
-        const recoveryScore = calculateEnhancedRecoveryScore(
-          historicalAnalysis,
-          inventoryStatus,
-          recoveryPotential,
-          customerStatus
-        );
-        
-        // Determine priority and category
-        const priority = getEnhancedPriority(recoveryScore, recoveryPotential, customerStatus);
-        const category = getEnhancedCategory(historicalAnalysis, inventoryStatus, customerStatus);
-        
-        // Generate enhanced action required
-        const actionRequired = generateEnhancedActionRequired(historicalAnalysis, inventoryStatus, customerStatus);
-        
-        // Create timeline analysis
-        const timelineAnalysis = generateTimelineAnalysis(historicalAnalysis);
-        
-        const opportunity: EnhancedSKURecoveryOpportunity = {
-          shopId: shop.shopId,
-          shopName: shop.shopName,
-          department: shop.department,
-          salesman: shop.salesman,
-          sku: skuInfo.displayName,
-          skuFamily: skuInfo.family,
-          skuVariant: skuInfo.variant,
-          skuSize: skuInfo.size,
-          skuFlavor: skuInfo.flavor,
-          
-          // Historical Analysis (FROM REAL SKU DATA)
-          lastOrderDate: historicalAnalysis.lastOrderDate,
-          daysSinceLastOrder: historicalAnalysis.daysSinceLastOrder,
-          lastOrderVolume: historicalAnalysis.lastOrderVolume,
-          peakMonthVolume: historicalAnalysis.peakMonthVolume,
-          peakMonth: historicalAnalysis.peakMonth,
-          historicalAverage: historicalAnalysis.historicalAverage,
-          totalHistoricalVolume: historicalAnalysis.totalHistoricalVolume,
-          monthsActive: historicalAnalysis.monthsActive,
-          
-          // Current Status
-          currentStockQuantity: inventoryStatus.currentQuantity,
-          isCurrentlyOutOfStock: inventoryStatus.isOutOfStock,
-          lastVisitDate: inventoryStatus.lastVisitDate,
-          daysSinceLastVisit: inventoryStatus.daysSinceLastVisit,
-          lastSupplyDate: inventoryStatus.lastSupplyDate,
-          daysSinceLastSupply: inventoryStatus.daysSinceLastSupply,
-          supplyDataSource: inventoryStatus.supplyDataSource,
-          reasonNoStock: inventoryStatus.reasonNoStock,
-          recentSupplyAttempts: inventoryStatus.recentSupplyAttempts,
-          
-          // Recovery Analysis
-          recoveryPotential,
-          recoveryScore,
-          priority,
-          category,
-          actionRequired,
-          
-          // Time-Based Customer Segmentation
-          customerStatus,
-          timeSegment,
-          
-          // Timeline Analysis
-          orderingPattern: historicalAnalysis.orderingPattern,
-          dropOffMonth: historicalAnalysis.dropOffMonth,
-          timelineAnalysis,
-          totalMonthsAnalyzed: historicalAnalysis.totalMonthsAnalyzed || 4
-        };
-        
-        opportunities.push(opportunity);
-      }
-    });
-  });
-
-  console.log('✅ REAL CSV-Based Recovery Analysis Complete:', {
-    totalOpportunities: opportunities.length,
-    skuLevelGranularity: 'PRESERVED',
-    dataSource: 'REAL_SUPPLY_TRANSACTIONS',
-    timeSegmentation: 'ENABLED',
-    byCustomerStatus: {
-      RECENTLY_STOPPED: opportunities.filter(o => o.customerStatus === 'RECENTLY_STOPPED').length,
-      SHORT_DORMANT: opportunities.filter(o => o.customerStatus === 'SHORT_DORMANT').length,
-      LONG_DORMANT: opportunities.filter(o => o.customerStatus === 'LONG_DORMANT').length,
-      INACTIVE: opportunities.filter(o => o.customerStatus === 'INACTIVE').length
-    }
-  });
-
-  return opportunities.sort((a, b) => b.recoveryScore - a.recoveryScore);
-};
-
-// ==========================================
-// ENHANCED HELPER FUNCTIONS
-// ==========================================
-
-const getCurrentInventoryStatus = (shopId: string, skuInfo: any, inventoryData?: InventoryData) => {
-  const defaultStatus = {
-    currentQuantity: 0,
-    isOutOfStock: false,
-    lastVisitDate: undefined,
-    daysSinceLastVisit: 999,
-    lastSupplyDate: undefined,
-    daysSinceLastSupply: 999,
-    supplyDataSource: 'no_data',
-    reasonNoStock: '',
-    recentSupplyAttempts: false
-  };
-  
-  if (!inventoryData?.shops[shopId]) return defaultStatus;
-  
-  const shop = inventoryData.shops[shopId];
-  const today = new Date();
-  
-  // Simplified inventory matching
-  const hasStock = Math.random() > 0.3; // 70% have stock
-  const quantity = hasStock ? Math.floor(Math.random() * 10) + 1 : 0;
-  
-  return {
-    currentQuantity: quantity,
-    isOutOfStock: quantity === 0,
-    lastVisitDate: shop.visitDate,
-    daysSinceLastVisit: Math.floor((today.getTime() - shop.visitDate.getTime()) / (1000 * 60 * 60 * 24)),
-    lastSupplyDate: undefined,
-    daysSinceLastSupply: 999,
-    supplyDataSource: 'simulated_data',
-    reasonNoStock: quantity === 0 ? 'Out of stock' : '',
-    recentSupplyAttempts: false
-  };
-};
-
-const determineRecoveryOpportunity = (historical: any, inventory: any, customerStatus: string) => {
-  // Recovery opportunity if:
-  // 1. Customer has stopped ordering (not CURRENT)
-  // 2. Had meaningful historical volume
-  // 3. Either recently stopped (high priority) or long dormant (lower priority)
-  
-  return (
-    customerStatus !== 'CURRENT' && 
-    historical.historicalAverage > 1 && 
-    (customerStatus === 'RECENTLY_STOPPED' || 
-     customerStatus === 'SHORT_DORMANT' || 
-     customerStatus === 'LONG_DORMANT' ||
-     (customerStatus === 'INACTIVE' && historical.peakMonthVolume > 10))
-  );
-};
-
-const calculateEnhancedRecoveryScore = (historical: any, inventory: any, recoveryPotential: number, customerStatus: string) => {
+const calculateRecoveryScore = (avgVolume: number, peakVolume: number, daysSinceLastOrder: number, customerStatus: string): number => {
   let score = 0;
   
   // Base score from historical performance
-  score += Math.min(historical.historicalAverage * 5, 40);
+  score += Math.min(avgVolume * 5, 40);
+  score += Math.min(peakVolume * 2, 20);
   
-  // Bonus for peak performance
-  score += Math.min(historical.peakMonthVolume * 2, 20);
-  
-  // Time urgency scoring (higher score for recently stopped)
+  // Time urgency scoring
   if (customerStatus === 'RECENTLY_STOPPED') score += 25;
   else if (customerStatus === 'SHORT_DORMANT') score += 15;
   else if (customerStatus === 'LONG_DORMANT') score += 10;
   else if (customerStatus === 'INACTIVE') score += 5;
   
-  // Current stock status
-  if (inventory.isOutOfStock) score += 10;
-  
-  // Pattern bonus
-  if (historical.orderingPattern === 'CONSISTENT') score += 10;
-  else if (historical.orderingPattern === 'SEASONAL') score += 5;
-  
   return Math.min(score, 100);
 };
 
-const getEnhancedPriority = (score: number, potential: number, customerStatus: string): 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW' => {
+const getPriority = (score: number, potential: number, customerStatus: string): RealSKURecoveryOpportunity['priority'] => {
   if (customerStatus === 'RECENTLY_STOPPED' && potential > 20) return 'CRITICAL';
-  if (score >= 80 || (customerStatus === 'RECENTLY_STOPPED')) return 'HIGH';
+  if (score >= 80 || customerStatus === 'RECENTLY_STOPPED') return 'HIGH';
   if (score >= 60 || customerStatus === 'SHORT_DORMANT') return 'MEDIUM';
   return 'LOW';
 };
 
-const getEnhancedCategory = (historical: any, inventory: any, customerStatus: string): 'IMMEDIATE_ACTION' | 'RELATIONSHIP_MAINTENANCE' | 'VIP_CUSTOMER' | 'GAP_ANALYSIS' | 'SUPPLY_CHAIN_ISSUE' => {
+const getCategory = (avgVolume: number, customerStatus: string): RealSKURecoveryOpportunity['category'] => {
   if (customerStatus === 'RECENTLY_STOPPED') return 'IMMEDIATE_ACTION';
-  if (historical.historicalAverage > 15) return 'VIP_CUSTOMER';
+  if (avgVolume > 15) return 'VIP_CUSTOMER';
   if (customerStatus === 'SHORT_DORMANT') return 'RELATIONSHIP_MAINTENANCE';
   return 'GAP_ANALYSIS';
 };
 
-const generateEnhancedActionRequired = (historical: any, inventory: any, customerStatus: string): string => {
+const generateActionRequired = (avgVolume: number, daysSinceLastOrder: number, customerStatus: string): string => {
   if (customerStatus === 'RECENTLY_STOPPED') {
-    return `🚨 URGENT: Customer stopped ordering ${historical.lastOrderVolume} cases just ${historical.daysSinceLastOrder} days ago - immediate follow-up required`;
+    return `🚨 URGENT: Customer stopped ordering ${avgVolume.toFixed(1)} avg cases just ${daysSinceLastOrder} days ago - immediate follow-up required`;
   } else if (customerStatus === 'SHORT_DORMANT') {
-    return `📞 Call customer: Stopped ordering ${historical.historicalAverage.toFixed(1)} avg cases/transaction ${historical.daysSinceLastOrder} days ago`;
+    return `📞 Call customer: Stopped ordering ${avgVolume.toFixed(1)} avg cases ${daysSinceLastOrder} days ago`;
   } else if (customerStatus === 'LONG_DORMANT') {
-    return `🎯 Re-engagement needed: Customer dormant for ${historical.daysSinceLastOrder} days, was ordering ${historical.peakMonthVolume} cases at peak`;
+    return `🎯 Re-engagement needed: Customer dormant for ${daysSinceLastOrder} days, was ordering ${avgVolume.toFixed(1)} cases average`;
   } else {
     return `💼 Strategic recovery: Long-term inactive customer, consider special incentives`;
   }
 };
 
-const generateTimelineAnalysis = (historical: any): string => {
+const getOrderingPattern = (transactions: RealSupplyTransaction[], daysSinceLastOrder: number): RealSKURecoveryOpportunity['orderingPattern'] => {
+  if (transactions.length >= 6 && daysSinceLastOrder <= 90) return 'CONSISTENT';
+  if (transactions.length >= 3 && daysSinceLastOrder <= 180) return 'SEASONAL';
+  if (transactions.length >= 2 && daysSinceLastOrder > 180) return 'DECLINING';
+  return 'STOPPED';
+};
+
+const generateTimelineAnalysis = (data: {
+  peakMonth: string;
+  peakMonthVolume: number;
+  lastOrderDate: string;
+  lastOrderVolume: number;
+  daysSinceLastOrder: number;
+}): string => {
   const timeline = [];
-  if (historical.peakMonth && historical.peakMonthVolume > 0) {
-    timeline.push(`Peak: ${historical.peakMonth} (${historical.peakMonthVolume} cases)`);
+  if (data.peakMonth && data.peakMonthVolume > 0) {
+    timeline.push(`Peak: ${data.peakMonth} (${data.peakMonthVolume} cases)`);
   }
-  if (historical.dropOffMonth) {
-    timeline.push(`Declined: ${historical.dropOffMonth}`);
+  if (data.lastOrderDate) {
+    timeline.push(`Last order: ${data.lastOrderDate} (${data.lastOrderVolume} cases)`);
   }
-  if (historical.lastOrderDate && historical.lastOrderDate !== 'Unknown') {
-    timeline.push(`Last order: ${historical.lastOrderDate} (${historical.lastOrderVolume} cases)`);
-  }
-  timeline.push(`Gap: ${historical.daysSinceLastOrder} days`);
+  timeline.push(`Gap: ${data.daysSinceLastOrder} days`);
   
   return timeline.join(' → ');
 };
@@ -694,12 +799,11 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
     priority: '',
     category: '',
     searchText: '',
-    lookbackPeriod: 365, // 12 months default
+    lookbackPeriod: 365,
     showOnlyOutOfStock: false,
     minimumRecoveryPotential: 5,
     showOnlyWithSupplyData: false,
     minimumHistoricalAverage: 2,
-    // NEW: Time-based filters
     customerStatus: '',
     timeSegment: '',
     brandFamily: '',
@@ -708,16 +812,39 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
   });
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(20);
+  const [loading, setLoading] = useState(true);
+  const [realSKUData, setRealSKUData] = useState<Record<string, RealSupplyTransaction[]>>({});
 
-  // Generate enhanced recovery opportunities
+  // Fetch real SKU data from Google Sheets
+  useEffect(() => {
+    const loadRealSKUData = async () => {
+      setLoading(true);
+      try {
+        const skuData = await fetchRealSKUData(filters.lookbackPeriod);
+        setRealSKUData(skuData);
+      } catch (error) {
+        console.error('Error loading real SKU data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadRealSKUData();
+  }, [filters.lookbackPeriod]);
+
+  // Generate recovery opportunities from real Google Sheets data
   const recoveryOpportunities = useMemo(() => {
-    return analyzeEnhancedRecoveryOpportunities(
-      data.allShopsComparison, 
-      inventoryData, 
-      filters.lookbackPeriod,
-      data.historicalData
+    if (loading || Object.keys(realSKUData).length === 0) {
+      return [];
+    }
+    
+    return analyzeRealSKURecovery(
+      data.allShopsComparison,
+      realSKUData,
+      inventoryData,
+      filters.lookbackPeriod
     );
-  }, [data.allShopsComparison, inventoryData, filters.lookbackPeriod, data.historicalData]);
+  }, [data.allShopsComparison, realSKUData, inventoryData, filters.lookbackPeriod, loading]);
 
   // Get unique values for filters
   const departments = [...new Set(data.allShopsComparison.map(shop => shop.department))].sort();
@@ -742,8 +869,6 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
       const matchesMinRecovery = opp.recoveryPotential >= filters.minimumRecoveryPotential;
       const matchesSupplyData = !filters.showOnlyWithSupplyData || opp.supplyDataSource !== 'no_data';
       const matchesMinHistorical = opp.historicalAverage >= filters.minimumHistoricalAverage;
-      
-      // NEW: Time-based filters
       const matchesCustomerStatus = !filters.customerStatus || opp.customerStatus === filters.customerStatus;
       const matchesTimeSegment = !filters.timeSegment || opp.timeSegment === filters.timeSegment;
       const matchesBrandFamily = !filters.brandFamily || opp.skuFamily === filters.brandFamily;
@@ -835,10 +960,10 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
   // Export function
   const exportToCSV = () => {
     let csvContent = "data:text/csv;charset=utf-8,";
-    csvContent += `REAL CSV-Based SKU Recovery Intelligence Report - ${new Date().toLocaleDateString()}\n`;
-    csvContent += `Data Source: Granular supply transactions with time-based customer segmentation\n`;
-    csvContent += `SKU-Level Tracking: Preserves size and flavor granularity (375ML vs 750ML, GREEN APPLE vs CRANBERRY)\n`;
-    csvContent += `Time Segmentation: Current, Recently Stopped (1-2m), Short Dormant (3-4m), Long Dormant (5-8m), Inactive (8m+)\n`;
+    csvContent += `LIVE Google Sheets SKU Recovery Intelligence Report - ${new Date().toLocaleDateString()}\n`;
+    csvContent += `Data Source: Live Google Sheets with real transaction data\n`;
+    csvContent += `Master Sheet: ${SHEETS_CONFIG.masterSheetId}\n`;
+    csvContent += `Historical Sheet: ${SHEETS_CONFIG.historicalSheetId}\n`;
     csvContent += `Total Opportunities: ${summary.total}\n`;
     csvContent += `Total Recovery Potential: ${summary.totalRecoveryPotential.toFixed(0)} cases\n\n`;
     
@@ -854,16 +979,16 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
     });
     
     csvContent += "\n";
-    csvContent += `Shop Name,Shop ID,Department,Salesman,Specific SKU,SKU Family,SKU Size,SKU Flavor,Customer Status,Time Segment,Last SKU Supply Date,Days Since Last SKU Supply,Last SKU Volume,Peak SKU Volume,Peak Month,SKU Historical Average,Total SKU Historical,SKU Recovery Potential,Recovery Score,Priority,Category,Current Stock,Out of SKU,Action Required,SKU Timeline Analysis\n`;
+    csvContent += `Shop Name,Shop ID,Department,Salesman,Specific SKU,SKU Family,SKU Size,SKU Flavor,Customer Status,Time Segment,Last SKU Supply Date,Days Since Last SKU Supply,Last SKU Volume,Peak SKU Volume,Peak Month,SKU Historical Average,Total SKU Historical,SKU Recovery Potential,Recovery Score,Priority,Category,Action Required,SKU Timeline Analysis\n`;
     
     filteredOpportunities.forEach(opp => {
-      csvContent += `"${opp.shopName}","${opp.shopId}","${opp.department}","${opp.salesman}","${opp.sku}","${opp.skuFamily}","${opp.skuSize}","${opp.skuFlavor || 'N/A'}","${opp.customerStatus}","${opp.timeSegment}","${opp.lastOrderDate}",${opp.daysSinceLastOrder},${opp.lastOrderVolume},${opp.peakMonthVolume},"${opp.peakMonth}",${opp.historicalAverage.toFixed(1)},${opp.totalHistoricalVolume},${opp.recoveryPotential.toFixed(1)},${opp.recoveryScore},"${opp.priority}","${opp.category}",${opp.currentStockQuantity},"${opp.isCurrentlyOutOfStock ? 'Yes' : 'No'}","${opp.actionRequired}","${opp.timelineAnalysis}"\n`;
+      csvContent += `"${opp.shopName}","${opp.shopId}","${opp.department}","${opp.salesman}","${opp.sku}","${opp.skuFamily}","${opp.skuSize}","${opp.skuFlavor || 'N/A'}","${opp.customerStatus}","${opp.timeSegment}","${opp.lastOrderDate}",${opp.daysSinceLastOrder},${opp.lastOrderVolume},${opp.peakMonthVolume},"${opp.peakMonth}",${opp.historicalAverage.toFixed(1)},${opp.totalHistoricalVolume},${opp.recoveryPotential.toFixed(1)},${opp.recoveryScore},"${opp.priority}","${opp.category}","${opp.actionRequired}","${opp.timelineAnalysis}"\n`;
     });
 
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `Enhanced_Time_Segmented_SKU_Recovery_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute("download", `LIVE_GoogleSheets_SKU_Recovery_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -913,6 +1038,18 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
     setCurrentPage(1);
   };
 
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <RefreshCw className="w-12 h-12 animate-spin mx-auto mb-4 text-purple-600" />
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Loading Live SKU Recovery Intelligence</h2>
+          <p className="text-gray-600">Fetching real data from Google Sheets...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       {/* Enhanced Header */}
@@ -921,21 +1058,21 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
           <div>
             <h2 className="text-xl font-semibold flex items-center mb-2">
               <Target className="w-6 h-6 mr-2 text-purple-600" />
-              Enhanced SKU Recovery Intelligence with Time Segmentation
+              LIVE Google Sheets SKU Recovery Intelligence
             </h2>
-            <p className="text-gray-600">Granular SKU-level customer recovery with time-based customer lifecycle analysis</p>
+            <p className="text-gray-600">Real-time SKU recovery analysis from live Google Sheets data</p>
             <div className="flex items-center mt-2 text-sm space-x-4">
               <div className="flex items-center text-green-600">
                 <CheckCircle className="w-4 h-4 mr-2" />
-                SKU-level granularity: 375ML vs 750ML tracked separately
+                Connected to live Google Sheets ({Object.keys(realSKUData).length} shops)
               </div>
               <div className="flex items-center text-blue-600">
                 <Timer className="w-4 h-4 mr-2" />
-                Time-based segmentation: Current → Recently Stopped → Dormant → Inactive
+                Real transaction data ({Object.values(realSKUData).flat().length} transactions)
               </div>
               <div className="flex items-center text-purple-600">
                 <Star className="w-4 h-4 mr-2" />
-                Full VERVE flavor tracking: GREEN APPLE, CRANBERRY, LEMON LUSH, GRAIN
+                SKU-level granularity preserved
               </div>
             </div>
           </div>
@@ -943,7 +1080,7 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
           <div className="flex items-center space-x-4 mt-4 lg:mt-0">
             <div className="flex items-center space-x-2">
               <Calendar className="w-4 h-4 text-gray-400" />
-              <label className="text-sm text-gray-600">Historical Analysis Period:</label>
+              <label className="text-sm text-gray-600">Analysis Period:</label>
               <select
                 value={filters.lookbackPeriod}
                 onChange={(e) => {
@@ -965,7 +1102,7 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
         <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4 mb-6">
           <h3 className="text-lg font-medium text-blue-900 mb-3 flex items-center">
             <Users className="w-5 h-5 mr-2" />
-            Time-Based Customer Lifecycle Analysis
+            LIVE Customer Lifecycle Analysis from Google Sheets
           </h3>
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
             {Object.entries(timeSegmentAnalysis).map(([status, data]) => (
@@ -993,42 +1130,40 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
               </div>
             ))}
           </div>
-          <div className="mt-3 text-sm text-blue-700">
-            💡 <strong>Quick Wins:</strong> Focus on "Recently Stopped" customers for immediate recovery. 
-            Target "Short Dormant" for relationship rebuilding.
-          </div>
         </div>
 
         {/* SKU Family Analysis Dashboard */}
-        <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-4 mb-6">
-          <h3 className="text-lg font-medium text-green-900 mb-3 flex items-center">
-            <Package className="w-5 h-5 mr-2" />
-            SKU Family & Variant Analysis
-          </h3>
-          <div className="space-y-2">
-            {skuFamilyAnalysis.map(family => (
-              <div key={family.family} className="flex items-center justify-between bg-white rounded p-3">
-                <div>
-                  <div className="font-medium text-gray-900">{family.family} Family</div>
-                  <div className="text-sm text-gray-600">
-                    {family.count} opportunities • {family.potential.toFixed(0)} cases potential
+        {skuFamilyAnalysis.length > 0 && (
+          <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-4 mb-6">
+            <h3 className="text-lg font-medium text-green-900 mb-3 flex items-center">
+              <Package className="w-5 h-5 mr-2" />
+              LIVE SKU Family Analysis from Real Data
+            </h3>
+            <div className="space-y-2">
+              {skuFamilyAnalysis.map(family => (
+                <div key={family.family} className="flex items-center justify-between bg-white rounded p-3">
+                  <div>
+                    <div className="font-medium text-gray-900">{family.family} Family</div>
+                    <div className="text-sm text-gray-600">
+                      {family.count} opportunities • {family.potential.toFixed(0)} cases potential
+                    </div>
+                    <div className="text-xs text-blue-600">
+                      Sizes: {family.sizes} {family.flavors && `• Flavors: ${family.flavors}`}
+                    </div>
                   </div>
-                  <div className="text-xs text-blue-600">
-                    Sizes: {family.sizes} {family.flavors && `• Flavors: ${family.flavors}`}
+                  <div className="text-right">
+                    <button
+                      onClick={() => setFilters({ ...filters, brandFamily: family.family })}
+                      className="px-3 py-1 bg-blue-100 text-blue-700 rounded text-sm hover:bg-blue-200"
+                    >
+                      Filter {family.family}
+                    </button>
                   </div>
                 </div>
-                <div className="text-right">
-                  <button
-                    onClick={() => setFilters({ ...filters, brandFamily: family.family })}
-                    className="px-3 py-1 bg-blue-100 text-blue-700 rounded text-sm hover:bg-blue-200"
-                  >
-                    Filter {family.family}
-                  </button>
-                </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Quick Filter Buttons for Time Segments */}
         <div className="flex flex-wrap gap-3 mb-6">
@@ -1088,7 +1223,7 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
         <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
           <div className="bg-gray-50 p-4 rounded-lg">
             <div className="text-2xl font-bold text-gray-900">{summary.total}</div>
-            <div className="text-sm text-gray-600">Recovery Opportunities</div>
+            <div className="text-sm text-gray-600">Live Opportunities</div>
           </div>
           <div className="bg-red-50 p-4 rounded-lg">
             <div className="text-2xl font-bold text-red-600">{summary.priorityCounts.CRITICAL}</div>
@@ -1234,11 +1369,11 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
             className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center space-x-2 text-sm"
           >
             <Download className="w-4 h-4" />
-            <span>Export Time-Segmented CSV</span>
+            <span>Export Live Data CSV</span>
           </button>
 
           <div className="text-sm text-gray-500">
-            {filteredOpportunities.length} of {recoveryOpportunities.length} opportunities
+            {filteredOpportunities.length} of {recoveryOpportunities.length} live opportunities
           </div>
         </div>
       </div>
@@ -1246,10 +1381,10 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
       {/* Enhanced Recovery Opportunities Table */}
       <div className="bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">Enhanced SKU Recovery Opportunities with Time Segmentation</h3>
+          <h3 className="text-lg font-medium text-gray-900">LIVE Google Sheets SKU Recovery Opportunities</h3>
           <p className="text-sm text-gray-500">
-            Showing {startIndex + 1}-{Math.min(endIndex, filteredOpportunities.length)} of {filteredOpportunities.length} opportunities 
-            with granular SKU tracking and customer lifecycle analysis
+            Showing {startIndex + 1}-{Math.min(endIndex, filteredOpportunities.length)} of {filteredOpportunities.length} live opportunities 
+            from real Google Sheets data
           </p>
         </div>
 
@@ -1326,7 +1461,7 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
                         </span>
                       </div>
                       <div className="text-xs text-gray-500">
-                        Based on {opportunity.totalMonthsAnalyzed} months data
+                        From live Google Sheets data
                       </div>
                     </div>
                   </td>
@@ -1352,11 +1487,10 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
         {filteredOpportunities.length === 0 && (
           <div className="text-center py-12">
             <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No SKU Recovery Opportunities Found</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No Live SKU Recovery Opportunities Found</h3>
             <p className="text-gray-500">Try adjusting your filters to see more opportunities.</p>
             <div className="mt-4 text-sm text-gray-600">
-              <p>Current filters: {filters.lookbackPeriod} days lookback, min recovery: {filters.minimumRecoveryPotential} cases</p>
-              <p className="text-blue-600 mt-2">💡 Enhanced with time-based customer segmentation and full SKU granularity</p>
+              <p>Connected to: {Object.keys(realSKUData).length} shops with {Object.values(realSKUData).flat().length} live transactions</p>
             </div>
           </div>
         )}
@@ -1365,7 +1499,7 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
         {totalPages > 1 && (
           <div className="px-6 py-3 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center">
             <div className="text-sm text-gray-700 mb-2 sm:mb-0">
-              Showing {startIndex + 1} to {Math.min(endIndex, filteredOpportunities.length)} of {filteredOpportunities.length} time-segmented opportunities
+              Showing {startIndex + 1} to {Math.min(endIndex, filteredOpportunities.length)} of {filteredOpportunities.length} live opportunities
             </div>
             <div className="flex space-x-2">
               <button
