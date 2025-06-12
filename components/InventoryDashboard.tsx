@@ -1155,7 +1155,7 @@ const InventoryDashboard = () => {
       visitCompliance: {
         totalSalesmen: salesmenStats.length,
         activeSalesmen: salesmenStats.filter(s => s.rollingPeriodVisits > 0).length,
-        rollingPeriodVisits: totalActualVisits, // FIXED: Use actual total visits
+        rollingPeriodVisits: uniqueVisitEvents.size, // FIXED: Use unique visit events count
         todayVisits: todayVisitCount,
         yesterdayVisits: yesterdayVisitCount,
         lastWeekVisits: lastWeekVisitCount,
