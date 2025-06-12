@@ -805,36 +805,42 @@ const InventoryDashboard = () => {
       }
     });
 
-    // FIXED: Count unique visit events (shop + date combinations) vs unique shops
-    const uniqueVisitEvents = new Set<string>();
+    // BACK TO WORKING LOGIC: Use the same approach as shopLatestVisits (which works correctly)
     const salesmenVisits: Record<string, any> = {};
     let todayVisitCount = 0;
     let yesterdayVisitCount = 0;
     let lastWeekVisitCount = 0;
     
-    // Count unique visit events (not every inventory row)
+    // Use the same logic that creates shopLatestVisits - that works correctly!
+    const allVisitEvents = new Set<string>();
+    
     rollingPeriodRows.forEach(row => {
       const shopId = row[columnIndices.shopId];
+      const shopName = row[columnIndices.shopName];
       const checkInDateTime = row[columnIndices.checkInDateTime];
       const salesman = row[columnIndices.salesman];
       
-      if (!shopId || !checkInDateTime || !salesman) return;
+      // Same filtering as shopLatestVisits logic (which works correctly)
+      if (!shopId || !checkInDateTime) return;
       
       try {
         const visitDate = parseDate(checkInDateTime);
         if (!visitDate) return;
         
-        // Create unique visit identifier (shop + date + salesman)
-        const visitKey = `${shopId}_${visitDate.toDateString()}_${salesman}`;
+        // Create visit event key
+        const visitEventKey = `${shopId}_${visitDate.toDateString()}_${salesman || 'unknown'}`;
         
-        if (!uniqueVisitEvents.has(visitKey)) {
-          uniqueVisitEvents.add(visitKey);
+        // Only count each visit event once
+        if (!allVisitEvents.has(visitEventKey)) {
+          allVisitEvents.add(visitEventKey);
+          
+          const finalSalesman = salesman || 'Unknown';
           
           // Initialize salesman tracking
-          if (!salesmenVisits[salesman]) {
-            salesmenVisits[salesman] = {
-              name: salesman,
-              totalActualVisits: 0,
+          if (!salesmenVisits[finalSalesman]) {
+            salesmenVisits[finalSalesman] = {
+              name: finalSalesman,
+              visitEvents: new Set(),
               uniqueShops: new Set(),
               todayVisits: 0,
               yesterdayVisits: 0,
@@ -842,24 +848,24 @@ const InventoryDashboard = () => {
             };
           }
           
-          // Count this unique visit event
-          salesmenVisits[salesman].totalActualVisits++;
-          salesmenVisits[salesman].uniqueShops.add(shopId);
+          // Add this visit event and shop
+          salesmenVisits[finalSalesman].visitEvents.add(visitEventKey);
+          salesmenVisits[finalSalesman].uniqueShops.add(shopId);
           
           // Time-based visit tracking
           if (visitDate.toDateString() === today.toDateString()) {
             todayVisitCount++;
-            salesmenVisits[salesman].todayVisits++;
+            salesmenVisits[finalSalesman].todayVisits++;
           }
           
           if (visitDate.toDateString() === yesterday.toDateString()) {
             yesterdayVisitCount++;
-            salesmenVisits[salesman].yesterdayVisits++;
+            salesmenVisits[finalSalesman].yesterdayVisits++;
           }
           
           if (visitDate >= lastWeek) {
             lastWeekVisitCount++;
-            salesmenVisits[salesman].lastWeekVisits++;
+            salesmenVisits[finalSalesman].lastWeekVisits++;
           }
         }
       } catch (error) {
@@ -1094,8 +1100,8 @@ const InventoryDashboard = () => {
 
     const salesmenStats = Object.values(salesmenVisits).map((salesman: any) => ({
       name: salesman.name,
-      rollingPeriodVisits: salesman.totalActualVisits, // FIXED: Use actual total visits
-      uniqueShops: salesman.uniqueShops.size, // Unique shops visited
+      rollingPeriodVisits: salesman.visitEvents.size, // CORRECTED: Use visit events count
+      uniqueShops: salesman.uniqueShops.size, // Keep existing unique shops logic
       todayVisits: salesman.todayVisits,
       yesterdayVisits: salesman.yesterdayVisits,
       lastWeekVisits: salesman.lastWeekVisits
@@ -1155,7 +1161,7 @@ const InventoryDashboard = () => {
       visitCompliance: {
         totalSalesmen: salesmenStats.length,
         activeSalesmen: salesmenStats.filter(s => s.rollingPeriodVisits > 0).length,
-        rollingPeriodVisits: uniqueVisitEvents.size, // FIXED: Use unique visit events count
+        rollingPeriodVisits: allVisitEvents.size, // CORRECTED: Use total visit events count
         todayVisits: todayVisitCount,
         yesterdayVisits: yesterdayVisitCount,
         lastWeekVisits: lastWeekVisitCount,
