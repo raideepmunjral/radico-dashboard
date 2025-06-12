@@ -760,7 +760,7 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
 
   // Time-based customer segmentation analysis
   const timeSegmentAnalysis = useMemo(() => {
-    const segments = {
+    const segments: Record<string, { count: number; potential: number; timeRange: string }> = {
       'CURRENT': { count: 0, potential: 0, timeRange: '0-30 days' },
       'RECENTLY_STOPPED': { count: 0, potential: 0, timeRange: '1-2 months' },
       'SHORT_DORMANT': { count: 0, potential: 0, timeRange: '3-4 months' },
@@ -778,7 +778,7 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
 
   // SKU Family Analysis
   const skuFamilyAnalysis = useMemo(() => {
-    const families = {};
+    const families: Record<string, { count: number; potential: number; sizes: Set<string>; flavors: Set<string> }> = {};
     filteredOpportunities.forEach(opp => {
       if (!families[opp.skuFamily]) {
         families[opp.skuFamily] = { count: 0, potential: 0, sizes: new Set(), flavors: new Set() };
@@ -812,7 +812,7 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
       ? filteredOpportunities.reduce((sum, opp) => sum + opp.recoveryScore, 0) / total 
       : 0;
 
-    const priorityCounts = {
+    const priorityCounts: Record<string, number> = {
       CRITICAL: filteredOpportunities.filter(o => o.priority === 'CRITICAL').length,
       HIGH: filteredOpportunities.filter(o => o.priority === 'HIGH').length,
       MEDIUM: filteredOpportunities.filter(o => o.priority === 'MEDIUM').length,
@@ -871,24 +871,24 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
 
   // Helper functions for UI
   const getPriorityBadge = (priority: string) => {
-    const colors = {
+    const colors: Record<string, string> = {
       CRITICAL: 'bg-red-100 text-red-800 border-red-200',
       HIGH: 'bg-orange-100 text-orange-800 border-orange-200',
       MEDIUM: 'bg-yellow-100 text-yellow-800 border-yellow-200',
       LOW: 'bg-green-100 text-green-800 border-green-200'
     };
-    return `px-2 py-1 text-xs font-semibold rounded-full border ${colors[priority as keyof typeof colors]}`;
+    return `px-2 py-1 text-xs font-semibold rounded-full border ${colors[priority] || colors.LOW}`;
   };
 
   const getCustomerStatusBadge = (status: string, timeSegment: string) => {
-    const colors = {
+    const colors: Record<string, string> = {
       CURRENT: 'bg-green-100 text-green-800 border-green-200',
       RECENTLY_STOPPED: 'bg-red-100 text-red-800 border-red-200',
       SHORT_DORMANT: 'bg-orange-100 text-orange-800 border-orange-200',
       LONG_DORMANT: 'bg-yellow-100 text-yellow-800 border-yellow-200',
       INACTIVE: 'bg-gray-100 text-gray-800 border-gray-200'
     };
-    return `px-2 py-1 text-xs font-semibold rounded border ${colors[status as keyof typeof colors]}`;
+    return `px-2 py-1 text-xs font-semibold rounded border ${colors[status] || colors.INACTIVE}`;
   };
 
   const clearAllFilters = () => {
