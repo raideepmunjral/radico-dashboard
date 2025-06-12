@@ -805,37 +805,72 @@ const InventoryDashboard = () => {
       }
     });
 
+    // ENHANCED: Count actual total visits vs unique shops  
+    let totalActualVisits = 0;
+    let todayVisitCount = 0;
+    let yesterdayVisitCount = 0;
+    let lastWeekVisitCount = 0;
+    
+    const salesmenVisits: Record<string, any> = {};
+    
+    // First pass: Count all actual visits for proper totals
+    rollingPeriodRows.forEach(row => {
+      const shopId = row[columnIndices.shopId];
+      const checkInDateTime = row[columnIndices.checkInDateTime];
+      const salesman = row[columnIndices.salesman];
+      
+      if (!shopId || !checkInDateTime || !salesman) return;
+      
+      try {
+        const visitDate = parseDate(checkInDateTime);
+        if (!visitDate) return;
+        
+        totalActualVisits++;
+        
+        // Initialize salesman tracking
+        if (!salesmenVisits[salesman]) {
+          salesmenVisits[salesman] = {
+            name: salesman,
+            totalActualVisits: 0,
+            uniqueShops: new Set(),
+            todayVisits: 0,
+            yesterdayVisits: 0,
+            lastWeekVisits: 0
+          };
+        }
+        
+        // Count actual visits per salesman
+        salesmenVisits[salesman].totalActualVisits++;
+        salesmenVisits[salesman].uniqueShops.add(shopId);
+        
+        // Time-based visit tracking
+        if (visitDate.toDateString() === today.toDateString()) {
+          todayVisitCount++;
+          salesmenVisits[salesman].todayVisits++;
+        }
+        
+        if (visitDate.toDateString() === yesterday.toDateString()) {
+          yesterdayVisitCount++;
+          salesmenVisits[salesman].yesterdayVisits++;
+        }
+        
+        if (visitDate >= lastWeek) {
+          lastWeekVisitCount++;
+          salesmenVisits[salesman].lastWeekVisits++;
+        }
+      } catch (error) {
+        // Skip invalid dates
+      }
+    });
+
     // Process inventory for each shop
     const shops: Record<string, ShopInventory> = {};
     const skuTracker: Record<string, any> = {};
     const allAgingLocations: Array<any> = [];
     const outOfStockItems: Array<any> = [];
-    const salesmenVisits: Record<string, any> = {};
     const processedSKUs = new Set<string>();
 
-    let rollingPeriodVisitCount = 0;
-    let todayVisitCount = 0;
-    let yesterdayVisitCount = 0;
-    let lastWeekVisitCount = 0;
-
     Object.values(shopLatestVisits).forEach((shopVisit: any) => {
-      if (shopVisit.visitDate) {
-        rollingPeriodVisitCount++;
-        
-        // NEW: Today's visit tracking
-        if (shopVisit.visitDate.toDateString() === today.toDateString()) {
-          todayVisitCount++;
-        }
-        
-        if (shopVisit.visitDate.toDateString() === yesterday.toDateString()) {
-          yesterdayVisitCount++;
-        }
-        
-        if (shopVisit.visitDate >= lastWeek) {
-          lastWeekVisitCount++;
-        }
-      }
-      
       const shopInventory: ShopInventory = {
         shopId: shopVisit.shopId,
         shopName: shopVisit.shopName,
@@ -852,35 +887,6 @@ const InventoryDashboard = () => {
         dataSource: shopVisit.dataSource,
         salesmanUid: shopVisit.salesmanUid
       };
-
-      if (!salesmenVisits[shopVisit.salesman]) {
-        salesmenVisits[shopVisit.salesman] = {
-          name: shopVisit.salesman,
-          rollingPeriodVisits: 0,
-          uniqueShops: new Set(),
-          todayVisits: 0,
-          yesterdayVisits: 0,
-          lastWeekVisits: 0
-        };
-      }
-      
-      if (shopVisit.visitDate) {
-        salesmenVisits[shopVisit.salesman].rollingPeriodVisits++;
-        salesmenVisits[shopVisit.salesman].uniqueShops.add(shopVisit.shopId);
-        
-        // NEW: Today's visit tracking per salesman
-        if (shopVisit.visitDate.toDateString() === today.toDateString()) {
-          salesmenVisits[shopVisit.salesman].todayVisits++;
-        }
-        
-        if (shopVisit.visitDate.toDateString() === yesterday.toDateString()) {
-          salesmenVisits[shopVisit.salesman].yesterdayVisits++;
-        }
-        
-        if (shopVisit.visitDate >= lastWeek) {
-          salesmenVisits[shopVisit.salesman].lastWeekVisits++;
-        }
-      }
 
       const visitRows = shopLatestVisitRows[shopVisit.shopId] || [];
       
@@ -1084,9 +1090,9 @@ const InventoryDashboard = () => {
 
     const salesmenStats = Object.values(salesmenVisits).map((salesman: any) => ({
       name: salesman.name,
-      rollingPeriodVisits: salesman.rollingPeriodVisits,
-      uniqueShops: salesman.uniqueShops.size,
-      todayVisits: salesman.todayVisits, // NEW: Today's visits
+      rollingPeriodVisits: salesman.totalActualVisits, // FIXED: Use actual total visits
+      uniqueShops: salesman.uniqueShops.size, // Unique shops visited
+      todayVisits: salesman.todayVisits,
       yesterdayVisits: salesman.yesterdayVisits,
       lastWeekVisits: salesman.lastWeekVisits
     })).sort((a, b) => b.rollingPeriodVisits - a.rollingPeriodVisits);
@@ -1145,8 +1151,8 @@ const InventoryDashboard = () => {
       visitCompliance: {
         totalSalesmen: salesmenStats.length,
         activeSalesmen: salesmenStats.filter(s => s.rollingPeriodVisits > 0).length,
-        rollingPeriodVisits: rollingPeriodVisitCount,
-        todayVisits: todayVisitCount, // NEW: Today's visits
+        rollingPeriodVisits: totalActualVisits, // FIXED: Use actual total visits
+        todayVisits: todayVisitCount,
         yesterdayVisits: yesterdayVisitCount,
         lastWeekVisits: lastWeekVisitCount,
         salesmenStats
@@ -1813,9 +1819,6 @@ const InventoryDashboard = () => {
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
-        {/* Master Data Integration Indicator */}
-        <MasterDataIntegrationIndicator data={inventoryData} />
-        
         {activeTab === 'overview' && <EnhancedInventoryOverviewTab data={inventoryData} />}
         {activeTab === 'shops' && (
           <EnhancedShopInventoryTab 
@@ -1871,39 +1874,6 @@ const InventoryDashboard = () => {
 // ==========================================
 // ENHANCED TAB COMPONENTS
 // ==========================================
-
-const MasterDataIntegrationIndicator = ({ data }: { data: InventoryData }) => (
-  <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4 mb-6">
-    <div className="flex items-center justify-between">
-      <div className="flex items-center space-x-3">
-        <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
-        <h3 className="text-lg font-semibold text-gray-900">Master Data Integration Active</h3>
-      </div>
-      <div className="flex space-x-6 text-sm">
-        <div className="text-center">
-          <div className="font-bold text-blue-600">{data.summary.masterDataIntegration?.totalMasterShops || 0}</div>
-          <div className="text-gray-600">Master Shops</div>
-        </div>
-        <div className="text-center">
-          <div className="font-bold text-green-600">{data.summary.masterDataIntegration?.masterDataAssignments || 0}</div>
-          <div className="text-gray-600">Master Assignments</div>
-        </div>
-        <div className="text-center">
-          <div className="font-bold text-orange-600">{data.summary.masterDataIntegration?.visitDataFallbacks || 0}</div>
-          <div className="text-gray-600">Visit Fallbacks</div>
-        </div>
-        <div className="text-center">
-          <div className="font-bold text-purple-600">{data.summary.masterDataIntegration?.assignmentCoverage || 0}%</div>
-          <div className="text-gray-600">Master Coverage</div>
-        </div>
-      </div>
-    </div>
-    <p className="text-sm text-gray-600 mt-2">
-      Shop-salesman assignments now prioritize master data for consistent allocation management. 
-      Automatic handling of salesman transitions and complete shop coverage.
-    </p>
-  </div>
-);
 
 const EnhancedInventoryOverviewTab = ({ data }: { data: InventoryData }) => (
   <div className="space-y-6">
