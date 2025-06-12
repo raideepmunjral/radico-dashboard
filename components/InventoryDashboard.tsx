@@ -805,15 +805,14 @@ const InventoryDashboard = () => {
       }
     });
 
-    // ENHANCED: Count actual total visits vs unique shops  
-    let totalActualVisits = 0;
+    // FIXED: Count unique visit events (shop + date combinations) vs unique shops
+    const uniqueVisitEvents = new Set<string>();
+    const salesmenVisits: Record<string, any> = {};
     let todayVisitCount = 0;
     let yesterdayVisitCount = 0;
     let lastWeekVisitCount = 0;
     
-    const salesmenVisits: Record<string, any> = {};
-    
-    // First pass: Count all actual visits for proper totals
+    // Count unique visit events (not every inventory row)
     rollingPeriodRows.forEach(row => {
       const shopId = row[columnIndices.shopId];
       const checkInDateTime = row[columnIndices.checkInDateTime];
@@ -825,38 +824,43 @@ const InventoryDashboard = () => {
         const visitDate = parseDate(checkInDateTime);
         if (!visitDate) return;
         
-        totalActualVisits++;
+        // Create unique visit identifier (shop + date + salesman)
+        const visitKey = `${shopId}_${visitDate.toDateString()}_${salesman}`;
         
-        // Initialize salesman tracking
-        if (!salesmenVisits[salesman]) {
-          salesmenVisits[salesman] = {
-            name: salesman,
-            totalActualVisits: 0,
-            uniqueShops: new Set(),
-            todayVisits: 0,
-            yesterdayVisits: 0,
-            lastWeekVisits: 0
-          };
-        }
-        
-        // Count actual visits per salesman
-        salesmenVisits[salesman].totalActualVisits++;
-        salesmenVisits[salesman].uniqueShops.add(shopId);
-        
-        // Time-based visit tracking
-        if (visitDate.toDateString() === today.toDateString()) {
-          todayVisitCount++;
-          salesmenVisits[salesman].todayVisits++;
-        }
-        
-        if (visitDate.toDateString() === yesterday.toDateString()) {
-          yesterdayVisitCount++;
-          salesmenVisits[salesman].yesterdayVisits++;
-        }
-        
-        if (visitDate >= lastWeek) {
-          lastWeekVisitCount++;
-          salesmenVisits[salesman].lastWeekVisits++;
+        if (!uniqueVisitEvents.has(visitKey)) {
+          uniqueVisitEvents.add(visitKey);
+          
+          // Initialize salesman tracking
+          if (!salesmenVisits[salesman]) {
+            salesmenVisits[salesman] = {
+              name: salesman,
+              totalActualVisits: 0,
+              uniqueShops: new Set(),
+              todayVisits: 0,
+              yesterdayVisits: 0,
+              lastWeekVisits: 0
+            };
+          }
+          
+          // Count this unique visit event
+          salesmenVisits[salesman].totalActualVisits++;
+          salesmenVisits[salesman].uniqueShops.add(shopId);
+          
+          // Time-based visit tracking
+          if (visitDate.toDateString() === today.toDateString()) {
+            todayVisitCount++;
+            salesmenVisits[salesman].todayVisits++;
+          }
+          
+          if (visitDate.toDateString() === yesterday.toDateString()) {
+            yesterdayVisitCount++;
+            salesmenVisits[salesman].yesterdayVisits++;
+          }
+          
+          if (visitDate >= lastWeek) {
+            lastWeekVisitCount++;
+            salesmenVisits[salesman].lastWeekVisits++;
+          }
         }
       } catch (error) {
         // Skip invalid dates
