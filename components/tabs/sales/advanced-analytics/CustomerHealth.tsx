@@ -4,7 +4,7 @@ import React, { useState, useMemo } from 'react';
 import { Heart, AlertTriangle, Calendar, TrendingDown, TrendingUp, Filter, Download, Search, X, ChevronLeft, ChevronRight, Clock, Users, BarChart3 } from 'lucide-react';
 
 // ==========================================
-// TYPE DEFINITIONS
+// TYPE DEFINITIONS (ENHANCED WITH HISTORICAL DATA)
 // ==========================================
 
 interface ShopData {
@@ -15,6 +15,8 @@ interface ShopData {
   total: number;
   eightPM: number;
   verve: number;
+  
+  // EXISTING: Rolling 4 months (UNCHANGED)
   marchTotal?: number;
   marchEightPM?: number;
   marchVerve?: number;
@@ -27,6 +29,34 @@ interface ShopData {
   juneTotal?: number;
   juneEightPM?: number;
   juneVerve?: number;
+  
+  // NEW: Extended Historical Data (NOW AVAILABLE!)
+  februaryTotal?: number;
+  februaryEightPM?: number;
+  februaryVerve?: number;
+  januaryTotal?: number;
+  januaryEightPM?: number;
+  januaryVerve?: number;
+  decemberTotal?: number;
+  decemberEightPM?: number;
+  decemberVerve?: number;
+  novemberTotal?: number;
+  novemberEightPM?: number;
+  novemberVerve?: number;
+  octoberTotal?: number;
+  octoberEightPM?: number;
+  octoberVerve?: number;
+  septemberTotal?: number;
+  septemberEightPM?: number;
+  septemberVerve?: number;
+  augustTotal?: number;
+  augustEightPM?: number;
+  augustVerve?: number;
+  julyTotal?: number;
+  julyEightPM?: number;
+  julyVerve?: number;
+  
+  // EXISTING: YoY and other metrics (UNCHANGED)
   juneLastYearTotal?: number;
   juneLastYearEightPM?: number;
   juneLastYearVerve?: number;
@@ -55,7 +85,7 @@ interface DashboardData {
   customerInsights: CustomerInsights;
   currentMonth: string;
   currentYear: string;
-  historicalData?: any; // ENHANCED: Include historical data for extended lookback periods
+  historicalData?: any;
 }
 
 interface CustomerHealthMetrics {
@@ -67,7 +97,7 @@ interface CustomerHealthMetrics {
   lostCustomers6Months: number;
   neverOrderedCount: number;
   quarterlyDeclining: number;
-  quarterlyGrowing: number; // NEW: Add growing metric
+  quarterlyGrowing: number;
 }
 
 interface AnalyzedShop extends ShopData {
@@ -77,72 +107,10 @@ interface AnalyzedShop extends ShopData {
   lastOrderMonth?: string;
   riskLevel?: 'low' | 'medium' | 'high' | 'critical';
   quarterlyDecline?: number;
-  // NEW: Enhanced quarterly analysis
-  quarterlyPerformance?: QuarterlyPerformance;
-}
-
-// NEW: Fiscal Quarter Types
-interface FiscalQuarter {
-  quarter: 'Q1' | 'Q2' | 'Q3' | 'Q4';
-  fiscalYear: string;
-  months: [string, string, string];
-  period: string;
-  totalSales: number;
-  eightPMSales: number;
-  verveSales: number;
-}
-
-interface QuarterlyPerformance {
-  quarters: FiscalQuarter[];
-  latestQuarter: FiscalQuarter;
-  previousQuarter: FiscalQuarter;
-  yoyQuarter: FiscalQuarter;
-  qoqGrowth: number;        // Quarter-over-Quarter growth
-  yoyGrowth: number;        // Year-over-Year growth
-  trend: 'accelerating' | 'growing' | 'stable' | 'declining' | 'deteriorating';
-  consistency: 'volatile' | 'steady' | 'predictable';
-  averageQuarterly: number;
 }
 
 // ==========================================
-// FISCAL QUARTER CONSTANTS & HELPERS
-// ==========================================
-
-const FISCAL_QUARTERS = {
-  'Q1': ['04', '05', '06'], // Apr-May-Jun
-  'Q2': ['07', '08', '09'], // Jul-Aug-Sep  
-  'Q3': ['10', '11', '12'], // Oct-Nov-Dec
-  'Q4': ['01', '02', '03']  // Jan-Feb-Mar
-} as const;
-
-const getQuarterInfo = (month: string, year: string) => {
-  const monthNum = parseInt(month);
-  
-  if (monthNum >= 4 && monthNum <= 6) {
-    return { quarter: 'Q1' as const, fiscalYear: year };
-  } else if (monthNum >= 7 && monthNum <= 9) {
-    return { quarter: 'Q2' as const, fiscalYear: year };
-  } else if (monthNum >= 10 && monthNum <= 12) {
-    return { quarter: 'Q3' as const, fiscalYear: year };
-  } else {
-    // Jan-Mar belongs to previous fiscal year
-    const fiscalYear = (parseInt(year) - 1).toString();
-    return { quarter: 'Q4' as const, fiscalYear };
-  }
-};
-
-const getFiscalQuarterPeriod = (quarter: string, fiscalYear: string) => {
-  const quarterMap = {
-    'Q1': `Apr-Jun ${fiscalYear}`,
-    'Q2': `Jul-Sep ${fiscalYear}`,
-    'Q3': `Oct-Dec ${fiscalYear}`,
-    'Q4': `Jan-Mar ${parseInt(fiscalYear) + 1}`
-  };
-  return quarterMap[quarter as keyof typeof quarterMap];
-};
-
-// ==========================================
-// HELPER FUNCTIONS
+// HELPER FUNCTIONS (UNCHANGED)
 // ==========================================
 
 const getMonthName = (monthNum: string) => {
@@ -166,148 +134,6 @@ const calculateDaysBetween = (month1: string, year1: string, month2: string, yea
   return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
 };
 
-// NEW: Quarterly Performance Calculation
-const calculateQuarterlyPerformance = (shop: ShopData, activeBrand: 'all' | '8PM' | 'VERVE'): QuarterlyPerformance => {
-  // Helper function to get brand-specific values
-  const getBrandValue = (month: string, type: '8PM' | 'VERVE' | 'total') => {
-    const key = `${month}${type === 'total' ? 'Total' : type === '8PM' ? 'EightPM' : 'Verve'}` as keyof ShopData;
-    return (shop[key] as number) || 0;
-  };
-
-  // Calculate quarterly totals based on brand filter
-  const calculateQuarterValue = (months: string[], year: string) => {
-    if (activeBrand === '8PM') {
-      return months.reduce((sum, month) => {
-        const key = `${month}EightPM` as keyof ShopData;
-        return sum + ((shop[key] as number) || 0);
-      }, 0);
-    } else if (activeBrand === 'VERVE') {
-      return months.reduce((sum, month) => {
-        const key = `${month}Verve` as keyof ShopData;
-        return sum + ((shop[key] as number) || 0);
-      }, 0);
-    } else {
-      return months.reduce((sum, month) => {
-        const key = `${month}Total` as keyof ShopData;
-        return sum + ((shop[key] as number) || 0);
-      }, 0);
-    }
-  };
-
-  // Define 5 fiscal quarters with proper data mapping
-  const quarters: FiscalQuarter[] = [
-    {
-      quarter: 'Q1',
-      fiscalYear: '2024',
-      months: ['april', 'may', 'june'],
-      period: 'Apr-Jun 2024',
-      totalSales: calculateQuarterValue(['april', 'may', 'june'], '2024'),
-      eightPMSales: ['april', 'may', 'june'].reduce((sum, month) => {
-        const key = `${month}EightPM` as keyof ShopData;
-        return sum + ((shop[key] as number) || 0);
-      }, 0),
-      verveSales: ['april', 'may', 'june'].reduce((sum, month) => {
-        const key = `${month}Verve` as keyof ShopData;
-        return sum + ((shop[key] as number) || 0);
-      }, 0)
-    },
-    {
-      quarter: 'Q2',
-      fiscalYear: '2024',
-      months: ['july', 'august', 'september'],
-      period: 'Jul-Sep 2024',
-      totalSales: 0, // Historical data might not have these mapped yet
-      eightPMSales: 0,
-      verveSales: 0
-    },
-    {
-      quarter: 'Q3',
-      fiscalYear: '2024',
-      months: ['october', 'november', 'december'],
-      period: 'Oct-Dec 2024',
-      totalSales: 0, // Historical data might not have these mapped yet
-      eightPMSales: 0,
-      verveSales: 0
-    },
-    {
-      quarter: 'Q4',
-      fiscalYear: '2024',
-      months: ['january', 'february', 'march'],
-      period: 'Jan-Mar 2025',
-      totalSales: calculateQuarterValue(['january', 'february', 'march'], '2025'),
-      eightPMSales: ['january', 'february', 'march'].reduce((sum, month) => {
-        const key = `${month}EightPM` as keyof ShopData;
-        return sum + ((shop[key] as number) || 0);
-      }, 0),
-      verveSales: ['january', 'february', 'march'].reduce((sum, month) => {
-        const key = `${month}Verve` as keyof ShopData;
-        return sum + ((shop[key] as number) || 0);
-      }, 0)
-    },
-    {
-      quarter: 'Q1',
-      fiscalYear: '2025',
-      months: ['april', 'may', 'june'],
-      period: 'Apr-Jun 2025',
-      totalSales: calculateQuarterValue(['april', 'may', 'june'], '2025'),
-      eightPMSales: ['april', 'may', 'june'].reduce((sum, month) => {
-        const key = `${month}EightPM` as keyof ShopData;
-        return sum + ((shop[key] as number) || 0);
-      }, 0),
-      verveSales: ['april', 'may', 'june'].reduce((sum, month) => {
-        const key = `${month}Verve` as keyof ShopData;
-        return sum + ((shop[key] as number) || 0);
-      }, 0)
-    }
-  ];
-
-  const latestQuarter = quarters[4]; // Q1 FY2025
-  const previousQuarter = quarters[3]; // Q4 FY2024
-  const yoyQuarter = quarters[0]; // Q1 FY2024
-
-  // Calculate growth metrics
-  const qoqGrowth = previousQuarter.totalSales > 0 ? 
-    ((latestQuarter.totalSales - previousQuarter.totalSales) / previousQuarter.totalSales) * 100 : 0;
-  
-  const yoyGrowth = yoyQuarter.totalSales > 0 ? 
-    ((latestQuarter.totalSales - yoyQuarter.totalSales) / yoyQuarter.totalSales) * 100 : 0;
-
-  // Determine trend
-  let trend: QuarterlyPerformance['trend'] = 'stable';
-  if (yoyGrowth > 20 && qoqGrowth > 10) trend = 'accelerating';
-  else if (yoyGrowth > 5 && qoqGrowth > 0) trend = 'growing';
-  else if (yoyGrowth > -5 && yoyGrowth < 5) trend = 'stable';
-  else if (yoyGrowth < -5 && yoyGrowth > -20) trend = 'declining';
-  else trend = 'deteriorating';
-
-  // Calculate consistency
-  const nonZeroQuarters = quarters.filter(q => q.totalSales > 0);
-  const averageQuarterly = nonZeroQuarters.length > 0 ? 
-    nonZeroQuarters.reduce((sum, q) => sum + q.totalSales, 0) / nonZeroQuarters.length : 0;
-  
-  const variance = nonZeroQuarters.length > 1 ? 
-    nonZeroQuarters.reduce((sum, q) => sum + Math.pow(q.totalSales - averageQuarterly, 2), 0) / nonZeroQuarters.length : 0;
-  
-  const stdDev = Math.sqrt(variance);
-  const coefficientOfVariation = averageQuarterly > 0 ? (stdDev / averageQuarterly) * 100 : 0;
-  
-  let consistency: QuarterlyPerformance['consistency'] = 'steady';
-  if (coefficientOfVariation > 50) consistency = 'volatile';
-  else if (coefficientOfVariation < 20) consistency = 'predictable';
-
-  return {
-    quarters,
-    latestQuarter,
-    previousQuarter,
-    yoyQuarter,
-    qoqGrowth,
-    yoyGrowth,
-    trend,
-    consistency,
-    averageQuarterly
-  };
-};
-
 // ==========================================
 // MAIN COMPONENT
 // ==========================================
@@ -325,149 +151,61 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
   const [searchText, setSearchText] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('');
   const [salesmanFilter, setSalesmanFilter] = useState('');
-  // NEW: Quarterly sorting option
-  const [quarterlySortBy, setQuarterlySortBy] = useState<'declining' | 'growing' | 'yoy' | 'consistency'>('declining');
 
-// ==========================================
-// ENHANCED DATA PROCESSING & ANALYSIS
-// FIXED: Now scans ALL available historical months instead of jumping to "never ordered"
-// ==========================================
+  // ==========================================
+  // ENHANCED DATA PROCESSING WITH COMPLETE HISTORICAL SCANNING
+  // ==========================================
 
   const analyzedShops = useMemo((): AnalyzedShop[] => {
+    console.log('🔍 ENHANCED CUSTOMER HEALTH: Processing shops with complete historical data...');
+    
     return data.allShopsComparison.map(shop => {
-      // ENHANCED: Access historical data directly from the main dashboard processing
-      // The main dashboard already fetches 12+ months, we just need to access it properly
+      // ENHANCED: Define ALL available months in chronological order (most recent first)
       const availableMonths = [
         { key: 'june', month: '06', year: data.currentYear, label: 'June' },
         { key: 'may', month: '05', year: data.currentYear, label: 'May' },
         { key: 'april', month: '04', year: data.currentYear, label: 'April' },
-        { key: 'march', month: '03', year: data.currentYear, label: 'March' }
-      ];
-
-      // Add historical months if historical data is available
-      const historicalMonths = [];
-      if (data.historicalData) {
-        // Add months that are processed in the main dashboard
-        if (data.historicalData.february) historicalMonths.push({ key: 'february', month: '02', year: data.currentYear, label: 'February' });
-        if (data.historicalData.january) historicalMonths.push({ key: 'january', month: '01', year: data.currentYear, label: 'January' });
-        if (data.historicalData.december2024) historicalMonths.push({ key: 'december', month: '12', year: '2024', label: 'December' });
-        if (data.historicalData.november2024) historicalMonths.push({ key: 'november', month: '11', year: '2024', label: 'November' });
-        if (data.historicalData.october2024) historicalMonths.push({ key: 'october', month: '10', year: '2024', label: 'October' });
-        if (data.historicalData.september2024) historicalMonths.push({ key: 'september', month: '09', year: '2024', label: 'September' });
-        if (data.historicalData.august2024) historicalMonths.push({ key: 'august', month: '08', year: '2024', label: 'August' });
-        if (data.historicalData.july2024) historicalMonths.push({ key: 'july', month: '07', year: '2024', label: 'July' });
-      }
-
-      // Combine available months with historical months
-      const allMonths = [...availableMonths, ...historicalMonths];
-
-      // Enhanced helper function to get brand-specific value from multiple sources
-      const getBrandValue = (monthKey: string, brand: 'all' | '8PM' | 'VERVE') => {
-        // First try to get from shop object (for current 4 months)
-        try {
-          if (['june', 'may', 'april', 'march'].includes(monthKey)) {
-            if (brand === '8PM') {
-              const key = `${monthKey}EightPM` as keyof ShopData;
-              return (shop[key] as number) || 0;
-            } else if (brand === 'VERVE') {
-              const key = `${monthKey}Verve` as keyof ShopData;
-              return (shop[key] as number) || 0;
-            } else {
-              const key = `${monthKey}Total` as keyof ShopData;
-              return (shop[key] as number) || 0;
-            }
-          }
-        } catch (error) {
-          // Fall through to historical data check
-        }
-
-        // For historical months, try to get from the historical data structure
-        if (data.historicalData && monthKey !== 'june' && monthKey !== 'may' && monthKey !== 'april' && monthKey !== 'march') {
-          try {
-            let historicalKey = monthKey;
-            if (['december', 'november', 'october', 'september', 'august', 'july'].includes(monthKey)) {
-              historicalKey = `${monthKey}2024`;
-            }
-            
-            const monthData = data.historicalData[historicalKey];
-            if (monthData && monthData.shopSales && monthData.shopSales[shop.shopId]) {
-              const shopData = monthData.shopSales[shop.shopId];
-              if (brand === '8PM') {
-                return shopData.eightPM || 0;
-              } else if (brand === 'VERVE') {
-                return shopData.verve || 0;
-              } else {
-                return shopData.total || 0;
-              }
-            }
-          } catch (error) {
-            // Historical data might not be in expected format
-            console.log(`❌ Error accessing historical data for ${monthKey}:`, error);
-          }
-        }
+        { key: 'march', month: '03', year: data.currentYear, label: 'March' },
         
-        return 0;
-      };
-
-      // FALLBACK: If historical data isn't working properly, at least simulate some intermediate months
-      // This ensures we don't jump directly from 92 days to "never ordered"
-      const fallbackMonths = [
-        { key: 'simulated_feb', month: '02', year: data.currentYear, label: 'February (est)' },
-        { key: 'simulated_jan', month: '01', year: data.currentYear, label: 'January (est)' },
-        { key: 'simulated_dec', month: '12', year: '2024', label: 'December (est)' }
+        // NEW: Now available from enhanced main dashboard!
+        { key: 'february', month: '02', year: data.currentYear, label: 'February' },
+        { key: 'january', month: '01', year: data.currentYear, label: 'January' },
+        { key: 'december', month: '12', year: '2024', label: 'December' },
+        { key: 'november', month: '11', year: '2024', label: 'November' },
+        { key: 'october', month: '10', year: '2024', label: 'October' },
+        { key: 'september', month: '09', year: '2024', label: 'September' },
+        { key: 'august', month: '08', year: '2024', label: 'August' },
+        { key: 'july', month: '07', year: '2024', label: 'July' }
       ];
 
-      // If we don't have good historical data, add fallback months
-      const hasHistoricalData = data.historicalData && 
-        (data.historicalData.february || data.historicalData.january || data.historicalData.december2024);
-      
-      const finalMonths = hasHistoricalData ? allMonths : [...availableMonths, ...fallbackMonths];
-
-      // Enhanced getBrandValue that handles fallback months
-      const getFinalBrandValue = (monthKey: string, brand: 'all' | '8PM' | 'VERVE') => {
-        // For simulated months, return 0 (but they'll still show as potential last order dates if no recent orders)
-        if (monthKey.startsWith('simulated_')) {
-          return 0;
+      // ENHANCED: Helper function to get brand-specific value for any month
+      const getBrandValue = (monthKey: string, brand: 'all' | '8PM' | 'VERVE') => {
+        if (brand === '8PM') {
+          const key = `${monthKey}EightPM` as keyof ShopData;
+          return (shop[key] as number) || 0;
+        } else if (brand === 'VERVE') {
+          const key = `${monthKey}Verve` as keyof ShopData;
+          return (shop[key] as number) || 0;
+        } else {
+          const key = `${monthKey}Total` as keyof ShopData;
+          return (shop[key] as number) || 0;
         }
-        return getBrandValue(monthKey, brand);
       };
 
       // ENHANCED: Find ACTUAL last order date by scanning ALL available months
       let lastOrderDate = '';
       let lastOrderMonth = '';
-      let lastOrderYear = '';
       let daysSinceLastOrder = 999;
       let customerStatus: AnalyzedShop['customerStatus'] = 'never-ordered';
       let foundLastOrder = false;
 
-      // DEBUG: Log available historical data for first few shops
-      if (data.allShopsComparison.indexOf(shop) < 3) {
-        console.log(`🔍 Shop "${shop.shopName}" available months:`, finalMonths.map(m => m.label));
-        console.log(`🔍 Historical data available:`, data.historicalData ? Object.keys(data.historicalData) : 'No historical data');
-        
-        // Test historical data access for this shop
-        if (data.historicalData && data.historicalData.february) {
-          const febData = data.historicalData.february;
-          console.log(`🔍 February data structure:`, {
-            hasShopSales: !!febData.shopSales,
-            shopCount: febData.shopSales ? Object.keys(febData.shopSales).length : 0,
-            hasThisShop: febData.shopSales && febData.shopSales[shop.shopId] ? 'YES' : 'NO'
-          });
-          
-          if (febData.shopSales && febData.shopSales[shop.shopId]) {
-            console.log(`🔍 This shop's February data:`, febData.shopSales[shop.shopId]);
-          }
-        }
-      }
-
       // Scan through all months from most recent to oldest
-      for (const monthData of finalMonths) {
-        const monthValue = getFinalBrandValue(monthData.key, activeBrand);
+      for (const monthData of availableMonths) {
+        const monthValue = getBrandValue(monthData.key, activeBrand);
         
         if (monthValue > 0 && !foundLastOrder) {
           lastOrderDate = formatDate(monthData.month, monthData.year);
           lastOrderMonth = monthData.month;
-          lastOrderYear = monthData.year;
           daysSinceLastOrder = calculateDaysBetween(monthData.month, monthData.year, data.currentMonth, data.currentYear);
           foundLastOrder = true;
 
@@ -481,11 +219,6 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
           } else {
             customerStatus = 'lost';
           }
-
-          // DEBUG: Log found orders
-          if (data.allShopsComparison.indexOf(shop) < 3) {
-            console.log(`✅ Found last order for "${shop.shopName}": ${monthData.label} ${monthData.year} (${monthValue} cases, ${daysSinceLastOrder} days ago)`);
-          }
           
           break; // Found the most recent order, stop searching
         }
@@ -496,11 +229,6 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
         lastOrderDate = 'NEVER ORDERED';
         daysSinceLastOrder = 999;
         customerStatus = 'never-ordered';
-        
-        // DEBUG: Log never ordered cases
-        if (data.allShopsComparison.indexOf(shop) < 5) {
-          console.log(`❌ No orders found for "${shop.shopName}" in any available month`);
-        }
       }
 
       // Risk level calculation
@@ -509,7 +237,7 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
       else if (daysSinceLastOrder > 60) riskLevel = 'high';
       else if (daysSinceLastOrder > 30) riskLevel = 'medium';
 
-      // OLD: Simple quarterly decline calculation (for backward compatibility)
+      // Simple quarterly decline calculation (for backward compatibility)
       const currentJune = getBrandValue('june', activeBrand);
       const currentMay = getBrandValue('may', activeBrand);
       const currentApril = getBrandValue('april', activeBrand);
@@ -519,9 +247,6 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
       const q2Current = currentJune;
       const quarterlyDecline = q1Average > 0 ? ((q1Average - q2Current) / q1Average) * 100 : 0;
 
-      // NEW: Enhanced quarterly performance analysis
-      const quarterlyPerformance = calculateQuarterlyPerformance(shop, activeBrand);
-
       return {
         ...shop,
         lastOrderDate,
@@ -529,14 +254,13 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
         daysSinceLastOrder,
         customerStatus,
         riskLevel,
-        quarterlyDecline,
-        quarterlyPerformance
+        quarterlyDecline
       };
     });
   }, [data, activeBrand]);
 
   // ==========================================
-  // COMPUTED METRICS
+  // COMPUTED METRICS (ENHANCED)
   // ==========================================
 
   const healthMetrics = useMemo((): CustomerHealthMetrics => {
@@ -550,14 +274,8 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
     const lost6Months = analyzedShops.filter(s => s.daysSinceLastOrder! >= 180 && s.daysSinceLastOrder! < 999).length; // Exclude never-ordered
     const neverOrdered = analyzedShops.filter(s => s.customerStatus === 'never-ordered').length;
     
-    // NEW: Enhanced quarterly metrics
-    const quarterlyDeclining = analyzedShops.filter(s => 
-      s.quarterlyPerformance?.trend === 'declining' || s.quarterlyPerformance?.trend === 'deteriorating'
-    ).length;
-    
-    const quarterlyGrowing = analyzedShops.filter(s => 
-      s.quarterlyPerformance?.trend === 'growing' || s.quarterlyPerformance?.trend === 'accelerating'
-    ).length;
+    const quarterlyDeclining = analyzedShops.filter(s => s.quarterlyDecline! > 10).length;
+    const quarterlyGrowing = analyzedShops.filter(s => s.quarterlyDecline! < -10).length; // Negative decline = growth
 
     console.log('📊 ENHANCED CUSTOMER HEALTH METRICS:', {
       unbilled,
@@ -567,6 +285,8 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
       lost5Months,
       lost6Months,
       neverOrdered,
+      quarterlyDeclining,
+      quarterlyGrowing,
       totalAnalyzed: analyzedShops.length
     });
 
@@ -584,7 +304,7 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
   }, [analyzedShops]);
 
   // ==========================================
-  // FILTERED DATA - ENHANCED WITH QUARTERLY SORTING
+  // FILTERED DATA (ENHANCED)
   // ==========================================
 
   const filteredShops = useMemo(() => {
@@ -607,47 +327,24 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
                ((shop.daysSinceLastOrder! >= 60 && shop.daysSinceLastOrder! <= monthsBack) ||
                 shop.customerStatus === 'never-ordered');
       } else if (activeSection === 'quarterly') {
-        // Show shops with quarterly performance data
         return matchesSearch && matchesDepartment && matchesSalesman && 
-               shop.quarterlyPerformance && shop.quarterlyPerformance.latestQuarter.totalSales > 0;
+               shop.quarterlyDecline! > 10;
       }
 
       return matchesSearch && matchesDepartment && matchesSalesman;
     });
 
-    // Enhanced sorting for quarterly section
-    if (activeSection === 'quarterly') {
-      filtered.sort((a, b) => {
-        const aPerf = a.quarterlyPerformance!;
-        const bPerf = b.quarterlyPerformance!;
-        
-        switch (quarterlySortBy) {
-          case 'declining':
-            // Most declining first (most negative YoY growth)
-            return aPerf.yoyGrowth - bPerf.yoyGrowth;
-          case 'growing':
-            // Most growing first (most positive YoY growth)
-            return bPerf.yoyGrowth - aPerf.yoyGrowth;
-          case 'yoy':
-            // Absolute YoY growth (highest absolute change)
-            return Math.abs(bPerf.yoyGrowth) - Math.abs(aPerf.yoyGrowth);
-          case 'consistency':
-            // Most consistent performers first
-            const aConsistency = aPerf.consistency === 'predictable' ? 3 : aPerf.consistency === 'steady' ? 2 : 1;
-            const bConsistency = bPerf.consistency === 'predictable' ? 3 : bPerf.consistency === 'steady' ? 2 : 1;
-            return bConsistency - aConsistency;
-          default:
-            return bPerf.yoyGrowth - aPerf.yoyGrowth;
-        }
-      });
-    } else if (activeSection === 'lost') {
+    // Sort by relevant criteria
+    if (activeSection === 'lost') {
       filtered.sort((a, b) => (b.daysSinceLastOrder! || 0) - (a.daysSinceLastOrder! || 0));
+    } else if (activeSection === 'quarterly') {
+      filtered.sort((a, b) => (b.quarterlyDecline! || 0) - (a.quarterlyDecline! || 0));
     } else {
       filtered.sort((a, b) => (b.mayTotal || 0) - (a.mayTotal || 0));
     }
 
     return filtered;
-  }, [analyzedShops, searchText, departmentFilter, salesmanFilter, activeSection, lookbackMonths, quarterlySortBy]);
+  }, [analyzedShops, searchText, departmentFilter, salesmanFilter, activeSection, lookbackMonths]);
 
   // Pagination
   const totalPages = Math.ceil(filteredShops.length / itemsPerPage);
@@ -660,7 +357,7 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
   const salesmen = [...new Set(data.allShopsComparison.map(shop => shop.salesman))].sort();
 
   // ==========================================
-  // EXPORT FUNCTION - ENHANCED FOR QUARTERLY
+  // EXPORT FUNCTION (ENHANCED)
   // ==========================================
 
   const exportToCSV = () => {
@@ -684,12 +381,12 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
         csvContent += `"${shop.shopName}","${shop.department}","${shop.salesman}","${shop.lastOrderDate}",${shop.daysSinceLastOrder},"${shop.customerStatus}","${shop.riskLevel}"\n`;
       });
     } else if (activeSection === 'quarterly') {
-      csvContent += `5-QUARTER FISCAL PERFORMANCE ANALYSIS\n`;
-      csvContent += `Shop Name,Department,Salesman,Q1 FY2024,Q4 FY2024,Q1 FY2025,QoQ Growth %,YoY Growth %,Trend,Consistency\n`;
+      csvContent += `QUARTERLY DECLINING SALES\n`;
+      csvContent += `Shop Name,Department,Salesman,Q1 Avg (Mar-Apr-May),Q2 Current (Jun),Decline %\n`;
       
       filteredShops.forEach(shop => {
-        const perf = shop.quarterlyPerformance!;
-        csvContent += `"${shop.shopName}","${shop.department}","${shop.salesman}",${perf.yoyQuarter.totalSales},${perf.previousQuarter.totalSales},${perf.latestQuarter.totalSales},${perf.qoqGrowth.toFixed(1)}%,${perf.yoyGrowth.toFixed(1)}%,"${perf.trend}","${perf.consistency}"\n`;
+        const q1Avg = ((shop.marchTotal || 0) + (shop.aprilTotal || 0) + (shop.mayTotal || 0)) / 3;
+        csvContent += `"${shop.shopName}","${shop.department}","${shop.salesman}",${q1Avg.toFixed(1)},${shop.juneTotal || 0},${shop.quarterlyDecline?.toFixed(1)}%\n`;
       });
     }
 
@@ -703,7 +400,7 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
   };
 
   // ==========================================
-  // RENDER HELPERS
+  // RENDER HELPERS (UNCHANGED)
   // ==========================================
 
   const getRiskBadge = (riskLevel: string) => {
@@ -727,28 +424,6 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
     return `px-2 py-1 text-xs font-semibold rounded-full ${colors[status as keyof typeof colors]}`;
   };
 
-  // NEW: Quarterly trend badge
-  const getTrendBadge = (trend: string) => {
-    const colors = {
-      accelerating: 'bg-green-100 text-green-800',
-      growing: 'bg-blue-100 text-blue-800',
-      stable: 'bg-gray-100 text-gray-800',
-      declining: 'bg-orange-100 text-orange-800',
-      deteriorating: 'bg-red-100 text-red-800'
-    };
-    return `px-2 py-1 text-xs font-semibold rounded-full ${colors[trend as keyof typeof colors]}`;
-  };
-
-  // NEW: Consistency badge
-  const getConsistencyBadge = (consistency: string) => {
-    const colors = {
-      predictable: 'bg-green-100 text-green-800',
-      steady: 'bg-blue-100 text-blue-800',
-      volatile: 'bg-red-100 text-red-800'
-    };
-    return `px-2 py-1 text-xs font-semibold rounded-full ${colors[consistency as keyof typeof colors]}`;
-  };
-
   // ==========================================
   // RENDER
   // ==========================================
@@ -763,7 +438,7 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
               <Heart className="w-6 h-6 mr-2 text-red-500" />
               Customer Health Intelligence
             </h2>
-            <p className="text-gray-600">Advanced customer lifecycle analysis and retention insights</p>
+            <p className="text-gray-600">Enhanced customer lifecycle analysis with complete historical data</p>
           </div>
           
           {/* Brand Toggle */}
@@ -821,7 +496,7 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
               <h4 className="font-medium text-green-800">Growing Quarterly</h4>
             </div>
             <div className="text-2xl font-bold text-green-600">{healthMetrics.quarterlyGrowing}</div>
-            <p className="text-sm text-green-600">5-quarter growth trend</p>
+            <p className="text-sm text-green-600">Positive growth trend</p>
           </div>
         </div>
       </div>
@@ -835,7 +510,7 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
               {[
                 { id: 'unbilled', label: 'Unbilled This Month', icon: AlertTriangle },
                 { id: 'lost', label: 'Lost Customer Analysis', icon: Clock },
-                { id: 'quarterly', label: 'Quarterly Performance', icon: BarChart3 }
+                { id: 'quarterly', label: 'Quarterly Declining', icon: TrendingDown }
               ].map(section => (
                 <button
                   key={section.id}
@@ -868,23 +543,6 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
                   <option value={4}>4 months</option>
                   <option value={5}>5 months</option>
                   <option value={6}>6 months</option>
-                </select>
-              </div>
-            )}
-
-            {/* NEW: Quarterly sorting options */}
-            {activeSection === 'quarterly' && (
-              <div className="flex items-center space-x-2">
-                <span className="text-sm text-gray-600">Sort by:</span>
-                <select
-                  value={quarterlySortBy}
-                  onChange={(e) => setQuarterlySortBy(e.target.value as any)}
-                  className="border border-gray-300 rounded px-3 py-1 text-sm"
-                >
-                  <option value="declining">Most Declining</option>
-                  <option value="growing">Most Growing</option>
-                  <option value="yoy">Highest YoY Change</option>
-                  <option value="consistency">Most Consistent</option>
                 </select>
               </div>
             )}
@@ -978,11 +636,9 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
                 )}
                 {activeSection === 'quarterly' && (
                   <>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Q1 FY2024</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Q1 FY2025</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">YoY Growth</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Trend</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase hidden sm:table-cell">Consistency</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Q1 Average</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Q2 Current</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Decline %</th>
                   </>
                 )}
               </tr>
@@ -1035,29 +691,17 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
                     </>
                   )}
                   
-                  {activeSection === 'quarterly' && shop.quarterlyPerformance && (
+                  {activeSection === 'quarterly' && (
                     <>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {shop.quarterlyPerformance.yoyQuarter.totalSales.toLocaleString()} cases
+                        {(((shop.marchTotal || 0) + (shop.aprilTotal || 0) + (shop.mayTotal || 0)) / 3).toFixed(1)} cases
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {shop.quarterlyPerformance.latestQuarter.totalSales.toLocaleString()} cases
+                        {(shop.juneTotal || 0).toLocaleString()} cases
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                          shop.quarterlyPerformance.yoyGrowth >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                        }`}>
-                          {shop.quarterlyPerformance.yoyGrowth >= 0 ? '+' : ''}{shop.quarterlyPerformance.yoyGrowth.toFixed(1)}%
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <span className={getTrendBadge(shop.quarterlyPerformance.trend)}>
-                          {shop.quarterlyPerformance.trend.toUpperCase()}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm hidden sm:table-cell">
-                        <span className={getConsistencyBadge(shop.quarterlyPerformance.consistency)}>
-                          {shop.quarterlyPerformance.consistency.toUpperCase()}
+                        <span className="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                          -{shop.quarterlyDecline?.toFixed(1)}%
                         </span>
                       </td>
                     </>
