@@ -345,7 +345,7 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
 
       // Try to find additional months by checking dynamic properties on shop object
       const shopKeys = Object.keys(shop);
-      const additionalMonths = [];
+      const additionalMonths: { key: string; month: string; year: string; label: string; }[] = [];
       
       // Look for patterns like "februaryTotal", "januaryTotal", etc.
       const monthNames = ['february', 'january', 'december', 'november', 'october', 'september', 'august', 'july'];
