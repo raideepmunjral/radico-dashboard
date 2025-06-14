@@ -237,19 +237,6 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
         customerStatus = 'never-ordered';
       }
 
-      // DEBUG: Log some quarterly calculations for first few shops
-      if (data.allShopsComparison.indexOf(shop) < 3) {
-        console.log(`🔍 QUARTERLY CALC for "${shop.shopName}":`, {
-          q1FY2024: q1FY2024,
-          q1FY2025: q1FY2025,
-          q4FY2024: q4FY2024,
-          yoyGrowth: yoyGrowth.toFixed(1) + '%',
-          qoqGrowth: qoqGrowth.toFixed(1) + '%',
-          customerStatus: customerStatus,
-          daysSinceLastOrder: daysSinceLastOrder
-        });
-      }
-
       // Risk level calculation
       let riskLevel: AnalyzedShop['riskLevel'] = 'low';
       if (daysSinceLastOrder > 90) riskLevel = 'critical';
@@ -284,6 +271,19 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
       const q1Average = (currentMarch + currentApril + currentMay) / 3;
       const q2Current = currentJune;
       const quarterlyDecline = q1Average > 0 ? ((q1Average - q2Current) / q1Average) * 100 : 0;
+
+      // DEBUG: Log some quarterly calculations for first few shops
+      if (data.allShopsComparison.indexOf(shop) < 3) {
+        console.log(`🔍 QUARTERLY CALC for "${shop.shopName}":`, {
+          q1FY2024: q1FY2024,
+          q1FY2025: q1FY2025,
+          q4FY2024: q4FY2024,
+          yoyGrowth: yoyGrowth.toFixed(1) + '%',
+          qoqGrowth: qoqGrowth.toFixed(1) + '%',
+          customerStatus: customerStatus,
+          daysSinceLastOrder: daysSinceLastOrder
+        });
+      }
 
       return {
         ...shop,
