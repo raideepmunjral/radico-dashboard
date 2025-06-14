@@ -107,6 +107,12 @@ interface AnalyzedShop extends ShopData {
   lastOrderMonth?: string;
   riskLevel?: 'low' | 'medium' | 'high' | 'critical';
   quarterlyDecline?: number;
+  // NEW: Enhanced quarterly performance metrics
+  q1FY2024?: number;
+  q1FY2025?: number;
+  q4FY2024?: number;
+  qoqGrowth?: number;
+  yoyGrowth?: number;
 }
 
 // ==========================================
@@ -153,7 +159,7 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
   const [salesmanFilter, setSalesmanFilter] = useState('');
 
   // ==========================================
-  // ENHANCED DATA PROCESSING WITH COMPLETE HISTORICAL SCANNING
+  // ENHANCED DATA PROCESSING WITH COMPLETE HISTORICAL SCANNING + QUARTERLY PERFORMANCE
   // ==========================================
 
   const analyzedShops = useMemo((): AnalyzedShop[] => {
@@ -231,18 +237,50 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
         customerStatus = 'never-ordered';
       }
 
+      // DEBUG: Log some quarterly calculations for first few shops
+      if (data.allShopsComparison.indexOf(shop) < 3) {
+        console.log(`🔍 QUARTERLY CALC for "${shop.shopName}":`, {
+          q1FY2024: q1FY2024,
+          q1FY2025: q1FY2025,
+          q4FY2024: q4FY2024,
+          yoyGrowth: yoyGrowth.toFixed(1) + '%',
+          qoqGrowth: qoqGrowth.toFixed(1) + '%',
+          customerStatus: customerStatus,
+          daysSinceLastOrder: daysSinceLastOrder
+        });
+      }
+
       // Risk level calculation
       let riskLevel: AnalyzedShop['riskLevel'] = 'low';
       if (daysSinceLastOrder > 90) riskLevel = 'critical';
       else if (daysSinceLastOrder > 60) riskLevel = 'high';
       else if (daysSinceLastOrder > 30) riskLevel = 'medium';
 
-      // Simple quarterly decline calculation (for backward compatibility)
+      // SIMPLIFIED QUARTERLY PERFORMANCE (using available data)
       const currentJune = getBrandValue('june', activeBrand);
       const currentMay = getBrandValue('may', activeBrand);
       const currentApril = getBrandValue('april', activeBrand);
-      const currentMarch = getBrandValue('march', activeBrand);
       
+      // Current Quarter: Q1 FY2025 (Apr-May-Jun 2025) - use current 3 months
+      const q1FY2025 = currentApril + currentMay + currentJune;
+      
+      // Previous Quarter: Use Q4 data if available, otherwise use Q1 average as fallback
+      const currentMarch = getBrandValue('march', activeBrand);
+      const currentFebruary = getBrandValue('february', activeBrand);
+      const currentJanuary = getBrandValue('january', activeBrand);
+      const q4FY2024 = currentJanuary + currentFebruary + currentMarch;
+      
+      // Year-over-Year Quarter: Q1 FY2024 - use last year June data
+      const juneLastYear = activeBrand === '8PM' ? (shop.juneLastYearEightPM || 0) :
+                          activeBrand === 'VERVE' ? (shop.juneLastYearVerve || 0) :
+                          (shop.juneLastYearTotal || 0);
+      const q1FY2024 = juneLastYear; // Use actual last year data
+      
+      // Calculate quarterly metrics
+      const qoqGrowth = q4FY2024 > 0 ? ((q1FY2025 - q4FY2024) / q4FY2024) * 100 : 0;
+      const yoyGrowth = q1FY2024 > 0 ? ((q1FY2025 - q1FY2024) / q1FY2024) * 100 : 0;
+      
+      // Simple quarterly decline for backward compatibility
       const q1Average = (currentMarch + currentApril + currentMay) / 3;
       const q2Current = currentJune;
       const quarterlyDecline = q1Average > 0 ? ((q1Average - q2Current) / q1Average) * 100 : 0;
@@ -254,7 +292,13 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
         daysSinceLastOrder,
         customerStatus,
         riskLevel,
-        quarterlyDecline
+        quarterlyDecline,
+        // NEW: Enhanced quarterly performance metrics
+        q1FY2024: q1FY2024,
+        q1FY2025: q1FY2025,
+        q4FY2024: q4FY2024,
+        qoqGrowth: qoqGrowth,
+        yoyGrowth: yoyGrowth
       };
     });
   }, [data, activeBrand]);
@@ -274,8 +318,8 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
     const lost6Months = analyzedShops.filter(s => s.daysSinceLastOrder! >= 180 && s.daysSinceLastOrder! < 999).length; // Exclude never-ordered
     const neverOrdered = analyzedShops.filter(s => s.customerStatus === 'never-ordered').length;
     
-    const quarterlyDeclining = analyzedShops.filter(s => s.quarterlyDecline! > 10).length;
-    const quarterlyGrowing = analyzedShops.filter(s => s.quarterlyDecline! < -10).length; // Negative decline = growth
+    const quarterlyDeclining = analyzedShops.filter(s => (s.yoyGrowth || 0) < -10).length; // YoY decline > 10%
+    const quarterlyGrowing = analyzedShops.filter(s => (s.yoyGrowth || 0) > 10).length; // YoY growth > 10%
 
     console.log('📊 ENHANCED CUSTOMER HEALTH METRICS:', {
       unbilled,
@@ -323,12 +367,14 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
                shop.customerStatus === 'unbilled';
       } else if (activeSection === 'lost') {
         const monthsBack = lookbackMonths * 30;
+        // ENHANCED: Include never-ordered customers and lost customers
         return matchesSearch && matchesDepartment && matchesSalesman && 
                ((shop.daysSinceLastOrder! >= 60 && shop.daysSinceLastOrder! <= monthsBack) ||
                 shop.customerStatus === 'never-ordered');
       } else if (activeSection === 'quarterly') {
+        // ENHANCED: Show shops with quarterly performance data (both declining and growing)
         return matchesSearch && matchesDepartment && matchesSalesman && 
-               shop.quarterlyDecline! > 10;
+               (shop.q1FY2025! > 0 || shop.q1FY2024! > 0);
       }
 
       return matchesSearch && matchesDepartment && matchesSalesman;
@@ -338,7 +384,8 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
     if (activeSection === 'lost') {
       filtered.sort((a, b) => (b.daysSinceLastOrder! || 0) - (a.daysSinceLastOrder! || 0));
     } else if (activeSection === 'quarterly') {
-      filtered.sort((a, b) => (b.quarterlyDecline! || 0) - (a.quarterlyDecline! || 0));
+      // ENHANCED: Sort by Year-over-Year growth (most declining first, then most growing)
+      filtered.sort((a, b) => (a.yoyGrowth! || 0) - (b.yoyGrowth! || 0));
     } else {
       filtered.sort((a, b) => (b.mayTotal || 0) - (a.mayTotal || 0));
     }
@@ -381,12 +428,11 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
         csvContent += `"${shop.shopName}","${shop.department}","${shop.salesman}","${shop.lastOrderDate}",${shop.daysSinceLastOrder},"${shop.customerStatus}","${shop.riskLevel}"\n`;
       });
     } else if (activeSection === 'quarterly') {
-      csvContent += `QUARTERLY DECLINING SALES\n`;
-      csvContent += `Shop Name,Department,Salesman,Q1 Avg (Mar-Apr-May),Q2 Current (Jun),Decline %\n`;
+      csvContent += `QUARTERLY FISCAL PERFORMANCE ANALYSIS\n`;
+      csvContent += `Shop Name,Department,Salesman,Q1 FY2024 (Jun),Q1 FY2025 (Total),YoY Growth %,QoQ Growth %\n`;
       
       filteredShops.forEach(shop => {
-        const q1Avg = ((shop.marchTotal || 0) + (shop.aprilTotal || 0) + (shop.mayTotal || 0)) / 3;
-        csvContent += `"${shop.shopName}","${shop.department}","${shop.salesman}",${q1Avg.toFixed(1)},${shop.juneTotal || 0},${shop.quarterlyDecline?.toFixed(1)}%\n`;
+        csvContent += `"${shop.shopName}","${shop.department}","${shop.salesman}",${shop.q1FY2024 || 0},${shop.q1FY2025 || 0},${(shop.yoyGrowth || 0).toFixed(1)}%,${(shop.qoqGrowth || 0).toFixed(1)}%\n`;
       });
     }
 
@@ -510,7 +556,7 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
               {[
                 { id: 'unbilled', label: 'Unbilled This Month', icon: AlertTriangle },
                 { id: 'lost', label: 'Lost Customer Analysis', icon: Clock },
-                { id: 'quarterly', label: 'Quarterly Declining', icon: TrendingDown }
+                { id: 'quarterly', label: 'Quarterly Performance', icon: BarChart3 }
               ].map(section => (
                 <button
                   key={section.id}
@@ -636,9 +682,9 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
                 )}
                 {activeSection === 'quarterly' && (
                   <>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Q1 Average</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Q2 Current</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Decline %</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Q1 FY2024 (Jun)</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Q1 FY2025 (Total)</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">YoY Growth</th>
                   </>
                 )}
               </tr>
@@ -694,14 +740,16 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
                   {activeSection === 'quarterly' && (
                     <>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {(((shop.marchTotal || 0) + (shop.aprilTotal || 0) + (shop.mayTotal || 0)) / 3).toFixed(1)} cases
+                        {(shop.q1FY2024 || 0).toLocaleString()} cases
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {(shop.juneTotal || 0).toLocaleString()} cases
+                        {(shop.q1FY2025 || 0).toLocaleString()} cases
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <span className="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
-                          -{shop.quarterlyDecline?.toFixed(1)}%
+                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                          (shop.yoyGrowth || 0) >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                        }`}>
+                          {(shop.yoyGrowth || 0) >= 0 ? '+' : ''}{(shop.yoyGrowth || 0).toFixed(1)}%
                         </span>
                       </td>
                     </>
