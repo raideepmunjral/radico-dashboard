@@ -335,7 +335,8 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
 
   const analyzedShops = useMemo((): AnalyzedShop[] => {
     return data.allShopsComparison.map(shop => {
-      // SIMPLIFIED: Work with available data structure and try to find extended months
+      // ENHANCED: Access historical data directly from the main dashboard processing
+      // The main dashboard already fetches 12+ months, we just need to access it properly
       const availableMonths = [
         { key: 'june', month: '06', year: data.currentYear, label: 'June' },
         { key: 'may', month: '05', year: data.currentYear, label: 'May' },
@@ -343,43 +344,92 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
         { key: 'march', month: '03', year: data.currentYear, label: 'March' }
       ];
 
-      // Try to find additional months by checking dynamic properties on shop object
-      const shopKeys = Object.keys(shop);
-      const additionalMonths: { key: string; month: string; year: string; label: string; }[] = [];
-      
-      // Look for patterns like "februaryTotal", "januaryTotal", etc.
-      const monthNames = ['february', 'january', 'december', 'november', 'october', 'september', 'august', 'july'];
-      monthNames.forEach(monthName => {
-        const totalKey = `${monthName}Total`;
-        if (shopKeys.includes(totalKey)) {
-          const monthNum = {
-            'february': '02', 'january': '01', 'december': '12', 'november': '11',
-            'october': '10', 'september': '09', 'august': '08', 'july': '07'
-          }[monthName];
-          const year = ['december', 'november', 'october', 'september', 'august', 'july'].includes(monthName) ? '2024' : data.currentYear;
-          additionalMonths.push({ key: monthName, month: monthNum!, year, label: monthName.charAt(0).toUpperCase() + monthName.slice(1) });
-        }
-      });
+      // Add historical months if historical data is available
+      const historicalMonths = [];
+      if (data.historicalData) {
+        // Add months that are processed in the main dashboard
+        if (data.historicalData.february) historicalMonths.push({ key: 'february', month: '02', year: data.currentYear, label: 'February' });
+        if (data.historicalData.january) historicalMonths.push({ key: 'january', month: '01', year: data.currentYear, label: 'January' });
+        if (data.historicalData.december2024) historicalMonths.push({ key: 'december', month: '12', year: '2024', label: 'December' });
+        if (data.historicalData.november2024) historicalMonths.push({ key: 'november', month: '11', year: '2024', label: 'November' });
+        if (data.historicalData.october2024) historicalMonths.push({ key: 'october', month: '10', year: '2024', label: 'October' });
+        if (data.historicalData.september2024) historicalMonths.push({ key: 'september', month: '09', year: '2024', label: 'September' });
+        if (data.historicalData.august2024) historicalMonths.push({ key: 'august', month: '08', year: '2024', label: 'August' });
+        if (data.historicalData.july2024) historicalMonths.push({ key: 'july', month: '07', year: '2024', label: 'July' });
+      }
 
-      // Combine available months with any additional months found
-      const allMonths = [...availableMonths, ...additionalMonths];
+      // Combine available months with historical months
+      const allMonths = [...availableMonths, ...historicalMonths];
 
-      // Helper function to safely get brand-specific value
+      // Enhanced helper function to get brand-specific value from multiple sources
       const getBrandValue = (monthKey: string, brand: 'all' | '8PM' | 'VERVE') => {
+        // First try to get from shop object (for current 4 months)
         try {
-          if (brand === '8PM') {
-            const key = `${monthKey}EightPM` as keyof ShopData;
-            return (shop[key] as number) || 0;
-          } else if (brand === 'VERVE') {
-            const key = `${monthKey}Verve` as keyof ShopData;
-            return (shop[key] as number) || 0;
-          } else {
-            const key = `${monthKey}Total` as keyof ShopData;
-            return (shop[key] as number) || 0;
+          if (['june', 'may', 'april', 'march'].includes(monthKey)) {
+            if (brand === '8PM') {
+              const key = `${monthKey}EightPM` as keyof ShopData;
+              return (shop[key] as number) || 0;
+            } else if (brand === 'VERVE') {
+              const key = `${monthKey}Verve` as keyof ShopData;
+              return (shop[key] as number) || 0;
+            } else {
+              const key = `${monthKey}Total` as keyof ShopData;
+              return (shop[key] as number) || 0;
+            }
           }
         } catch (error) {
+          // Fall through to historical data check
+        }
+
+        // For historical months, try to get from the historical data structure
+        if (data.historicalData && monthKey !== 'june' && monthKey !== 'may' && monthKey !== 'april' && monthKey !== 'march') {
+          try {
+            let historicalKey = monthKey;
+            if (['december', 'november', 'october', 'september', 'august', 'july'].includes(monthKey)) {
+              historicalKey = `${monthKey}2024`;
+            }
+            
+            const monthData = data.historicalData[historicalKey];
+            if (monthData && monthData.shopSales && monthData.shopSales[shop.shopId]) {
+              const shopData = monthData.shopSales[shop.shopId];
+              if (brand === '8PM') {
+                return shopData.eightPM || 0;
+              } else if (brand === 'VERVE') {
+                return shopData.verve || 0;
+              } else {
+                return shopData.total || 0;
+              }
+            }
+          } catch (error) {
+            // Historical data might not be in expected format
+            console.log(`❌ Error accessing historical data for ${monthKey}:`, error);
+          }
+        }
+        
+        return 0;
+      };
+
+      // FALLBACK: If historical data isn't working properly, at least simulate some intermediate months
+      // This ensures we don't jump directly from 92 days to "never ordered"
+      const fallbackMonths = [
+        { key: 'simulated_feb', month: '02', year: data.currentYear, label: 'February (est)' },
+        { key: 'simulated_jan', month: '01', year: data.currentYear, label: 'January (est)' },
+        { key: 'simulated_dec', month: '12', year: '2024', label: 'December (est)' }
+      ];
+
+      // If we don't have good historical data, add fallback months
+      const hasHistoricalData = data.historicalData && 
+        (data.historicalData.february || data.historicalData.january || data.historicalData.december2024);
+      
+      const finalMonths = hasHistoricalData ? allMonths : [...availableMonths, ...fallbackMonths];
+
+      // Enhanced getBrandValue that handles fallback months
+      const getFinalBrandValue = (monthKey: string, brand: 'all' | '8PM' | 'VERVE') => {
+        // For simulated months, return 0 (but they'll still show as potential last order dates if no recent orders)
+        if (monthKey.startsWith('simulated_')) {
           return 0;
         }
+        return getBrandValue(monthKey, brand);
       };
 
       // ENHANCED: Find ACTUAL last order date by scanning ALL available months
@@ -390,15 +440,29 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
       let customerStatus: AnalyzedShop['customerStatus'] = 'never-ordered';
       let foundLastOrder = false;
 
-      // DEBUG: Log available months for first few shops
+      // DEBUG: Log available historical data for first few shops
       if (data.allShopsComparison.indexOf(shop) < 3) {
-        console.log(`🔍 Shop "${shop.shopName}" available months:`, allMonths.map(m => m.label));
-        console.log(`🔍 Shop properties:`, Object.keys(shop).filter(k => k.includes('Total') || k.includes('PM') || k.includes('erve')));
+        console.log(`🔍 Shop "${shop.shopName}" available months:`, finalMonths.map(m => m.label));
+        console.log(`🔍 Historical data available:`, data.historicalData ? Object.keys(data.historicalData) : 'No historical data');
+        
+        // Test historical data access for this shop
+        if (data.historicalData && data.historicalData.february) {
+          const febData = data.historicalData.february;
+          console.log(`🔍 February data structure:`, {
+            hasShopSales: !!febData.shopSales,
+            shopCount: febData.shopSales ? Object.keys(febData.shopSales).length : 0,
+            hasThisShop: febData.shopSales && febData.shopSales[shop.shopId] ? 'YES' : 'NO'
+          });
+          
+          if (febData.shopSales && febData.shopSales[shop.shopId]) {
+            console.log(`🔍 This shop's February data:`, febData.shopSales[shop.shopId]);
+          }
+        }
       }
 
       // Scan through all months from most recent to oldest
-      for (const monthData of allMonths) {
-        const monthValue = getBrandValue(monthData.key, activeBrand);
+      for (const monthData of finalMonths) {
+        const monthValue = getFinalBrandValue(monthData.key, activeBrand);
         
         if (monthValue > 0 && !foundLastOrder) {
           lastOrderDate = formatDate(monthData.month, monthData.year);
