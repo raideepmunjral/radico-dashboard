@@ -113,6 +113,7 @@ interface AnalyzedShop extends ShopData {
   q4FY2024?: number;
   qoqGrowth?: number;
   yoyGrowth?: number;
+  isNewCustomer?: boolean; // NEW: Flag for new customers
 }
 
 // ==========================================
@@ -263,9 +264,24 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
                           (shop.juneLastYearTotal || 0);
       const q1FY2024 = juneLastYear; // Use actual last year data
       
-      // Calculate quarterly metrics
+      // Calculate quarterly metrics with NEW customer logic
       const qoqGrowth = q4FY2024 > 0 ? ((q1FY2025 - q4FY2024) / q4FY2024) * 100 : 0;
-      const yoyGrowth = q1FY2024 > 0 ? ((q1FY2025 - q1FY2024) / q1FY2024) * 100 : 0;
+      
+      // ENHANCED: Handle NEW customers properly
+      let yoyGrowth = 0;
+      let isNewCustomer = false;
+      
+      if (q1FY2024 === 0 && q1FY2025 > 0) {
+        // NEW customer: had no sales last year but has sales this year
+        isNewCustomer = true;
+        yoyGrowth = 999; // Use 999 as marker for NEW customer
+      } else if (q1FY2024 > 0) {
+        // Regular YoY calculation
+        yoyGrowth = ((q1FY2025 - q1FY2024) / q1FY2024) * 100;
+      } else {
+        // No sales in either year
+        yoyGrowth = 0;
+      }
       
       // Simple quarterly decline for backward compatibility
       const q1Average = (currentMarch + currentApril + currentMay) / 3;
@@ -278,8 +294,9 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
           q1FY2024: q1FY2024,
           q1FY2025: q1FY2025,
           q4FY2024: q4FY2024,
-          yoyGrowth: yoyGrowth.toFixed(1) + '%',
+          yoyGrowth: isNewCustomer ? 'NEW CUSTOMER' : yoyGrowth.toFixed(1) + '%',
           qoqGrowth: qoqGrowth.toFixed(1) + '%',
+          isNewCustomer: isNewCustomer,
           customerStatus: customerStatus,
           daysSinceLastOrder: daysSinceLastOrder
         });
@@ -298,7 +315,8 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
         q1FY2025: q1FY2025,
         q4FY2024: q4FY2024,
         qoqGrowth: qoqGrowth,
-        yoyGrowth: yoyGrowth
+        yoyGrowth: yoyGrowth,
+        isNewCustomer: isNewCustomer
       };
     });
   }, [data, activeBrand]);
@@ -318,8 +336,8 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
     const lost6Months = analyzedShops.filter(s => s.daysSinceLastOrder! >= 180 && s.daysSinceLastOrder! < 999).length; // Exclude never-ordered
     const neverOrdered = analyzedShops.filter(s => s.customerStatus === 'never-ordered').length;
     
-    const quarterlyDeclining = analyzedShops.filter(s => (s.yoyGrowth || 0) < -10).length; // YoY decline > 10%
-    const quarterlyGrowing = analyzedShops.filter(s => (s.yoyGrowth || 0) > 10).length; // YoY growth > 10%
+    const quarterlyDeclining = analyzedShops.filter(s => !s.isNewCustomer && (s.yoyGrowth || 0) < -10).length; // YoY decline > 10% (excluding new customers)
+    const quarterlyGrowing = analyzedShops.filter(s => s.isNewCustomer || (s.yoyGrowth || 0) > 10).length; // YoY growth > 10% OR new customers
 
     console.log('📊 ENHANCED CUSTOMER HEALTH METRICS:', {
       unbilled,
@@ -385,7 +403,12 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
       filtered.sort((a, b) => (b.daysSinceLastOrder! || 0) - (a.daysSinceLastOrder! || 0));
     } else if (activeSection === 'quarterly') {
       // ENHANCED: Sort by Year-over-Year growth (most declining first, then most growing)
-      filtered.sort((a, b) => (a.yoyGrowth! || 0) - (b.yoyGrowth! || 0));
+      // NEW customers are treated as high positive growth for sorting
+      filtered.sort((a, b) => {
+        const aGrowth = a.isNewCustomer ? 1000 : (a.yoyGrowth || 0); // NEW customers get high score
+        const bGrowth = b.isNewCustomer ? 1000 : (b.yoyGrowth || 0);
+        return aGrowth - bGrowth; // Most declining first, NEW customers at the end
+      });
     } else {
       filtered.sort((a, b) => (b.mayTotal || 0) - (a.mayTotal || 0));
     }
@@ -432,7 +455,8 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
       csvContent += `Shop Name,Department,Salesman,Q1 FY2024 (Jun),Q1 FY2025 (Total),YoY Growth %,QoQ Growth %\n`;
       
       filteredShops.forEach(shop => {
-        csvContent += `"${shop.shopName}","${shop.department}","${shop.salesman}",${shop.q1FY2024 || 0},${shop.q1FY2025 || 0},${(shop.yoyGrowth || 0).toFixed(1)}%,${(shop.qoqGrowth || 0).toFixed(1)}%\n`;
+        const yoyDisplay = shop.isNewCustomer ? 'NEW' : `${(shop.yoyGrowth || 0).toFixed(1)}%`;
+        csvContent += `"${shop.shopName}","${shop.department}","${shop.salesman}",${shop.q1FY2024 || 0},${shop.q1FY2025 || 0},"${yoyDisplay}",${(shop.qoqGrowth || 0).toFixed(1)}%\n`;
       });
     }
 
@@ -746,11 +770,17 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
                         {(shop.q1FY2025 || 0).toLocaleString()} cases
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                          (shop.yoyGrowth || 0) >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-                        }`}>
-                          {(shop.yoyGrowth || 0) >= 0 ? '+' : ''}{(shop.yoyGrowth || 0).toFixed(1)}%
-                        </span>
+                        {shop.isNewCustomer ? (
+                          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                            NEW
+                          </span>
+                        ) : (
+                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                            (shop.yoyGrowth || 0) >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                          }`}>
+                            {(shop.yoyGrowth || 0) >= 0 ? '+' : ''}{(shop.yoyGrowth || 0).toFixed(1)}%
+                          </span>
+                        )}
                       </td>
                     </>
                   )}
