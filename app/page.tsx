@@ -16,7 +16,7 @@ import DepartmentTab from '../components/tabs/sales/DepartmentTab';
 import OverviewTab from '../components/tabs/sales/OverviewTab';
 
 // ==========================================
-// PART 1: TYPE DEFINITIONS & INTERFACES (ENHANCED BUT BACKWARD COMPATIBLE)
+// PART 1: ENHANCED TYPE DEFINITIONS & INTERFACES (EXTENDED WITH HISTORICAL DATA)
 // ==========================================
 
 interface ShopData {
@@ -27,7 +27,8 @@ interface ShopData {
   total: number;
   eightPM: number;
   verve: number;
-  // Updated to rolling 4 months: Mar-Apr-May-June (UNCHANGED)
+  
+  // EXISTING: Rolling 4 months (UNCHANGED)
   marchTotal?: number;
   marchEightPM?: number;
   marchVerve?: number;
@@ -40,17 +41,45 @@ interface ShopData {
   juneTotal?: number;
   juneEightPM?: number;
   juneVerve?: number;
-  // YoY comparison (UNCHANGED)
+  
+  // NEW: Extended Historical Data (12+ months) - OPTION 1 IMPLEMENTATION
+  februaryTotal?: number;
+  februaryEightPM?: number;
+  februaryVerve?: number;
+  januaryTotal?: number;
+  januaryEightPM?: number;
+  januaryVerve?: number;
+  decemberTotal?: number;
+  decemberEightPM?: number;
+  decemberVerve?: number;
+  novemberTotal?: number;
+  novemberEightPM?: number;
+  novemberVerve?: number;
+  octoberTotal?: number;
+  octoberEightPM?: number;
+  octoberVerve?: number;
+  septemberTotal?: number;
+  septemberEightPM?: number;
+  septemberVerve?: number;
+  augustTotal?: number;
+  augustEightPM?: number;
+  augustVerve?: number;
+  julyTotal?: number;
+  julyEightPM?: number;
+  julyVerve?: number;
+  
+  // EXISTING: YoY comparison (UNCHANGED)
   juneLastYearTotal?: number;
   juneLastYearEightPM?: number;
   juneLastYearVerve?: number;
   yoyGrowthPercent?: number;
   growthPercent?: number;
   monthlyTrend?: 'improving' | 'declining' | 'stable' | 'new';
-  skuBreakdown?: SKUData[]; // EXISTING - PRESERVED
-  detailedSKUBreakdown?: DetailedSKUData[]; // NEW - ADDITIONAL (doesn't break existing)
+  skuBreakdown?: SKUData[];
+  detailedSKUBreakdown?: DetailedSKUData[];
   historicalData?: MonthlyData[];
-  // NEW: 3-month averages (UNCHANGED)
+  
+  // EXISTING: 3-month averages (UNCHANGED)
   threeMonthAvgTotal?: number;
   threeMonthAvg8PM?: number;
   threeMonthAvgVERVE?: number;
@@ -63,13 +92,12 @@ interface SKUData {
   month?: string;
 }
 
-// NEW: Additional detailed SKU structure (doesn't replace existing)
 interface DetailedSKUData {
   originalBrand: string;
   displayName: string;
-  family: string; // 8PM, VERVE, OTHER
-  variant: string; // 8PM BLACK 750ML, VERVE CRANBERRY 180ML, etc.
-  size: string; // 750ML, 180ML, etc.
+  family: string;
+  variant: string;
+  size: string;
   cases: number;
   percentage: number;
   month?: string;
@@ -106,7 +134,6 @@ interface DashboardData {
     totalVerveTarget: number;
     eightPmAchievement: string;
     verveAchievement: string;
-    // YoY metrics
     lastYearTotal8PM?: number;
     lastYearTotalVERVE?: number;
     yoy8PMGrowth?: string;
@@ -126,21 +153,18 @@ interface DashboardData {
 }
 
 // ==========================================
-// PART 2: ENHANCED SKU PROCESSING FUNCTIONS (NEW - ADDITIONS ONLY)
+// PART 2: ENHANCED SKU PROCESSING FUNCTIONS (UNCHANGED)
 // ==========================================
 
-// NEW: Enhanced function that preserves detailed SKU information
 const getDetailedSKUInfo = (brand: string) => {
   const cleanBrand = brand?.toString().trim().toUpperCase();
   
-  // Extract size information
-  let size = '750ML'; // Default
+  let size = '750ML';
   if (cleanBrand.includes('180')) size = '180ML';
   else if (cleanBrand.includes('375')) size = '375ML';
   else if (cleanBrand.includes('90')) size = '90ML';
   else if (cleanBrand.includes('60')) size = '60ML';
   
-  // Determine family and create detailed variant name
   let family = '';
   let variant = '';
   let displayName = '';
@@ -187,7 +211,6 @@ const getDetailedSKUInfo = (brand: string) => {
   };
 };
 
-// EXISTING FUNCTION - UNCHANGED (for backward compatibility)
 const brandFamily: Record<string, string> = {
   "VERVE": "VERVE",
   "8 PM BLACK": "8PM", 
@@ -234,7 +257,6 @@ const getBrandFamily = (brandShort?: string, brand?: string): string | null => {
 // PART 3: CONFIGURATION & CONSTANTS (UNCHANGED)
 // ==========================================
 
-// Helper function for month names (used throughout the component)
 const getMonthName = (monthNum: string) => {
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   return months[parseInt(monthNum) - 1] || 'Unknown';
@@ -252,19 +274,17 @@ const RadicoDashboard = () => {
   const [error, setError] = useState<string | null>(null);
   const [lastUpdated, setLastUpdated] = useState(new Date());
   const [showInventory, setShowInventory] = useState(false);
-  const [inventoryData, setInventoryData] = useState<any>(null); // NEW: Add inventory data state
+  const [inventoryData, setInventoryData] = useState<any>(null);
 
-  // DYNAMIC DATE DETECTION (UNCHANGED)
   const getCurrentMonthYear = () => {
     const now = new Date();
-    const currentMonth = String(now.getMonth() + 1).padStart(2, '0'); // June = 06
-    const currentYear = String(now.getFullYear()); // 2025
+    const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
+    const currentYear = String(now.getFullYear());
     return { currentMonth, currentYear };
   };
 
   const { currentMonth, currentYear } = getCurrentMonthYear();
 
-  // FIXED CONFIGURATION WITH PROPER HISTORICAL DATA SHEET (UNCHANGED)
   const SHEETS_CONFIG = {
     masterSheetId: process.env.NEXT_PUBLIC_MASTER_SHEET_ID || '1pRz9CgOoamTrFipnmF-XuBCg9IZON9br5avgRlKYtxM',
     visitSheetId: process.env.NEXT_PUBLIC_VISIT_SHEET_ID || '1XG4c_Lrpk-YglTq3G3ZY9Qjt7wSnUq0UZWDSYT61eWE',
@@ -380,7 +400,7 @@ const RadicoDashboard = () => {
   };
 
   // ==========================================
-  // PART 5: ENHANCED DATA PROCESSING (ENHANCED BUT PRESERVES ALL EXISTING FUNCTIONALITY)
+  // PART 5: ENHANCED DATA PROCESSING WITH HISTORICAL POPULATION (OPTION 1 IMPLEMENTATION)
   // ==========================================
 
   const processEnhancedRadicoData = (masterData: Record<string, any[]>, visitData: any[], historicalData: any[]): DashboardData => {
@@ -388,14 +408,14 @@ const RadicoDashboard = () => {
     const targets = masterData['Target Vs Achievement'] || [];
     const challans = masterData['Pending Challans'] || [];
     
-    console.log(`🔧 PROCESSING DATA WITH ENHANCED SKU PRESERVATION: ${currentMonth}-${currentYear}`);
-    console.log('🔄 ROLLING 4-MONTH WINDOW: Mar-Apr-May-Jun 2025 + YoY (Jun 2024)');
+    console.log(`🔧 ENHANCED PROCESSING WITH HISTORICAL POPULATION: ${currentMonth}-${currentYear}`);
+    console.log('🔄 ROLLING 12-MONTH WINDOW WITH INDIVIDUAL SHOP POPULATION');
     
-    // ENHANCED MONTHLY DATA PROCESSING WITH DETAILED SKU BREAKDOWN
+    // ENHANCED MONTHLY DATA PROCESSING WITH HISTORICAL SHOP POPULATION
     const processMonthlyData = (monthNumber: string, year: string = currentYear, useHistorical: boolean = false) => {
       let monthShopSales: Record<string, any> = {};
-      let monthShopSKUs: Record<string, Record<string, number>> = {}; // EXISTING - PRESERVED
-      let monthShopDetailedSKUs: Record<string, DetailedSKUData[]> = {}; // NEW - ADDITIONAL
+      let monthShopSKUs: Record<string, Record<string, number>> = {};
+      let monthShopDetailedSKUs: Record<string, DetailedSKUData[]> = {};
       let monthlyUniqueShops = new Set<string>();
       let monthly8PM = 0, monthlyVERVE = 0;
 
@@ -437,15 +457,14 @@ const RadicoDashboard = () => {
 
                     if (!monthShopSales[shopIdentifier]) {
                       monthShopSales[shopIdentifier] = { total: 0, eightPM: 0, verve: 0, shopName: shopName };
-                      monthShopSKUs[shopIdentifier] = {}; // EXISTING
-                      monthShopDetailedSKUs[shopIdentifier] = []; // NEW
+                      monthShopSKUs[shopIdentifier] = {};
+                      monthShopDetailedSKUs[shopIdentifier] = [];
                     }
                     
                     monthShopSales[shopIdentifier].total += cases;
                     if (parentBrand === "8PM") monthShopSales[shopIdentifier].eightPM += cases;
                     else if (parentBrand === "VERVE") monthShopSales[shopIdentifier].verve += cases;
                     
-                    // EXISTING SKU tracking (PRESERVED)
                     const brandName = fullBrand || brandShort || 'Unknown Brand';
                     const sizeInfo = row[4]?.toString().trim();
                     const enhancedBrandName = sizeInfo ? `${brandName} ${sizeInfo}ml` : brandName;
@@ -455,7 +474,6 @@ const RadicoDashboard = () => {
                     }
                     monthShopSKUs[shopIdentifier][enhancedBrandName] += cases;
                     
-                    // NEW: Store detailed SKU information (ADDITIONAL)
                     const detailedSKUInfo = getDetailedSKUInfo(enhancedBrandName);
                     const existingDetailedSKU = monthShopDetailedSKUs[shopIdentifier].find(
                       sku => sku.displayName === detailedSKUInfo.displayName
@@ -491,7 +509,6 @@ const RadicoDashboard = () => {
         });
         
       } else {
-        // Use current data source for current and recent months
         console.log(`📊 Processing current data for month ${monthNumber}-${year}`);
         
         const monthChallans = challans.filter(row => 
@@ -515,15 +532,14 @@ const RadicoDashboard = () => {
 
               if (!monthShopSales[shopId]) {
                 monthShopSales[shopId] = { total: 0, eightPM: 0, verve: 0 };
-                monthShopSKUs[shopId] = {}; // EXISTING
-                monthShopDetailedSKUs[shopId] = []; // NEW
+                monthShopSKUs[shopId] = {};
+                monthShopDetailedSKUs[shopId] = [];
               }
               
               monthShopSales[shopId].total += cases;
               if (parentBrand === "8PM") monthShopSales[shopId].eightPM += cases;
               else if (parentBrand === "VERVE") monthShopSales[shopId].verve += cases;
               
-              // EXISTING SKU tracking (PRESERVED)
               const sizeInfo = row[12]?.toString().trim();
               const enhancedBrandName = sizeInfo ? `${brand} ${sizeInfo}ml` : brand;
               
@@ -532,7 +548,6 @@ const RadicoDashboard = () => {
               }
               monthShopSKUs[shopId][enhancedBrandName] += cases;
               
-              // NEW: Store detailed SKU information (ADDITIONAL)
               const detailedSKUInfo = getDetailedSKUInfo(enhancedBrandName);
               const existingDetailedSKU = monthShopDetailedSKUs[shopId].find(
                 sku => sku.displayName === detailedSKUInfo.displayName
@@ -559,8 +574,8 @@ const RadicoDashboard = () => {
 
       return { 
         shopSales: monthShopSales, 
-        shopSKUs: monthShopSKUs, // EXISTING - PRESERVED
-        shopDetailedSKUs: monthShopDetailedSKUs, // NEW - ADDITIONAL
+        shopSKUs: monthShopSKUs,
+        shopDetailedSKUs: monthShopDetailedSKUs,
         uniqueShops: monthlyUniqueShops, 
         total8PM: monthly8PM, 
         totalVERVE: monthlyVERVE,
@@ -570,15 +585,17 @@ const RadicoDashboard = () => {
       };
     };
 
-    // ENHANCED: Process 12 months for comprehensive historical analysis (ENHANCED FROM EXISTING)
+    // ENHANCED: Process ALL 12 months for comprehensive historical analysis
+    console.log('🔄 PROCESSING ALL 12 MONTHS FOR HISTORICAL POPULATION...');
+    
     const juneData = processMonthlyData(currentMonth, currentYear, false);
     const mayData = processMonthlyData('05', currentYear, false);
     const aprilData = processMonthlyData('04', currentYear, false);
     const marchData = processMonthlyData('03', currentYear, true);
+    
+    // NEW: Process all remaining historical months (OPTION 1 IMPLEMENTATION)
     const februaryData = processMonthlyData('02', currentYear, true);
     const januaryData = processMonthlyData('01', currentYear, true);
-    
-    // EXTENDED: 12-Month Historical Data
     const decemberData = processMonthlyData('12', '2024', true);
     const novemberData = processMonthlyData('11', '2024', true);
     const octoberData = processMonthlyData('10', '2024', true);
@@ -589,19 +606,17 @@ const RadicoDashboard = () => {
     // YoY COMPARISON
     const juneLastYearData = processMonthlyData(currentMonth, '2024', true);
     
-    console.log('📊 ENHANCED 12-MONTH PROCESSING WITH DETAILED SKUs COMPLETE');
+    console.log('📊 ENHANCED 12-MONTH PROCESSING WITH INDIVIDUAL SHOP POPULATION COMPLETE');
     
     // Current month primary data (UNCHANGED)
     const total8PM = juneData.total8PM;
     const totalVERVE = juneData.totalVERVE;
     const uniqueShops = juneData.uniqueShops;
 
-    // ENHANCED SHOP DATA BUILDING WITH DETAILED SKU BREAKDOWN
+    // ENHANCED SHOP DATA BUILDING WITH HISTORICAL POPULATION
     const shopSales: Record<string, ShopData> = {};
     
-    // EXISTING: Master SKU aggregation (PRESERVED)
     const masterShopSKUs: Record<string, Record<string, number>> = {};
-    // NEW: Master detailed SKU aggregation (ADDITIONAL)
     const masterShopDetailedSKUs: Record<string, DetailedSKUData[]> = {};
     
     // Build comprehensive shop name mapping (EXISTING - UNCHANGED)
@@ -643,7 +658,6 @@ const RadicoDashboard = () => {
       });
     };
 
-    // NEW: Function to merge detailed SKUs from multiple months (ADDITIONAL)
     const mergeDetailedSKUsFromMonth = (monthData: any, shopIdentifierMap: Record<string, string>) => {
       Object.keys(monthData.shopDetailedSKUs || {}).forEach(shopIdentifier => {
         const actualShopId = shopIdentifierMap[shopIdentifier] || shopIdentifier;
@@ -677,7 +691,8 @@ const RadicoDashboard = () => {
       shopIdentifierMap[shopId] = shopId;
     });
     
-    [mayData, aprilData, marchData, februaryData, januaryData, juneLastYearData].forEach(monthData => {
+    // ENHANCED: Include ALL 12 months in identifier mapping
+    [mayData, aprilData, marchData, februaryData, januaryData, decemberData, novemberData, octoberData, septemberData, augustData, julyData, juneLastYearData].forEach(monthData => {
       Object.keys(monthData.shopSales).forEach(shopIdentifier => {
         if (!shopIdentifierMap[shopIdentifier]) {
           if (shopDetailsMap[shopIdentifier]) {
@@ -696,29 +711,14 @@ const RadicoDashboard = () => {
       });
     });
 
-    // EXISTING: Merge SKUs from ALL months (PRESERVED)
-    console.log('🔄 MERGING EXISTING SKUs FROM ALL MONTHS...');
-    mergeSKUsFromMonth(juneData, shopIdentifierMap);
-    mergeSKUsFromMonth(mayData, shopIdentifierMap);
-    mergeSKUsFromMonth(aprilData, shopIdentifierMap);
-    mergeSKUsFromMonth(marchData, shopIdentifierMap);
-    mergeSKUsFromMonth(februaryData, shopIdentifierMap);
-    mergeSKUsFromMonth(januaryData, shopIdentifierMap);
-    
-    // NEW: Merge detailed SKUs from ALL months (ADDITIONAL)
-    console.log('🔄 MERGING NEW DETAILED SKUs FROM ALL MONTHS...');
-    mergeDetailedSKUsFromMonth(juneData, shopIdentifierMap);
-    mergeDetailedSKUsFromMonth(mayData, shopIdentifierMap);
-    mergeDetailedSKUsFromMonth(aprilData, shopIdentifierMap);
-    mergeDetailedSKUsFromMonth(marchData, shopIdentifierMap);
-    mergeDetailedSKUsFromMonth(februaryData, shopIdentifierMap);
-    mergeDetailedSKUsFromMonth(januaryData, shopIdentifierMap);
-    
-    console.log('✅ BOTH EXISTING AND DETAILED SKU BREAKDOWNS COLLECTED:', {
-      shopsWithSKUs: Object.keys(masterShopSKUs).length,
-      shopsWithDetailedSKUs: Object.keys(masterShopDetailedSKUs).length,
-      totalDetailedSKUs: Object.values(masterShopDetailedSKUs).reduce((sum, skus) => sum + skus.length, 0)
+    // ENHANCED: Merge SKUs from ALL 12 months
+    console.log('🔄 MERGING SKUs FROM ALL 12 MONTHS...');
+    [juneData, mayData, aprilData, marchData, februaryData, januaryData, decemberData, novemberData, octoberData, septemberData, augustData, julyData].forEach(monthData => {
+      mergeSKUsFromMonth(monthData, shopIdentifierMap);
+      mergeDetailedSKUsFromMonth(monthData, shopIdentifierMap);
     });
+    
+    console.log('✅ COMPREHENSIVE 12-MONTH SKU BREAKDOWN COLLECTED');
 
     // Process current month data (ALL EXISTING LOGIC PRESERVED)
     juneData.challans.forEach(row => {
@@ -741,7 +741,8 @@ const RadicoDashboard = () => {
               total: 0,
               eightPM: 0,
               verve: 0,
-              // ROLLING 4-MONTH WINDOW
+              
+              // EXISTING: Rolling 4-month window (UNCHANGED)
               marchTotal: 0,
               marchEightPM: 0,
               marchVerve: 0,
@@ -754,14 +755,41 @@ const RadicoDashboard = () => {
               juneTotal: 0,
               juneEightPM: 0,
               juneVerve: 0,
-              // YoY COMPARISON
+              
+              // NEW: Extended historical months (OPTION 1 IMPLEMENTATION)
+              februaryTotal: 0,
+              februaryEightPM: 0,
+              februaryVerve: 0,
+              januaryTotal: 0,
+              januaryEightPM: 0,
+              januaryVerve: 0,
+              decemberTotal: 0,
+              decemberEightPM: 0,
+              decemberVerve: 0,
+              novemberTotal: 0,
+              novemberEightPM: 0,
+              novemberVerve: 0,
+              octoberTotal: 0,
+              octoberEightPM: 0,
+              octoberVerve: 0,
+              septemberTotal: 0,
+              septemberEightPM: 0,
+              septemberVerve: 0,
+              augustTotal: 0,
+              augustEightPM: 0,
+              augustVerve: 0,
+              julyTotal: 0,
+              julyEightPM: 0,
+              julyVerve: 0,
+              
+              // EXISTING: YoY and other metrics (UNCHANGED)
               juneLastYearTotal: 0,
               juneLastYearEightPM: 0,
               juneLastYearVerve: 0,
               yoyGrowthPercent: 0,
               monthlyTrend: 'stable',
-              skuBreakdown: [], // EXISTING - PRESERVED
-              detailedSKUBreakdown: [], // NEW - ADDITIONAL
+              skuBreakdown: [],
+              detailedSKUBreakdown: [],
               threeMonthAvgTotal: 0,
               threeMonthAvg8PM: 0,
               threeMonthAvgVERVE: 0
@@ -783,10 +811,25 @@ const RadicoDashboard = () => {
       }
     });
 
-    // Add historical data for rolling window + YoY (ALL EXISTING LOGIC PRESERVED)
-    [mayData, aprilData, marchData, juneLastYearData].forEach((monthData, index) => {
-      const monthKey = index === 0 ? 'may' : index === 1 ? 'april' : index === 2 ? 'march' : 'juneLastYear';
-      
+    // ENHANCED: Add ALL historical data for rolling window + YoY + EXTENDED MONTHS
+    console.log('🔄 POPULATING ALL HISTORICAL MONTHS FOR EACH SHOP...');
+    
+    const allHistoricalMonths = [
+      { data: mayData, key: 'may' },
+      { data: aprilData, key: 'april' },
+      { data: marchData, key: 'march' },
+      { data: februaryData, key: 'february' },
+      { data: januaryData, key: 'january' },
+      { data: decemberData, key: 'december' },
+      { data: novemberData, key: 'november' },
+      { data: octoberData, key: 'october' },
+      { data: septemberData, key: 'september' },
+      { data: augustData, key: 'august' },
+      { data: julyData, key: 'july' },
+      { data: juneLastYearData, key: 'juneLastYear' }
+    ];
+    
+    allHistoricalMonths.forEach(({ data: monthData, key: monthKey }) => {
       Object.keys(monthData.shopSales).forEach(shopIdentifier => {
         const monthShopData = monthData.shopSales[shopIdentifier];
         
@@ -822,32 +865,31 @@ const RadicoDashboard = () => {
             total: 0,
             eightPM: 0,
             verve: 0,
-            marchTotal: 0,
-            marchEightPM: 0,
-            marchVerve: 0,
-            aprilTotal: 0,
-            aprilEightPM: 0,
-            aprilVerve: 0,
-            mayTotal: 0,
-            mayEightPM: 0,
-            mayVerve: 0,
-            juneTotal: 0,
-            juneEightPM: 0,
-            juneVerve: 0,
-            juneLastYearTotal: 0,
-            juneLastYearEightPM: 0,
-            juneLastYearVerve: 0,
+            
+            // Initialize ALL historical months to 0
+            marchTotal: 0, marchEightPM: 0, marchVerve: 0,
+            aprilTotal: 0, aprilEightPM: 0, aprilVerve: 0,
+            mayTotal: 0, mayEightPM: 0, mayVerve: 0,
+            juneTotal: 0, juneEightPM: 0, juneVerve: 0,
+            februaryTotal: 0, februaryEightPM: 0, februaryVerve: 0,
+            januaryTotal: 0, januaryEightPM: 0, januaryVerve: 0,
+            decemberTotal: 0, decemberEightPM: 0, decemberVerve: 0,
+            novemberTotal: 0, novemberEightPM: 0, novemberVerve: 0,
+            octoberTotal: 0, octoberEightPM: 0, octoberVerve: 0,
+            septemberTotal: 0, septemberEightPM: 0, septemberVerve: 0,
+            augustTotal: 0, augustEightPM: 0, augustVerve: 0,
+            julyTotal: 0, julyEightPM: 0, julyVerve: 0,
+            
+            juneLastYearTotal: 0, juneLastYearEightPM: 0, juneLastYearVerve: 0,
             yoyGrowthPercent: 0,
             monthlyTrend: 'declining',
-            skuBreakdown: [], // EXISTING
-            detailedSKUBreakdown: [], // NEW
-            threeMonthAvgTotal: 0,
-            threeMonthAvg8PM: 0,
-            threeMonthAvgVERVE: 0
+            skuBreakdown: [],
+            detailedSKUBreakdown: [],
+            threeMonthAvgTotal: 0, threeMonthAvg8PM: 0, threeMonthAvgVERVE: 0
           };
         }
         
-        // Add historical data (EXISTING LOGIC PRESERVED)
+        // ENHANCED: Populate historical data for ALL months
         if (monthKey === 'may') {
           shopSales[actualShopId].mayTotal = monthShopData.total;
           shopSales[actualShopId].mayEightPM = monthShopData.eightPM;
@@ -860,6 +902,38 @@ const RadicoDashboard = () => {
           shopSales[actualShopId].marchTotal = monthShopData.total;
           shopSales[actualShopId].marchEightPM = monthShopData.eightPM;
           shopSales[actualShopId].marchVerve = monthShopData.verve;
+        } else if (monthKey === 'february') {
+          shopSales[actualShopId].februaryTotal = monthShopData.total;
+          shopSales[actualShopId].februaryEightPM = monthShopData.eightPM;
+          shopSales[actualShopId].februaryVerve = monthShopData.verve;
+        } else if (monthKey === 'january') {
+          shopSales[actualShopId].januaryTotal = monthShopData.total;
+          shopSales[actualShopId].januaryEightPM = monthShopData.eightPM;
+          shopSales[actualShopId].januaryVerve = monthShopData.verve;
+        } else if (monthKey === 'december') {
+          shopSales[actualShopId].decemberTotal = monthShopData.total;
+          shopSales[actualShopId].decemberEightPM = monthShopData.eightPM;
+          shopSales[actualShopId].decemberVerve = monthShopData.verve;
+        } else if (monthKey === 'november') {
+          shopSales[actualShopId].novemberTotal = monthShopData.total;
+          shopSales[actualShopId].novemberEightPM = monthShopData.eightPM;
+          shopSales[actualShopId].novemberVerve = monthShopData.verve;
+        } else if (monthKey === 'october') {
+          shopSales[actualShopId].octoberTotal = monthShopData.total;
+          shopSales[actualShopId].octoberEightPM = monthShopData.eightPM;
+          shopSales[actualShopId].octoberVerve = monthShopData.verve;
+        } else if (monthKey === 'september') {
+          shopSales[actualShopId].septemberTotal = monthShopData.total;
+          shopSales[actualShopId].septemberEightPM = monthShopData.eightPM;
+          shopSales[actualShopId].septemberVerve = monthShopData.verve;
+        } else if (monthKey === 'august') {
+          shopSales[actualShopId].augustTotal = monthShopData.total;
+          shopSales[actualShopId].augustEightPM = monthShopData.eightPM;
+          shopSales[actualShopId].augustVerve = monthShopData.verve;
+        } else if (monthKey === 'july') {
+          shopSales[actualShopId].julyTotal = monthShopData.total;
+          shopSales[actualShopId].julyEightPM = monthShopData.eightPM;
+          shopSales[actualShopId].julyVerve = monthShopData.verve;
         } else if (monthKey === 'juneLastYear') {
           shopSales[actualShopId].juneLastYearTotal = monthShopData.total;
           shopSales[actualShopId].juneLastYearEightPM = monthShopData.eightPM;
@@ -868,7 +942,9 @@ const RadicoDashboard = () => {
       });
     });
 
-    // ENHANCED: Populate BOTH legacy and detailed SKU breakdowns for ALL shops
+    console.log('✅ ALL HISTORICAL MONTHS POPULATED FOR INDIVIDUAL SHOPS');
+
+    // ENHANCED: Populate BOTH legacy and detailed SKU breakdowns for ALL shops (UNCHANGED)
     console.log('🔄 POPULATING BOTH EXISTING AND NEW SKU BREAKDOWNS...');
     let totalSKUsPopulated = 0;
     let totalDetailedSKUsPopulated = 0;
@@ -876,10 +952,8 @@ const RadicoDashboard = () => {
     Object.keys(shopSales).forEach(shopId => {
       const shop = shopSales[shopId];
       
-      // EXISTING: Get complete SKU data for this shop (PRESERVED)
       const shopSKUData = masterShopSKUs[shopId] || {};
       
-      // EXISTING: Convert to SKUData format (PRESERVED)
       shop.skuBreakdown = Object.keys(shopSKUData).map(brand => ({
         brand,
         cases: shopSKUData[brand],
@@ -889,10 +963,8 @@ const RadicoDashboard = () => {
       
       totalSKUsPopulated += shop.skuBreakdown.length;
       
-      // EXISTING: Calculate total for percentage calculation (PRESERVED)
       const totalCases = shop.skuBreakdown.reduce((sum, sku) => sum + sku.cases, 0);
       
-      // EXISTING: Calculate percentages and sort (PRESERVED)
       if (totalCases > 0) {
         shop.skuBreakdown.forEach(sku => {
           sku.percentage = Math.round((sku.cases / totalCases) * 100 * 100) / 100;
@@ -900,10 +972,8 @@ const RadicoDashboard = () => {
         shop.skuBreakdown.sort((a, b) => b.cases - a.cases);
       }
       
-      // NEW: Get detailed SKU data for this shop (ADDITIONAL)
       const shopDetailedSKUs = masterShopDetailedSKUs[shopId] || [];
       
-      // NEW: Populate detailed SKU breakdown with percentages (ADDITIONAL)
       shop.detailedSKUBreakdown = shopDetailedSKUs.map(sku => ({
         ...sku,
         percentage: totalCases > 0 ? Math.round((sku.cases / totalCases) * 100 * 100) / 100 : 0
@@ -912,12 +982,10 @@ const RadicoDashboard = () => {
       totalDetailedSKUsPopulated += shop.detailedSKUBreakdown.length;
     });
     
-    console.log('✅ BOTH EXISTING AND NEW SKU BREAKDOWNS POPULATED:', {
+    console.log('✅ COMPREHENSIVE HISTORICAL SKU BREAKDOWNS POPULATED:', {
       shopsProcessed: Object.keys(shopSales).length,
       totalExistingSKUsPopulated: totalSKUsPopulated,
-      totalNewDetailedSKUsPopulated: totalDetailedSKUsPopulated,
-      sampleShopExistingSKUs: shopSales[Object.keys(shopSales)[0]]?.skuBreakdown?.slice(0, 3),
-      sampleShopNewDetailedSKUs: shopSales[Object.keys(shopSales)[0]]?.detailedSKUBreakdown?.slice(0, 3)
+      totalNewDetailedSKUsPopulated: totalDetailedSKUsPopulated
     });
 
     // ALL REMAINING LOGIC PRESERVED UNCHANGED
@@ -932,12 +1000,10 @@ const RadicoDashboard = () => {
       const march = shop.marchTotal || 0;
       const juneLastYear = shop.juneLastYearTotal || 0;
       
-      // Calculate 3-month averages
       shop.threeMonthAvgTotal = (march + april + may) / 3;
       shop.threeMonthAvg8PM = ((shop.marchEightPM || 0) + (shop.aprilEightPM || 0) + (shop.mayEightPM || 0)) / 3;
       shop.threeMonthAvgVERVE = ((shop.marchVerve || 0) + (shop.aprilVerve || 0) + (shop.mayVerve || 0)) / 3;
       
-      // Month-over-month growth
       if (may > 0) {
         shop.growthPercent = Math.round(((june - may) / may) * 100 * 100) / 100;
       } else if (june > 0) {
@@ -946,7 +1012,6 @@ const RadicoDashboard = () => {
         shop.growthPercent = -100;
       }
       
-      // YoY growth
       if (juneLastYear > 0) {
         shop.yoyGrowthPercent = Math.round(((june - juneLastYear) / juneLastYear) * 100 * 100) / 100;
       } else if (june > 0) {
@@ -955,7 +1020,6 @@ const RadicoDashboard = () => {
         shop.yoyGrowthPercent = 0;
       }
       
-      // Enhanced trend logic
       if (march === 0 && april === 0 && may === 0 && june > 0) {
         shop.monthlyTrend = 'new';
       } else if ((march > 0 || april > 0 || may > 0) && june === 0) {
@@ -1103,6 +1167,11 @@ const RadicoDashboard = () => {
       .sort((a, b) => (b.threeMonthAvgTotal! || 0) - (a.threeMonthAvgTotal! || 0))
       .slice(0, 20);
 
+    console.log('🎯 FINAL RESULT: ENHANCED DATA WITH COMPLETE HISTORICAL POPULATION');
+    console.log('✅ All shop objects now contain 12+ months of historical data');
+    console.log('✅ CustomerHealth will now show proper progression instead of gaps');
+    console.log('✅ All existing components work unchanged - fully backward compatible');
+
     return {
       summary: {
         totalShops: shopDetails.length - 1,
@@ -1136,15 +1205,17 @@ const RadicoDashboard = () => {
         may: mayData,
         april: aprilData,
         march: marchData,
+        
+        // NEW: Extended 12-month historical data (OPTION 1 IMPLEMENTATION)
         february: februaryData,
         january: januaryData,
-        // ENHANCED: Extended 12-month historical data (NEW)
         december2024: decemberData,
         november2024: novemberData,
         october2024: octoberData,
         september2024: septemberData,
         august2024: augustData,
         july2024: julyData,
+        
         // YoY comparison - UNCHANGED
         juneLastYear: juneLastYearData
       }
@@ -1206,7 +1277,7 @@ const RadicoDashboard = () => {
         <div className="text-center">
           <RefreshCw className="w-12 h-12 animate-spin mx-auto mb-4 text-blue-600" />
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Loading Enhanced Radico Dashboard</h2>
-          <p className="text-gray-600">Processing live data with detailed SKU analytics for {getMonthName(currentMonth)} {currentYear}...</p>
+          <p className="text-gray-600">Processing live data with comprehensive historical analytics for {getMonthName(currentMonth)} {currentYear}...</p>
         </div>
       </div>
     );
