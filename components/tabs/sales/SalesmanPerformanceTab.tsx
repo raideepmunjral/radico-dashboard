@@ -1007,22 +1007,7 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
         <p className="text-gray-600 text-sm sm:text-base">Individual salesman achievements and targets for {getMonthName(data.currentMonth)} {data.currentYear}</p>
       </div>
 
-      {/* DEBUGGING PANEL - Remove this after fixing */}
-      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-        <h3 className="text-sm font-bold text-yellow-800 mb-2">🔧 Debug Info (Top 3 Salesmen) - CORRECTED</h3>
-        <div className="text-xs text-yellow-700 space-y-1">
-          {sortedSalesmen.slice(0, 3).map((salesman, index) => (
-            <div key={salesman.name}>
-              <strong>Rank {index + 1}:</strong> {salesman.name} - Total Sales: {Number(salesman.totalSales).toLocaleString()} 
-              (8PM: {Number(salesman.total8PM).toLocaleString()}, VERVE: {Number(salesman.totalVERVE).toLocaleString()})
-              {index === 0 && Number(salesman.totalSales) < 400 && <span className="text-red-600 font-bold"> ⚠️ RANKING ERROR!</span>}
-            </div>
-          ))}
-        </div>
-        <div className="mt-2 text-xs text-yellow-600">
-          <strong>Expected Top 3:</strong> Manish (459), Sahir Kumar (442), Amit Kumar (356)
-        </div>
-      </div>
+
 
       {/* Performance Summary Cards - Mobile Responsive */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
