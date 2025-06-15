@@ -559,6 +559,7 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
       </div>
     );
   };
+
   const CustomerPenetrationModal = ({ onClose }: { onClose: () => void }) => {
     if (!selectedPenetrationBreakdown) return null;
 
@@ -861,9 +862,9 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
           totalShops: 0,
           billedShops: 0,
           coverage: 0,
-          total8PM: 0,
-          totalVERVE: 0,
-          totalSales: 0,
+          total8PM: 0,        // CRITICAL: Initialize as NUMBER
+          totalVERVE: 0,      // CRITICAL: Initialize as NUMBER  
+          totalSales: 0,      // CRITICAL: Initialize as NUMBER
           target8PM: 0,
           targetVERVE: 0,
           achievement8PM: 0,
@@ -893,10 +894,34 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
       // Only count as billed if shop has sales in current month
       if (shop.total > 0) {
         performanceMap[normalizedName].billedShops++;
-        // ENSURE NUMERIC VALUES - CRITICAL FIX
-        performanceMap[normalizedName].total8PM += Number(shop.eightPM) || 0;
-        performanceMap[normalizedName].totalVERVE += Number(shop.verve) || 0;
-        performanceMap[normalizedName].totalSales += Number(shop.total) || 0;
+        
+        // CRITICAL FIX: Force numeric conversion and validate
+        const shop8PM = Number(shop.eightPM) || 0;
+        const shopVERVE = Number(shop.verve) || 0;
+        const shopTotal = Number(shop.total) || 0;
+        
+        // Debug log for problematic values
+        if (isNaN(shop8PM) || isNaN(shopVERVE) || isNaN(shopTotal)) {
+          console.warn(`⚠️  Invalid numeric values for shop ${shop.shopName}:`, {
+            eightPM: shop.eightPM,
+            verve: shop.verve, 
+            total: shop.total,
+            converted8PM: shop8PM,
+            convertedVERVE: shopVERVE,
+            convertedTotal: shopTotal
+          });
+        }
+        
+        // CRITICAL FIX: Ensure numeric addition using explicit type conversion
+        performanceMap[normalizedName].total8PM = Number(performanceMap[normalizedName].total8PM) + shop8PM;
+        performanceMap[normalizedName].totalVERVE = Number(performanceMap[normalizedName].totalVERVE) + shopVERVE;
+        performanceMap[normalizedName].totalSales = Number(performanceMap[normalizedName].totalSales) + shopTotal;
+        
+        // Validation after each addition
+        if (isNaN(performanceMap[normalizedName].totalSales)) {
+          console.error(`❌ NaN detected for ${originalSalesmanName} after adding ${shopTotal}`);
+          performanceMap[normalizedName].totalSales = shopTotal; // Reset to current shop total
+        }
       }
         
       // Add historical data regardless of current sales - ENSURE NUMERIC
@@ -934,16 +959,22 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
       }
     });
     
-    // STEP 3: Calculate coverage and achievements
+    // STEP 3: Calculate coverage and achievements with FINAL NUMERIC VALIDATION
     Object.values(performanceMap).forEach((perf: any) => {
       perf.coverage = perf.totalShops > 0 ? (perf.billedShops / perf.totalShops) * 100 : 0;
       perf.achievement8PM = perf.target8PM > 0 ? (perf.total8PM / perf.target8PM) * 100 : 0;
       perf.achievementVERVE = perf.targetVERVE > 0 ? (perf.totalVERVE / perf.targetVERVE) * 100 : 0;
       
-      // ENSURE ALL VALUES ARE NUMBERS
+      // CRITICAL: Final validation and type conversion
       perf.totalSales = Number(perf.totalSales) || 0;
       perf.total8PM = Number(perf.total8PM) || 0;
       perf.totalVERVE = Number(perf.totalVERVE) || 0;
+      
+      // Additional validation
+      if (isNaN(perf.totalSales) || perf.totalSales < 0) {
+        console.error(`❌ Invalid totalSales for ${perf.name}: ${perf.totalSales}`);
+        perf.totalSales = 0;
+      }
     });
     
     const result = Object.values(performanceMap).filter((p: any) => p.name !== 'Unknown');
@@ -957,7 +988,7 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
     });
     
     // CRITICAL DEBUG: Check if totalSales values are correct
-    console.log('🔍 RAW TOTAL SALES VALUES:');
+    console.log('🔍 RAW TOTAL SALES VALUES BEFORE SORTING:');
     result.forEach((salesman: any) => {
       console.log(`${salesman.name}: totalSales = ${salesman.totalSales} (${typeof salesman.totalSales}), total8PM = ${salesman.total8PM}, totalVERVE = ${salesman.totalVERVE}`);
     });
@@ -965,37 +996,47 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
     return result;
   }, [data]);
 
-  // FIXED: PROPER SORTING WITH DEBUGGING
+  // FIXED: PROPER SORTING WITH ENHANCED DEBUGGING
   const sortedSalesmen = useMemo(() => {
     console.log('🔄 SORTING SALESMEN BY TOTAL SALES...');
     console.log('Raw salesmanPerformance before sorting:', salesmanPerformance.map(s => ({
       name: s.name,
       totalSales: s.totalSales,
-      type: typeof s.totalSales
+      type: typeof s.totalSales,
+      isNumber: !isNaN(Number(s.totalSales))
     })));
     
     // Create a copy to avoid mutating original array
     const sorted = [...salesmanPerformance].sort((a: any, b: any) => {
-      const aTotal = Number(a.totalSales) || 0;
-      const bTotal = Number(b.totalSales) || 0;
+      // CRITICAL FIX: Explicit numeric conversion with validation
+      const aTotal = parseFloat(String(a.totalSales)) || 0;
+      const bTotal = parseFloat(String(b.totalSales)) || 0;
       
       // Debug comparison
       console.log(`Comparing ${a.name} (${aTotal}) vs ${b.name} (${bTotal}) - Result: ${bTotal - aTotal}`);
+      
+      // Additional validation
+      if (isNaN(aTotal) || isNaN(bTotal)) {
+        console.error(`❌ NaN values in sorting: ${a.name}=${aTotal}, ${b.name}=${bTotal}`);
+      }
       
       return bTotal - aTotal; // Descending order (highest first)
     });
     
     console.log('✅ FINAL SORTED ORDER BY TOTAL SALES:');
     sorted.forEach((salesman, index) => {
-      console.log(`${index + 1}. ${salesman.name}: ${Number(salesman.totalSales).toLocaleString()} total sales`);
+      const totalSales = Number(salesman.totalSales);
+      console.log(`${index + 1}. ${salesman.name}: ${totalSales.toLocaleString()} total sales (type: ${typeof totalSales})`);
     });
     
-    // FORCE CHECK: Let's verify the top 3 are correct
-    const top3 = sorted.slice(0, 3);
-    console.log('🎯 TOP 3 VERIFICATION:');
-    top3.forEach((salesman, index) => {
-      console.log(`Position ${index + 1}: ${salesman.name} with ${salesman.totalSales} sales`);
-    });
+    // VALIDATION: Check if sorting worked correctly
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const current = Number(sorted[i].totalSales);
+      const next = Number(sorted[i + 1].totalSales);
+      if (current < next) {
+        console.error(`❌ SORTING ERROR: Position ${i + 1} (${sorted[i].name}: ${current}) < Position ${i + 2} (${sorted[i + 1].name}: ${next})`);
+      }
+    }
     
     return sorted;
   }, [salesmanPerformance]);
@@ -1006,8 +1047,6 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
         <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Salesman Performance Dashboard</h2>
         <p className="text-gray-600 text-sm sm:text-base">Individual salesman achievements and targets for {getMonthName(data.currentMonth)} {data.currentYear}</p>
       </div>
-
-
 
       {/* Performance Summary Cards - Mobile Responsive */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
