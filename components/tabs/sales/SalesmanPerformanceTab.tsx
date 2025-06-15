@@ -64,6 +64,15 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
     verve: number;
   } | null>(null);
 
+  // NEW STATE for customer penetration modal
+  const [showPenetrationBreakdown, setShowPenetrationBreakdown] = useState(false);
+  const [selectedPenetrationBreakdown, setSelectedPenetrationBreakdown] = useState<{
+    salesmanName: string;
+    totalShops: number;
+    billedShops: number;
+    shops: any[];
+  } | null>(null);
+
   // INTERNAL FUNCTION to handle case breakdown click
   const handleCaseBreakdownClick = (salesmanName: string, month: string, monthName: string, total: number, eightPM: number, verve: number) => {
     setSelectedSalesmanBreakdown({
@@ -75,6 +84,17 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
       verve
     });
     setShowSalesmanBreakdown(true);
+  };
+
+  // NEW FUNCTION to handle customer penetration breakdown click
+  const handlePenetrationBreakdownClick = (salesmanName: string, totalShops: number, billedShops: number, shops: any[]) => {
+    setSelectedPenetrationBreakdown({
+      salesmanName,
+      totalShops,
+      billedShops,
+      shops
+    });
+    setShowPenetrationBreakdown(true);
   };
 
   // ==========================================
@@ -96,7 +116,12 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
             )}
           </div>
           <h3 className="font-medium text-gray-900 text-base">{salesman.name}</h3>
-          <p className="text-sm text-gray-500">{salesman.billedShops}/{salesman.totalShops} shops</p>
+          <button
+            onClick={() => handlePenetrationBreakdownClick(salesman.name, salesman.totalShops, salesman.billedShops, salesman.shops)}
+            className="text-sm text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+          >
+            {salesman.billedShops}/{salesman.totalShops} shops
+          </button>
         </div>
         <div className="text-right">
           <div className="text-lg font-bold text-blue-600">{salesman.totalSales.toLocaleString()}</div>
@@ -291,9 +316,195 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
     );
   };
 
+  // NEW COMPONENT: Customer Penetration Modal
+  const CustomerPenetrationModal = ({ onClose }: { onClose: () => void }) => {
+    if (!selectedPenetrationBreakdown) return null;
+
+    const { salesmanName, totalShops, billedShops, shops } = selectedPenetrationBreakdown;
+    
+    // Calculate penetration metrics
+    const shopsWithSales = shops.filter(shop => shop.total > 0);
+    const shops8PM = shopsWithSales.filter(shop => (shop.eightPM || 0) > 0);
+    const shopsVERVE = shopsWithSales.filter(shop => (shop.verve || 0) > 0);
+    const shopsBoth = shopsWithSales.filter(shop => (shop.eightPM || 0) > 0 && (shop.verve || 0) > 0);
+    const shops8PMOnly = shopsWithSales.filter(shop => (shop.eightPM || 0) > 0 && (shop.verve || 0) === 0);
+    const shopsVERVEOnly = shopsWithSales.filter(shop => (shop.verve || 0) > 0 && (shop.eightPM || 0) === 0);
+    const shopsZeroSales = shops.filter(shop => shop.total === 0);
+    
+    const total8PMCases = shops8PM.reduce((sum, shop) => sum + (shop.eightPM || 0), 0);
+    const totalVERVECases = shopsVERVE.reduce((sum, shop) => sum + (shop.verve || 0), 0);
+    
+    const penetration8PM = billedShops > 0 ? (shops8PM.length / billedShops * 100) : 0;
+    const penetrationVERVE = billedShops > 0 ? (shopsVERVE.length / billedShops * 100) : 0;
+    const crossSellRate = billedShops > 0 ? (shopsBoth.length / billedShops * 100) : 0;
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden">
+          <div className="flex justify-between items-center p-4 sm:p-6 border-b">
+            <h3 className="text-lg font-semibold">
+              🏪 {salesmanName} - Customer Penetration ({billedShops} Billed Shops)
+            </h3>
+            <button 
+              onClick={onClose} 
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+
+          <div className="p-4 sm:p-6 overflow-y-auto">
+            {/* Brand Penetration by Customer Count */}
+            <div className="mb-6">
+              <h4 className="text-md font-semibold text-gray-900 mb-4">📊 BRAND PENETRATION BY CUSTOMER COUNT</h4>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-purple-50 p-4 rounded-lg text-center">
+                  <div className="text-2xl font-bold text-purple-600">{shops8PM.length}/{billedShops}</div>
+                  <div className="text-sm text-gray-600">8PM BUYERS</div>
+                  <div className="text-xs text-gray-500">{penetration8PM.toFixed(1)}% shops</div>
+                  <div className="text-xs text-purple-600">📦 {total8PMCases.toLocaleString()} cases</div>
+                </div>
+                <div className="bg-orange-50 p-4 rounded-lg text-center">
+                  <div className="text-2xl font-bold text-orange-600">{shopsVERVE.length}/{billedShops}</div>
+                  <div className="text-sm text-gray-600">VERVE BUYERS</div>
+                  <div className="text-xs text-gray-500">{penetrationVERVE.toFixed(1)}% shops</div>
+                  <div className="text-xs text-orange-600">📦 {totalVERVECases.toLocaleString()} cases</div>
+                </div>
+                <div className="bg-green-50 p-4 rounded-lg text-center">
+                  <div className="text-2xl font-bold text-green-600">{shopsBoth.length}/{billedShops}</div>
+                  <div className="text-sm text-gray-600">BOTH BRANDS</div>
+                  <div className="text-xs text-gray-500">{crossSellRate.toFixed(1)}% shops</div>
+                  <div className="text-xs text-green-600">💰 Best buyers</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Customer Behavior Analysis */}
+            <div className="mb-6">
+              <h4 className="text-md font-semibold text-gray-900 mb-4">🎯 CUSTOMER BEHAVIOR ANALYSIS</h4>
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="bg-blue-50 p-4 rounded-lg text-center">
+                  <div className="text-xl font-bold text-blue-600">{shops8PMOnly.length}</div>
+                  <div className="text-sm text-gray-600">8PM ONLY</div>
+                  <div className="text-xs text-gray-500">{billedShops > 0 ? (shops8PMOnly.length / billedShops * 100).toFixed(1) : 0}%</div>
+                  <div className="text-xs text-blue-600">🎯 Upsell VERVE</div>
+                </div>
+                <div className="bg-yellow-50 p-4 rounded-lg text-center">
+                  <div className="text-xl font-bold text-yellow-600">{shopsVERVEOnly.length}</div>
+                  <div className="text-sm text-gray-600">VERVE ONLY</div>
+                  <div className="text-xs text-gray-500">{billedShops > 0 ? (shopsVERVEOnly.length / billedShops * 100).toFixed(1) : 0}%</div>
+                  <div className="text-xs text-yellow-600">🎯 Upsell 8PM</div>
+                </div>
+                <div className="bg-green-50 p-4 rounded-lg text-center">
+                  <div className="text-xl font-bold text-green-600">{shopsBoth.length}</div>
+                  <div className="text-sm text-gray-600">CROSS-SELL SUCCESS</div>
+                  <div className="text-xs text-gray-500">{crossSellRate.toFixed(1)}% rate</div>
+                  <div className="text-xs text-green-600">🎉 Both brands</div>
+                </div>
+                <div className="bg-red-50 p-4 rounded-lg text-center">
+                  <div className="text-xl font-bold text-red-600">{shopsZeroSales.length}</div>
+                  <div className="text-sm text-gray-600">ZERO SALES</div>
+                  <div className="text-xs text-gray-500">{totalShops > 0 ? (shopsZeroSales.length / totalShops * 100).toFixed(1) : 0}% of assigned</div>
+                  <div className="text-xs text-red-600">⚠️ Urgent follow-up</div>
+                </div>
+              </div>
+            </div>
+
+            {/* Actionable Insights */}
+            <div className="mb-6">
+              <h4 className="text-md font-semibold text-gray-900 mb-4">📈 ACTIONABLE INSIGHTS</h4>
+              <div className="bg-gray-50 p-4 rounded-lg space-y-2">
+                <div className="flex items-center text-sm">
+                  <span className="mr-2">🎉</span>
+                  <span><strong>{shopsBoth.length} shops</strong> buy both brands = <strong>{crossSellRate.toFixed(1)}%</strong> cross-sell rate</span>
+                </div>
+                <div className="flex items-center text-sm">
+                  <span className="mr-2">📈</span>
+                  <span><strong>{shops8PMOnly.length} shops</strong> only buy 8PM = VERVE opportunity</span>
+                </div>
+                <div className="flex items-center text-sm">
+                  <span className="mr-2">📈</span>
+                  <span><strong>{shopsVERVEOnly.length} shops</strong> only buy VERVE = 8PM opportunity</span>
+                </div>
+                {shopsZeroSales.length > 0 && (
+                  <div className="flex items-center text-sm">
+                    <span className="mr-2">⚠️</span>
+                    <span><strong>{shopsZeroSales.length} shops</strong> assigned but no sales = urgent follow-up needed</span>
+                  </div>
+                )}
+                {shopsBoth.length > 0 && (
+                  <div className="flex items-center text-sm">
+                    <span className="mr-2">💰</span>
+                    <span>Cross-buyers average <strong>{(shopsBoth.reduce((sum, shop) => sum + shop.total, 0) / shopsBoth.length).toFixed(0)} cases</strong> vs single-brand buyers</span>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Top Performing Shops */}
+            {shopsWithSales.length > 0 && (
+              <div className="mb-6">
+                <h4 className="text-md font-semibold text-gray-900 mb-4">🏆 TOP 5 PERFORMING SHOPS</h4>
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Shop Name</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Total Cases</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">8PM</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">VERVE</th>
+                        <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {shopsWithSales.sort((a, b) => b.total - a.total).slice(0, 5).map((shop, index) => (
+                        <tr key={shop.shopId} className={index === 0 ? 'bg-yellow-50' : ''}>
+                          <td className="px-4 py-2 text-sm font-medium text-gray-900">{shop.shopName}</td>
+                          <td className="px-4 py-2 text-sm text-gray-900 font-bold">{shop.total.toLocaleString()}</td>
+                          <td className="px-4 py-2 text-sm text-purple-600">{(shop.eightPM || 0).toLocaleString()}</td>
+                          <td className="px-4 py-2 text-sm text-orange-600">{(shop.verve || 0).toLocaleString()}</td>
+                          <td className="px-4 py-2 text-sm">
+                            {(shop.eightPM || 0) > 0 && (shop.verve || 0) > 0 ? (
+                              <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">Both</span>
+                            ) : (shop.eightPM || 0) > 0 ? (
+                              <span className="px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded-full">8PM</span>
+                            ) : (
+                              <span className="px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded-full">VERVE</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={onClose}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+              >
+                Close
+              </button>
+              <button
+                onClick={() => {
+                  // Future: Export functionality
+                  alert('Export functionality coming soon!');
+                }}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+              >
+                Export Shop List
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
   // ==========================================
-  // FIXED: ENHANCED SALESMAN PERFORMANCE CALCULATION
-  // This now includes ALL assigned shops, not just those with sales data
+  // FIXED: ENHANCED SALESMAN PERFORMANCE CALCULATION WITH PROPER SORTING
   // ==========================================
   
   const salesmanPerformance = useMemo(() => {
@@ -380,23 +591,24 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
       // Only count as billed if shop has sales in current month
       if (shop.total > 0) {
         performanceMap[normalizedName].billedShops++;
-        performanceMap[normalizedName].total8PM += shop.eightPM || 0;
-        performanceMap[normalizedName].totalVERVE += shop.verve || 0;
-        performanceMap[normalizedName].totalSales += shop.total || 0;
+        // ENSURE NUMERIC VALUES - CRITICAL FIX
+        performanceMap[normalizedName].total8PM += Number(shop.eightPM) || 0;
+        performanceMap[normalizedName].totalVERVE += Number(shop.verve) || 0;
+        performanceMap[normalizedName].totalSales += Number(shop.total) || 0;
       }
         
-      // Add historical data regardless of current sales
-      performanceMap[normalizedName].marchTotal += shop.marchTotal || 0;
-      performanceMap[normalizedName].marchEightPM += shop.marchEightPM || 0;
-      performanceMap[normalizedName].marchVerve += shop.marchVerve || 0;
+      // Add historical data regardless of current sales - ENSURE NUMERIC
+      performanceMap[normalizedName].marchTotal += Number(shop.marchTotal) || 0;
+      performanceMap[normalizedName].marchEightPM += Number(shop.marchEightPM) || 0;
+      performanceMap[normalizedName].marchVerve += Number(shop.marchVerve) || 0;
       
-      performanceMap[normalizedName].aprilTotal += shop.aprilTotal || 0;
-      performanceMap[normalizedName].aprilEightPM += shop.aprilEightPM || 0;
-      performanceMap[normalizedName].aprilVerve += shop.aprilVerve || 0;
+      performanceMap[normalizedName].aprilTotal += Number(shop.aprilTotal) || 0;
+      performanceMap[normalizedName].aprilEightPM += Number(shop.aprilEightPM) || 0;
+      performanceMap[normalizedName].aprilVerve += Number(shop.aprilVerve) || 0;
       
-      performanceMap[normalizedName].mayTotal += shop.mayTotal || 0;
-      performanceMap[normalizedName].mayEightPM += shop.mayEightPM || 0;
-      performanceMap[normalizedName].mayVerve += shop.mayVerve || 0;
+      performanceMap[normalizedName].mayTotal += Number(shop.mayTotal) || 0;
+      performanceMap[normalizedName].mayEightPM += Number(shop.mayEightPM) || 0;
+      performanceMap[normalizedName].mayVerve += Number(shop.mayVerve) || 0;
     });
     
     // Update display names to best format
@@ -411,8 +623,9 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
       const normalizedStatsName = normalizeName(originalStatsName);
       
       if (performanceMap[normalizedStatsName]) {
-        performanceMap[normalizedStatsName].target8PM = stats.eightPmTarget || 0;
-        performanceMap[normalizedStatsName].targetVERVE = stats.verveTarget || 0;
+        // ENSURE NUMERIC VALUES
+        performanceMap[normalizedStatsName].target8PM = Number(stats.eightPmTarget) || 0;
+        performanceMap[normalizedStatsName].targetVERVE = Number(stats.verveTarget) || 0;
         console.log(`✅ Matched targets for: "${originalStatsName}" (normalized: "${normalizedStatsName}")`);
       } else {
         console.log(`❌ No match found for target: "${originalStatsName}" (normalized: "${normalizedStatsName}")`);
@@ -424,6 +637,11 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
       perf.coverage = perf.totalShops > 0 ? (perf.billedShops / perf.totalShops) * 100 : 0;
       perf.achievement8PM = perf.target8PM > 0 ? (perf.total8PM / perf.target8PM) * 100 : 0;
       perf.achievementVERVE = perf.targetVERVE > 0 ? (perf.totalVERVE / perf.targetVERVE) * 100 : 0;
+      
+      // ENSURE ALL VALUES ARE NUMBERS
+      perf.totalSales = Number(perf.totalSales) || 0;
+      perf.total8PM = Number(perf.total8PM) || 0;
+      perf.totalVERVE = Number(perf.totalVERVE) || 0;
     });
     
     const result = Object.values(performanceMap).filter((p: any) => p.name !== 'Unknown');
@@ -433,19 +651,53 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
     result.forEach((salesman: any) => {
       const nameInfo = salesman.originalNames.length > 1 ? 
         ` (merged ${salesman.originalNames.length} variations: ${salesman.originalNames.join(', ')})` : '';
-      console.log(`${salesman.name}: ${salesman.billedShops}/${salesman.totalShops} shops (${salesman.coverage.toFixed(1)}% coverage)${nameInfo}`);
+      console.log(`${salesman.name}: ${salesman.billedShops}/${salesman.totalShops} shops (${salesman.coverage.toFixed(1)}% coverage) - Total Sales: ${salesman.totalSales}${nameInfo}`);
     });
     
     return result;
   }, [data]);
 
-  const sortedSalesmen = salesmanPerformance.sort((a: any, b: any) => b.totalSales - a.totalSales);
+  // FIXED: PROPER SORTING WITH DEBUGGING
+  const sortedSalesmen = useMemo(() => {
+    console.log('🔄 SORTING SALESMEN BY TOTAL SALES...');
+    
+    // Create a copy to avoid mutating original array
+    const sorted = [...salesmanPerformance].sort((a: any, b: any) => {
+      const aTotal = Number(a.totalSales) || 0;
+      const bTotal = Number(b.totalSales) || 0;
+      
+      // Debug comparison
+      console.log(`Comparing ${a.name} (${aTotal}) vs ${b.name} (${bTotal}) - Result: ${bTotal - aTotal}`);
+      
+      return bTotal - aTotal; // Descending order (highest first)
+    });
+    
+    console.log('✅ FINAL SORTED ORDER BY TOTAL SALES:');
+    sorted.forEach((salesman, index) => {
+      console.log(`${index + 1}. ${salesman.name}: ${Number(salesman.totalSales).toLocaleString()} total sales`);
+    });
+    
+    return sorted;
+  }, [salesmanPerformance]);
 
   return (
     <div className="space-y-6">
       <div className="text-center">
         <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Salesman Performance Dashboard</h2>
         <p className="text-gray-600 text-sm sm:text-base">Individual salesman achievements and targets for {getMonthName(data.currentMonth)} {data.currentYear}</p>
+      </div>
+
+      {/* DEBUGGING PANEL - Remove this after fixing */}
+      <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+        <h3 className="text-sm font-bold text-yellow-800 mb-2">🔧 Debug Info (Top 3 Salesmen)</h3>
+        <div className="text-xs text-yellow-700 space-y-1">
+          {sortedSalesmen.slice(0, 3).map((salesman, index) => (
+            <div key={salesman.name}>
+              <strong>Rank {index + 1}:</strong> {salesman.name} - Total Sales: {Number(salesman.totalSales).toLocaleString()} 
+              (8PM: {Number(salesman.total8PM).toLocaleString()}, VERVE: {Number(salesman.totalVERVE).toLocaleString()})
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* Performance Summary Cards - Mobile Responsive */}
@@ -455,7 +707,7 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
           {sortedSalesmen.length > 0 && (
             <div>
               <div className="text-lg sm:text-2xl font-bold text-blue-600 truncate">{sortedSalesmen[0].name}</div>
-              <div className="text-xs sm:text-sm text-gray-500">{sortedSalesmen[0].totalSales.toLocaleString()} cases</div>
+              <div className="text-xs sm:text-sm text-gray-500">{Number(sortedSalesmen[0].totalSales).toLocaleString()} cases</div>
             </div>
           )}
         </div>
@@ -563,7 +815,14 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
                   </td>
                   <td className="px-6 py-4 text-sm font-medium text-gray-900">{salesman.name}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-bold">{salesman.totalShops}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{salesman.billedShops}</td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <button
+                      onClick={() => handlePenetrationBreakdownClick(salesman.name, salesman.totalShops, salesman.billedShops, salesman.shops)}
+                      className="text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer"
+                    >
+                      {salesman.billedShops}
+                    </button>
+                  </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                       salesman.coverage >= 80 ? 'bg-green-100 text-green-800' :
@@ -574,9 +833,9 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-purple-600">
-                    <div className="font-medium">{salesman.total8PM.toLocaleString()}/{salesman.target8PM.toLocaleString()}</div>
+                    <div className="font-medium">{Number(salesman.total8PM).toLocaleString()}/{Number(salesman.target8PM).toLocaleString()}</div>
                     <div className="text-xs text-gray-500">
-                      {salesman.total8PM.toLocaleString()} cases, target {salesman.target8PM.toLocaleString()}
+                      {Number(salesman.total8PM).toLocaleString()} cases, target {Number(salesman.target8PM).toLocaleString()}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -589,9 +848,9 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600">
-                    <div className="font-medium">{salesman.totalVERVE.toLocaleString()}/{salesman.targetVERVE.toLocaleString()}</div>
+                    <div className="font-medium">{Number(salesman.totalVERVE).toLocaleString()}/{Number(salesman.targetVERVE).toLocaleString()}</div>
                     <div className="text-xs text-gray-500">
-                      {salesman.totalVERVE.toLocaleString()} cases, target {salesman.targetVERVE.toLocaleString()}
+                      {Number(salesman.totalVERVE).toLocaleString()} cases, target {Number(salesman.targetVERVE).toLocaleString()}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -604,7 +863,7 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                    {salesman.totalSales.toLocaleString()}
+                    {Number(salesman.totalSales).toLocaleString()}
                   </td>
                 </tr>
               ))}
@@ -633,35 +892,35 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {sortedSalesmen.slice(0, 10).map((salesman: any) => {
-                const avg3Month = ((salesman.marchTotal + salesman.aprilTotal + salesman.mayTotal) / 3).toFixed(0);
-                const trend = salesman.mayTotal > salesman.aprilTotal && salesman.aprilTotal > salesman.marchTotal ? 'improving' :
-                            salesman.mayTotal < salesman.aprilTotal && salesman.aprilTotal < salesman.marchTotal ? 'declining' : 'stable';
+                const avg3Month = ((Number(salesman.marchTotal) + Number(salesman.aprilTotal) + Number(salesman.mayTotal)) / 3).toFixed(0);
+                const trend = Number(salesman.mayTotal) > Number(salesman.aprilTotal) && Number(salesman.aprilTotal) > Number(salesman.marchTotal) ? 'improving' :
+                            Number(salesman.mayTotal) < Number(salesman.aprilTotal) && Number(salesman.aprilTotal) < Number(salesman.marchTotal) ? 'declining' : 'stable';
                 
                 return (
                   <tr key={salesman.name}>
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">{salesman.name}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       <button
-                        onClick={() => handleCaseBreakdownClick(salesman.name, 'march', 'March', salesman.marchTotal, salesman.marchEightPM, salesman.marchVerve)}
+                        onClick={() => handleCaseBreakdownClick(salesman.name, 'march', 'March', Number(salesman.marchTotal), Number(salesman.marchEightPM), Number(salesman.marchVerve))}
                         className="text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer"
                       >
-                        {salesman.marchTotal.toLocaleString()}
+                        {Number(salesman.marchTotal).toLocaleString()}
                       </button>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       <button
-                        onClick={() => handleCaseBreakdownClick(salesman.name, 'april', 'April', salesman.aprilTotal, salesman.aprilEightPM, salesman.aprilVerve)}
+                        onClick={() => handleCaseBreakdownClick(salesman.name, 'april', 'April', Number(salesman.aprilTotal), Number(salesman.aprilEightPM), Number(salesman.aprilVerve))}
                         className="text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer"
                       >
-                        {salesman.aprilTotal.toLocaleString()}
+                        {Number(salesman.aprilTotal).toLocaleString()}
                       </button>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       <button
-                        onClick={() => handleCaseBreakdownClick(salesman.name, 'may', 'May', salesman.mayTotal, salesman.mayEightPM, salesman.mayVerve)}
+                        onClick={() => handleCaseBreakdownClick(salesman.name, 'may', 'May', Number(salesman.mayTotal), Number(salesman.mayEightPM), Number(salesman.mayVerve))}
                         className="text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer"
                       >
-                        {salesman.mayTotal.toLocaleString()}
+                        {Number(salesman.mayTotal).toLocaleString()}
                       </button>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -729,7 +988,7 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-gray-900 truncate">{salesman.name}</div>
                     <div className="text-xs text-gray-500">
-                      {salesman.billedShops}/{salesman.totalShops} shops • {salesman.totalSales.toLocaleString()} cases
+                      {salesman.billedShops}/{salesman.totalShops} shops • {Number(salesman.totalSales).toLocaleString()} cases
                     </div>
                   </div>
                   <div className="flex items-center space-x-3 sm:space-x-4 ml-2">
@@ -743,7 +1002,7 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
                       <div className="text-xs text-gray-500">Coverage</div>
                     </div>
                     <div className="text-center">
-                      <div className="text-lg font-bold text-blue-600">{salesman.totalSales.toLocaleString()}</div>
+                      <div className="text-lg font-bold text-blue-600">{Number(salesman.totalSales).toLocaleString()}</div>
                       <div className="text-xs text-gray-500">Cases</div>
                     </div>
                   </div>
@@ -785,12 +1044,21 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-      {/* Modal */}
+      {/* Modals */}
       {showSalesmanBreakdown && (
         <SalesmanBreakdownModal 
           onClose={() => {
             setShowSalesmanBreakdown(false);
             setSelectedSalesmanBreakdown(null);
+          }} 
+        />
+      )}
+
+      {showPenetrationBreakdown && (
+        <CustomerPenetrationModal 
+          onClose={() => {
+            setShowPenetrationBreakdown(false);
+            setSelectedPenetrationBreakdown(null);
           }} 
         />
       )}
