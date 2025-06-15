@@ -73,6 +73,15 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
     shops: any[];
   } | null>(null);
 
+  // NEW STATE for shop list modal
+  const [showShopList, setShowShopList] = useState(false);
+  const [selectedShopList, setSelectedShopList] = useState<{
+    title: string;
+    subtitle: string;
+    shops: any[];
+    type: '8pm' | 'verve' | 'both' | '8pm-only' | 'verve-only' | 'zero-sales';
+  } | null>(null);
+
   // INTERNAL FUNCTION to handle case breakdown click
   const handleCaseBreakdownClick = (salesmanName: string, month: string, monthName: string, total: number, eightPM: number, verve: number) => {
     setSelectedSalesmanBreakdown({
@@ -95,6 +104,17 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
       shops
     });
     setShowPenetrationBreakdown(true);
+  };
+
+  // NEW FUNCTION to handle shop list click
+  const handleShopListClick = (title: string, subtitle: string, shops: any[], type: '8pm' | 'verve' | 'both' | '8pm-only' | 'verve-only' | 'zero-sales') => {
+    setSelectedShopList({
+      title,
+      subtitle,
+      shops,
+      type
+    });
+    setShowShopList(true);
   };
 
   // ==========================================
@@ -316,7 +336,227 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
     );
   };
 
-  // NEW COMPONENT: Customer Penetration Modal
+  // NEW COMPONENT: Shop List Modal
+  const ShopListModal = ({ onClose }: { onClose: () => void }) => {
+    if (!selectedShopList) return null;
+
+    const { title, subtitle, shops, type } = selectedShopList;
+
+    const getTypeStyles = (type: string) => {
+      switch(type) {
+        case '8pm': return {
+          bg: 'bg-purple-50',
+          text: 'text-purple-600',
+          border: 'border-purple-200'
+        };
+        case 'verve': return {
+          bg: 'bg-orange-50',
+          text: 'text-orange-600',
+          border: 'border-orange-200'
+        };
+        case 'both': return {
+          bg: 'bg-green-50',
+          text: 'text-green-600',
+          border: 'border-green-200'
+        };
+        case '8pm-only': return {
+          bg: 'bg-blue-50',
+          text: 'text-blue-600',
+          border: 'border-blue-200'
+        };
+        case 'verve-only': return {
+          bg: 'bg-yellow-50',
+          text: 'text-yellow-600',
+          border: 'border-yellow-200'
+        };
+        case 'zero-sales': return {
+          bg: 'bg-red-50',
+          text: 'text-red-600',
+          border: 'border-red-200'
+        };
+        default: return {
+          bg: 'bg-gray-50',
+          text: 'text-gray-600',
+          border: 'border-gray-200'
+        };
+      }
+    };
+
+    const typeStyles = getTypeStyles(type);
+
+    return (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
+        <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-hidden">
+          <div className="flex justify-between items-center p-4 sm:p-6 border-b">
+            <div>
+              <h3 className="text-lg font-semibold">{title}</h3>
+              <p className="text-sm text-gray-500">{subtitle}</p>
+            </div>
+            <button 
+              onClick={onClose} 
+              className="text-gray-400 hover:text-gray-600"
+            >
+              <X className="w-6 h-6" />
+            </button>
+          </div>
+
+          <div className="p-4 sm:p-6 overflow-y-auto">
+            {shops.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-gray-500">No shops found in this category.</p>
+              </div>
+            ) : (
+              <>
+                {/* Summary Stats */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+                  <div className={`${typeStyles.bg} p-4 rounded-lg text-center border ${typeStyles.border}`}>
+                    <div className={`text-2xl font-bold ${typeStyles.text}`}>{shops.length}</div>
+                    <div className="text-sm text-gray-600">Total Shops</div>
+                  </div>
+                  <div className={`${typeStyles.bg} p-4 rounded-lg text-center border ${typeStyles.border}`}>
+                    <div className={`text-2xl font-bold ${typeStyles.text}`}>
+                      {shops.reduce((sum, shop) => sum + (shop.total || 0), 0).toLocaleString()}
+                    </div>
+                    <div className="text-sm text-gray-600">Total Cases</div>
+                  </div>
+                  <div className={`${typeStyles.bg} p-4 rounded-lg text-center border ${typeStyles.border}`}>
+                    <div className={`text-2xl font-bold ${typeStyles.text}`}>
+                      {shops.length > 0 ? Math.round(shops.reduce((sum, shop) => sum + (shop.total || 0), 0) / shops.length) : 0}
+                    </div>
+                    <div className="text-sm text-gray-600">Avg Cases/Shop</div>
+                  </div>
+                </div>
+
+                {/* Shop List Table */}
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">#</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shop Name</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Cases</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">8PM Cases</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">VERVE Cases</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {shops
+                        .sort((a, b) => (b.total || 0) - (a.total || 0)) // Sort by total cases descending
+                        .map((shop, index) => (
+                        <tr key={shop.shopId} className={index === 0 && shop.total > 0 ? 'bg-yellow-50' : index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                          <td className="px-4 py-3 text-sm text-gray-900">
+                            {index + 1}
+                            {index === 0 && shop.total > 0 && <span className="ml-1">🏆</span>}
+                          </td>
+                          <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                            {shop.shopName || 'Unknown Shop'}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-gray-500">
+                            {shop.department || 'Unknown'}
+                          </td>
+                          <td className="px-4 py-3 text-sm font-bold text-gray-900">
+                            {(shop.total || 0).toLocaleString()}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-purple-600">
+                            {(shop.eightPM || 0).toLocaleString()}
+                          </td>
+                          <td className="px-4 py-3 text-sm text-orange-600">
+                            {(shop.verve || 0).toLocaleString()}
+                          </td>
+                          <td className="px-4 py-3 text-sm">
+                            {(shop.eightPM || 0) > 0 && (shop.verve || 0) > 0 ? (
+                              <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">Both</span>
+                            ) : (shop.eightPM || 0) > 0 ? (
+                              <span className="px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded-full">8PM</span>
+                            ) : (shop.verve || 0) > 0 ? (
+                              <span className="px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded-full">VERVE</span>
+                            ) : (
+                              <span className="px-2 py-1 text-xs bg-red-100 text-red-800 rounded-full">No Sales</span>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Insights for specific types */}
+                {type === 'both' && (
+                  <div className="mt-6 bg-green-50 p-4 rounded-lg">
+                    <h4 className="font-medium text-green-800 mb-2">🎉 Cross-Selling Champions!</h4>
+                    <p className="text-sm text-green-700">
+                      These shops buy both 8PM and VERVE. They're your most valuable customers - 
+                      focus on maintaining their loyalty and understanding what makes them successful.
+                    </p>
+                  </div>
+                )}
+
+                {type === '8pm-only' && (
+                  <div className="mt-6 bg-blue-50 p-4 rounded-lg">
+                    <h4 className="font-medium text-blue-800 mb-2">🎯 VERVE Upselling Opportunity</h4>
+                    <p className="text-sm text-blue-700">
+                      These shops already trust you with 8PM sales. They're prime candidates for VERVE introduction.
+                      Consider offering VERVE samples or promotions to these loyal customers.
+                    </p>
+                  </div>
+                )}
+
+                {type === 'verve-only' && (
+                  <div className="mt-6 bg-yellow-50 p-4 rounded-lg">
+                    <h4 className="font-medium text-yellow-800 mb-2">🎯 8PM Upselling Opportunity</h4>
+                    <p className="text-sm text-yellow-700">
+                      These shops already buy VERVE. Introduce them to 8PM premium offerings.
+                      They might be interested in expanding their whisky selection.
+                    </p>
+                  </div>
+                )}
+
+                {type === 'zero-sales' && (
+                  <div className="mt-6 bg-red-50 p-4 rounded-lg">
+                    <h4 className="font-medium text-red-800 mb-2">⚠️ Urgent Follow-Up Required</h4>
+                    <p className="text-sm text-red-700">
+                      These shops are assigned but have zero sales. Priority actions: Visit, understand barriers, 
+                      check competition, verify shop details, and develop recovery plan.
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+
+            <div className="mt-6 flex justify-end space-x-3">
+              <button
+                onClick={() => {
+                  // Future: Export functionality
+                  const csvContent = shops.map(shop => 
+                    `${shop.shopName},${shop.department},${shop.total},${shop.eightPM || 0},${shop.verve || 0}`
+                  ).join('\n');
+                  const header = 'Shop Name,Department,Total Cases,8PM Cases,VERVE Cases\n';
+                  const blob = new Blob([header + csvContent], { type: 'text/csv' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `${title.replace(/[^a-zA-Z0-9]/g, '_')}.csv`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+              >
+                Export CSV
+              </button>
+              <button
+                onClick={onClose}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
   const CustomerPenetrationModal = ({ onClose }: { onClose: () => void }) => {
     if (!selectedPenetrationBreakdown) return null;
 
@@ -362,13 +602,33 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
                   <div className="text-2xl font-bold text-purple-600">{shops8PM.length}/{billedShops}</div>
                   <div className="text-sm text-gray-600">8PM BUYERS</div>
                   <div className="text-xs text-gray-500">{penetration8PM.toFixed(1)}% shops</div>
-                  <div className="text-xs text-purple-600">📦 {total8PMCases.toLocaleString()} cases</div>
+                  <button
+                    onClick={() => handleShopListClick(
+                      `${salesmanName} - 8PM Buyers`,
+                      `${shops8PM.length} shops purchased 8PM products`,
+                      shops8PM,
+                      '8pm'
+                    )}
+                    className="text-xs text-purple-600 hover:text-purple-800 hover:underline cursor-pointer font-medium"
+                  >
+                    📦 {total8PMCases.toLocaleString()} cases
+                  </button>
                 </div>
                 <div className="bg-orange-50 p-4 rounded-lg text-center">
                   <div className="text-2xl font-bold text-orange-600">{shopsVERVE.length}/{billedShops}</div>
                   <div className="text-sm text-gray-600">VERVE BUYERS</div>
                   <div className="text-xs text-gray-500">{penetrationVERVE.toFixed(1)}% shops</div>
-                  <div className="text-xs text-orange-600">📦 {totalVERVECases.toLocaleString()} cases</div>
+                  <button
+                    onClick={() => handleShopListClick(
+                      `${salesmanName} - VERVE Buyers`,
+                      `${shopsVERVE.length} shops purchased VERVE products`,
+                      shopsVERVE,
+                      'verve'
+                    )}
+                    className="text-xs text-orange-600 hover:text-orange-800 hover:underline cursor-pointer font-medium"
+                  >
+                    📦 {totalVERVECases.toLocaleString()} cases
+                  </button>
                 </div>
                 <div className="bg-green-50 p-4 rounded-lg text-center">
                   <div className="text-2xl font-bold text-green-600">{shopsBoth.length}/{billedShops}</div>
@@ -384,25 +644,65 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
               <h4 className="text-md font-semibold text-gray-900 mb-4">🎯 CUSTOMER BEHAVIOR ANALYSIS</h4>
               <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                 <div className="bg-blue-50 p-4 rounded-lg text-center">
-                  <div className="text-xl font-bold text-blue-600">{shops8PMOnly.length}</div>
+                  <button
+                    onClick={() => handleShopListClick(
+                      `${salesmanName} - 8PM Only Customers`,
+                      `${shops8PMOnly.length} shops buy only 8PM (VERVE upselling opportunity)`,
+                      shops8PMOnly,
+                      '8pm-only'
+                    )}
+                    className="text-xl font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                  >
+                    {shops8PMOnly.length}
+                  </button>
                   <div className="text-sm text-gray-600">8PM ONLY</div>
                   <div className="text-xs text-gray-500">{billedShops > 0 ? (shops8PMOnly.length / billedShops * 100).toFixed(1) : 0}%</div>
                   <div className="text-xs text-blue-600">🎯 Upsell VERVE</div>
                 </div>
                 <div className="bg-yellow-50 p-4 rounded-lg text-center">
-                  <div className="text-xl font-bold text-yellow-600">{shopsVERVEOnly.length}</div>
+                  <button
+                    onClick={() => handleShopListClick(
+                      `${salesmanName} - VERVE Only Customers`,
+                      `${shopsVERVEOnly.length} shops buy only VERVE (8PM upselling opportunity)`,
+                      shopsVERVEOnly,
+                      'verve-only'
+                    )}
+                    className="text-xl font-bold text-yellow-600 hover:text-yellow-800 hover:underline cursor-pointer"
+                  >
+                    {shopsVERVEOnly.length}
+                  </button>
                   <div className="text-sm text-gray-600">VERVE ONLY</div>
                   <div className="text-xs text-gray-500">{billedShops > 0 ? (shopsVERVEOnly.length / billedShops * 100).toFixed(1) : 0}%</div>
                   <div className="text-xs text-yellow-600">🎯 Upsell 8PM</div>
                 </div>
                 <div className="bg-green-50 p-4 rounded-lg text-center">
-                  <div className="text-xl font-bold text-green-600">{shopsBoth.length}</div>
+                  <button
+                    onClick={() => handleShopListClick(
+                      `${salesmanName} - Cross-Selling Champions`,
+                      `${shopsBoth.length} shops buy both 8PM and VERVE (your best customers!)`,
+                      shopsBoth,
+                      'both'
+                    )}
+                    className="text-xl font-bold text-green-600 hover:text-green-800 hover:underline cursor-pointer"
+                  >
+                    {shopsBoth.length}
+                  </button>
                   <div className="text-sm text-gray-600">CROSS-SELL SUCCESS</div>
                   <div className="text-xs text-gray-500">{crossSellRate.toFixed(1)}% rate</div>
                   <div className="text-xs text-green-600">🎉 Both brands</div>
                 </div>
                 <div className="bg-red-50 p-4 rounded-lg text-center">
-                  <div className="text-xl font-bold text-red-600">{shopsZeroSales.length}</div>
+                  <button
+                    onClick={() => handleShopListClick(
+                      `${salesmanName} - Zero Sales Shops`,
+                      `${shopsZeroSales.length} shops assigned but no sales (urgent follow-up needed)`,
+                      shopsZeroSales,
+                      'zero-sales'
+                    )}
+                    className="text-xl font-bold text-red-600 hover:text-red-800 hover:underline cursor-pointer"
+                  >
+                    {shopsZeroSales.length}
+                  </button>
                   <div className="text-sm text-gray-600">ZERO SALES</div>
                   <div className="text-xs text-gray-500">{totalShops > 0 ? (shopsZeroSales.length / totalShops * 100).toFixed(1) : 0}% of assigned</div>
                   <div className="text-xs text-red-600">⚠️ Urgent follow-up</div>
@@ -651,7 +951,13 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
     result.forEach((salesman: any) => {
       const nameInfo = salesman.originalNames.length > 1 ? 
         ` (merged ${salesman.originalNames.length} variations: ${salesman.originalNames.join(', ')})` : '';
-      console.log(`${salesman.name}: ${salesman.billedShops}/${salesman.totalShops} shops (${salesman.coverage.toFixed(1)}% coverage) - Total Sales: ${salesman.totalSales}${nameInfo}`);
+      console.log(`${salesman.name}: ${salesman.billedShops}/${salesman.totalShops} shops (${salesman.coverage.toFixed(1)}% coverage) - Total Sales: ${salesman.totalSales} (type: ${typeof salesman.totalSales})${nameInfo}`);
+    });
+    
+    // CRITICAL DEBUG: Check if totalSales values are correct
+    console.log('🔍 RAW TOTAL SALES VALUES:');
+    result.forEach((salesman: any) => {
+      console.log(`${salesman.name}: totalSales = ${salesman.totalSales} (${typeof salesman.totalSales}), total8PM = ${salesman.total8PM}, totalVERVE = ${salesman.totalVERVE}`);
     });
     
     return result;
@@ -660,6 +966,11 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
   // FIXED: PROPER SORTING WITH DEBUGGING
   const sortedSalesmen = useMemo(() => {
     console.log('🔄 SORTING SALESMEN BY TOTAL SALES...');
+    console.log('Raw salesmanPerformance before sorting:', salesmanPerformance.map(s => ({
+      name: s.name,
+      totalSales: s.totalSales,
+      type: typeof s.totalSales
+    })));
     
     // Create a copy to avoid mutating original array
     const sorted = [...salesmanPerformance].sort((a: any, b: any) => {
@@ -677,6 +988,13 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
       console.log(`${index + 1}. ${salesman.name}: ${Number(salesman.totalSales).toLocaleString()} total sales`);
     });
     
+    // FORCE CHECK: Let's verify the top 3 are correct
+    const top3 = sorted.slice(0, 3);
+    console.log('🎯 TOP 3 VERIFICATION:');
+    top3.forEach((salesman, index) => {
+      console.log(`Position ${index + 1}: ${salesman.name} with ${salesman.totalSales} sales`);
+    });
+    
     return sorted;
   }, [salesmanPerformance]);
 
@@ -689,14 +1007,18 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
 
       {/* DEBUGGING PANEL - Remove this after fixing */}
       <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-        <h3 className="text-sm font-bold text-yellow-800 mb-2">🔧 Debug Info (Top 3 Salesmen)</h3>
+        <h3 className="text-sm font-bold text-yellow-800 mb-2">🔧 Debug Info (Top 3 Salesmen) - CORRECTED</h3>
         <div className="text-xs text-yellow-700 space-y-1">
           {sortedSalesmen.slice(0, 3).map((salesman, index) => (
             <div key={salesman.name}>
               <strong>Rank {index + 1}:</strong> {salesman.name} - Total Sales: {Number(salesman.totalSales).toLocaleString()} 
               (8PM: {Number(salesman.total8PM).toLocaleString()}, VERVE: {Number(salesman.totalVERVE).toLocaleString()})
+              {index === 0 && Number(salesman.totalSales) < 400 && <span className="text-red-600 font-bold"> ⚠️ RANKING ERROR!</span>}
             </div>
           ))}
+        </div>
+        <div className="mt-2 text-xs text-yellow-600">
+          <strong>Expected Top 3:</strong> Manish (459), Sahir Kumar (442), Amit Kumar (356)
         </div>
       </div>
 
@@ -1059,6 +1381,15 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
           onClose={() => {
             setShowPenetrationBreakdown(false);
             setSelectedPenetrationBreakdown(null);
+          }} 
+        />
+      )}
+
+      {showShopList && (
+        <ShopListModal 
+          onClose={() => {
+            setShowShopList(false);
+            setSelectedShopList(null);
           }} 
         />
       )}
