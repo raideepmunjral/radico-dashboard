@@ -829,11 +829,10 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
       return names[0] || 'Unknown';
     };
     
-    console.log('🔧 PROCESSING SALESMAN PERFORMANCE WITH CASE-INSENSITIVE MATCHING');
+    console.log('🔧 Processing salesman performance data...');
     
     // STEP 1: Use allShopsComparison which includes ALL shops (assigned + sales data)
     const allShops = data.allShopsComparison || [];
-    console.log(`📊 Total shops in allShopsComparison: ${allShops.length}`);
     
     // Track all name variations for each normalized name
     const nameVariations: Record<string, string[]> = {};
@@ -953,9 +952,6 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
         // ENSURE NUMERIC VALUES
         performanceMap[normalizedStatsName].target8PM = Number(stats.eightPmTarget) || 0;
         performanceMap[normalizedStatsName].targetVERVE = Number(stats.verveTarget) || 0;
-        console.log(`✅ Matched targets for: "${originalStatsName}" (normalized: "${normalizedStatsName}")`);
-      } else {
-        console.log(`❌ No match found for target: "${originalStatsName}" (normalized: "${normalizedStatsName}")`);
       }
     });
     
@@ -979,19 +975,7 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
     
     const result = Object.values(performanceMap).filter((p: any) => p.name !== 'Unknown');
     
-    // Enhanced debug logging
-    console.log('🎯 CASE-INSENSITIVE SALESMAN PERFORMANCE SUMMARY:');
-    result.forEach((salesman: any) => {
-      const nameInfo = salesman.originalNames.length > 1 ? 
-        ` (merged ${salesman.originalNames.length} variations: ${salesman.originalNames.join(', ')})` : '';
-      console.log(`${salesman.name}: ${salesman.billedShops}/${salesman.totalShops} shops (${salesman.coverage.toFixed(1)}% coverage) - Total Sales: ${salesman.totalSales} (type: ${typeof salesman.totalSales})${nameInfo}`);
-    });
-    
-    // CRITICAL DEBUG: Check if totalSales values are correct
-    console.log('🔍 RAW TOTAL SALES VALUES BEFORE SORTING:');
-    result.forEach((salesman: any) => {
-      console.log(`${salesman.name}: totalSales = ${salesman.totalSales} (${typeof salesman.totalSales}), total8PM = ${salesman.total8PM}, totalVERVE = ${salesman.totalVERVE}`);
-    });
+    console.log(`✅ Processed ${result.length} salesmen with case-insensitive matching`);
     
     return result;
   }, [data]);
@@ -1000,14 +984,6 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
   const [forceUpdate, setForceUpdate] = useState(0);
   
   const sortedSalesmen = useMemo(() => {
-    console.log('🔄 SORTING SALESMEN BY TOTAL SALES... (Force update #' + forceUpdate + ')');
-    console.log('Raw salesmanPerformance before sorting:', salesmanPerformance.map(s => ({
-      name: s.name,
-      totalSales: s.totalSales,
-      type: typeof s.totalSales,
-      isNumber: !isNaN(Number(s.totalSales))
-    })));
-    
     // Create a completely new array with new objects to force React re-render
     const sorted = salesmanPerformance.map(salesman => ({
       ...salesman,
@@ -1018,9 +994,6 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
       const aTotal = parseFloat(String(a.totalSales)) || 0;
       const bTotal = parseFloat(String(b.totalSales)) || 0;
       
-      // Debug comparison
-      console.log(`Comparing ${a.name} (${aTotal}) vs ${b.name} (${bTotal}) - Result: ${bTotal - aTotal}`);
-      
       // Additional validation
       if (isNaN(aTotal) || isNaN(bTotal)) {
         console.error(`❌ NaN values in sorting: ${a.name}=${aTotal}, ${b.name}=${bTotal}`);
@@ -1029,51 +1002,15 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
       return bTotal - aTotal; // Descending order (highest first)
     });
     
-    console.log('✅ FINAL SORTED ORDER BY TOTAL SALES:');
-    sorted.forEach((salesman, index) => {
-      const totalSales = Number(salesman.totalSales);
-      console.log(`${index + 1}. ${salesman.name}: ${totalSales.toLocaleString()} total sales (type: ${typeof totalSales})`);
-    });
-    
-    // VALIDATION: Check if sorting worked correctly
-    for (let i = 0; i < sorted.length - 1; i++) {
-      const current = Number(sorted[i].totalSales);
-      const next = Number(sorted[i + 1].totalSales);
-      if (current < next) {
-        console.error(`❌ SORTING ERROR: Position ${i + 1} (${sorted[i].name}: ${current}) < Position ${i + 2} (${sorted[i + 1].name}: ${next})`);
-      }
-    }
+    console.log('✅ Top 5 salesmen by total sales:', sorted.slice(0, 5).map((s, i) => 
+      `${i + 1}. ${s.name}: ${Number(s.totalSales).toLocaleString()}`
+    ).join(' | '));
     
     return sorted;
   }, [salesmanPerformance, data.currentMonth, forceUpdate]); // Added forceUpdate dependency
 
-  // 🚨 CRITICAL DEBUG: Log what React is about to render
-  console.log('🎯 REACT RENDER - sortedSalesmen order:', sortedSalesmen.map((s, i) => 
-    `${i + 1}. ${s.name}: ${s.totalSales} cases (key: ${s._sortKey})`
-  ));
-
-  // 🚨 EMERGENCY DEBUG: Show first 3 salesmen right in UI
-  const debugTop3 = sortedSalesmen.slice(0, 3).map((s, i) => `#${i+1}: ${s.name} (${s.totalSales})`).join(' | ');
-  console.log('🔥 TOP 3 FOR UI:', debugTop3);
-
   return (
     <div className="space-y-6">
-      {/* 🚨 EMERGENCY DEBUG DISPLAY */}
-      <div className="bg-red-100 border border-red-300 rounded-lg p-4">
-        <h4 className="font-bold text-red-800 mb-2">🐛 DEBUG: React Render Order</h4>
-        <div className="text-sm text-red-700">
-          <div className="font-semibold">Console shows correct order, but UI shows:</div>
-          <div className="mt-1">
-            {sortedSalesmen.slice(0, 5).map((s, i) => (
-              <span key={`debug-${i}`} className="inline-block mr-4 font-mono">
-                #{i+1}: {s.name} ({s.totalSales})
-              </span>
-            ))}
-          </div>
-          <div className="mt-2 text-xs">Force Update Count: {forceUpdate}</div>
-        </div>
-      </div>
-
       <div className="text-center">
         <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Salesman Performance Dashboard</h2>
         <p className="text-gray-600 text-sm sm:text-base">Individual salesman achievements and targets for {getMonthName(data.currentMonth)} {data.currentYear}</p>
@@ -1145,19 +1082,6 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
             <p className="text-sm text-gray-500">
               Ranked by total sales ({getMonthName(data.currentMonth)} {data.currentYear})
             </p>
-            {/* DEBUG: Mobile view debug info */}
-            <div className="text-xs text-gray-400 mt-2 flex justify-between items-center">
-              <span>Top: {sortedSalesmen[0]?.name} ({sortedSalesmen[0]?.totalSales} cases)</span>
-              <button 
-                onClick={() => {
-                  console.log('🔄 FORCING MOBILE RE-RENDER...');
-                  setForceUpdate(prev => prev + 1);
-                }} 
-                className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs"
-              >
-                🚨 REFRESH
-              </button>
-            </div>
           </div>
           
           <div className="p-4">
@@ -1173,19 +1097,6 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900">Salesman Performance Details - {getMonthName(data.currentMonth)} {data.currentYear}</h3>
           <p className="text-sm text-gray-500">Complete performance breakdown with current month targets and achievements</p>
-          {/* DEBUG: Force React to see the sorted data */}
-          <div className="text-xs text-gray-400 mt-1 flex justify-between items-center">
-            <span>Showing {sortedSalesmen.length} salesmen ranked by total sales • Top: {sortedSalesmen[0]?.name} ({sortedSalesmen[0]?.totalSales} cases)</span>
-            <button 
-              onClick={() => {
-                console.log('🔄 FORCING MANUAL RE-RENDER...');
-                setForceUpdate(prev => prev + 1);
-              }} 
-              className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-xs font-medium"
-            >
-              🚨 FORCE REFRESH
-            </button>
-          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
