@@ -996,9 +996,11 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
     return result;
   }, [data]);
 
-  // FIXED: PROPER SORTING WITH ENHANCED DEBUGGING
+  // AGGRESSIVE FIX: Force React to completely re-render
+  const [forceUpdate, setForceUpdate] = useState(0);
+  
   const sortedSalesmen = useMemo(() => {
-    console.log('🔄 SORTING SALESMEN BY TOTAL SALES...');
+    console.log('🔄 SORTING SALESMEN BY TOTAL SALES... (Force update #' + forceUpdate + ')');
     console.log('Raw salesmanPerformance before sorting:', salesmanPerformance.map(s => ({
       name: s.name,
       totalSales: s.totalSales,
@@ -1006,8 +1008,12 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
       isNumber: !isNaN(Number(s.totalSales))
     })));
     
-    // Create a copy to avoid mutating original array
-    const sorted = [...salesmanPerformance].sort((a: any, b: any) => {
+    // Create a completely new array with new objects to force React re-render
+    const sorted = salesmanPerformance.map(salesman => ({
+      ...salesman,
+      // Force new object identity
+      _sortKey: `${salesman.name}-${salesman.totalSales}-${Date.now()}-${Math.random()}`
+    })).sort((a: any, b: any) => {
       // CRITICAL FIX: Explicit numeric conversion with validation
       const aTotal = parseFloat(String(a.totalSales)) || 0;
       const bTotal = parseFloat(String(b.totalSales)) || 0;
@@ -1039,15 +1045,35 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
     }
     
     return sorted;
-  }, [salesmanPerformance, data.currentMonth]); // Added data.currentMonth to force updates
+  }, [salesmanPerformance, data.currentMonth, forceUpdate]); // Added forceUpdate dependency
 
   // 🚨 CRITICAL DEBUG: Log what React is about to render
   console.log('🎯 REACT RENDER - sortedSalesmen order:', sortedSalesmen.map((s, i) => 
-    `${i + 1}. ${s.name}: ${s.totalSales} cases`
+    `${i + 1}. ${s.name}: ${s.totalSales} cases (key: ${s._sortKey})`
   ));
+
+  // 🚨 EMERGENCY DEBUG: Show first 3 salesmen right in UI
+  const debugTop3 = sortedSalesmen.slice(0, 3).map((s, i) => `#${i+1}: ${s.name} (${s.totalSales})`).join(' | ');
+  console.log('🔥 TOP 3 FOR UI:', debugTop3);
 
   return (
     <div className="space-y-6">
+      {/* 🚨 EMERGENCY DEBUG DISPLAY */}
+      <div className="bg-red-100 border border-red-300 rounded-lg p-4">
+        <h4 className="font-bold text-red-800 mb-2">🐛 DEBUG: React Render Order</h4>
+        <div className="text-sm text-red-700">
+          <div className="font-semibold">Console shows correct order, but UI shows:</div>
+          <div className="mt-1">
+            {sortedSalesmen.slice(0, 5).map((s, i) => (
+              <span key={`debug-${i}`} className="inline-block mr-4 font-mono">
+                #{i+1}: {s.name} ({s.totalSales})
+              </span>
+            ))}
+          </div>
+          <div className="mt-2 text-xs">Force Update Count: {forceUpdate}</div>
+        </div>
+      </div>
+
       <div className="text-center">
         <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Salesman Performance Dashboard</h2>
         <p className="text-gray-600 text-sm sm:text-base">Individual salesman achievements and targets for {getMonthName(data.currentMonth)} {data.currentYear}</p>
@@ -1119,11 +1145,24 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
             <p className="text-sm text-gray-500">
               Ranked by total sales ({getMonthName(data.currentMonth)} {data.currentYear})
             </p>
+            {/* DEBUG: Mobile view debug info */}
+            <div className="text-xs text-gray-400 mt-2 flex justify-between items-center">
+              <span>Top: {sortedSalesmen[0]?.name} ({sortedSalesmen[0]?.totalSales} cases)</span>
+              <button 
+                onClick={() => {
+                  console.log('🔄 FORCING MOBILE RE-RENDER...');
+                  setForceUpdate(prev => prev + 1);
+                }} 
+                className="bg-red-500 hover:bg-red-600 text-white px-2 py-1 rounded text-xs"
+              >
+                🚨 REFRESH
+              </button>
+            </div>
           </div>
           
           <div className="p-4">
             {sortedSalesmen.map((salesman, index) => (
-              <MobileSalesmanCard key={salesman.name} salesman={salesman} index={index} />
+              <MobileSalesmanCard key={salesman._sortKey || `mobile-${salesman.name}-${index}-${forceUpdate}`} salesman={salesman} index={index} />
             ))}
           </div>
         </div>
@@ -1138,10 +1177,13 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
           <div className="text-xs text-gray-400 mt-1 flex justify-between items-center">
             <span>Showing {sortedSalesmen.length} salesmen ranked by total sales • Top: {sortedSalesmen[0]?.name} ({sortedSalesmen[0]?.totalSales} cases)</span>
             <button 
-              onClick={() => window.location.reload()} 
-              className="text-blue-600 hover:text-blue-800 text-xs underline"
+              onClick={() => {
+                console.log('🔄 FORCING MANUAL RE-RENDER...');
+                setForceUpdate(prev => prev + 1);
+              }} 
+              className="bg-red-500 hover:bg-red-600 text-white px-3 py-1 rounded text-xs font-medium"
             >
-              🔄 Force Refresh
+              🚨 FORCE REFRESH
             </button>
           </div>
         </div>
@@ -1163,7 +1205,7 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {sortedSalesmen.map((salesman: any, index) => (
-                <tr key={`${salesman.name}-${salesman.totalSales}-${index}`} className={index < 3 ? 'bg-yellow-50' : index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                <tr key={salesman._sortKey || `${salesman.name}-${index}-${forceUpdate}`} className={index < 3 ? 'bg-yellow-50' : index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     <div className="flex items-center">
                       {index + 1}
@@ -1260,7 +1302,7 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
                             Number(salesman.mayTotal) < Number(salesman.aprilTotal) && Number(salesman.aprilTotal) < Number(salesman.marchTotal) ? 'declining' : 'stable';
                 
                 return (
-                  <tr key={salesman.name}>
+                  <tr key={`hist-${salesman._sortKey || salesman.name}-${forceUpdate}`}>
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">{salesman.name}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       <button
@@ -1313,7 +1355,7 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
           <div className="p-4 sm:p-6">
             <div className="space-y-4">
               {sortedSalesmen.slice(0, 8).map((salesman: any) => (
-                <div key={salesman.name}>
+                <div key={`achievement-${salesman._sortKey || salesman.name}-${forceUpdate}`}>
                   <div className="flex justify-between text-sm mb-1">
                     <span className="font-medium truncate flex-1 mr-2">{salesman.name}</span>
                     <span className="whitespace-nowrap text-xs sm:text-sm">
@@ -1347,7 +1389,7 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
           <div className="p-4 sm:p-6">
             <div className="space-y-4">
               {sortedSalesmen.slice(0, 8).map((salesman: any) => (
-                <div key={salesman.name} className="flex items-center justify-between">
+                <div key={`coverage-${salesman._sortKey || salesman.name}-${forceUpdate}`} className="flex items-center justify-between">
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-gray-900 truncate">{salesman.name}</div>
                     <div className="text-xs text-gray-500">
