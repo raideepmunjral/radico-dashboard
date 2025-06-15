@@ -987,27 +987,16 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
     // Create a completely new array with new objects to force React re-render
     const sorted = salesmanPerformance.map(salesman => ({
       ...salesman,
-      // Force new object identity
-      _sortKey: `${salesman.name}-${salesman.totalSales}-${Date.now()}-${Math.random()}`
+      // Force new object identity for React rendering
+      _sortKey: `${salesman.name}-${salesman.totalSales}-${Date.now()}`
     })).sort((a: any, b: any) => {
-      // CRITICAL FIX: Explicit numeric conversion with validation
       const aTotal = parseFloat(String(a.totalSales)) || 0;
       const bTotal = parseFloat(String(b.totalSales)) || 0;
-      
-      // Additional validation
-      if (isNaN(aTotal) || isNaN(bTotal)) {
-        console.error(`❌ NaN values in sorting: ${a.name}=${aTotal}, ${b.name}=${bTotal}`);
-      }
-      
       return bTotal - aTotal; // Descending order (highest first)
     });
     
-    console.log('✅ Top 5 salesmen by total sales:', sorted.slice(0, 5).map((s, i) => 
-      `${i + 1}. ${s.name}: ${Number(s.totalSales).toLocaleString()}`
-    ).join(' | '));
-    
     return sorted;
-  }, [salesmanPerformance, data.currentMonth, forceUpdate]); // Added forceUpdate dependency
+  }, [salesmanPerformance, data.currentMonth]);
 
   return (
     <div className="space-y-6">
@@ -1086,7 +1075,7 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
           
           <div className="p-4">
             {sortedSalesmen.map((salesman, index) => (
-              <MobileSalesmanCard key={salesman._sortKey || `mobile-${salesman.name}-${index}-${forceUpdate}`} salesman={salesman} index={index} />
+              <MobileSalesmanCard key={salesman._sortKey} salesman={salesman} index={index} />
             ))}
           </div>
         </div>
@@ -1116,7 +1105,7 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {sortedSalesmen.map((salesman: any, index) => (
-                <tr key={salesman._sortKey || `${salesman.name}-${index}-${forceUpdate}`} className={index < 3 ? 'bg-yellow-50' : index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                <tr key={salesman._sortKey} className={index < 3 ? 'bg-yellow-50' : index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     <div className="flex items-center">
                       {index + 1}
@@ -1213,7 +1202,7 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
                             Number(salesman.mayTotal) < Number(salesman.aprilTotal) && Number(salesman.aprilTotal) < Number(salesman.marchTotal) ? 'declining' : 'stable';
                 
                 return (
-                  <tr key={`hist-${salesman._sortKey || salesman.name}-${forceUpdate}`}>
+                  <tr key={salesman._sortKey}>
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">{salesman.name}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                       <button
@@ -1266,7 +1255,7 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
           <div className="p-4 sm:p-6">
             <div className="space-y-4">
               {sortedSalesmen.slice(0, 8).map((salesman: any) => (
-                <div key={`achievement-${salesman._sortKey || salesman.name}-${forceUpdate}`}>
+                <div key={salesman._sortKey}>
                   <div className="flex justify-between text-sm mb-1">
                     <span className="font-medium truncate flex-1 mr-2">{salesman.name}</span>
                     <span className="whitespace-nowrap text-xs sm:text-sm">
@@ -1300,7 +1289,7 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
           <div className="p-4 sm:p-6">
             <div className="space-y-4">
               {sortedSalesmen.slice(0, 8).map((salesman: any) => (
-                <div key={`coverage-${salesman._sortKey || salesman.name}-${forceUpdate}`} className="flex items-center justify-between">
+                <div key={salesman._sortKey} className="flex items-center justify-between">
                   <div className="flex-1 min-w-0">
                     <div className="text-sm font-medium text-gray-900 truncate">{salesman.name}</div>
                     <div className="text-xs text-gray-500">
