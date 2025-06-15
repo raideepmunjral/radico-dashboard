@@ -1039,7 +1039,12 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
     }
     
     return sorted;
-  }, [salesmanPerformance]);
+  }, [salesmanPerformance, data.currentMonth]); // Added data.currentMonth to force updates
+
+  // 🚨 CRITICAL DEBUG: Log what React is about to render
+  console.log('🎯 REACT RENDER - sortedSalesmen order:', sortedSalesmen.map((s, i) => 
+    `${i + 1}. ${s.name}: ${s.totalSales} cases`
+  ));
 
   return (
     <div className="space-y-6">
@@ -1093,7 +1098,7 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
         <div className="bg-white p-3 sm:p-6 rounded-lg shadow">
           <h3 className="text-sm sm:text-lg font-medium text-gray-900 mb-1 sm:mb-2">Best Coverage</h3>
           {(() => {
-            const bestCoverage = sortedSalesmen.sort((a: any, b: any) => b.coverage - a.coverage)[0];
+            const bestCoverage = [...sortedSalesmen].sort((a: any, b: any) => b.coverage - a.coverage)[0];
             return bestCoverage ? (
               <div>
                 <div className="text-lg sm:text-2xl font-bold text-green-600 truncate">{bestCoverage.name}</div>
@@ -1129,6 +1134,16 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900">Salesman Performance Details - {getMonthName(data.currentMonth)} {data.currentYear}</h3>
           <p className="text-sm text-gray-500">Complete performance breakdown with current month targets and achievements</p>
+          {/* DEBUG: Force React to see the sorted data */}
+          <div className="text-xs text-gray-400 mt-1 flex justify-between items-center">
+            <span>Showing {sortedSalesmen.length} salesmen ranked by total sales • Top: {sortedSalesmen[0]?.name} ({sortedSalesmen[0]?.totalSales} cases)</span>
+            <button 
+              onClick={() => window.location.reload()} 
+              className="text-blue-600 hover:text-blue-800 text-xs underline"
+            >
+              🔄 Force Refresh
+            </button>
+          </div>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
@@ -1148,7 +1163,7 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {sortedSalesmen.map((salesman: any, index) => (
-                <tr key={salesman.name} className={index < 3 ? 'bg-yellow-50' : index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                <tr key={`${salesman.name}-${salesman.totalSales}-${index}`} className={index < 3 ? 'bg-yellow-50' : index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                     <div className="flex items-center">
                       {index + 1}
