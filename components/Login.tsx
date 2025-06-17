@@ -12,6 +12,15 @@ interface LoginProps {
   onLogin: (user: User) => void;
 }
 
+// Interface for processing raw user data from Google Sheets
+interface RawUserData {
+  email: string;
+  role: string;
+  name: string;
+  passwordHash: string;
+  isActive: boolean;
+}
+
 // Simple hash function using built-in browser APIs (no external dependencies)
 const hashPassword = async (password: string): Promise<string> => {
   const encoder = new TextEncoder();
@@ -48,20 +57,25 @@ export default function Login({ onLogin }: LoginProps) {
         throw new Error('No user data found');
       }
 
-      // Process user data (skip header row)
-      const users = data.values.slice(1).map((row: string[]) => ({
-        email: row[0]?.trim().toLowerCase(),
-        role: row[1]?.trim().toLowerCase() as User['role'], 
-        name: row[2]?.trim(),
-        passwordHash: row[3]?.trim(),
+      // Process user data (skip header row) with explicit typing
+      const rawUsers: RawUserData[] = data.values.slice(1).map((row: string[]) => ({
+        email: row[0]?.trim().toLowerCase() || '',
+        role: row[1]?.trim().toLowerCase() || '',
+        name: row[2]?.trim() || '',
+        passwordHash: row[3]?.trim() || '',
         isActive: row[4]?.trim().toUpperCase() === 'TRUE'
-      })).filter(user => user.email && user.passwordHash);
+      }));
 
-      console.log('👥 Processed users:', users.length);
+      // Filter users with explicit typing to avoid TypeScript error
+      const validUsers = rawUsers.filter((user: RawUserData) => 
+        user.email && user.passwordHash
+      );
+
+      console.log('👥 Processed users:', validUsers.length);
       console.log('🔎 Looking for email:', email.toLowerCase());
 
       // Find user by email
-      const user = users.find(u => u.email === email.toLowerCase());
+      const user = validUsers.find((u: RawUserData) => u.email === email.toLowerCase());
       
       if (!user) {
         console.log('❌ User not found');
@@ -82,6 +96,13 @@ export default function Login({ onLogin }: LoginProps) {
         throw new Error('Account is not active');
       }
 
+      // Validate role
+      const validRoles = ['admin', 'manager', 'salesman'];
+      if (!validRoles.includes(user.role)) {
+        console.log('❌ Invalid role:', user.role);
+        throw new Error('Invalid user role');
+      }
+
       // Generate hash for provided password using built-in Web Crypto API
       const providedHash = await hashPassword(password);
       console.log('🔐 Password verification:', {
@@ -98,11 +119,11 @@ export default function Login({ onLogin }: LoginProps) {
 
       console.log('✅ Authentication successful');
 
-      // Return user object
+      // Return properly typed user object
       return {
         email: user.email,
         name: user.name,
-        role: user.role,
+        role: user.role as 'admin' | 'manager' | 'salesman',
         isActive: user.isActive
       };
 
