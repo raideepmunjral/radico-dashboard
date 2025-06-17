@@ -176,7 +176,7 @@ export default function Login({ onLogin }: LoginProps) {
                     // Fallback if image doesn't exist
                     const target = e.target as HTMLImageElement;
                     target.style.display = 'none';
-                    target.nextElementSibling!.style.display = 'block';
+                    (target.nextElementSibling as HTMLElement)!.style.display = 'block';
                   }}
                 />
                 {/* Fallback design */}
@@ -205,7 +205,7 @@ export default function Login({ onLogin }: LoginProps) {
                     // Fallback if image doesn't exist
                     const target = e.target as HTMLImageElement;
                     target.style.display = 'none';
-                    target.nextElementSibling!.style.display = 'block';
+                    (target.nextElementSibling as HTMLElement)!.style.display = 'block';
                   }}
                 />
                 {/* Fallback design */}
