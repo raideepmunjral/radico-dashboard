@@ -169,7 +169,7 @@ export default function Login({ onLogin }: LoginProps) {
             <div className="flex flex-col items-center">
               <div className="h-20 w-24 bg-white rounded-xl shadow-lg flex items-center justify-center p-2 border">
                 <img 
-                  src="/radico-logo.png" 
+                  src="/radico-dashboard/radico-logo.png" 
                   alt="Radico Khaitan" 
                   className="h-16 w-20 object-contain"
                   onError={(e) => {
@@ -198,7 +198,7 @@ export default function Login({ onLogin }: LoginProps) {
             <div className="flex flex-col items-center">
               <div className="h-20 w-20 bg-white rounded-xl shadow-lg flex items-center justify-center p-2 border">
                 <img 
-                  src="/munjral-logo.png" 
+                  src="/radico-dashboard/munjral-logo.png" 
                   alt="Munjral Brothers" 
                   className="h-16 w-16 object-contain"
                   onError={(e) => {
