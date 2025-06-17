@@ -1,26 +1,17 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Download, RefreshCw, MapPin, TrendingUp, Users, ShoppingBag, BarChart3, Calendar, Trophy, Building, Target, Activity, FileText, Table, X, ChevronLeft, ChevronRight, Star, AlertTriangle, TrendingDown, UserPlus, Search, Filter, History, Package, Lock, Unlock } from 'lucide-react';
+import { Download, RefreshCw, MapPin, TrendingUp, Users, ShoppingBag, BarChart3, Calendar, Trophy, Building, Target, Activity, FileText, Table, X, ChevronLeft, ChevronRight, Star, AlertTriangle, TrendingDown, UserPlus, Search, Filter, History, Package } from 'lucide-react';
 import InventoryDashboard from '../components/InventoryDashboard';
 
 // ==========================================
-// 🔐 AUTHENTICATION IMPORTS (NEW)
+// 🔐 AUTHENTICATION IMPORTS
 // ==========================================
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import Login from '../components/Login';
 
 // ==========================================
-// 🔧 SAFETY CONFIGURATION (NEW) - AUTHENTICATION DISABLED BY DEFAULT
-// ==========================================
-const AUTH_CONFIG = {
-  ENABLE_AUTHENTICATION: false, // 👈 DISABLED - Your dashboard works exactly as before
-  ALLOW_DEVELOPER_BYPASS: true, // 👈 Emergency bypass available
-  SHOW_AUTH_TOGGLE: true // 👈 Toggle button to enable/disable
-};
-
-// ==========================================
-// IMPORTED EXTRACTED COMPONENTS (UNCHANGED FROM YOUR ORIGINAL)
+// IMPORTED EXTRACTED COMPONENTS
 // ==========================================
 import AdvancedAnalyticsTab from '../components/tabs/sales/AdvancedAnalyticsTab';
 import HistoricalAnalysisTab from '../components/tabs/sales/HistoricalAnalysisTab';
@@ -283,43 +274,178 @@ const getShortMonthName = (monthNum: string) => {
 };
 
 // ==========================================
-// 🔐 AUTHENTICATION COMPONENTS (NEW) - ONLY USED WHEN ENABLED
+// 🔐 NEW: ROLE-BASED DATA FILTERING FUNCTION
 // ==========================================
 
-const AuthToggle = ({ authEnabled, onToggle }: { authEnabled: boolean, onToggle: () => void }) => {
-  if (!AUTH_CONFIG.SHOW_AUTH_TOGGLE) return null;
+const applyRoleBasedFiltering = (data: DashboardData, user: any): DashboardData => {
+  // Admin sees everything - no filtering
+  if (!user || user.role === 'admin') {
+    console.log('🔐 Admin access - no filtering applied');
+    return data;
+  }
 
-  return (
-    <div className="fixed top-4 right-4 z-50">
-      <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-lg">
-        <div className="flex items-center space-x-2">
-          <span className="text-sm font-medium text-gray-700">Auth:</span>
-          <button
-            onClick={onToggle}
-            className={`flex items-center space-x-2 px-3 py-1 rounded text-sm font-medium transition-colors ${
-              authEnabled 
-                ? 'bg-red-100 text-red-700 hover:bg-red-200' 
-                : 'bg-green-100 text-green-700 hover:bg-green-200'
-            }`}
-          >
-            {authEnabled ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
-            <span>{authEnabled ? 'ON' : 'OFF'}</span>
-          </button>
-        </div>
-      </div>
-    </div>
-  );
+  console.log(`🔐 Applying ${user.role} filtering for ${user.name}`, {
+    role: user.role,
+    department: user.department,
+    originalShops: Object.keys(data.salesData).length
+  });
+
+  // Helper function to filter shops based on role
+  const filterShops = (shops: ShopData[]): ShopData[] => {
+    return shops.filter(shop => {
+      if (user.role === 'manager') {
+        // Manager sees only their department
+        return shop.department === user.department;
+      } else if (user.role === 'salesman') {
+        // Salesman sees only their own shops - multiple matching strategies
+        return shop.salesman === user.name || 
+               shop.salesman === user.email ||
+               shop.salesman?.toLowerCase() === user.name?.toLowerCase();
+      }
+      return true;
+    });
+  };
+
+  // Filter all shop arrays
+  const filteredTopShops = filterShops(data.topShops);
+  const filteredAllShopsComparison = filterShops(data.allShopsComparison);
+  
+  // Filter salesData object
+  const filteredSalesData: Record<string, ShopData> = {};
+  Object.keys(data.salesData).forEach(shopId => {
+    const shop = data.salesData[shopId];
+    let includeShop = false;
+    
+    if (user.role === 'manager') {
+      includeShop = shop.department === user.department;
+    } else if (user.role === 'salesman') {
+      includeShop = shop.salesman === user.name || 
+                   shop.salesman === user.email ||
+                   shop.salesman?.toLowerCase() === user.name?.toLowerCase();
+    }
+    
+    if (includeShop) {
+      filteredSalesData[shopId] = shop;
+    }
+  });
+
+  // Filter customer insights
+  const filteredCustomerInsights: CustomerInsights = {
+    ...data.customerInsights,
+    newShops: filterShops(data.customerInsights.newShops),
+    lostShops: filterShops(data.customerInsights.lostShops),
+    consistentShops: filterShops(data.customerInsights.consistentShops),
+    decliningShops: filterShops(data.customerInsights.decliningShops)
+  };
+
+  // Recalculate customer insights counts
+  filteredCustomerInsights.firstTimeCustomers = filteredCustomerInsights.newShops.length;
+  filteredCustomerInsights.lostCustomers = filteredCustomerInsights.lostShops.length;
+  filteredCustomerInsights.consistentPerformers = filteredCustomerInsights.consistentShops.length;
+  filteredCustomerInsights.decliningPerformers = filteredCustomerInsights.decliningShops.length;
+
+  // Filter department performance (for managers)
+  let filteredDeptPerformance = data.deptPerformance;
+  if (user.role === 'manager') {
+    filteredDeptPerformance = {
+      [user.department]: data.deptPerformance[user.department] || { totalShops: 0, billedShops: 0, sales: 0 }
+    };
+  }
+
+  // Filter salesperson stats (for salesmen)
+  let filteredSalespersonStats = data.salespersonStats;
+  if (user.role === 'salesman') {
+    // Find salesperson stats by matching name
+    const salesmanStats = Object.keys(data.salespersonStats).find(name => 
+      name === user.name || 
+      name.toLowerCase() === user.name?.toLowerCase()
+    );
+    
+    if (salesmanStats) {
+      filteredSalespersonStats = {
+        [salesmanStats]: data.salespersonStats[salesmanStats]
+      };
+    } else {
+      filteredSalespersonStats = {};
+    }
+  } else if (user.role === 'manager') {
+    // Manager sees only salesmen in their department
+    const managerSalesmen: Record<string, any> = {};
+    Object.keys(data.salespersonStats).forEach(salesmanName => {
+      // Check if this salesman has shops in manager's department
+      const hasShopsInDept = Object.values(filteredSalesData).some(shop => 
+        shop.salesman === salesmanName ||
+        shop.salesman?.toLowerCase() === salesmanName?.toLowerCase()
+      );
+      if (hasShopsInDept) {
+        managerSalesmen[salesmanName] = data.salespersonStats[salesmanName];
+      }
+    });
+    filteredSalespersonStats = managerSalesmen;
+  }
+
+  // Recalculate summary metrics based on filtered data
+  const filteredShops = Object.values(filteredSalesData);
+  const totalShops = filteredShops.length;
+  const billedShops = filteredShops.filter(shop => shop.total > 0).length;
+  const total8PM = filteredShops.reduce((sum, shop) => sum + (shop.eightPM || 0), 0);
+  const totalVERVE = filteredShops.reduce((sum, shop) => sum + (shop.verve || 0), 0);
+  const totalSales = total8PM + totalVERVE;
+  const coverage = totalShops > 0 ? ((billedShops / totalShops) * 100).toFixed(1) : '0';
+
+  // Filter and recalculate targets
+  let total8PMTarget = 0;
+  let totalVerveTarget = 0;
+  
+  Object.values(filteredSalespersonStats).forEach((stats: any) => {
+    total8PMTarget += stats.eightPmTarget || 0;
+    totalVerveTarget += stats.verveTarget || 0;
+  });
+
+  const eightPmAchievement = total8PMTarget > 0 ? ((total8PM / total8PMTarget) * 100).toFixed(1) : '0';
+  const verveAchievement = totalVerveTarget > 0 ? ((totalVERVE / totalVerveTarget) * 100).toFixed(1) : '0';
+
+  const filteredSummary = {
+    ...data.summary,
+    totalShops,
+    billedShops,
+    total8PM,
+    totalVERVE,
+    totalSales,
+    coverage,
+    total8PMTarget,
+    totalVerveTarget,
+    eightPmAchievement,
+    verveAchievement
+  };
+
+  console.log(`✅ Filtered data for ${user.role} ${user.name}:`, {
+    originalShops: Object.keys(data.salesData).length,
+    filteredShops: totalShops,
+    billedShops: billedShops,
+    total8PM: total8PM,
+    totalVERVE: totalVERVE
+  });
+
+  return {
+    ...data,
+    summary: filteredSummary,
+    topShops: filteredTopShops,
+    salesData: filteredSalesData,
+    deptPerformance: filteredDeptPerformance,
+    salespersonStats: filteredSalespersonStats,
+    customerInsights: filteredCustomerInsights,
+    allShopsComparison: filteredAllShopsComparison
+  };
 };
 
 // ==========================================
-// YOUR COMPLETE DASHBOARD COMPONENT (EXACTLY AS YOU HAD IT, JUST RENAMED)
+// YOUR COMPLETE DASHBOARD COMPONENT
 // ==========================================
 
 const ProtectedRadicoDashboard = () => {
-  // 🔐 NEW: Auth hooks (only used when authentication is enabled)
-  const authContext = React.useContext(React.createContext<any>(null));
-  const user = authContext?.user || null;
-  const logout = authContext?.logout || (() => {});
+  // 🔐 Auth hooks
+  const { user, logout } = useAuth();
 
   const [activeTab, setActiveTab] = useState('overview');
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
@@ -365,7 +491,11 @@ const ProtectedRadicoDashboard = () => {
       ]);
       
       const processedData = processEnhancedRadicoData(masterData, visitData, historicalData);
-      setDashboardData(processedData);
+      
+      // 🔐 NEW: Apply role-based filtering - THE KEY CHANGE!
+      const filteredData = applyRoleBasedFiltering(processedData, user);
+      
+      setDashboardData(filteredData);
       setLastUpdated(new Date());
     } catch (error: any) {
       console.error('Error fetching data:', error);
@@ -1319,7 +1449,7 @@ const ProtectedRadicoDashboard = () => {
 
   React.useEffect(() => {
     fetchDashboardData();
-  }, []);
+  }, [user]); // Re-fetch when user changes
 
   if (loading) {
     return (
@@ -1372,7 +1502,7 @@ const ProtectedRadicoDashboard = () => {
               <span className="ml-3 px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
                 Live Data - {getShortMonthName(currentMonth)} {currentYear}
               </span>
-              {/* 🔐 NEW: Show user info when authenticated (only displays when auth is enabled) */}
+              {/* 🔐 Show user info when authenticated */}
               {user && (
                 <span className="ml-2 px-3 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
                   {user.name} ({user.role})
@@ -1419,7 +1549,7 @@ const ProtectedRadicoDashboard = () => {
                   <Download className="w-4 h-4" />
                   <span>PDF</span>
                 </button>
-                {/* 🔐 NEW: Logout button (only shows when authenticated) */}
+                {/* 🔐 Logout button */}
                 {user && (
                   <button
                     onClick={logout}
@@ -1488,10 +1618,10 @@ const ProtectedRadicoDashboard = () => {
 };
 
 // ==========================================
-// 🔐 AUTHENTICATION WRAPPER COMPONENTS (NEW) - ONLY USED WHEN ENABLED
+// 🔐 AUTHENTICATION WRAPPER COMPONENTS
 // ==========================================
 
-const AuthenticatedApp = ({ onBypass }: { onBypass: () => void }) => {
+const AuthenticatedApp = () => {
   const { isAuthenticated, login } = useAuth();
 
   if (!isAuthenticated) {
@@ -1502,38 +1632,10 @@ const AuthenticatedApp = ({ onBypass }: { onBypass: () => void }) => {
 };
 
 const RadicoDashboard = () => {
-  const [authenticationEnabled, setAuthenticationEnabled] = useState(AUTH_CONFIG.ENABLE_AUTHENTICATION);
-  const [bypassedAuth, setBypassedAuth] = useState(false);
-
-  // 🛡️ SAFETY: If authentication is disabled (default), show dashboard directly
-  if (!authenticationEnabled || bypassedAuth) {
-    return (
-      <>
-        <AuthToggle 
-          authEnabled={authenticationEnabled && !bypassedAuth} 
-          onToggle={() => {
-            setAuthenticationEnabled(!authenticationEnabled);
-            setBypassedAuth(false);
-          }} 
-        />
-        <AuthProvider>
-          <ProtectedRadicoDashboard />
-        </AuthProvider>
-      </>
-    );
-  }
-
-  // Authentication is enabled - show login first
   return (
-    <>
-      <AuthToggle 
-        authEnabled={authenticationEnabled} 
-        onToggle={() => setAuthenticationEnabled(false)} 
-      />
-      <AuthProvider>
-        <AuthenticatedApp onBypass={() => setBypassedAuth(true)} />
-      </AuthProvider>
-    </>
+    <AuthProvider>
+      <AuthenticatedApp />
+    </AuthProvider>
   );
 };
 
