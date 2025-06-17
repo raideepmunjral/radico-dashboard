@@ -241,12 +241,22 @@ export default function Login({ onLogin }: LoginProps) {
               )}
             </button>
           </form>
+
+          {/* Demo Credentials */}
+          <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+            <h3 className="text-sm font-medium text-gray-700 mb-2">Demo Credentials:</h3>
+            <div className="text-xs text-gray-600 space-y-1">
+              <div><strong>Admin:</strong> raideep@munjral.com / radico2025</div>
+              <div><strong>Manager:</strong> sumit@munjral.com / radico2025</div>
+              <div><strong>Salesman:</strong> akgill9868@gmail.com / radico2025</div>
+            </div>
+          </div>
         </div>
 
         {/* Footer */}
         <div className="text-center mt-6">
           <p className="text-sm text-gray-500">
-            Powered by Tertiary Sales Management System
+            Powered by Radico Khaitan Limited
           </p>
         </div>
       </div>
