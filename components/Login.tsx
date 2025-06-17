@@ -194,7 +194,7 @@ export default function Login({ onLogin }: LoginProps) {
               <div className="h-8 w-px bg-gradient-to-b from-transparent via-gray-300 to-transparent"></div>
             </div>
             
-            {/* Logo 2 - Munjral Brothers (Larger, less white space) */}
+            {/* Logo 2 - Munjral Brothers (Clean, no text) */}
             <div className="flex flex-col items-center">
               <div className="h-24 w-24 bg-gradient-to-br from-teal-50 to-cyan-50 rounded-xl shadow-lg flex items-center justify-center p-1 border border-teal-200">
                 <img 
@@ -213,7 +213,6 @@ export default function Login({ onLogin }: LoginProps) {
                   <div className="text-4xl font-bold text-teal-600">M</div>
                 </div>
               </div>
-              <p className="text-xs font-semibold text-gray-600 mt-3 tracking-wider">MUNJRAL BROTHERS</p>
             </div>
           </div>
 
