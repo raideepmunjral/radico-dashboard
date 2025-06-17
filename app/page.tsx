@@ -8,6 +8,7 @@ import InventoryDashboard from '../components/InventoryDashboard';
 // 🔐 AUTHENTICATION IMPORTS
 // ==========================================
 import { AuthProvider, useAuth } from '../contexts/AuthContext';
+import { hasPermission } from '../contexts/AuthContext';
 import Login from '../components/Login';
 
 // ==========================================
@@ -294,8 +295,13 @@ const applyRoleBasedFiltering = (data: DashboardData, user: any): DashboardData 
   const filterShops = (shops: ShopData[]): ShopData[] => {
     return shops.filter(shop => {
       if (user.role === 'manager') {
-        // Manager sees only their department
-        return shop.department === user.department;
+        // 🔧 FIXED: For managers, show shops where their assigned salesmen work
+        // For now, if department is assigned, filter by department
+        if (user.department) {
+          return shop.department === user.department;
+        }
+        // If no department assigned to manager, show all (to be refined)
+        return true;
       } else if (user.role === 'salesman') {
         // Salesman sees only their own shops - multiple matching strategies
         return shop.salesman === user.name || 
@@ -317,7 +323,11 @@ const applyRoleBasedFiltering = (data: DashboardData, user: any): DashboardData 
     let includeShop = false;
     
     if (user.role === 'manager') {
-      includeShop = shop.department === user.department;
+      if (user.department) {
+        includeShop = shop.department === user.department;
+      } else {
+        includeShop = true; // Show all if no department assigned
+      }
     } else if (user.role === 'salesman') {
       includeShop = shop.salesman === user.name || 
                    shop.salesman === user.email ||
@@ -344,15 +354,34 @@ const applyRoleBasedFiltering = (data: DashboardData, user: any): DashboardData 
   filteredCustomerInsights.consistentPerformers = filteredCustomerInsights.consistentShops.length;
   filteredCustomerInsights.decliningPerformers = filteredCustomerInsights.decliningShops.length;
 
-  // Filter department performance (for managers)
-  let filteredDeptPerformance = data.deptPerformance;
-  if (user.role === 'manager') {
-    filteredDeptPerformance = {
-      [user.department]: data.deptPerformance[user.department] || { totalShops: 0, billedShops: 0, sales: 0 }
-    };
-  }
+  // Recalculate summary metrics based on filtered data
+  const filteredShops = Object.values(filteredSalesData);
+  const totalShops = filteredShops.length;
+  const billedShops = filteredShops.filter(shop => shop.total > 0).length;
+  const total8PM = filteredShops.reduce((sum, shop) => sum + (shop.eightPM || 0), 0);
+  const totalVERVE = filteredShops.reduce((sum, shop) => sum + (shop.verve || 0), 0);
+  const totalSales = total8PM + totalVERVE;
+  const coverage = totalShops > 0 ? ((billedShops / totalShops) * 100).toFixed(1) : '0';
 
-  // Filter salesperson stats (for salesmen)
+  // 🔧 FIXED: Recalculate department performance based on filtered shops
+  const filteredDeptPerformance: Record<string, any> = {};
+  
+  // Get all departments from filtered shops
+  const filteredDepartments = Array.from(new Set(filteredShops.map(shop => shop.department).filter(Boolean)));
+  
+  filteredDepartments.forEach(dept => {
+    const deptShops = filteredShops.filter(shop => shop.department === dept);
+    const deptShopsWithSales = deptShops.filter(shop => shop.total > 0);
+    const deptTotalSales = deptShopsWithSales.reduce((sum, shop) => sum + shop.total, 0);
+    
+    filteredDeptPerformance[dept] = {
+      totalShops: deptShops.length,
+      billedShops: deptShopsWithSales.length,
+      sales: deptTotalSales
+    };
+  });
+
+  // Filter salesperson stats
   let filteredSalespersonStats = data.salespersonStats;
   if (user.role === 'salesman') {
     // Find salesperson stats by matching name
@@ -369,29 +398,20 @@ const applyRoleBasedFiltering = (data: DashboardData, user: any): DashboardData 
       filteredSalespersonStats = {};
     }
   } else if (user.role === 'manager') {
-    // Manager sees only salesmen in their department
+    // Manager sees only salesmen in their filtered data
     const managerSalesmen: Record<string, any> = {};
     Object.keys(data.salespersonStats).forEach(salesmanName => {
-      // Check if this salesman has shops in manager's department
-      const hasShopsInDept = Object.values(filteredSalesData).some(shop => 
+      // Check if this salesman has shops in filtered data
+      const hasShopsInFilteredData = Object.values(filteredSalesData).some(shop => 
         shop.salesman === salesmanName ||
         shop.salesman?.toLowerCase() === salesmanName?.toLowerCase()
       );
-      if (hasShopsInDept) {
+      if (hasShopsInFilteredData) {
         managerSalesmen[salesmanName] = data.salespersonStats[salesmanName];
       }
     });
     filteredSalespersonStats = managerSalesmen;
   }
-
-  // Recalculate summary metrics based on filtered data
-  const filteredShops = Object.values(filteredSalesData);
-  const totalShops = filteredShops.length;
-  const billedShops = filteredShops.filter(shop => shop.total > 0).length;
-  const total8PM = filteredShops.reduce((sum, shop) => sum + (shop.eightPM || 0), 0);
-  const totalVERVE = filteredShops.reduce((sum, shop) => sum + (shop.verve || 0), 0);
-  const totalSales = total8PM + totalVERVE;
-  const coverage = totalShops > 0 ? ((billedShops / totalShops) * 100).toFixed(1) : '0';
 
   // Filter and recalculate targets
   let total8PMTarget = 0;
@@ -423,6 +443,7 @@ const applyRoleBasedFiltering = (data: DashboardData, user: any): DashboardData 
     originalShops: Object.keys(data.salesData).length,
     filteredShops: totalShops,
     billedShops: billedShops,
+    departments: Object.keys(filteredDeptPerformance),
     total8PM: total8PM,
     totalVERVE: totalVERVE
   });
@@ -1523,17 +1544,20 @@ const ProtectedRadicoDashboard = () => {
                 Last updated: {lastUpdated.toLocaleTimeString()}
               </span>
               <div className="flex space-x-2">
-                <button
-                  onClick={() => setShowInventory(!showInventory)}
-                  className={`px-3 sm:px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors text-sm font-medium ${
-                    showInventory 
-                      ? 'bg-purple-600 hover:bg-purple-700 text-white' 
-                      : 'bg-purple-100 hover:bg-purple-200 text-purple-700'
-                  }`}
-                >
-                  <Package className="w-4 h-4" />
-                  <span>{showInventory ? 'Sales View' : 'Inventory View'}</span>
-                </button>
+                {/* 🔐 Only show inventory button if user has permission */}
+                {hasPermission(user, 'view_inventory') && (
+                  <button
+                    onClick={() => setShowInventory(!showInventory)}
+                    className={`px-3 sm:px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors text-sm font-medium ${
+                      showInventory 
+                        ? 'bg-purple-600 hover:bg-purple-700 text-white' 
+                        : 'bg-purple-100 hover:bg-purple-200 text-purple-700'
+                    }`}
+                  >
+                    <Package className="w-4 h-4" />
+                    <span>{showInventory ? 'Sales View' : 'Inventory View'}</span>
+                  </button>
+                )}
                 
                 <button
                   onClick={fetchDashboardData}
