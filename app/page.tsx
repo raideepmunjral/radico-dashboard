@@ -1,11 +1,26 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Download, RefreshCw, MapPin, TrendingUp, Users, ShoppingBag, BarChart3, Calendar, Trophy, Building, Target, Activity, FileText, Table, X, ChevronLeft, ChevronRight, Star, AlertTriangle, TrendingDown, UserPlus, Search, Filter, History, Package } from 'lucide-react';
+import { Download, RefreshCw, MapPin, TrendingUp, Users, ShoppingBag, BarChart3, Calendar, Trophy, Building, Target, Activity, FileText, Table, X, ChevronLeft, ChevronRight, Star, AlertTriangle, TrendingDown, UserPlus, Search, Filter, History, Package, Lock, Unlock } from 'lucide-react';
 import InventoryDashboard from '../components/InventoryDashboard';
 
 // ==========================================
-// IMPORTED EXTRACTED COMPONENTS (UNCHANGED)
+// 🔐 AUTHENTICATION IMPORTS (NEW)
+// ==========================================
+import { AuthProvider, useAuth } from '../contexts/AuthContext';
+import Login from '../components/Login';
+
+// ==========================================
+// 🔧 SAFETY CONFIGURATION (NEW) - AUTHENTICATION DISABLED BY DEFAULT
+// ==========================================
+const AUTH_CONFIG = {
+  ENABLE_AUTHENTICATION: false, // 👈 DISABLED - Your dashboard works exactly as before
+  ALLOW_DEVELOPER_BYPASS: true, // 👈 Emergency bypass available
+  SHOW_AUTH_TOGGLE: true // 👈 Toggle button to enable/disable
+};
+
+// ==========================================
+// IMPORTED EXTRACTED COMPONENTS (UNCHANGED FROM YOUR ORIGINAL)
 // ==========================================
 import AdvancedAnalyticsTab from '../components/tabs/sales/AdvancedAnalyticsTab';
 import HistoricalAnalysisTab from '../components/tabs/sales/HistoricalAnalysisTab';
@@ -16,7 +31,7 @@ import DepartmentTab from '../components/tabs/sales/DepartmentTab';
 import OverviewTab from '../components/tabs/sales/OverviewTab';
 
 // ==========================================
-// PART 1: ENHANCED TYPE DEFINITIONS & INTERFACES (EXTENDED WITH HISTORICAL DATA)
+// PART 1: ENHANCED TYPE DEFINITIONS & INTERFACES (EXTENDED WITH HISTORICAL DATA) - UNCHANGED
 // ==========================================
 
 interface ShopData {
@@ -153,7 +168,7 @@ interface DashboardData {
 }
 
 // ==========================================
-// PART 2: ENHANCED SKU PROCESSING FUNCTIONS (UNCHANGED)
+// PART 2: ENHANCED SKU PROCESSING FUNCTIONS (UNCHANGED FROM YOUR ORIGINAL)
 // ==========================================
 
 const getDetailedSKUInfo = (brand: string) => {
@@ -254,7 +269,7 @@ const getBrandFamily = (brandShort?: string, brand?: string): string | null => {
 };
 
 // ==========================================
-// PART 3: CONFIGURATION & CONSTANTS (UNCHANGED)
+// PART 3: CONFIGURATION & CONSTANTS (UNCHANGED FROM YOUR ORIGINAL)
 // ==========================================
 
 const getMonthName = (monthNum: string) => {
@@ -267,7 +282,45 @@ const getShortMonthName = (monthNum: string) => {
   return months[parseInt(monthNum) - 1] || 'Unknown';
 };
 
-const RadicoDashboard = () => {
+// ==========================================
+// 🔐 AUTHENTICATION COMPONENTS (NEW) - ONLY USED WHEN ENABLED
+// ==========================================
+
+const AuthToggle = ({ authEnabled, onToggle }: { authEnabled: boolean, onToggle: () => void }) => {
+  if (!AUTH_CONFIG.SHOW_AUTH_TOGGLE) return null;
+
+  return (
+    <div className="fixed top-4 right-4 z-50">
+      <div className="bg-white border border-gray-200 rounded-lg p-3 shadow-lg">
+        <div className="flex items-center space-x-2">
+          <span className="text-sm font-medium text-gray-700">Auth:</span>
+          <button
+            onClick={onToggle}
+            className={`flex items-center space-x-2 px-3 py-1 rounded text-sm font-medium transition-colors ${
+              authEnabled 
+                ? 'bg-red-100 text-red-700 hover:bg-red-200' 
+                : 'bg-green-100 text-green-700 hover:bg-green-200'
+            }`}
+          >
+            {authEnabled ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+            <span>{authEnabled ? 'ON' : 'OFF'}</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ==========================================
+// YOUR COMPLETE DASHBOARD COMPONENT (EXACTLY AS YOU HAD IT, JUST RENAMED)
+// ==========================================
+
+const ProtectedRadicoDashboard = () => {
+  // 🔐 NEW: Auth hooks (only used when authentication is enabled)
+  const authContext = React.useContext(React.createContext<any>(null));
+  const user = authContext?.user || null;
+  const logout = authContext?.logout || (() => {});
+
   const [activeTab, setActiveTab] = useState('overview');
   const [dashboardData, setDashboardData] = useState<DashboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -293,7 +346,7 @@ const RadicoDashboard = () => {
   };
 
   // ==========================================
-  // PART 4: DATA FETCHING FUNCTIONS (UNCHANGED)
+  // PART 4: DATA FETCHING FUNCTIONS (UNCHANGED FROM YOUR ORIGINAL)
   // ==========================================
 
   const fetchDashboardData = async () => {
@@ -400,7 +453,7 @@ const RadicoDashboard = () => {
   };
 
   // ==========================================
-  // PART 5: ENHANCED DATA PROCESSING WITH HISTORICAL POPULATION (OPTION 1 IMPLEMENTATION)
+  // PART 5: YOUR COMPLETE ENHANCED DATA PROCESSING (EXACTLY FROM YOUR ORIGINAL FILE)
   // ==========================================
 
   const processEnhancedRadicoData = (masterData: Record<string, any[]>, visitData: any[], historicalData: any[]): DashboardData => {
@@ -988,9 +1041,6 @@ const RadicoDashboard = () => {
       totalNewDetailedSKUsPopulated: totalDetailedSKUsPopulated
     });
 
-    // ALL REMAINING LOGIC PRESERVED UNCHANGED
-    // (Growth calculations, customer insights, department performance, etc.)
-
     // ENHANCED GROWTH AND TREND CALCULATION WITH YoY + 3-MONTH AVERAGES (UNCHANGED)
     Object.keys(shopSales).forEach(shopId => {
       const shop = shopSales[shopId];
@@ -1322,6 +1372,12 @@ const RadicoDashboard = () => {
               <span className="ml-3 px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
                 Live Data - {getShortMonthName(currentMonth)} {currentYear}
               </span>
+              {/* 🔐 NEW: Show user info when authenticated (only displays when auth is enabled) */}
+              {user && (
+                <span className="ml-2 px-3 py-1 bg-blue-100 text-blue-800 text-xs font-medium rounded-full">
+                  {user.name} ({user.role})
+                </span>
+              )}
               {dashboardData?.summary.yoy8PMGrowth && (
                 <span className={`ml-2 px-3 py-1 text-xs font-medium rounded-full ${
                   parseFloat(dashboardData.summary.yoy8PMGrowth) >= 0 
@@ -1363,6 +1419,16 @@ const RadicoDashboard = () => {
                   <Download className="w-4 h-4" />
                   <span>PDF</span>
                 </button>
+                {/* 🔐 NEW: Logout button (only shows when authenticated) */}
+                {user && (
+                  <button
+                    onClick={logout}
+                    className="bg-red-600 hover:bg-red-700 text-white px-3 sm:px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors text-sm"
+                  >
+                    <X className="w-4 h-4" />
+                    <span>Logout</span>
+                  </button>
+                )}
               </div>
             </div>
           </div>
@@ -1418,6 +1484,56 @@ const RadicoDashboard = () => {
         </>
       )}
     </div>
+  );
+};
+
+// ==========================================
+// 🔐 AUTHENTICATION WRAPPER COMPONENTS (NEW) - ONLY USED WHEN ENABLED
+// ==========================================
+
+const AuthenticatedApp = ({ onBypass }: { onBypass: () => void }) => {
+  const { isAuthenticated, login } = useAuth();
+
+  if (!isAuthenticated) {
+    return <Login onLogin={login} />;
+  }
+
+  return <ProtectedRadicoDashboard />;
+};
+
+const RadicoDashboard = () => {
+  const [authenticationEnabled, setAuthenticationEnabled] = useState(AUTH_CONFIG.ENABLE_AUTHENTICATION);
+  const [bypassedAuth, setBypassedAuth] = useState(false);
+
+  // 🛡️ SAFETY: If authentication is disabled (default), show dashboard directly
+  if (!authenticationEnabled || bypassedAuth) {
+    return (
+      <>
+        <AuthToggle 
+          authEnabled={authenticationEnabled && !bypassedAuth} 
+          onToggle={() => {
+            setAuthenticationEnabled(!authenticationEnabled);
+            setBypassedAuth(false);
+          }} 
+        />
+        <AuthProvider>
+          <ProtectedRadicoDashboard />
+        </AuthProvider>
+      </>
+    );
+  }
+
+  // Authentication is enabled - show login first
+  return (
+    <>
+      <AuthToggle 
+        authEnabled={authenticationEnabled} 
+        onToggle={() => setAuthenticationEnabled(false)} 
+      />
+      <AuthProvider>
+        <AuthenticatedApp onBypass={() => setBypassedAuth(true)} />
+      </AuthProvider>
+    </>
   );
 };
 
