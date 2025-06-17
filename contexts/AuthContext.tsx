@@ -3,7 +3,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 interface User {
   email: string;
   name: string;
-  role: 'ADMIN' | 'SALES_MANAGER' | 'SALESPERSON';
+  role: 'admin' | 'manager' | 'salesman'; // 🔧 FIXED: Now matches Login.tsx and Google Sheet
   department?: string;
   isActive: boolean;
 }
@@ -65,26 +65,26 @@ export function useAuth() {
   return context;
 }
 
-// Role-based data filtering utility
+// Role-based data filtering utility (updated for new role names)
 export const filterDataByRole = (data: any[], user: User) => {
   if (!user || !data) return [];
 
   switch (user.role) {
-    case 'SALESPERSON':
+    case 'salesman':
       // Filter to only show data for this salesperson
       return data.filter(item => 
         item.salesman === user.name || 
         item.assignedTo === user.email
       );
     
-    case 'SALES_MANAGER':
+    case 'manager':
       // Filter to show data for their department
       return data.filter(item => 
         item.department === user.department ||
         item.region === user.department
       );
     
-    case 'ADMIN':
+    case 'admin':
       // Full access to all data
       return data;
     
@@ -93,14 +93,14 @@ export const filterDataByRole = (data: any[], user: User) => {
   }
 };
 
-// Permission checking utility
+// Permission checking utility (updated for new role names)
 export const hasPermission = (user: User, action: string, resource?: string) => {
   if (!user) return false;
 
   const permissions = {
-    'ADMIN': ['view_all', 'edit_all', 'delete_all', 'manage_users'],
-    'SALES_MANAGER': ['view_department', 'edit_department', 'view_reports'],
-    'SALESPERSON': ['view_own', 'edit_own']
+    'admin': ['view_all', 'edit_all', 'delete_all', 'manage_users'],
+    'manager': ['view_department', 'edit_department', 'view_reports'],
+    'salesman': ['view_own', 'edit_own']
   };
 
   return permissions[user.role]?.includes(action) || false;
