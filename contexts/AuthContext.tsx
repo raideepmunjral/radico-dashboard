@@ -4,7 +4,7 @@ interface User {
   email: string;
   name: string;
   role: 'admin' | 'manager' | 'salesman';
-  department?: string;
+  department?: string; // Keep for backward compatibility but don't populate
   isActive: boolean;
 }
 
@@ -26,12 +26,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (savedUser) {
       try {
         const parsedUser = JSON.parse(savedUser);
-        // 🔧 ENHANCED: Fetch department info if missing (for existing sessions)
-        if (parsedUser.role === 'manager' && !parsedUser.department) {
-          fetchUserDepartment(parsedUser);
-        } else {
-          setUser(parsedUser);
-        }
+        setUser(parsedUser);
       } catch (error) {
         console.error('Error parsing saved user:', error);
         sessionStorage.removeItem('radico_user');
@@ -39,73 +34,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  // 🔧 NEW: Fetch department info for managers
-  const fetchUserDepartment = async (userInfo: User) => {
-    try {
-      const response = await fetch(
-        `https://sheets.googleapis.com/v4/spreadsheets/${process.env.NEXT_PUBLIC_MASTER_SHEET_ID}/values/User Management?key=${process.env.NEXT_PUBLIC_GOOGLE_API_KEY}`
-      );
-      
-      if (response.ok) {
-        const data = await response.json();
-        if (data.values && data.values.length > 1) {
-          // Find user row and get department from column F (index 5)
-          const userRow = data.values.find((row: any[]) => 
-            row[0]?.trim().toLowerCase() === userInfo.email.toLowerCase()
-          );
-          
-          if (userRow && userRow[5]) {
-            const departmentInfo = userRow[5].trim();
-            const enhancedUser = {
-              ...userInfo,
-              department: departmentInfo
-            };
-            
-            setUser(enhancedUser);
-            sessionStorage.setItem('radico_user', JSON.stringify(enhancedUser));
-            console.log(`✅ Department info added for manager: ${departmentInfo}`);
-            return;
-          }
-        }
-      }
-      
-      // Fallback: set user without department
-      setUser(userInfo);
-      console.warn('⚠️ Could not fetch department info, proceeding without');
-    } catch (error) {
-      console.error('Error fetching department info:', error);
-      setUser(userInfo);
-    }
-  };
-
   const login = async (user: User) => {
-    // 🔧 ENHANCED: Fetch department info for managers during login
-    if (user.role === 'manager' && !user.department) {
-      try {
-        const response = await fetch(
-          `https://sheets.googleapis.com/v4/spreadsheets/${process.env.NEXT_PUBLIC_MASTER_SHEET_ID}/values/User Management?key=${process.env.NEXT_PUBLIC_GOOGLE_API_KEY}`
-        );
-        
-        if (response.ok) {
-          const data = await response.json();
-          if (data.values && data.values.length > 1) {
-            // Find user row and get department from column F (index 5)
-            const userRow = data.values.find((row: any[]) => 
-              row[0]?.trim().toLowerCase() === user.email.toLowerCase()
-            );
-            
-            if (userRow && userRow[5]) {
-              const departmentInfo = userRow[5].trim();
-              user.department = departmentInfo;
-              console.log(`✅ Department info fetched for manager: ${departmentInfo}`);
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching department during login:', error);
-      }
-    }
-
+    // 🔧 SIMPLIFIED: No department fetching - departments are derived from shop assignments
+    console.log(`✅ Login successful for ${user.role}: ${user.name}`);
     setUser(user);
     sessionStorage.setItem('radico_user', JSON.stringify(user));
   };
@@ -137,13 +68,12 @@ export function useAuth() {
   return context;
 }
 
-// 🔧 ENHANCED: Role-based data filtering utility with improved logic
+// 🔧 ENHANCED: Role-based data filtering utility with shop-based department logic
 export const filterDataByRole = (data: any[], user: User) => {
   if (!user || !data) return [];
 
   console.log(`🔍 Filtering data for ${user.role}: ${user.name}`, {
     role: user.role,
-    department: user.department,
     dataLength: data.length
   });
 
@@ -156,7 +86,8 @@ export const filterDataByRole = (data: any[], user: User) => {
           item.salesman === user.name || 
           item.assignedTo === user.email ||
           item.salesmanName === user.name ||
-          item.rep === user.name;
+          item.rep === user.name ||
+          item.salesman?.toLowerCase() === user.name?.toLowerCase();
         
         return salesmanMatch;
       });
@@ -165,24 +96,10 @@ export const filterDataByRole = (data: any[], user: User) => {
       return salesmanData;
     
     case 'manager':
-      // 🔧 FIXED: Since departments aren't assigned to users, derive from shops
-      // For now, if no department is set, show all data (to be refined)
-      if (!user.department) {
-        console.warn('⚠️ Manager has no department set, showing all data');
-        return data;
-      }
-      
-      const managerData = data.filter(item => {
-        const departmentMatch = 
-          item.department === user.department ||
-          item.region === user.department ||
-          item.dept === user.department;
-        
-        return departmentMatch;
-      });
-      
-      console.log(`🔍 Manager filtering: ${managerData.length} items found for department ${user.department}`);
-      return managerData;
+      // 🔧 NEW: Managers see departments based on their assigned shops
+      // For now, return all data (will be refined based on shop assignments)
+      console.log(`🔍 Manager access: ${data.length} items (needs shop-based filtering)`);
+      return data;
     
     case 'admin':
       // Full access to all data
@@ -195,7 +112,7 @@ export const filterDataByRole = (data: any[], user: User) => {
   }
 };
 
-// 🔧 ENHANCED: Permission checking utility with comprehensive role permissions
+// 🔧 ENHANCED: Permission checking utility
 export const hasPermission = (user: User, action: string, resource?: string) => {
   if (!user) return false;
 
@@ -220,50 +137,14 @@ export const hasPermission = (user: User, action: string, resource?: string) => 
   };
 
   const userPermissions = permissions[user.role] || [];
-  
-  // Check for specific resource permissions
-  if (resource) {
-    switch (user.role) {
-      case 'manager':
-        // Managers can only access their department's resources
-        if (resource !== user.department) return false;
-        break;
-      case 'salesman':
-        // Salesmen can only access their own resources
-        if (resource !== user.name && resource !== user.email) return false;
-        break;
-    }
-  }
-
   const hasPermission = userPermissions.includes(action);
   
-  console.log(`🔐 Permission check: ${user.role} ${user.name} -> ${action} on ${resource || 'any'}: ${hasPermission ? '✅' : '❌'}`);
+  console.log(`🔐 Permission check: ${user.role} ${user.name} -> ${action}: ${hasPermission ? '✅' : '❌'}`);
   
   return hasPermission;
 };
 
-// 🔧 NEW: Helper function to get user's data scope description
-export const getUserDataScope = (user: User): string => {
-  if (!user) return 'No access';
-  
-  switch (user.role) {
-    case 'admin':
-      return 'All departments and salesmen (Full access)';
-    case 'manager':
-      return `${user.department || 'Unknown'} department only`;
-    case 'salesman':
-      return 'Personal shops and data only';
-    default:
-      return 'Limited access';
-  }
-};
-
-// 🔧 NEW: Helper function to check if user needs department setup
-export const needsDepartmentSetup = (user: User): boolean => {
-  return user.role === 'manager' && !user.department;
-};
-
-// 🔧 NEW: Helper function to get departments accessible to user based on their shops
+// 🔧 NEW: Helper function to get user's accessible departments based on shop assignments
 export const getUserAccessibleDepartments = (user: User, allShopsData: any[]): string[] => {
   if (!user || !allShopsData) return [];
   
@@ -273,8 +154,9 @@ export const getUserAccessibleDepartments = (user: User, allShopsData: any[]): s
       return Array.from(new Set(allShopsData.map(shop => shop.department).filter(Boolean)));
     
     case 'manager':
-      // Manager sees their assigned department
-      return user.department ? [user.department] : [];
+      // 🔧 TODO: Implement manager department access based on shop assignments
+      // For now, return all departments (to be refined)
+      return Array.from(new Set(allShopsData.map(shop => shop.department).filter(Boolean)));
     
     case 'salesman':
       // Salesman sees departments of shops assigned to them
