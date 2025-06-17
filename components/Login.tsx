@@ -165,13 +165,13 @@ export default function Login({ onLogin }: LoginProps) {
           
           {/* Enhanced Dual Logo Layout - Bigger & Better */}
           <div className="flex items-center justify-center space-x-8 mb-6">
-            {/* Logo 1 - Radico Khaitan (Larger, less white space) */}
+            {/* Logo 1 - Radico Khaitan (Perfect Square) */}
             <div className="flex flex-col items-center">
-              <div className="h-24 w-28 bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl shadow-lg flex items-center justify-center p-1 border border-amber-200">
+              <div className="h-24 w-24 bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl shadow-lg flex items-center justify-center p-1 border border-amber-200">
                 <img 
                   src="/radico-dashboard/radico-logo.png" 
                   alt="Radico Khaitan" 
-                  className="h-22 w-26 object-contain rounded-lg"
+                  className="h-22 w-22 object-contain rounded-lg"
                   onError={(e) => {
                     // Fallback if image doesn't exist
                     const target = e.target as HTMLImageElement;
