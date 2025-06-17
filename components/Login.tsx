@@ -163,15 +163,15 @@ export default function Login({ onLogin }: LoginProps) {
         {/* Logo/Header */}
         <div className="text-center mb-8">
           
-          {/* Professional Dual Logo Layout - Radico + Munjral Brothers */}
-          <div className="flex items-center justify-center space-x-6 mb-6">
-            {/* Logo 1 - Radico Khaitan */}
+          {/* Enhanced Dual Logo Layout - Bigger & Better */}
+          <div className="flex items-center justify-center space-x-8 mb-6">
+            {/* Logo 1 - Radico Khaitan (Larger, less white space) */}
             <div className="flex flex-col items-center">
-              <div className="h-20 w-24 bg-white rounded-xl shadow-lg flex items-center justify-center p-2 border">
+              <div className="h-24 w-28 bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl shadow-lg flex items-center justify-center p-1 border border-amber-200">
                 <img 
                   src="/radico-dashboard/radico-logo.png" 
                   alt="Radico Khaitan" 
-                  className="h-16 w-20 object-contain"
+                  className="h-22 w-26 object-contain rounded-lg"
                   onError={(e) => {
                     // Fallback if image doesn't exist
                     const target = e.target as HTMLImageElement;
@@ -181,7 +181,7 @@ export default function Login({ onLogin }: LoginProps) {
                 />
                 {/* Fallback design */}
                 <div className="hidden text-center">
-                  <div className="text-2xl font-bold text-amber-700 mb-1">👑</div>
+                  <div className="text-3xl font-bold text-amber-700 mb-1">👑</div>
                   <div className="text-xs font-bold text-amber-700">RADICO</div>
                 </div>
               </div>
@@ -189,18 +189,18 @@ export default function Login({ onLogin }: LoginProps) {
             
             {/* Elegant Separator */}
             <div className="flex flex-col items-center">
-              <div className="h-6 w-px bg-gradient-to-b from-transparent via-gray-400 to-transparent"></div>
-              <div className="text-gray-400 text-xs font-medium py-2">×</div>
-              <div className="h-6 w-px bg-gradient-to-b from-transparent via-gray-400 to-transparent"></div>
+              <div className="h-8 w-px bg-gradient-to-b from-transparent via-gray-300 to-transparent"></div>
+              <div className="text-gray-300 text-sm font-light py-3">×</div>
+              <div className="h-8 w-px bg-gradient-to-b from-transparent via-gray-300 to-transparent"></div>
             </div>
             
-            {/* Logo 2 - Munjral Brothers */}
+            {/* Logo 2 - Munjral Brothers (Larger, less white space) */}
             <div className="flex flex-col items-center">
-              <div className="h-20 w-20 bg-white rounded-xl shadow-lg flex items-center justify-center p-2 border">
+              <div className="h-24 w-24 bg-gradient-to-br from-teal-50 to-cyan-50 rounded-xl shadow-lg flex items-center justify-center p-1 border border-teal-200">
                 <img 
                   src="/radico-dashboard/munjral-logo.png" 
                   alt="Munjral Brothers" 
-                  className="h-16 w-16 object-contain"
+                  className="h-22 w-22 object-cover rounded-lg"
                   onError={(e) => {
                     // Fallback if image doesn't exist
                     const target = e.target as HTMLImageElement;
@@ -210,10 +210,10 @@ export default function Login({ onLogin }: LoginProps) {
                 />
                 {/* Fallback design */}
                 <div className="hidden text-center">
-                  <div className="text-3xl font-bold text-blue-600">M</div>
+                  <div className="text-4xl font-bold text-teal-600">M</div>
                 </div>
               </div>
-              <p className="text-xs font-semibold text-gray-600 mt-2 tracking-wide">MUNJRAL BROTHERS</p>
+              <p className="text-xs font-semibold text-gray-600 mt-3 tracking-wider">MUNJRAL BROTHERS</p>
             </div>
           </div>
 
