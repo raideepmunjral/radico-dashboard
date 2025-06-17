@@ -274,7 +274,7 @@ const getShortMonthName = (monthNum: string) => {
 };
 
 // ==========================================
-// 🔐 NEW: ROLE-BASED DATA FILTERING FUNCTION
+// 🔐 FIXED: ROLE-BASED DATA FILTERING FUNCTION WITH PROPER DEPARTMENT RECALCULATION
 // ==========================================
 
 const applyRoleBasedFiltering = (data: DashboardData, user: any): DashboardData => {
@@ -294,8 +294,9 @@ const applyRoleBasedFiltering = (data: DashboardData, user: any): DashboardData 
   const filterShops = (shops: ShopData[]): ShopData[] => {
     return shops.filter(shop => {
       if (user.role === 'manager') {
-        // Manager sees only their department
-        return shop.department === user.department;
+        // 🔧 TODO: Implement proper manager filtering based on shop assignments
+        // For now, managers see all (will be refined based on shop assignments)
+        return true;
       } else if (user.role === 'salesman') {
         // Salesman sees only their own shops - multiple matching strategies
         return shop.salesman === user.name || 
@@ -317,7 +318,8 @@ const applyRoleBasedFiltering = (data: DashboardData, user: any): DashboardData 
     let includeShop = false;
     
     if (user.role === 'manager') {
-      includeShop = shop.department === user.department;
+      // 🔧 TODO: Implement proper manager filtering based on shop assignments
+      includeShop = true;
     } else if (user.role === 'salesman') {
       includeShop = shop.salesman === user.name || 
                    shop.salesman === user.email ||
@@ -328,6 +330,27 @@ const applyRoleBasedFiltering = (data: DashboardData, user: any): DashboardData 
       filteredSalesData[shopId] = shop;
     }
   });
+
+  // 🔧 CRITICAL FIX: Recalculate department performance from filtered shop data
+  const recalculatedDeptPerformance: Record<string, any> = {};
+  
+  // Get all departments from filtered shops
+  const filteredShops = Object.values(filteredSalesData);
+  const departments = Array.from(new Set(filteredShops.map(shop => shop.department).filter(Boolean)));
+  
+  departments.forEach(dept => {
+    const deptShops = filteredShops.filter(shop => shop.department === dept);
+    const billedShops = deptShops.filter(shop => shop.total > 0);
+    const totalSales = deptShops.reduce((sum, shop) => sum + shop.total, 0);
+    
+    recalculatedDeptPerformance[dept] = {
+      totalShops: deptShops.length,
+      billedShops: billedShops.length,
+      sales: totalSales
+    };
+  });
+
+  console.log('🔧 RECALCULATED Department Performance:', recalculatedDeptPerformance);
 
   // Filter customer insights
   const filteredCustomerInsights: CustomerInsights = {
@@ -344,15 +367,7 @@ const applyRoleBasedFiltering = (data: DashboardData, user: any): DashboardData 
   filteredCustomerInsights.consistentPerformers = filteredCustomerInsights.consistentShops.length;
   filteredCustomerInsights.decliningPerformers = filteredCustomerInsights.decliningShops.length;
 
-  // Filter department performance (for managers)
-  let filteredDeptPerformance = data.deptPerformance;
-  if (user.role === 'manager') {
-    filteredDeptPerformance = {
-      [user.department]: data.deptPerformance[user.department] || { totalShops: 0, billedShops: 0, sales: 0 }
-    };
-  }
-
-  // Filter salesperson stats (for salesmen)
+  // Filter salesperson stats
   let filteredSalespersonStats = data.salespersonStats;
   if (user.role === 'salesman') {
     // Find salesperson stats by matching name
@@ -369,23 +384,22 @@ const applyRoleBasedFiltering = (data: DashboardData, user: any): DashboardData 
       filteredSalespersonStats = {};
     }
   } else if (user.role === 'manager') {
-    // Manager sees only salesmen in their department
+    // Manager sees only salesmen in their scope
     const managerSalesmen: Record<string, any> = {};
     Object.keys(data.salespersonStats).forEach(salesmanName => {
-      // Check if this salesman has shops in manager's department
-      const hasShopsInDept = Object.values(filteredSalesData).some(shop => 
+      // Check if this salesman has shops in the filtered data
+      const hasShopsInScope = Object.values(filteredSalesData).some(shop => 
         shop.salesman === salesmanName ||
         shop.salesman?.toLowerCase() === salesmanName?.toLowerCase()
       );
-      if (hasShopsInDept) {
+      if (hasShopsInScope) {
         managerSalesmen[salesmanName] = data.salespersonStats[salesmanName];
       }
     });
     filteredSalespersonStats = managerSalesmen;
   }
 
-  // Recalculate summary metrics based on filtered data
-  const filteredShops = Object.values(filteredSalesData);
+  // 🔧 CRITICAL FIX: Recalculate summary metrics based on filtered data
   const totalShops = filteredShops.length;
   const billedShops = filteredShops.filter(shop => shop.total > 0).length;
   const total8PM = filteredShops.reduce((sum, shop) => sum + (shop.eightPM || 0), 0);
@@ -393,7 +407,7 @@ const applyRoleBasedFiltering = (data: DashboardData, user: any): DashboardData 
   const totalSales = total8PM + totalVERVE;
   const coverage = totalShops > 0 ? ((billedShops / totalShops) * 100).toFixed(1) : '0';
 
-  // Filter and recalculate targets
+  // Recalculate targets from filtered salesperson stats
   let total8PMTarget = 0;
   let totalVerveTarget = 0;
   
@@ -405,6 +419,7 @@ const applyRoleBasedFiltering = (data: DashboardData, user: any): DashboardData 
   const eightPmAchievement = total8PMTarget > 0 ? ((total8PM / total8PMTarget) * 100).toFixed(1) : '0';
   const verveAchievement = totalVerveTarget > 0 ? ((totalVERVE / totalVerveTarget) * 100).toFixed(1) : '0';
 
+  // 🔧 FIXED: Recalculated summary based on filtered data
   const filteredSummary = {
     ...data.summary,
     totalShops,
@@ -419,12 +434,14 @@ const applyRoleBasedFiltering = (data: DashboardData, user: any): DashboardData 
     verveAchievement
   };
 
-  console.log(`✅ Filtered data for ${user.role} ${user.name}:`, {
+  console.log(`✅ FIXED Filtered data for ${user.role} ${user.name}:`, {
     originalShops: Object.keys(data.salesData).length,
     filteredShops: totalShops,
     billedShops: billedShops,
     total8PM: total8PM,
-    totalVERVE: totalVERVE
+    totalVERVE: totalVERVE,
+    originalDepartments: Object.keys(data.deptPerformance).length,
+    recalculatedDepartments: Object.keys(recalculatedDeptPerformance).length
   });
 
   return {
@@ -432,7 +449,7 @@ const applyRoleBasedFiltering = (data: DashboardData, user: any): DashboardData 
     summary: filteredSummary,
     topShops: filteredTopShops,
     salesData: filteredSalesData,
-    deptPerformance: filteredDeptPerformance,
+    deptPerformance: recalculatedDeptPerformance, // 🔧 FIXED: Use recalculated data
     salespersonStats: filteredSalespersonStats,
     customerInsights: filteredCustomerInsights,
     allShopsComparison: filteredAllShopsComparison
@@ -1523,17 +1540,20 @@ const ProtectedRadicoDashboard = () => {
                 Last updated: {lastUpdated.toLocaleTimeString()}
               </span>
               <div className="flex space-x-2">
-                <button
-                  onClick={() => setShowInventory(!showInventory)}
-                  className={`px-3 sm:px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors text-sm font-medium ${
-                    showInventory 
-                      ? 'bg-purple-600 hover:bg-purple-700 text-white' 
-                      : 'bg-purple-100 hover:bg-purple-200 text-purple-700'
-                  }`}
-                >
-                  <Package className="w-4 h-4" />
-                  <span>{showInventory ? 'Sales View' : 'Inventory View'}</span>
-                </button>
+                {/* 🔐 FIXED: Only show inventory button for admin and manager roles */}
+                {user && (user.role === 'admin' || user.role === 'manager') && (
+                  <button
+                    onClick={() => setShowInventory(!showInventory)}
+                    className={`px-3 sm:px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors text-sm font-medium ${
+                      showInventory 
+                        ? 'bg-purple-600 hover:bg-purple-700 text-white' 
+                        : 'bg-purple-100 hover:bg-purple-200 text-purple-700'
+                    }`}
+                  >
+                    <Package className="w-4 h-4" />
+                    <span>{showInventory ? 'Sales View' : 'Inventory View'}</span>
+                  </button>
+                )}
                 
                 <button
                   onClick={fetchDashboardData}
@@ -1572,15 +1592,18 @@ const ProtectedRadicoDashboard = () => {
           <nav className="bg-white border-b overflow-x-auto">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="flex space-x-4 sm:space-x-8 min-w-max">
+                {/* 🔐 OPTIONAL: Role-based tab filtering */}
                 {[
-                  { id: 'overview', label: 'Sales Overview', icon: BarChart3 },
-                  { id: 'shops', label: 'Top Shops', icon: Trophy },
-                  { id: 'focus-shops', label: 'Focus Shops', icon: Target },
-                  { id: 'department', label: 'Department Analysis', icon: Building },
-                  { id: 'salesman', label: 'Salesman Performance', icon: Users },
-                  { id: 'analytics', label: 'Advanced Analytics', icon: Activity },
-                  { id: 'historical', label: 'Historical Analysis', icon: History }
-                ].map((tab) => (
+                  { id: 'overview', label: 'Sales Overview', icon: BarChart3, roles: ['admin', 'manager', 'salesman'] },
+                  { id: 'shops', label: 'Top Shops', icon: Trophy, roles: ['admin', 'manager', 'salesman'] },
+                  { id: 'focus-shops', label: 'Focus Shops', icon: Target, roles: ['admin', 'manager', 'salesman'] },
+                  { id: 'department', label: 'Department Analysis', icon: Building, roles: ['admin', 'manager'] },
+                  { id: 'salesman', label: 'Salesman Performance', icon: Users, roles: ['admin', 'manager'] },
+                  { id: 'analytics', label: 'Advanced Analytics', icon: Activity, roles: ['admin', 'manager'] },
+                  { id: 'historical', label: 'Historical Analysis', icon: History, roles: ['admin', 'manager', 'salesman'] }
+                ]
+                .filter(tab => !user || tab.roles.includes(user.role)) // 🔐 Filter tabs by user role
+                .map((tab) => (
                   <button
                     key={tab.id}
                     onClick={() => setActiveTab(tab.id)}
