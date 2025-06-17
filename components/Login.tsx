@@ -222,7 +222,7 @@ export default function Login({ onLogin }: LoginProps) {
             Radico Analytics Dashboard
           </h2>
           <p className="mt-2 text-gray-600">
-            Powered by Munjral Brothers | Enhanced Analytics & Reporting
+            Enhanced Analytics & Reporting System
           </p>
         </div>
 
