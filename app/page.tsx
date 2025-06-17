@@ -1592,15 +1592,15 @@ const ProtectedRadicoDashboard = () => {
           <nav className="bg-white border-b overflow-x-auto">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
               <div className="flex space-x-4 sm:space-x-8 min-w-max">
-                {/* 🔐 OPTIONAL: Role-based tab filtering */}
+                {/* 🔐 FIXED: Role-based tab filtering for salesman */}
                 {[
                   { id: 'overview', label: 'Sales Overview', icon: BarChart3, roles: ['admin', 'manager', 'salesman'] },
                   { id: 'shops', label: 'Top Shops', icon: Trophy, roles: ['admin', 'manager', 'salesman'] },
                   { id: 'focus-shops', label: 'Focus Shops', icon: Target, roles: ['admin', 'manager', 'salesman'] },
                   { id: 'department', label: 'Department Analysis', icon: Building, roles: ['admin', 'manager'] },
-                  { id: 'salesman', label: 'Salesman Performance', icon: Users, roles: ['admin', 'manager'] },
+                  { id: 'salesman', label: 'Salesman Performance', icon: Users, roles: ['admin', 'manager', 'salesman'] },
                   { id: 'analytics', label: 'Advanced Analytics', icon: Activity, roles: ['admin', 'manager'] },
-                  { id: 'historical', label: 'Historical Analysis', icon: History, roles: ['admin', 'manager', 'salesman'] }
+                  { id: 'historical', label: 'Historical Analysis', icon: History, roles: ['admin', 'manager'] }
                 ]
                 .filter(tab => !user || tab.roles.includes(user.role)) // 🔐 Filter tabs by user role
                 .map((tab) => (
