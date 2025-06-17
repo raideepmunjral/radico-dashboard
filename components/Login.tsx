@@ -162,14 +162,67 @@ export default function Login({ onLogin }: LoginProps) {
       <div className="max-w-md w-full">
         {/* Logo/Header */}
         <div className="text-center mb-8">
-          <div className="mx-auto h-16 w-16 bg-gradient-to-r from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center mb-4">
-            <span className="text-white text-2xl font-bold">R</span>
+          
+          {/* Professional Dual Logo Layout - Radico + Munjral Brothers */}
+          <div className="flex items-center justify-center space-x-6 mb-6">
+            {/* Logo 1 - Radico Khaitan */}
+            <div className="flex flex-col items-center">
+              <div className="h-20 w-24 bg-white rounded-xl shadow-lg flex items-center justify-center p-2 border">
+                <img 
+                  src="/radico-logo.png" 
+                  alt="Radico Khaitan" 
+                  className="h-16 w-20 object-contain"
+                  onError={(e) => {
+                    // Fallback if image doesn't exist
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    target.nextElementSibling!.style.display = 'block';
+                  }}
+                />
+                {/* Fallback design */}
+                <div className="hidden text-center">
+                  <div className="text-2xl font-bold text-amber-700 mb-1">👑</div>
+                  <div className="text-xs font-bold text-amber-700">RADICO</div>
+                </div>
+              </div>
+            </div>
+            
+            {/* Elegant Separator */}
+            <div className="flex flex-col items-center">
+              <div className="h-6 w-px bg-gradient-to-b from-transparent via-gray-400 to-transparent"></div>
+              <div className="text-gray-400 text-xs font-medium py-2">×</div>
+              <div className="h-6 w-px bg-gradient-to-b from-transparent via-gray-400 to-transparent"></div>
+            </div>
+            
+            {/* Logo 2 - Munjral Brothers */}
+            <div className="flex flex-col items-center">
+              <div className="h-20 w-20 bg-white rounded-xl shadow-lg flex items-center justify-center p-2 border">
+                <img 
+                  src="/munjral-logo.png" 
+                  alt="Munjral Brothers" 
+                  className="h-16 w-16 object-contain"
+                  onError={(e) => {
+                    // Fallback if image doesn't exist
+                    const target = e.target as HTMLImageElement;
+                    target.style.display = 'none';
+                    target.nextElementSibling!.style.display = 'block';
+                  }}
+                />
+                {/* Fallback design */}
+                <div className="hidden text-center">
+                  <div className="text-3xl font-bold text-blue-600">M</div>
+                </div>
+              </div>
+              <p className="text-xs font-semibold text-gray-600 mt-2 tracking-wide">MUNJRAL BROTHERS</p>
+            </div>
           </div>
+
+
           <h2 className="text-3xl font-bold text-gray-900">
-            Radico Dashboard
+            Radico Analytics Dashboard
           </h2>
           <p className="mt-2 text-gray-600">
-            Enhanced Analytics & Reporting System
+            Powered by Munjral Brothers | Enhanced Analytics & Reporting
           </p>
         </div>
 
@@ -246,7 +299,10 @@ export default function Login({ onLogin }: LoginProps) {
         {/* Footer */}
         <div className="text-center mt-6">
           <p className="text-sm text-gray-500">
-            Powered by Tertiary Sales Management System
+            Radico Khaitan × Munjral Brothers Partnership
+          </p>
+          <p className="text-xs text-gray-400 mt-1">
+            Tertiary Sales Management System
           </p>
         </div>
       </div>
