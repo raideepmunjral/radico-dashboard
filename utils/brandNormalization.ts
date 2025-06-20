@@ -391,6 +391,72 @@ export const debugBrandMapping = (shopId: string, brandInput: string, sizeInput?
   return { brandInfo, matchingKey, allKeys };
 };
 
+// ==========================================
+// BRAND MAPPING VALIDATION FUNCTION
+// ==========================================
+
+export const validateBrandMapping = (): { success: boolean; errors: string[] } => {
+  const errors: string[] = [];
+  
+  // Test known brand combinations
+  const testCases = [
+    { brand: '8 PM BLACK', size: '375', expected: '8PM_PREMIUM_BLACK_BLENDED_WHISKY_375' },
+    { brand: '8 PM BLACK', size: '180P', expected: '8PM_PREMIUM_BLACK_BLENDED_WHISKY_PET_180' },
+    { brand: '8 PM BLACK', size: '180', expected: '8PM_PREMIUM_BLACK_BLENDED_WHISKY_180' },
+    { brand: 'VERVE GREEN APPLE', size: '750', expected: 'VERVE_GREEN_APPLE_750' },
+    { brand: '8 PM BLACK 375', size: '', expected: '8PM_PREMIUM_BLACK_BLENDED_WHISKY_375' },
+    { brand: 'M2 MAGIC MOMENTS VERVE GREEN APPLE SUPERIOR FLAVOURED VODKA', size: '750', expected: 'VERVE_GREEN_APPLE_750' }
+  ];
+  
+  testCases.forEach(({ brand, size, expected }) => {
+    const result = normalizeBrand(brand, size);
+    if (result.normalizedKey !== expected) {
+      errors.push(`Failed: ${brand} + ${size} -> ${result.normalizedKey}, expected: ${expected}`);
+    }
+  });
+  
+  // Check for duplicate normalized keys
+  const normalizedKeys = new Set<string>();
+  const duplicates = new Set<string>();
+  
+  Object.values(BRAND_MAPPING).forEach(brandInfo => {
+    if (normalizedKeys.has(brandInfo.normalizedKey)) {
+      duplicates.add(brandInfo.normalizedKey);
+    }
+    normalizedKeys.add(brandInfo.normalizedKey);
+  });
+  
+  if (duplicates.size > 0) {
+    errors.push(`Duplicate normalized keys found: ${Array.from(duplicates).join(', ')}`);
+  }
+  
+  return {
+    success: errors.length === 0,
+    errors
+  };
+};
+
+// ==========================================
+// NAMED EXPORTS FOR COMPONENT IMPORTS
+// ==========================================
+
+export {
+  normalizeBrand,
+  createMatchingKey,
+  createMultipleMatchingKeys,
+  getBrandFamily,
+  isSameBrand,
+  getBrandVariations,
+  debugBrandMapping,
+  validateBrandMapping,
+  BRAND_MAPPING,
+  type BrandInfo
+};
+
+// ==========================================
+// DEFAULT EXPORT FOR CONVENIENCE
+// ==========================================
+
 export default {
   normalizeBrand,
   createMatchingKey,
@@ -398,5 +464,7 @@ export default {
   getBrandFamily,
   isSameBrand,
   getBrandVariations,
-  debugBrandMapping
+  debugBrandMapping,
+  validateBrandMapping,
+  BRAND_MAPPING
 };
