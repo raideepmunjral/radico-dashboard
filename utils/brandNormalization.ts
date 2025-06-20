@@ -4,226 +4,399 @@
 // ==========================================
 
 export interface BrandInfo {
-  family: string;
-  variant: string;
-  size: string;
-  flavor: string;
-  displayName: string;
-  normalizedKey: string;
+  family: string;           // "8PM" or "VERVE"
+  variant: string;          // "PREMIUM_BLACK_BLENDED_WHISKY" or "GREEN_APPLE"
+  size: string;             // "375", "750", "180", etc.
+  packaging: string;        // "GLASS" or "PET"
+  normalizedKey: string;    // Final unique identifier
+  displayName: string;      // Human readable name
+  fullSupplyName: string;   // Exact name as it appears in supply sheets
 }
 
 // ==========================================
-// MASTER BRAND MAPPING - SINGLE SOURCE OF TRUTH
+// MASTER BRAND MAPPING TABLE
 // ==========================================
 
-const BRAND_MAPPING: Record<string, string> = {
-  // 8PM WHISKY FAMILY - Glass Bottles
-  '8 PM BLACK 750': '8PM_PREMIUM_BLACK_BLENDED_WHISKY_750',
-  '8 PM BLACK 375': '8PM_PREMIUM_BLACK_BLENDED_WHISKY_375',
-  '8 PM BLACK 180': '8PM_PREMIUM_BLACK_BLENDED_WHISKY_180',  // Glass bottle
-  '8PM BLACK 750': '8PM_PREMIUM_BLACK_BLENDED_WHISKY_750',
-  '8PM BLACK 375': '8PM_PREMIUM_BLACK_BLENDED_WHISKY_375',
-  '8PM BLACK 180': '8PM_PREMIUM_BLACK_BLENDED_WHISKY_180',
+const BRAND_MAPPING: { [key: string]: BrandInfo } = {
+  // 8PM WHISKY FAMILY - GLASS BOTTLES
+  '8 PM BLACK': { 
+    family: '8PM', variant: 'PREMIUM_BLACK_BLENDED_WHISKY', size: '750', packaging: 'GLASS',
+    normalizedKey: '8PM_PREMIUM_BLACK_BLENDED_WHISKY_750', displayName: '8PM Black 750ML',
+    fullSupplyName: '8 PM PREMIUM BLACK BLENDED WHISKY'
+  },
+  '8 PM BLACK 750': { 
+    family: '8PM', variant: 'PREMIUM_BLACK_BLENDED_WHISKY', size: '750', packaging: 'GLASS',
+    normalizedKey: '8PM_PREMIUM_BLACK_BLENDED_WHISKY_750', displayName: '8PM Black 750ML',
+    fullSupplyName: '8 PM PREMIUM BLACK BLENDED WHISKY'
+  },
+  '8 PM BLACK 375': { 
+    family: '8PM', variant: 'PREMIUM_BLACK_BLENDED_WHISKY', size: '375', packaging: 'GLASS',
+    normalizedKey: '8PM_PREMIUM_BLACK_BLENDED_WHISKY_375', displayName: '8PM Black 375ML',
+    fullSupplyName: '8 PM PREMIUM BLACK BLENDED WHISKY'
+  },
+  '8 PM BLACK 180': { 
+    family: '8PM', variant: 'PREMIUM_BLACK_BLENDED_WHISKY', size: '180', packaging: 'GLASS',
+    normalizedKey: '8PM_PREMIUM_BLACK_BLENDED_WHISKY_180', displayName: '8PM Black 180ML Glass',
+    fullSupplyName: '8 PM PREMIUM BLACK BLENDED WHISKY'
+  },
   
-  // 8PM WHISKY FAMILY - PET Bottles (SEPARATE from glass)
-  '8 PM BLACK 180P': '8PM_PREMIUM_BLACK_BLENDED_WHISKY_Pet_180',
-  '8 PM BLACK 90A': '8PM_PREMIUM_BLACK_BLENDED_WHISKY_Pet_90',
-  '8 PM BLACK 60P': '8PM_PREMIUM_BLACK_BLENDED_WHISKY_Pet_60',
-  '8PM BLACK 180P': '8PM_PREMIUM_BLACK_BLENDED_WHISKY_Pet_180',
-  '8PM BLACK 90A': '8PM_PREMIUM_BLACK_BLENDED_WHISKY_Pet_90',
-  '8PM BLACK 60P': '8PM_PREMIUM_BLACK_BLENDED_WHISKY_Pet_60',
+  // 8PM WHISKY FAMILY - PET BOTTLES
+  '8 PM BLACK 180P': { 
+    family: '8PM', variant: 'PREMIUM_BLACK_BLENDED_WHISKY', size: '180', packaging: 'PET',
+    normalizedKey: '8PM_PREMIUM_BLACK_BLENDED_WHISKY_PET_180', displayName: '8PM Black 180P PET',
+    fullSupplyName: '8 PM PREMIUM BLACK BLENDED WHISKY Pet'
+  },
+  '8 PM BLACK 180-P': { 
+    family: '8PM', variant: 'PREMIUM_BLACK_BLENDED_WHISKY', size: '180', packaging: 'PET',
+    normalizedKey: '8PM_PREMIUM_BLACK_BLENDED_WHISKY_PET_180', displayName: '8PM Black 180P PET',
+    fullSupplyName: '8 PM PREMIUM BLACK BLENDED WHISKY Pet'
+  },
+  '8 PM BLACK 90A': { 
+    family: '8PM', variant: 'PREMIUM_BLACK_BLENDED_WHISKY', size: '90', packaging: 'PET',
+    normalizedKey: '8PM_PREMIUM_BLACK_BLENDED_WHISKY_PET_90', displayName: '8PM Black 90A PET',
+    fullSupplyName: '8 PM PREMIUM BLACK BLENDED WHISKY Pet'
+  },
+  '8 PM BLACK 90': { 
+    family: '8PM', variant: 'PREMIUM_BLACK_BLENDED_WHISKY', size: '90', packaging: 'PET',
+    normalizedKey: '8PM_PREMIUM_BLACK_BLENDED_WHISKY_PET_90', displayName: '8PM Black 90A PET',
+    fullSupplyName: '8 PM PREMIUM BLACK BLENDED WHISKY Pet'
+  },
+  '8 PM BLACK 60P': { 
+    family: '8PM', variant: 'PREMIUM_BLACK_BLENDED_WHISKY', size: '60', packaging: 'PET',
+    normalizedKey: '8PM_PREMIUM_BLACK_BLENDED_WHISKY_PET_60', displayName: '8PM Black 60P PET',
+    fullSupplyName: '8 PM PREMIUM BLACK BLENDED WHISKY Pet'
+  },
+  '8 PM BLACK 60': { 
+    family: '8PM', variant: 'PREMIUM_BLACK_BLENDED_WHISKY', size: '60', packaging: 'PET',
+    normalizedKey: '8PM_PREMIUM_BLACK_BLENDED_WHISKY_PET_60', displayName: '8PM Black 60P PET',
+    fullSupplyName: '8 PM PREMIUM BLACK BLENDED WHISKY Pet'
+  },
   
-  // VERVE VODKA FAMILY - Green Apple
-  'VERVE GREEN APPLE 750': 'VERVE_GREEN_APPLE_750',
-  'VERVE GREEN APPLE 375': 'VERVE_GREEN_APPLE_375',
+  // DIRECT SUPPLY SHEET MAPPINGS FOR 8PM
+  '8 PM PREMIUM BLACK BLENDED WHISKY': { 
+    family: '8PM', variant: 'PREMIUM_BLACK_BLENDED_WHISKY', size: '750', packaging: 'GLASS',
+    normalizedKey: '8PM_PREMIUM_BLACK_BLENDED_WHISKY_750', displayName: '8PM Black 750ML',
+    fullSupplyName: '8 PM PREMIUM BLACK BLENDED WHISKY'
+  },
+  '8 PM PREMIUM BLACK BLENDED WHISKY Pet': { 
+    family: '8PM', variant: 'PREMIUM_BLACK_BLENDED_WHISKY', size: '180', packaging: 'PET',
+    normalizedKey: '8PM_PREMIUM_BLACK_BLENDED_WHISKY_PET_180', displayName: '8PM Black 180P PET',
+    fullSupplyName: '8 PM PREMIUM BLACK BLENDED WHISKY Pet'
+  },
   
-  // VERVE VODKA FAMILY - Cranberry
-  'VERVE CRANBERRY 750': 'VERVE_CRANBERRY_750', 
-  'VERVE CRANBERRY 375': 'VERVE_CRANBERRY_375',
-  'VERVE CRANBERRY TEASE 750': 'VERVE_CRANBERRY_750',
-  'VERVE CRANBERRY TEASE 375': 'VERVE_CRANBERRY_375',
+  // VERVE VODKA FAMILY - GREEN APPLE (GLASS ONLY)
+  'VERVE GREEN APPLE': { 
+    family: 'VERVE', variant: 'GREEN_APPLE', size: '750', packaging: 'GLASS',
+    normalizedKey: 'VERVE_GREEN_APPLE_750', displayName: 'VERVE Green Apple 750ML',
+    fullSupplyName: 'M2 MAGIC MOMENTS VERVE GREEN APPLE SUPERIOR FLAVOURED VODKA'
+  },
+  'VERVE GREEN APPLE 750': { 
+    family: 'VERVE', variant: 'GREEN_APPLE', size: '750', packaging: 'GLASS',
+    normalizedKey: 'VERVE_GREEN_APPLE_750', displayName: 'VERVE Green Apple 750ML',
+    fullSupplyName: 'M2 MAGIC MOMENTS VERVE GREEN APPLE SUPERIOR FLAVOURED VODKA'
+  },
+  'VERVE GREEN APPLE 375': { 
+    family: 'VERVE', variant: 'GREEN_APPLE', size: '375', packaging: 'GLASS',
+    normalizedKey: 'VERVE_GREEN_APPLE_375', displayName: 'VERVE Green Apple 375ML',
+    fullSupplyName: 'M2 MAGIC MOMENTS VERVE GREEN APPLE SUPERIOR FLAVOURED VODKA'
+  },
   
-  // VERVE VODKA FAMILY - Lemon Lush
-  'VERVE LEMON LUSH 750': 'VERVE_LEMON_LUSH_750',
-  'VERVE LEMON LUSH 375': 'VERVE_LEMON_LUSH_375',
+  // VERVE VODKA FAMILY - CRANBERRY (GLASS ONLY)
+  'VERVE CRANBERRY': { 
+    family: 'VERVE', variant: 'CRANBERRY', size: '750', packaging: 'GLASS',
+    normalizedKey: 'VERVE_CRANBERRY_750', displayName: 'VERVE Cranberry 750ML',
+    fullSupplyName: 'M2 MAGIC MOMENTS VERVE CRANBERRY TEASE SUPERIOR FLAVOUR'
+  },
+  'VERVE CRANBERRY 750': { 
+    family: 'VERVE', variant: 'CRANBERRY', size: '750', packaging: 'GLASS',
+    normalizedKey: 'VERVE_CRANBERRY_750', displayName: 'VERVE Cranberry 750ML',
+    fullSupplyName: 'M2 MAGIC MOMENTS VERVE CRANBERRY TEASE SUPERIOR FLAVOUR'
+  },
+  'VERVE CRANBERRY 375': { 
+    family: 'VERVE', variant: 'CRANBERRY', size: '375', packaging: 'GLASS',
+    normalizedKey: 'VERVE_CRANBERRY_375', displayName: 'VERVE Cranberry 375ML',
+    fullSupplyName: 'M2 MAGIC MOMENTS VERVE CRANBERRY TEASE SUPERIOR FLAVOUR'
+  },
   
-  // VERVE VODKA FAMILY - Grain
-  'VERVE GRAIN 750': 'VERVE_GRAIN_750',
-  'VERVE GRAIN 375': 'VERVE_GRAIN_375',
-  'VERVE SUPERIOR GRAIN 750': 'VERVE_GRAIN_750',
-  'VERVE SUPERIOR GRAIN 375': 'VERVE_GRAIN_375',
+  // VERVE VODKA FAMILY - LEMON LUSH (GLASS ONLY)
+  'VERVE LEMON LUSH': { 
+    family: 'VERVE', variant: 'LEMON_LUSH', size: '750', packaging: 'GLASS',
+    normalizedKey: 'VERVE_LEMON_LUSH_750', displayName: 'VERVE Lemon Lush 750ML',
+    fullSupplyName: 'M2 MAGIC MOMENTS VERVE LEMON LUSH SUPERIOR FLAVOURED VODKA'
+  },
+  'VERVE LEMON LUSH 750': { 
+    family: 'VERVE', variant: 'LEMON_LUSH', size: '750', packaging: 'GLASS',
+    normalizedKey: 'VERVE_LEMON_LUSH_750', displayName: 'VERVE Lemon Lush 750ML',
+    fullSupplyName: 'M2 MAGIC MOMENTS VERVE LEMON LUSH SUPERIOR FLAVOURED VODKA'
+  },
+  'VERVE LEMON LUSH 375': { 
+    family: 'VERVE', variant: 'LEMON_LUSH', size: '375', packaging: 'GLASS',
+    normalizedKey: 'VERVE_LEMON_LUSH_375', displayName: 'VERVE Lemon Lush 375ML',
+    fullSupplyName: 'M2 MAGIC MOMENTS VERVE LEMON LUSH SUPERIOR FLAVOURED VODKA'
+  },
+  
+  // VERVE VODKA FAMILY - GRAIN (GLASS ONLY)
+  'VERVE GRAIN': { 
+    family: 'VERVE', variant: 'GRAIN', size: '750', packaging: 'GLASS',
+    normalizedKey: 'VERVE_GRAIN_750', displayName: 'VERVE Grain 750ML',
+    fullSupplyName: 'M2 MAGIC MOMENTS VERVE SUPERIOR GRAIN VODKA'
+  },
+  'VERVE GRAIN 750': { 
+    family: 'VERVE', variant: 'GRAIN', size: '750', packaging: 'GLASS',
+    normalizedKey: 'VERVE_GRAIN_750', displayName: 'VERVE Grain 750ML',
+    fullSupplyName: 'M2 MAGIC MOMENTS VERVE SUPERIOR GRAIN VODKA'
+  },
+  'VERVE GRAIN 375': { 
+    family: 'VERVE', variant: 'GRAIN', size: '375', packaging: 'GLASS',
+    normalizedKey: 'VERVE_GRAIN_375', displayName: 'VERVE Grain 375ML',
+    fullSupplyName: 'M2 MAGIC MOMENTS VERVE SUPERIOR GRAIN VODKA'
+  },
+  
+  // DIRECT SUPPLY SHEET MAPPINGS FOR VERVE
+  'M2 MAGIC MOMENTS VERVE GREEN APPLE SUPERIOR FLAVOURED VODKA': { 
+    family: 'VERVE', variant: 'GREEN_APPLE', size: '750', packaging: 'GLASS',
+    normalizedKey: 'VERVE_GREEN_APPLE_750', displayName: 'VERVE Green Apple 750ML',
+    fullSupplyName: 'M2 MAGIC MOMENTS VERVE GREEN APPLE SUPERIOR FLAVOURED VODKA'
+  },
+  'M2 MAGIC MOMENTS VERVE CRANBERRY TEASE SUPERIOR FLAVOUR': { 
+    family: 'VERVE', variant: 'CRANBERRY', size: '750', packaging: 'GLASS',
+    normalizedKey: 'VERVE_CRANBERRY_750', displayName: 'VERVE Cranberry 750ML',
+    fullSupplyName: 'M2 MAGIC MOMENTS VERVE CRANBERRY TEASE SUPERIOR FLAVOUR'
+  },
+  'M2 MAGIC MOMENTS VERVE LEMON LUSH SUPERIOR FLAVOURED VODKA': { 
+    family: 'VERVE', variant: 'LEMON_LUSH', size: '750', packaging: 'GLASS',
+    normalizedKey: 'VERVE_LEMON_LUSH_750', displayName: 'VERVE Lemon Lush 750ML',
+    fullSupplyName: 'M2 MAGIC MOMENTS VERVE LEMON LUSH SUPERIOR FLAVOURED VODKA'
+  },
+  'M2 MAGIC MOMENTS VERVE SUPERIOR GRAIN VODKA': { 
+    family: 'VERVE', variant: 'GRAIN', size: '750', packaging: 'GLASS',
+    normalizedKey: 'VERVE_GRAIN_750', displayName: 'VERVE Grain 750ML',
+    fullSupplyName: 'M2 MAGIC MOMENTS VERVE SUPERIOR GRAIN VODKA'
+  }
 };
 
 // ==========================================
-// CORE NORMALIZATION FUNCTION
+// MAIN NORMALIZATION FUNCTIONS
 // ==========================================
 
+/**
+ * Normalize brand name from any input format to consistent BrandInfo
+ * Handles inputs from visit sheets, historical sheets, and pending challans
+ */
 export const normalizeBrand = (brandInput: string, sizeInput?: string): BrandInfo => {
-  let brand = brandInput?.toString().trim().toUpperCase() || '';
+  const brand = brandInput?.toString().trim().toUpperCase() || '';
   let size = sizeInput?.toString().trim() || '';
   
-  // Handle combined input like "8 PM BLACK 375" 
-  if (!size && brand.includes(' ')) {
-    const parts = brand.split(' ');
-    const lastPart = parts[parts.length - 1];
-    
-    // Check if last part is a size
-    if (/^\d+[PA]?$/.test(lastPart)) {
-      size = lastPart;
-      brand = parts.slice(0, -1).join(' ');
+  console.log(`🔍 Normalizing: "${brandInput}" + "${sizeInput}"`);
+  
+  // Step 1: Try direct mapping with concatenated brand+size
+  if (size) {
+    const concatenated = `${brand} ${size}`;
+    if (BRAND_MAPPING[concatenated]) {
+      console.log(`✅ Direct match: "${concatenated}"`);
+      return BRAND_MAPPING[concatenated];
     }
   }
   
-  // Normalize size variations
-  size = size.replace(/[^0-9A-Z]/g, ''); // Remove special chars
-  if (size === '180-P' || size === 'PETP') size = '180P';
-  if (size === '90' && brand.includes('8PM')) size = '90A'; // 8PM 90 is PET
-  if (!size || size === '') size = '750'; // Default
-  
-  let family = '';
-  let variant = '';
-  let flavor = '';
-  let displayName = '';
-  
-  // Detect brand family and create consistent format
-  if (brand.includes('8 PM') || brand.includes('8PM') || brand.includes('PREMIUM BLACK')) {
-    family = '8PM';
-    
-    if (size === '180P' || size === '90A' || size === '60P') {
-      variant = `8PM PREMIUM BLACK BLENDED WHISKY Pet ${size.replace(/[PA]/, '')}`;
-      displayName = `8PM BLACK ${size} PET`;
-    } else {
-      variant = `8PM PREMIUM BLACK BLENDED WHISKY ${size}`;
-      displayName = `8PM BLACK ${size}ML`;
+  // Step 2: Try direct mapping with brand only
+  if (BRAND_MAPPING[brand]) {
+    const result = BRAND_MAPPING[brand];
+    // If size provided, update the result with the specific size
+    if (size && size !== result.size) {
+      const updatedResult = { ...result };
+      updatedResult.size = size;
+      updatedResult.normalizedKey = `${result.family}_${result.variant}_${result.packaging === 'PET' ? 'PET_' : ''}${size}`;
+      updatedResult.displayName = `${result.family} ${result.variant.replace(/_/g, ' ')} ${size}ML${result.packaging === 'PET' ? ' PET' : ''}`;
+      console.log(`✅ Brand match with size override: "${brand}" -> ${updatedResult.normalizedKey}`);
+      return updatedResult;
     }
-  }
-  else if (brand.includes('VERVE') || brand.includes('M2M') || brand.includes('MAGIC MOMENTS')) {
-    family = 'VERVE';
-    
-    // Detect flavor
-    if (brand.includes('GREEN APPLE') || brand.includes('APPLE')) {
-      flavor = 'GREEN APPLE';
-      variant = `VERVE GREEN APPLE ${size}`;
-      displayName = `VERVE GREEN APPLE ${size}ML`;
-    } else if (brand.includes('CRANBERRY') || brand.includes('TEASE')) {
-      flavor = 'CRANBERRY';
-      variant = `VERVE CRANBERRY ${size}`;
-      displayName = `VERVE CRANBERRY ${size}ML`;
-    } else if (brand.includes('LEMON') || brand.includes('LUSH')) {
-      flavor = 'LEMON LUSH';
-      variant = `VERVE LEMON LUSH ${size}`;
-      displayName = `VERVE LEMON LUSH ${size}ML`;
-    } else if (brand.includes('GRAIN')) {
-      flavor = 'GRAIN';
-      variant = `VERVE GRAIN ${size}`;
-      displayName = `VERVE GRAIN ${size}ML`;
-    } else {
-      flavor = 'CLASSIC';
-      variant = `VERVE ${size}`;
-      displayName = `VERVE ${size}ML`;
-    }
-  }
-  else {
-    family = 'OTHER';
-    variant = `${brand} ${size}`;
-    displayName = `${brand} ${size}ML`;
+    console.log(`✅ Brand match: "${brand}"`);
+    return result;
   }
   
-  // Create normalized key using BRAND_MAPPING
-  const lookupKey = displayName.replace('ML', '').replace(' PET', 'P');
-  const normalizedKey = BRAND_MAPPING[lookupKey] || `${family}_${variant.replace(/\s+/g, '_')}_${size}`;
+  // Step 3: Intelligent fallback logic
+  const fallbackResult = intelligentBrandMapping(brand, size);
+  if (fallbackResult) {
+    console.log(`✅ Fallback match: "${brand}" + "${size}" -> ${fallbackResult.normalizedKey}`);
+    return fallbackResult;
+  }
   
+  // Step 4: Default unknown brand
+  console.log(`❌ Unknown brand: "${brand}" + "${size}"`);
   return {
-    family,
-    variant,
-    size,
-    flavor,
-    displayName,
-    normalizedKey
+    family: 'UNKNOWN',
+    variant: 'UNKNOWN',
+    size: size || '750',
+    packaging: 'GLASS',
+    normalizedKey: `UNKNOWN_${brand.replace(/\s+/g, '_')}_${size || '750'}`,
+    displayName: `${brand} ${size || '750'}ML`,
+    fullSupplyName: brand
   };
 };
 
-// ==========================================
-// SHOP-BRAND MATCHING KEY GENERATION
-// ==========================================
-
-export const createMatchingKey = (shopName: string, brandInfo: BrandInfo): string => {
-  const cleanShopName = shopName.replace(/[^a-zA-Z0-9]/g, '_').toUpperCase();
-  return `${cleanShopName}_${brandInfo.normalizedKey}`;
-};
-
-export const createMultipleMatchingKeys = (shopName: string, brandInput: string, sizeInput?: string): string[] => {
-  const brandInfo = normalizeBrand(brandInput, sizeInput);
-  const baseKey = createMatchingKey(shopName, brandInfo);
-  
-  // Generate alternative keys for better matching
-  const alternatives = [baseKey];
-  
-  // Add variation without size
-  if (brandInfo.size) {
-    const noSizeInfo = { ...brandInfo, normalizedKey: brandInfo.normalizedKey.replace(`_${brandInfo.size}`, '') };
-    alternatives.push(createMatchingKey(shopName, noSizeInfo));
+/**
+ * Intelligent brand mapping for cases not in direct mapping
+ */
+const intelligentBrandMapping = (brand: string, size: string): BrandInfo | null => {
+  // Extract size from brand name if not provided separately
+  if (!size) {
+    const sizeMatch = brand.match(/(\d+)\s?(P|A|ML)?$/);
+    if (sizeMatch) {
+      size = sizeMatch[1] + (sizeMatch[2] || '');
+      brand = brand.replace(/\s*\d+\s?(P|A|ML)?$/, '').trim();
+    } else {
+      size = '750'; // Default size
+    }
   }
   
-  return alternatives;
+  // Normalize size format
+  size = size.replace(/[^0-9PA]/g, ''); // Remove everything except digits, P, A
+  if (!size) size = '750';
+  
+  // 8PM FAMILY DETECTION
+  if (brand.includes('8 PM') || brand.includes('8PM') || brand.includes('PREMIUM BLACK')) {
+    const isPET = size.includes('P') || size.includes('A') || ['180', '90', '60'].includes(size.replace(/[PA]/g, ''));
+    const cleanSize = size.replace(/[PA]/g, '');
+    
+    return {
+      family: '8PM',
+      variant: 'PREMIUM_BLACK_BLENDED_WHISKY',
+      size: cleanSize,
+      packaging: isPET ? 'PET' : 'GLASS',
+      normalizedKey: `8PM_PREMIUM_BLACK_BLENDED_WHISKY_${isPET ? 'PET_' : ''}${cleanSize}`,
+      displayName: `8PM Black ${cleanSize}ML${isPET ? ' PET' : ''}`,
+      fullSupplyName: isPET ? '8 PM PREMIUM BLACK BLENDED WHISKY Pet' : '8 PM PREMIUM BLACK BLENDED WHISKY'
+    };
+  }
+  
+  // VERVE FAMILY DETECTION
+  if (brand.includes('VERVE') || brand.includes('M2 MAGIC MOMENTS')) {
+    let variant = 'GREEN_APPLE'; // Default
+    let fullSupplyName = 'M2 MAGIC MOMENTS VERVE GREEN APPLE SUPERIOR FLAVOURED VODKA';
+    
+    if (brand.includes('CRANBERRY') || brand.includes('TEASE')) {
+      variant = 'CRANBERRY';
+      fullSupplyName = 'M2 MAGIC MOMENTS VERVE CRANBERRY TEASE SUPERIOR FLAVOUR';
+    } else if (brand.includes('LEMON') || brand.includes('LUSH')) {
+      variant = 'LEMON_LUSH';
+      fullSupplyName = 'M2 MAGIC MOMENTS VERVE LEMON LUSH SUPERIOR FLAVOURED VODKA';
+    } else if (brand.includes('GRAIN')) {
+      variant = 'GRAIN';
+      fullSupplyName = 'M2 MAGIC MOMENTS VERVE SUPERIOR GRAIN VODKA';
+    }
+    
+    const cleanSize = size.replace(/[PA]/g, '');
+    
+    return {
+      family: 'VERVE',
+      variant: variant,
+      size: cleanSize,
+      packaging: 'GLASS', // VERVE only comes in glass
+      normalizedKey: `VERVE_${variant}_${cleanSize}`,
+      displayName: `VERVE ${variant.replace(/_/g, ' ')} ${cleanSize}ML`,
+      fullSupplyName: fullSupplyName
+    };
+  }
+  
+  return null;
 };
 
-// ==========================================
-// UTILITY FUNCTIONS
-// ==========================================
+/**
+ * Create a matching key for shop-brand combination
+ * Used for connecting different data sources
+ */
+export const createMatchingKey = (shopId: string, brandInput: string, sizeInput?: string): string => {
+  const brandInfo = normalizeBrand(brandInput, sizeInput);
+  const cleanShopId = shopId?.toString().trim() || 'UNKNOWN_SHOP';
+  return `${cleanShopId}_${brandInfo.normalizedKey}`;
+};
 
-export const getBrandFamily = (brandInput: string): string => {
-  const brandInfo = normalizeBrand(brandInput);
+/**
+ * Create multiple possible matching keys for a shop-brand combination
+ * Useful for finding matches across different naming conventions
+ */
+export const createMultipleMatchingKeys = (shopId: string, brandInput: string, sizeInput?: string): string[] => {
+  const primaryKey = createMatchingKey(shopId, brandInput, sizeInput);
+  const keys = [primaryKey];
+  
+  // Add alternative keys for common variations
+  const brandInfo = normalizeBrand(brandInput, sizeInput);
+  const cleanShopId = shopId?.toString().trim() || 'UNKNOWN_SHOP';
+  
+  // Alternative with original brand name
+  if (brandInput) {
+    const altKey = `${cleanShopId}_${brandInput.toUpperCase().replace(/\s+/g, '_')}_${brandInfo.size}`;
+    keys.push(altKey);
+  }
+  
+  // Alternative with display name
+  const displayKey = `${cleanShopId}_${brandInfo.displayName.toUpperCase().replace(/\s+/g, '_')}`;
+  keys.push(displayKey);
+  
+  return [...new Set(keys)]; // Remove duplicates
+};
+
+/**
+ * Get brand family (8PM or VERVE) from any brand input
+ */
+export const getBrandFamily = (brandInput: string, sizeInput?: string): string => {
+  const brandInfo = normalizeBrand(brandInput, sizeInput);
   return brandInfo.family;
 };
 
-export const debugBrandMapping = (brandInput: string, sizeInput?: string, shopName?: string): void => {
-  console.log('🔍 Brand Mapping Debug:', {
-    input: { brand: brandInput, size: sizeInput, shop: shopName },
-    normalized: normalizeBrand(brandInput, sizeInput),
-    matchingKey: shopName ? createMatchingKey(shopName, normalizeBrand(brandInput, sizeInput)) : 'N/A'
-  });
+/**
+ * Check if two brand inputs represent the same product
+ */
+export const isSameBrand = (brand1: string, size1: string, brand2: string, size2: string): boolean => {
+  const info1 = normalizeBrand(brand1, size1);
+  const info2 = normalizeBrand(brand2, size2);
+  return info1.normalizedKey === info2.normalizedKey;
 };
 
-// ==========================================
-// BRAND VALIDATION
-// ==========================================
-
-export const validateBrandMapping = (): { success: boolean; errors: string[] } => {
-  const errors: string[] = [];
+/**
+ * Get all possible brand variations for a normalized key
+ * Useful for debugging and validation
+ */
+export const getBrandVariations = (normalizedKey: string): string[] => {
+  const variations: string[] = [];
   
-  // Test known brand combinations
-  const testCases = [
-    { brand: '8 PM BLACK', size: '375', expected: '8PM_PREMIUM_BLACK_BLENDED_WHISKY_375' },
-    { brand: '8 PM BLACK', size: '180P', expected: '8PM_PREMIUM_BLACK_BLENDED_WHISKY_Pet_180' },
-    { brand: '8 PM BLACK', size: '180', expected: '8PM_PREMIUM_BLACK_BLENDED_WHISKY_180' },
-    { brand: 'VERVE GREEN APPLE', size: '750', expected: 'VERVE_GREEN_APPLE_750' },
-    { brand: '8 PM BLACK 375', size: '', expected: '8PM_PREMIUM_BLACK_BLENDED_WHISKY_375' }
-  ];
-  
-  testCases.forEach(({ brand, size, expected }) => {
-    const result = normalizeBrand(brand, size);
-    if (!result.normalizedKey.includes(expected.split('_')[0])) {
-      errors.push(`Failed: ${brand} + ${size} -> ${result.normalizedKey}, expected pattern: ${expected}`);
+  Object.entries(BRAND_MAPPING).forEach(([key, value]) => {
+    if (value.normalizedKey === normalizedKey) {
+      variations.push(key);
     }
   });
   
-  return {
-    success: errors.length === 0,
-    errors
-  };
+  return variations;
 };
 
 // ==========================================
-// EXPORT ALL FUNCTIONS
+// UTILITY FUNCTIONS FOR DEBUGGING
 // ==========================================
+
+export const debugBrandMapping = (shopId: string, brandInput: string, sizeInput?: string) => {
+  console.group(`🔍 Debug Brand Mapping: ${shopId} - ${brandInput} ${sizeInput || ''}`);
+  
+  const brandInfo = normalizeBrand(brandInput, sizeInput);
+  const matchingKey = createMatchingKey(shopId, brandInput, sizeInput);
+  const allKeys = createMultipleMatchingKeys(shopId, brandInput, sizeInput);
+  
+  console.log('Input:', { shopId, brandInput, sizeInput });
+  console.log('Brand Info:', brandInfo);
+  console.log('Primary Matching Key:', matchingKey);
+  console.log('All Possible Keys:', allKeys);
+  console.log('Variations for this product:', getBrandVariations(brandInfo.normalizedKey));
+  
+  console.groupEnd();
+  
+  return { brandInfo, matchingKey, allKeys };
+};
 
 export default {
   normalizeBrand,
   createMatchingKey,
   createMultipleMatchingKeys,
   getBrandFamily,
-  debugBrandMapping,
-  validateBrandMapping,
-  BRAND_MAPPING
+  isSameBrand,
+  getBrandVariations,
+  debugBrandMapping
 };
