@@ -14,7 +14,7 @@ import {
   debugBrandMapping,
   validateBrandMapping,
   type BrandInfo 
-} from '../../../utils/brandNormalization';
+} from '../../../../utils/brandNormalization';
 
 // ==========================================
 // TYPE DEFINITIONS FOR REAL GOOGLE SHEETS DATA
