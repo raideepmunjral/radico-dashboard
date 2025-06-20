@@ -4,6 +4,19 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { Target, Search, Filter, Download, X, ChevronLeft, ChevronRight, AlertTriangle, TrendingDown, UserPlus, Package, Calendar, Eye, Clock, RefreshCw, BarChart3, Truck, CheckCircle, XCircle, Users, Timer, Star, Zap } from 'lucide-react';
 
 // ==========================================
+// IMPORT UNIFIED BRAND NORMALIZATION SERVICE
+// ==========================================
+import { 
+  normalizeBrand, 
+  createMatchingKey, 
+  createMultipleMatchingKeys, 
+  getBrandFamily, 
+  debugBrandMapping,
+  validateBrandMapping,
+  type BrandInfo 
+} from '../../../utils/brandNormalization';
+
+// ==========================================
 // TYPE DEFINITIONS FOR REAL GOOGLE SHEETS DATA
 // ==========================================
 
@@ -85,6 +98,8 @@ interface RealSupplyTransaction {
   shopName: string;
   orderNo: string;
   source: 'pending_challans' | 'historical';
+  normalizedBrandInfo: BrandInfo;
+  matchingKey: string;
 }
 
 interface RealSKURecoveryOpportunity {
@@ -135,6 +150,10 @@ interface RealSKURecoveryOpportunity {
   dropOffMonth?: string;
   timelineAnalysis: string;
   totalMonthsAnalyzed: number;
+  
+  // Unified Normalization Data
+  normalizedKey: string;
+  matchingKey: string;
 }
 
 interface EnhancedFilters {
@@ -167,97 +186,22 @@ const SHEETS_CONFIG = {
 };
 
 // ==========================================
-// BRAND MAPPING & NORMALIZATION FOR REAL DATA
-// ==========================================
-
-const normalizeBrandFromSheets = (brandInput: string, sizeInput: string, source: 'pending_challans' | 'historical'): {
-  family: string;
-  variant: string;
-  size: string;
-  flavor: string;
-  displayName: string;
-  normalizedKey: string;
-} => {
-  const brand = brandInput?.toString().trim().toUpperCase() || '';
-  let size = sizeInput?.toString().trim() || '';
-  
-  // Normalize size variations
-  size = size.replace(/[^0-9A-Z]/g, ''); // Remove special chars
-  if (size === '180P' || size === '180-P' || size === 'PETP' || size === 'PET') size = '180P';
-  if (size === '90A' || size === '90') size = '90A';
-  if (!size || size === '') size = '750'; // Default
-  
-  let family = '';
-  let variant = '';
-  let flavor = '';
-  let displayName = '';
-  
-  // 8PM Brand Family Detection
-  if (brand.includes('8 PM') || brand.includes('8PM') || brand.includes('PREMIUM BLACK')) {
-    family = '8PM';
-    if (size === '180P' || size === '90A' || size === '60P') {
-      variant = `8PM BLACK ${size} PET`;
-      displayName = `8PM BLACK ${size} PET`;
-    } else {
-      variant = `8PM BLACK ${size}ML`;
-      displayName = `8PM BLACK ${size}ML`;
-    }
-  }
-  // VERVE Brand Family Detection
-  else if (brand.includes('VERVE') || brand.includes('M2M') || brand.includes('MAGIC MOMENTS')) {
-    family = 'VERVE';
-    
-    // Detect flavor
-    if (brand.includes('GREEN APPLE') || brand.includes('APPLE')) {
-      flavor = 'GREEN APPLE';
-      variant = `VERVE GREEN APPLE ${size}ML`;
-      displayName = `VERVE GREEN APPLE ${size}ML`;
-    } else if (brand.includes('CRANBERRY') || brand.includes('TEASE')) {
-      flavor = 'CRANBERRY';
-      variant = `VERVE CRANBERRY ${size}ML`;
-      displayName = `VERVE CRANBERRY ${size}ML`;
-    } else if (brand.includes('LEMON') || brand.includes('LUSH')) {
-      flavor = 'LEMON LUSH';
-      variant = `VERVE LEMON LUSH ${size}ML`;
-      displayName = `VERVE LEMON LUSH ${size}ML`;
-    } else if (brand.includes('GRAIN')) {
-      flavor = 'GRAIN';
-      variant = `VERVE GRAIN ${size}ML`;
-      displayName = `VERVE GRAIN ${size}ML`;
-    } else {
-      flavor = 'CLASSIC';
-      variant = `VERVE ${size}ML`;
-      displayName = `VERVE ${size}ML`;
-    }
-  }
-  // Other brands
-  else {
-    family = 'OTHER';
-    variant = `${brand} ${size}ML`;
-    displayName = `${brand} ${size}ML`;
-  }
-  
-  const normalizedKey = `${family}_${variant}_${size}`;
-  
-  return {
-    family,
-    variant,
-    size,
-    flavor,
-    displayName,
-    normalizedKey
-  };
-};
-
-// ==========================================
 // REAL GOOGLE SHEETS DATA FETCHING
 // ==========================================
 
 const fetchRealSKUData = async (lookbackPeriod: number): Promise<Record<string, RealSupplyTransaction[]>> => {
-  console.log('🔄 Fetching REAL SKU data from Google Sheets...', {
+  console.log('🔄 Fetching REAL SKU data from Google Sheets with UNIFIED normalization...', {
     lookbackPeriod,
     sheetsConfig: SHEETS_CONFIG
   });
+
+  // Validate brand mapping on startup
+  const validation = validateBrandMapping();
+  if (!validation.success) {
+    console.error('❌ Brand mapping validation failed:', validation.errors);
+  } else {
+    console.log('✅ Brand mapping validation passed');
+  }
 
   if (!SHEETS_CONFIG.apiKey) {
     console.error('❌ Google API key not configured');
@@ -271,13 +215,13 @@ const fetchRealSKUData = async (lookbackPeriod: number): Promise<Record<string, 
       fetchHistoricalData()
     ]);
 
-    // Process and combine data
+    // Process and combine data with unified normalization
     const combinedSKUData = processCombinedSKUData(pendingChallansData, historicalData, lookbackPeriod);
     
-    console.log('✅ Real SKU data fetched and processed:', {
+    console.log('✅ Real SKU data fetched and processed with UNIFIED normalization:', {
       totalShops: Object.keys(combinedSKUData).length,
       totalTransactions: Object.values(combinedSKUData).flat().length,
-      dataSource: 'LIVE_GOOGLE_SHEETS'
+      dataSource: 'LIVE_GOOGLE_SHEETS_UNIFIED_NORMALIZATION'
     });
 
     return combinedSKUData;
@@ -343,7 +287,7 @@ const processCombinedSKUData = (
   const today = new Date();
   const cutoffDate = new Date(today.getTime() - (lookbackPeriod * 24 * 60 * 60 * 1000));
 
-  console.log('🔧 Processing combined SKU data from real sheets...', {
+  console.log('🔧 Processing combined SKU data with UNIFIED brand normalization...', {
     pendingChallansRows: pendingChallansData.length,
     historicalRows: historicalData.length,
     lookbackPeriod,
@@ -382,8 +326,25 @@ const processCombinedSKUData = (
           const transactionDate = parseSheetDate(dateStr);
           
           if (transactionDate && transactionDate >= cutoffDate) {
-            const normalizedBrand = normalizeBrandFromSheets(brand, size, 'pending_challans');
+            // Use UNIFIED brand normalization
+            const normalizedBrandInfo = normalizeBrand(brand, size);
+            const matchingKey = createMatchingKey(shopName || shopId, normalizedBrandInfo);
             const shopKey = shopId;
+
+            // Special debug logging for NASIR/NASEER shops
+            if (shopName?.includes('NASIR') || shopName?.includes('NASEER') || shopId?.includes('NASIR') || shopId?.includes('NASEER')) {
+              console.log('🔍 SKU Recovery Pending Challan - NASIR/NASEER found:', {
+                shopName,
+                shopId,
+                originalBrand: brand,
+                originalSize: size,
+                normalizedBrandInfo,
+                matchingKey,
+                dateStr,
+                cases
+              });
+              debugBrandMapping(brand, size, shopName || shopId);
+            }
 
             if (!shopSKUTransactions[shopKey]) {
               shopSKUTransactions[shopKey] = [];
@@ -394,12 +355,14 @@ const processCombinedSKUData = (
               dateStr: dateStr,
               cases: cases,
               fullBrand: brand,
-              brandShort: normalizedBrand.family,
-              size: normalizedBrand.size,
+              brandShort: normalizedBrandInfo.family,
+              size: normalizedBrandInfo.size,
               shopId: shopId,
               shopName: shopName || 'Unknown Shop',
               orderNo: orderNo || '',
-              source: 'pending_challans'
+              source: 'pending_challans',
+              normalizedBrandInfo,
+              matchingKey
             });
           }
         }
@@ -438,8 +401,28 @@ const processCombinedSKUData = (
           const transactionDate = parseSheetDate(dateStr);
           
           if (transactionDate && transactionDate >= cutoffDate) {
-            const normalizedBrand = normalizeBrandFromSheets(brand || brandShort, size, 'historical');
+            // Use UNIFIED brand normalization - prioritize brandShort if available
+            const brandToNormalize = brandShort || brand;
+            const normalizedBrandInfo = normalizeBrand(brandToNormalize, size);
             const shopKey = shopId || shopName;
+            const matchingKey = createMatchingKey(shopName || shopId || '', normalizedBrandInfo);
+
+            // Special debug logging for NASIR/NASEER shops
+            if (shopName?.includes('NASIR') || shopName?.includes('NASEER') || shopId?.includes('NASIR') || shopId?.includes('NASEER')) {
+              console.log('🔍 SKU Recovery Historical - NASIR/NASEER found:', {
+                shopName,
+                shopId,
+                originalBrandShort: brandShort,
+                originalBrand: brand,
+                brandToNormalize,
+                originalSize: size,
+                normalizedBrandInfo,
+                matchingKey,
+                dateStr,
+                cases
+              });
+              debugBrandMapping(brandToNormalize, size, shopName || shopId);
+            }
 
             if (!shopSKUTransactions[shopKey]) {
               shopSKUTransactions[shopKey] = [];
@@ -450,12 +433,14 @@ const processCombinedSKUData = (
               dateStr: dateStr,
               cases: cases,
               fullBrand: brand || brandShort,
-              brandShort: brandShort || normalizedBrand.family,
-              size: normalizedBrand.size,
+              brandShort: brandShort || normalizedBrandInfo.family,
+              size: normalizedBrandInfo.size,
               shopId: shopId || '',
               shopName: shopName || 'Unknown Shop',
               orderNo: '',
-              source: 'historical'
+              source: 'historical',
+              normalizedBrandInfo,
+              matchingKey
             });
           }
         }
@@ -471,11 +456,12 @@ const processCombinedSKUData = (
   const totalShops = Object.keys(shopSKUTransactions).length;
   const totalTransactions = Object.values(shopSKUTransactions).flat().length;
   
-  console.log('✅ Combined SKU data processed:', {
+  console.log('✅ Combined SKU data processed with UNIFIED normalization:', {
     totalShops,
     totalTransactions,
     sampleShops: Object.keys(shopSKUTransactions).slice(0, 5),
-    cutoffDate: cutoffDate.toLocaleDateString()
+    cutoffDate: cutoffDate.toLocaleDateString(),
+    normalizationSource: 'UNIFIED_BRAND_NORMALIZATION_SERVICE'
   });
 
   return shopSKUTransactions;
@@ -520,7 +506,7 @@ const parseSheetDate = (dateStr: string): Date | null => {
 };
 
 // ==========================================
-// SKU RECOVERY ANALYSIS WITH REAL DATA
+// SKU RECOVERY ANALYSIS WITH UNIFIED NORMALIZATION
 // ==========================================
 
 const analyzeRealSKURecovery = (
@@ -529,7 +515,7 @@ const analyzeRealSKURecovery = (
   inventoryData: InventoryData | undefined,
   lookbackPeriod: number
 ): RealSKURecoveryOpportunity[] => {
-  console.log('🔍 Analyzing REAL SKU recovery opportunities...', {
+  console.log('🔍 Analyzing REAL SKU recovery with UNIFIED normalization...', {
     totalShops: shops.length,
     realSKUDataShops: Object.keys(realSKUData).length,
     lookbackPeriod
@@ -564,9 +550,9 @@ const analyzeRealSKURecovery = (
     }
   });
 
-  console.log('✅ Real SKU recovery analysis complete:', {
+  console.log('✅ Real SKU recovery analysis complete with UNIFIED normalization:', {
     totalOpportunities: opportunities.length,
-    dataSource: 'LIVE_GOOGLE_SHEETS',
+    dataSource: 'LIVE_GOOGLE_SHEETS_UNIFIED_NORMALIZATION',
     byCustomerStatus: {
       RECENTLY_STOPPED: opportunities.filter(o => o.customerStatus === 'RECENTLY_STOPPED').length,
       SHORT_DORMANT: opportunities.filter(o => o.customerStatus === 'SHORT_DORMANT').length,
@@ -586,12 +572,23 @@ const processShopSKUOpportunities = (
   lookbackPeriod: number,
   today: Date
 ) => {
-  // Group transactions by SKU variant
+  // Group transactions by normalized SKU key (using unified normalization)
   const skuGroups: Record<string, RealSupplyTransaction[]> = {};
   
   transactions.forEach(transaction => {
-    const skuInfo = normalizeBrandFromSheets(transaction.fullBrand, transaction.size, transaction.source);
-    const skuKey = skuInfo.normalizedKey;
+    const skuKey = transaction.normalizedBrandInfo.normalizedKey;
+    
+    // Special debug logging for NASIR/NASEER shops
+    if (shop.shopName?.includes('NASIR') || shop.shopName?.includes('NASEER')) {
+      console.log('🔍 SKU Recovery Transaction - NASIR/NASEER processing:', {
+        shopName: shop.shopName,
+        skuKey,
+        normalizedBrandInfo: transaction.normalizedBrandInfo,
+        matchingKey: transaction.matchingKey,
+        originalBrand: transaction.fullBrand,
+        originalSize: transaction.size
+      });
+    }
     
     if (!skuGroups[skuKey]) {
       skuGroups[skuKey] = [];
@@ -603,7 +600,7 @@ const processShopSKUOpportunities = (
   Object.entries(skuGroups).forEach(([skuKey, skuTransactions]) => {
     const sortedTransactions = skuTransactions.sort((a, b) => b.date.getTime() - a.date.getTime());
     const latestTransaction = sortedTransactions[0];
-    const skuInfo = normalizeBrandFromSheets(latestTransaction.fullBrand, latestTransaction.size, latestTransaction.source);
+    const skuInfo = latestTransaction.normalizedBrandInfo;
     
     // Calculate historical metrics
     const totalVolume = sortedTransactions.reduce((sum, t) => sum + t.cases, 0);
@@ -668,7 +665,7 @@ const processShopSKUOpportunities = (
         daysSinceLastVisit: 999,
         lastSupplyDate: latestTransaction.date,
         daysSinceLastSupply: daysSinceLastOrder,
-        supplyDataSource: 'google_sheets',
+        supplyDataSource: 'google_sheets_unified_normalization',
         reasonNoStock: '',
         recentSupplyAttempts: false,
         
@@ -687,8 +684,25 @@ const processShopSKUOpportunities = (
         orderingPattern: getOrderingPattern(sortedTransactions, daysSinceLastOrder),
         dropOffMonth: daysSinceLastOrder > 90 ? latestTransaction.dateStr : undefined,
         timelineAnalysis,
-        totalMonthsAnalyzed: Math.min(Math.ceil(lookbackPeriod / 30), sortedTransactions.length)
+        totalMonthsAnalyzed: Math.min(Math.ceil(lookbackPeriod / 30), sortedTransactions.length),
+        
+        // Unified Normalization Data
+        normalizedKey: skuInfo.normalizedKey,
+        matchingKey: latestTransaction.matchingKey
       };
+      
+      // Special debug logging for NASIR/NASEER opportunities
+      if (shop.shopName?.includes('NASIR') || shop.shopName?.includes('NASEER')) {
+        console.log('🔍 SKU Recovery Opportunity created - NASIR/NASEER:', {
+          shopName: shop.shopName,
+          sku: opportunity.sku,
+          normalizedKey: opportunity.normalizedKey,
+          matchingKey: opportunity.matchingKey,
+          recoveryPotential: opportunity.recoveryPotential,
+          customerStatus: opportunity.customerStatus,
+          daysSinceLastOrder: opportunity.daysSinceLastOrder
+        });
+      }
       
       opportunities.push(opportunity);
     }
@@ -815,7 +829,7 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
   const [loading, setLoading] = useState(true);
   const [realSKUData, setRealSKUData] = useState<Record<string, RealSupplyTransaction[]>>({});
 
-  // Fetch real SKU data from Google Sheets
+  // Fetch real SKU data from Google Sheets with unified normalization
   useEffect(() => {
     const loadRealSKUData = async () => {
       setLoading(true);
@@ -832,7 +846,7 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
     loadRealSKUData();
   }, [filters.lookbackPeriod]);
 
-  // Generate recovery opportunities from real Google Sheets data
+  // Generate recovery opportunities from real Google Sheets data with unified normalization
   const recoveryOpportunities = useMemo(() => {
     if (loading || Object.keys(realSKUData).length === 0) {
       return [];
@@ -960,10 +974,11 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
   // Export function
   const exportToCSV = () => {
     let csvContent = "data:text/csv;charset=utf-8,";
-    csvContent += `LIVE Google Sheets SKU Recovery Intelligence Report - ${new Date().toLocaleDateString()}\n`;
-    csvContent += `Data Source: Live Google Sheets with real transaction data\n`;
+    csvContent += `UNIFIED NORMALIZATION SKU Recovery Intelligence Report - ${new Date().toLocaleDateString()}\n`;
+    csvContent += `Data Source: Live Google Sheets with UNIFIED brand normalization\n`;
     csvContent += `Master Sheet: ${SHEETS_CONFIG.masterSheetId}\n`;
     csvContent += `Historical Sheet: ${SHEETS_CONFIG.historicalSheetId}\n`;
+    csvContent += `Normalization Service: UNIFIED_BRAND_NORMALIZATION_SERVICE\n`;
     csvContent += `Total Opportunities: ${summary.total}\n`;
     csvContent += `Total Recovery Potential: ${summary.totalRecoveryPotential.toFixed(0)} cases\n\n`;
     
@@ -979,16 +994,16 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
     });
     
     csvContent += "\n";
-    csvContent += `Shop Name,Shop ID,Department,Salesman,Specific SKU,SKU Family,SKU Size,SKU Flavor,Customer Status,Time Segment,Last SKU Supply Date,Days Since Last SKU Supply,Last SKU Volume,Peak SKU Volume,Peak Month,SKU Historical Average,Total SKU Historical,SKU Recovery Potential,Recovery Score,Priority,Category,Action Required,SKU Timeline Analysis\n`;
+    csvContent += `Shop Name,Shop ID,Department,Salesman,Specific SKU,SKU Family,SKU Size,SKU Flavor,Customer Status,Time Segment,Last SKU Supply Date,Days Since Last SKU Supply,Last SKU Volume,Peak SKU Volume,Peak Month,SKU Historical Average,Total SKU Historical,SKU Recovery Potential,Recovery Score,Priority,Category,Action Required,SKU Timeline Analysis,Normalized Key,Matching Key\n`;
     
     filteredOpportunities.forEach(opp => {
-      csvContent += `"${opp.shopName}","${opp.shopId}","${opp.department}","${opp.salesman}","${opp.sku}","${opp.skuFamily}","${opp.skuSize}","${opp.skuFlavor || 'N/A'}","${opp.customerStatus}","${opp.timeSegment}","${opp.lastOrderDate}",${opp.daysSinceLastOrder},${opp.lastOrderVolume},${opp.peakMonthVolume},"${opp.peakMonth}",${opp.historicalAverage.toFixed(1)},${opp.totalHistoricalVolume},${opp.recoveryPotential.toFixed(1)},${opp.recoveryScore},"${opp.priority}","${opp.category}","${opp.actionRequired}","${opp.timelineAnalysis}"\n`;
+      csvContent += `"${opp.shopName}","${opp.shopId}","${opp.department}","${opp.salesman}","${opp.sku}","${opp.skuFamily}","${opp.skuSize}","${opp.skuFlavor || 'N/A'}","${opp.customerStatus}","${opp.timeSegment}","${opp.lastOrderDate}",${opp.daysSinceLastOrder},${opp.lastOrderVolume},${opp.peakMonthVolume},"${opp.peakMonth}",${opp.historicalAverage.toFixed(1)},${opp.totalHistoricalVolume},${opp.recoveryPotential.toFixed(1)},${opp.recoveryScore},"${opp.priority}","${opp.category}","${opp.actionRequired}","${opp.timelineAnalysis}","${opp.normalizedKey}","${opp.matchingKey}"\n`;
     });
 
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `LIVE_GoogleSheets_SKU_Recovery_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute("download", `UNIFIED_NORMALIZATION_SKU_Recovery_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1043,8 +1058,8 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <RefreshCw className="w-12 h-12 animate-spin mx-auto mb-4 text-purple-600" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Loading Live SKU Recovery Intelligence</h2>
-          <p className="text-gray-600">Fetching real data from Google Sheets...</p>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Loading UNIFIED SKU Recovery Intelligence</h2>
+          <p className="text-gray-600">Fetching real data from Google Sheets with unified brand normalization...</p>
         </div>
       </div>
     );
@@ -1058,9 +1073,9 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
           <div>
             <h2 className="text-xl font-semibold flex items-center mb-2">
               <Target className="w-6 h-6 mr-2 text-purple-600" />
-              LIVE Google Sheets SKU Recovery Intelligence
+              UNIFIED NORMALIZATION SKU Recovery Intelligence
             </h2>
-            <p className="text-gray-600">Real-time SKU recovery analysis from live Google Sheets data</p>
+            <p className="text-gray-600">Real-time SKU recovery analysis with unified brand normalization across all data sources</p>
             <div className="flex items-center mt-2 text-sm space-x-4">
               <div className="flex items-center text-green-600">
                 <CheckCircle className="w-4 h-4 mr-2" />
@@ -1072,7 +1087,11 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
               </div>
               <div className="flex items-center text-purple-600">
                 <Star className="w-4 h-4 mr-2" />
-                SKU-level granularity preserved
+                UNIFIED brand normalization service
+              </div>
+              <div className="flex items-center text-orange-600">
+                <Zap className="w-4 h-4 mr-2" />
+                Glass vs PET distinction maintained
               </div>
             </div>
           </div>
@@ -1102,7 +1121,7 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
         <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4 mb-6">
           <h3 className="text-lg font-medium text-blue-900 mb-3 flex items-center">
             <Users className="w-5 h-5 mr-2" />
-            LIVE Customer Lifecycle Analysis from Google Sheets
+            UNIFIED Customer Lifecycle Analysis from Google Sheets
           </h3>
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
             {Object.entries(timeSegmentAnalysis).map(([status, data]) => (
@@ -1137,7 +1156,7 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
           <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-4 mb-6">
             <h3 className="text-lg font-medium text-green-900 mb-3 flex items-center">
               <Package className="w-5 h-5 mr-2" />
-              LIVE SKU Family Analysis from Real Data
+              UNIFIED SKU Family Analysis from Real Data
             </h3>
             <div className="space-y-2">
               {skuFamilyAnalysis.map(family => (
@@ -1223,7 +1242,7 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
         <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
           <div className="bg-gray-50 p-4 rounded-lg">
             <div className="text-2xl font-bold text-gray-900">{summary.total}</div>
-            <div className="text-sm text-gray-600">Live Opportunities</div>
+            <div className="text-sm text-gray-600">UNIFIED Opportunities</div>
           </div>
           <div className="bg-red-50 p-4 rounded-lg">
             <div className="text-2xl font-bold text-red-600">{summary.priorityCounts.CRITICAL}</div>
@@ -1369,11 +1388,11 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
             className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center space-x-2 text-sm"
           >
             <Download className="w-4 h-4" />
-            <span>Export Live Data CSV</span>
+            <span>Export UNIFIED Data CSV</span>
           </button>
 
           <div className="text-sm text-gray-500">
-            {filteredOpportunities.length} of {recoveryOpportunities.length} live opportunities
+            {filteredOpportunities.length} of {recoveryOpportunities.length} unified opportunities
           </div>
         </div>
       </div>
@@ -1381,10 +1400,10 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
       {/* Enhanced Recovery Opportunities Table */}
       <div className="bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">LIVE Google Sheets SKU Recovery Opportunities</h3>
+          <h3 className="text-lg font-medium text-gray-900">UNIFIED NORMALIZATION SKU Recovery Opportunities</h3>
           <p className="text-sm text-gray-500">
-            Showing {startIndex + 1}-{Math.min(endIndex, filteredOpportunities.length)} of {filteredOpportunities.length} live opportunities 
-            from real Google Sheets data
+            Showing {startIndex + 1}-{Math.min(endIndex, filteredOpportunities.length)} of {filteredOpportunities.length} unified opportunities 
+            from real Google Sheets data with consistent brand normalization
           </p>
         </div>
 
@@ -1397,11 +1416,12 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Historical Performance</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Recovery Analysis</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action Required</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unified Normalization</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {currentOpportunities.map((opportunity, index) => (
-                <tr key={`${opportunity.shopId}-${opportunity.sku}-${index}`} className={
+                <tr key={`${opportunity.shopId}-${opportunity.normalizedKey}-${index}`} className={
                   opportunity.customerStatus === 'RECENTLY_STOPPED' ? 'bg-red-50' : 
                   opportunity.customerStatus === 'SHORT_DORMANT' ? 'bg-orange-50' : ''
                 }>
@@ -1461,7 +1481,7 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
                         </span>
                       </div>
                       <div className="text-xs text-gray-500">
-                        From live Google Sheets data
+                        From unified normalization
                       </div>
                     </div>
                   </td>
@@ -1478,6 +1498,21 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
                       </div>
                     </div>
                   </td>
+                  <td className="px-6 py-4">
+                    <div className="space-y-1">
+                      <div className="text-xs text-gray-500">
+                        <span className="font-medium">Normalized Key:</span>
+                        <div className="font-mono text-xs bg-gray-100 p-1 rounded">{opportunity.normalizedKey}</div>
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        <span className="font-medium">Matching Key:</span>
+                        <div className="font-mono text-xs bg-blue-100 p-1 rounded truncate">{opportunity.matchingKey}</div>
+                      </div>
+                      <div className="text-xs text-green-600">
+                        ✅ UNIFIED normalization applied
+                      </div>
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -1487,10 +1522,10 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
         {filteredOpportunities.length === 0 && (
           <div className="text-center py-12">
             <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No Live SKU Recovery Opportunities Found</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No UNIFIED SKU Recovery Opportunities Found</h3>
             <p className="text-gray-500">Try adjusting your filters to see more opportunities.</p>
             <div className="mt-4 text-sm text-gray-600">
-              <p>Connected to: {Object.keys(realSKUData).length} shops with {Object.values(realSKUData).flat().length} live transactions</p>
+              <p>Connected to: {Object.keys(realSKUData).length} shops with {Object.values(realSKUData).flat().length} unified transactions</p>
             </div>
           </div>
         )}
@@ -1499,7 +1534,7 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
         {totalPages > 1 && (
           <div className="px-6 py-3 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center">
             <div className="text-sm text-gray-700 mb-2 sm:mb-0">
-              Showing {startIndex + 1} to {Math.min(endIndex, filteredOpportunities.length)} of {filteredOpportunities.length} live opportunities
+              Showing {startIndex + 1} to {Math.min(endIndex, filteredOpportunities.length)} of {filteredOpportunities.length} unified opportunities
             </div>
             <div className="flex space-x-2">
               <button
