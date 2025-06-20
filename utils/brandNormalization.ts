@@ -437,23 +437,6 @@ export const validateBrandMapping = (): { success: boolean; errors: string[] } =
 };
 
 // ==========================================
-// NAMED EXPORTS FOR COMPONENT IMPORTS
-// ==========================================
-
-export {
-  normalizeBrand,
-  createMatchingKey,
-  createMultipleMatchingKeys,
-  getBrandFamily,
-  isSameBrand,
-  getBrandVariations,
-  debugBrandMapping,
-  validateBrandMapping,
-  BRAND_MAPPING,
-  type BrandInfo
-};
-
-// ==========================================
 // DEFAULT EXPORT FOR CONVENIENCE
 // ==========================================
 
