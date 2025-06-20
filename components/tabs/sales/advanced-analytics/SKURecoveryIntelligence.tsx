@@ -9,11 +9,7 @@ import { Target, Search, Filter, Download, X, ChevronLeft, ChevronRight, AlertTr
 import { 
   normalizeBrand, 
   createMatchingKey, 
-  createMultipleMatchingKeys, 
-  getBrandFamily, 
   debugBrandMapping,
-  isSameBrand,
-  getBrandVariations,
   type BrandInfo 
 } from '../../../../utils/brandNormalization';
 
