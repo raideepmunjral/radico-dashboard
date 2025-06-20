@@ -11,6 +11,11 @@ import { AuthProvider, useAuth } from '../contexts/AuthContext';
 import Login from '../components/Login';
 
 // ==========================================
+// 🔧 NEW: UNIFIED BRAND NORMALIZATION IMPORT
+// ==========================================
+import { normalizeBrand, createMatchingKey, createMultipleMatchingKeys, getBrandFamily as getBrandFamilyFromService, debugBrandMapping } from '../utils/brandNormalization';
+
+// ==========================================
 // IMPORTED EXTRACTED COMPONENTS
 // ==========================================
 import AdvancedAnalyticsTab from '../components/tabs/sales/AdvancedAnalyticsTab';
@@ -159,64 +164,23 @@ interface DashboardData {
 }
 
 // ==========================================
-// PART 2: ENHANCED SKU PROCESSING FUNCTIONS (UNCHANGED FROM YOUR ORIGINAL)
+// PART 2: ENHANCED SKU PROCESSING FUNCTIONS (UPDATED WITH UNIFIED NORMALIZATION)
 // ==========================================
 
 const getDetailedSKUInfo = (brand: string) => {
-  const cleanBrand = brand?.toString().trim().toUpperCase();
-  
-  let size = '750ML';
-  if (cleanBrand.includes('180')) size = '180ML';
-  else if (cleanBrand.includes('375')) size = '375ML';
-  else if (cleanBrand.includes('90')) size = '90ML';
-  else if (cleanBrand.includes('60')) size = '60ML';
-  
-  let family = '';
-  let variant = '';
-  let displayName = '';
-  
-  if (cleanBrand.includes('8 PM') || cleanBrand.includes('8PM') || cleanBrand.includes('PREMIUM BLACK')) {
-    family = '8PM';
-    if (cleanBrand.includes('PET') || cleanBrand.includes('180') || cleanBrand.includes('90') || cleanBrand.includes('60')) {
-      variant = `8PM BLACK ${size} PET`;
-      displayName = `8PM Black ${size} Pet`;
-    } else {
-      variant = `8PM BLACK ${size}`;
-      displayName = `8PM Black ${size}`;
-    }
-  } else if (cleanBrand.includes('VERVE') || cleanBrand.includes('M2M') || cleanBrand.includes('MAGIC MOMENTS')) {
-    family = 'VERVE';
-    if (cleanBrand.includes('CRANBERRY')) {
-      variant = `VERVE CRANBERRY ${size}`;
-      displayName = `VERVE Cranberry ${size}`;
-    } else if (cleanBrand.includes('GREEN APPLE') || cleanBrand.includes('APPLE')) {
-      variant = `VERVE GREEN APPLE ${size}`;
-      displayName = `VERVE Green Apple ${size}`;
-    } else if (cleanBrand.includes('LEMON')) {
-      variant = `VERVE LEMON LUSH ${size}`;
-      displayName = `VERVE Lemon Lush ${size}`;
-    } else if (cleanBrand.includes('GRAIN')) {
-      variant = `VERVE GRAIN ${size}`;
-      displayName = `VERVE Grain ${size}`;
-    } else {
-      variant = `VERVE ${size}`;
-      displayName = `VERVE ${size}`;
-    }
-  } else {
-    family = 'OTHER';
-    variant = cleanBrand;
-    displayName = brand;
-  }
+  // 🔧 UPDATED: Use unified normalization service
+  const brandInfo = normalizeBrand(brand);
   
   return {
     originalBrand: brand,
-    family,
-    variant,
-    size,
-    displayName
+    family: brandInfo.family,
+    variant: brandInfo.variant,
+    size: brandInfo.size,
+    displayName: brandInfo.displayName
   };
 };
 
+// 🔧 UPDATED: Use unified normalization service - LEGACY COMPATIBILITY
 const brandFamily: Record<string, string> = {
   "VERVE": "VERVE",
   "8 PM BLACK": "8PM", 
@@ -225,7 +189,6 @@ const brandFamily: Record<string, string> = {
   "8 PM": "8PM",
   "8 PM PREMIUM BLACK BLENDED WHISKY": "8PM",
   "8 PM PREMIUM BLACK BLENDED WHISKY Pet": "8PM",
-  "8 PM PREMIUM BLACK BLENDED WHISKY PET": "8PM",
   "8PM PREMIUM BLACK BLENDED WHISKY": "8PM",
   "8PM PREMIUM BLACK SUPERIOR WHISKY": "8PM",
   "M2M VERVE CRANBERRY TEASE SP FL VODKA": "VERVE",
@@ -238,7 +201,20 @@ const brandFamily: Record<string, string> = {
   "M2 MAGIC MOMENTS VERVE SUPERIOR GRAIN VODKA": "VERVE"
 };
 
+// 🔧 UPDATED: Use unified normalization service
 const getBrandFamily = (brandShort?: string, brand?: string): string | null => {
+  // Try with unified service first
+  if (brandShort) {
+    const family = getBrandFamilyFromService(brandShort);
+    if (family !== 'UNKNOWN') return family;
+  }
+  
+  if (brand) {
+    const family = getBrandFamilyFromService(brand);
+    if (family !== 'UNKNOWN') return family;
+  }
+  
+  // Fallback to legacy mapping for backward compatibility
   const cleanBrandShort = brandShort?.toString().trim();
   const cleanBrand = brand?.toString().trim();
   
@@ -600,7 +576,7 @@ const ProtectedRadicoDashboard = () => {
   };
 
   // ==========================================
-  // PART 5: YOUR COMPLETE ENHANCED DATA PROCESSING (EXACTLY FROM YOUR ORIGINAL FILE)
+  // PART 5: YOUR COMPLETE ENHANCED DATA PROCESSING (UPDATED WITH UNIFIED NORMALIZATION)
   // ==========================================
 
   const processEnhancedRadicoData = (masterData: Record<string, any[]>, visitData: any[], historicalData: any[]): DashboardData => {
@@ -608,7 +584,7 @@ const ProtectedRadicoDashboard = () => {
     const targets = masterData['Target Vs Achievement'] || [];
     const challans = masterData['Pending Challans'] || [];
     
-    console.log(`🔧 ENHANCED PROCESSING WITH HISTORICAL POPULATION: ${currentMonth}-${currentYear}`);
+    console.log(`🔧 ENHANCED PROCESSING WITH UNIFIED NORMALIZATION: ${currentMonth}-${currentYear}`);
     console.log('🔄 ROLLING 12-MONTH WINDOW WITH INDIVIDUAL SHOP POPULATION');
     
     // ENHANCED MONTHLY DATA PROCESSING WITH HISTORICAL SHOP POPULATION
@@ -632,6 +608,7 @@ const ProtectedRadicoDashboard = () => {
             
             const shopName = row[0]?.toString().trim();
             const brandShort = row[3]?.toString().trim();
+            const size = row[4]?.toString().trim();
             const cases = parseFloat(row[5]) || 0;
             const dateStr = row[7]?.toString().trim();
             const fullBrand = row[10]?.toString().trim();
@@ -650,7 +627,9 @@ const ProtectedRadicoDashboard = () => {
                   if (shopIdentifier) {
                     monthlyUniqueShops.add(shopIdentifier);
                     
-                    const parentBrand = getBrandFamily(brandShort, fullBrand);
+                    // 🔧 UPDATED: Use unified normalization service
+                    const brandInfo = normalizeBrand(brandShort || fullBrand, size);
+                    const parentBrand = brandInfo.family;
                     
                     if (parentBrand === "8PM") monthly8PM += cases;
                     else if (parentBrand === "VERVE") monthlyVERVE += cases;
@@ -665,9 +644,7 @@ const ProtectedRadicoDashboard = () => {
                     if (parentBrand === "8PM") monthShopSales[shopIdentifier].eightPM += cases;
                     else if (parentBrand === "VERVE") monthShopSales[shopIdentifier].verve += cases;
                     
-                    const brandName = fullBrand || brandShort || 'Unknown Brand';
-                    const sizeInfo = row[4]?.toString().trim();
-                    const enhancedBrandName = sizeInfo ? `${brandName} ${sizeInfo}ml` : brandName;
+                    const enhancedBrandName = size ? `${fullBrand || brandShort} ${size}ml` : (fullBrand || brandShort);
                     
                     if (!monthShopSKUs[shopIdentifier][enhancedBrandName]) {
                       monthShopSKUs[shopIdentifier][enhancedBrandName] = 0;
@@ -721,11 +698,15 @@ const ProtectedRadicoDashboard = () => {
           if (row.length >= 15) {
             const shopId = row[8]?.toString().trim();
             const brand = row[11]?.toString().trim();
+            const size = row[12]?.toString().trim();
             const cases = parseFloat(row[14]) || 0;
             
             if (shopId && brand && cases > 0) {
               monthlyUniqueShops.add(shopId);
-              const parentBrand = getBrandFamily(brand, brand);
+              
+              // 🔧 UPDATED: Use unified normalization service
+              const brandInfo = normalizeBrand(brand, size);
+              const parentBrand = brandInfo.family;
               
               if (parentBrand === "8PM") monthly8PM += cases;
               else if (parentBrand === "VERVE") monthlyVERVE += cases;
@@ -740,8 +721,7 @@ const ProtectedRadicoDashboard = () => {
               if (parentBrand === "8PM") monthShopSales[shopId].eightPM += cases;
               else if (parentBrand === "VERVE") monthShopSales[shopId].verve += cases;
               
-              const sizeInfo = row[12]?.toString().trim();
-              const enhancedBrandName = sizeInfo ? `${brand} ${sizeInfo}ml` : brand;
+              const enhancedBrandName = size ? `${brand} ${size}ml` : brand;
               
               if (!monthShopSKUs[shopId][enhancedBrandName]) {
                 monthShopSKUs[shopId][enhancedBrandName] = 0;
@@ -926,6 +906,7 @@ const ProtectedRadicoDashboard = () => {
         const shopId = row[8]?.toString().trim();
         const shopNameFromChallan = row[9]?.toString().trim();
         const brand = row[11]?.toString().trim();
+        const size = row[12]?.toString().trim();
         const cases = parseFloat(row[14]) || 0;
         
         if (shopId && brand && cases > 0) {
@@ -996,7 +977,10 @@ const ProtectedRadicoDashboard = () => {
             };
           }
           
-          const parentBrand = getBrandFamily(brand, brand);
+          // 🔧 UPDATED: Use unified normalization service
+          const brandInfo = normalizeBrand(brand, size);
+          const parentBrand = brandInfo.family;
+          
           shopSales[shopId].total += cases;
           shopSales[shopId].juneTotal! += cases;
           
@@ -1364,9 +1348,9 @@ const ProtectedRadicoDashboard = () => {
       .sort((a, b) => (b.threeMonthAvgTotal! || 0) - (a.threeMonthAvgTotal! || 0))
       .slice(0, 20);
 
-    console.log('🎯 FINAL RESULT: ENHANCED DATA WITH COMPLETE HISTORICAL POPULATION');
+    console.log('🎯 FINAL RESULT: ENHANCED DATA WITH UNIFIED NORMALIZATION');
     console.log('✅ All shop objects now contain 12+ months of historical data');
-    console.log('✅ CustomerHealth will now show proper progression instead of gaps');
+    console.log('✅ Brand normalization unified across all data sources');
     console.log('✅ All existing components work unchanged - fully backward compatible');
 
     return {
@@ -1474,7 +1458,7 @@ const ProtectedRadicoDashboard = () => {
         <div className="text-center">
           <RefreshCw className="w-12 h-12 animate-spin mx-auto mb-4 text-blue-600" />
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Loading Enhanced Radico Dashboard</h2>
-          <p className="text-gray-600">Processing live data with comprehensive historical analytics for {getMonthName(currentMonth)} {currentYear}...</p>
+          <p className="text-gray-600">Processing live data with unified brand normalization for {getMonthName(currentMonth)} {currentYear}...</p>
         </div>
       </div>
     );
@@ -1517,7 +1501,7 @@ const ProtectedRadicoDashboard = () => {
             <div className="flex items-center mb-4 sm:mb-0">
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Radico Khaitan Enhanced Analytics Dashboard</h1>
               <span className="ml-3 px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
-                Live Data - {getShortMonthName(currentMonth)} {currentYear}
+                Unified Normalization - {getShortMonthName(currentMonth)} {currentYear}
               </span>
               {/* 🔐 Show user info when authenticated */}
               {user && (
