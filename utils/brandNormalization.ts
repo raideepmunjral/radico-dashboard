@@ -8,6 +8,7 @@ export interface BrandInfo {
   variant: string;          // "PREMIUM_BLACK_BLENDED_WHISKY" or "GREEN_APPLE"
   size: string;             // "375", "750", "180", etc.
   packaging: string;        // "GLASS" or "PET"
+  flavor: string;           // "N/A" for 8PM, "GREEN_APPLE", "CRANBERRY", etc. for VERVE
   normalizedKey: string;    // Final unique identifier
   displayName: string;      // Human readable name
   fullSupplyName: string;   // Exact name as it appears in supply sheets
@@ -20,156 +21,156 @@ export interface BrandInfo {
 const BRAND_MAPPING: { [key: string]: BrandInfo } = {
   // 8PM WHISKY FAMILY - GLASS BOTTLES
   '8 PM BLACK': { 
-    family: '8PM', variant: 'PREMIUM_BLACK_BLENDED_WHISKY', size: '750', packaging: 'GLASS',
+    family: '8PM', variant: 'PREMIUM_BLACK_BLENDED_WHISKY', size: '750', packaging: 'GLASS', flavor: 'N/A',
     normalizedKey: '8PM_PREMIUM_BLACK_BLENDED_WHISKY_750', displayName: '8PM Black 750ML',
     fullSupplyName: '8 PM PREMIUM BLACK BLENDED WHISKY'
   },
   '8 PM BLACK 750': { 
-    family: '8PM', variant: 'PREMIUM_BLACK_BLENDED_WHISKY', size: '750', packaging: 'GLASS',
+    family: '8PM', variant: 'PREMIUM_BLACK_BLENDED_WHISKY', size: '750', packaging: 'GLASS', flavor: 'N/A',
     normalizedKey: '8PM_PREMIUM_BLACK_BLENDED_WHISKY_750', displayName: '8PM Black 750ML',
     fullSupplyName: '8 PM PREMIUM BLACK BLENDED WHISKY'
   },
   '8 PM BLACK 375': { 
-    family: '8PM', variant: 'PREMIUM_BLACK_BLENDED_WHISKY', size: '375', packaging: 'GLASS',
+    family: '8PM', variant: 'PREMIUM_BLACK_BLENDED_WHISKY', size: '375', packaging: 'GLASS', flavor: 'N/A',
     normalizedKey: '8PM_PREMIUM_BLACK_BLENDED_WHISKY_375', displayName: '8PM Black 375ML',
     fullSupplyName: '8 PM PREMIUM BLACK BLENDED WHISKY'
   },
   '8 PM BLACK 180': { 
-    family: '8PM', variant: 'PREMIUM_BLACK_BLENDED_WHISKY', size: '180', packaging: 'GLASS',
+    family: '8PM', variant: 'PREMIUM_BLACK_BLENDED_WHISKY', size: '180', packaging: 'GLASS', flavor: 'N/A',
     normalizedKey: '8PM_PREMIUM_BLACK_BLENDED_WHISKY_180', displayName: '8PM Black 180ML Glass',
     fullSupplyName: '8 PM PREMIUM BLACK BLENDED WHISKY'
   },
   
   // 8PM WHISKY FAMILY - PET BOTTLES
   '8 PM BLACK 180P': { 
-    family: '8PM', variant: 'PREMIUM_BLACK_BLENDED_WHISKY', size: '180', packaging: 'PET',
+    family: '8PM', variant: 'PREMIUM_BLACK_BLENDED_WHISKY', size: '180', packaging: 'PET', flavor: 'N/A',
     normalizedKey: '8PM_PREMIUM_BLACK_BLENDED_WHISKY_PET_180', displayName: '8PM Black 180P PET',
     fullSupplyName: '8 PM PREMIUM BLACK BLENDED WHISKY Pet'
   },
   '8 PM BLACK 180-P': { 
-    family: '8PM', variant: 'PREMIUM_BLACK_BLENDED_WHISKY', size: '180', packaging: 'PET',
+    family: '8PM', variant: 'PREMIUM_BLACK_BLENDED_WHISKY', size: '180', packaging: 'PET', flavor: 'N/A',
     normalizedKey: '8PM_PREMIUM_BLACK_BLENDED_WHISKY_PET_180', displayName: '8PM Black 180P PET',
     fullSupplyName: '8 PM PREMIUM BLACK BLENDED WHISKY Pet'
   },
   '8 PM BLACK 90A': { 
-    family: '8PM', variant: 'PREMIUM_BLACK_BLENDED_WHISKY', size: '90', packaging: 'PET',
+    family: '8PM', variant: 'PREMIUM_BLACK_BLENDED_WHISKY', size: '90', packaging: 'PET', flavor: 'N/A',
     normalizedKey: '8PM_PREMIUM_BLACK_BLENDED_WHISKY_PET_90', displayName: '8PM Black 90A PET',
     fullSupplyName: '8 PM PREMIUM BLACK BLENDED WHISKY Pet'
   },
   '8 PM BLACK 90': { 
-    family: '8PM', variant: 'PREMIUM_BLACK_BLENDED_WHISKY', size: '90', packaging: 'PET',
+    family: '8PM', variant: 'PREMIUM_BLACK_BLENDED_WHISKY', size: '90', packaging: 'PET', flavor: 'N/A',
     normalizedKey: '8PM_PREMIUM_BLACK_BLENDED_WHISKY_PET_90', displayName: '8PM Black 90A PET',
     fullSupplyName: '8 PM PREMIUM BLACK BLENDED WHISKY Pet'
   },
   '8 PM BLACK 60P': { 
-    family: '8PM', variant: 'PREMIUM_BLACK_BLENDED_WHISKY', size: '60', packaging: 'PET',
+    family: '8PM', variant: 'PREMIUM_BLACK_BLENDED_WHISKY', size: '60', packaging: 'PET', flavor: 'N/A',
     normalizedKey: '8PM_PREMIUM_BLACK_BLENDED_WHISKY_PET_60', displayName: '8PM Black 60P PET',
     fullSupplyName: '8 PM PREMIUM BLACK BLENDED WHISKY Pet'
   },
   '8 PM BLACK 60': { 
-    family: '8PM', variant: 'PREMIUM_BLACK_BLENDED_WHISKY', size: '60', packaging: 'PET',
+    family: '8PM', variant: 'PREMIUM_BLACK_BLENDED_WHISKY', size: '60', packaging: 'PET', flavor: 'N/A',
     normalizedKey: '8PM_PREMIUM_BLACK_BLENDED_WHISKY_PET_60', displayName: '8PM Black 60P PET',
     fullSupplyName: '8 PM PREMIUM BLACK BLENDED WHISKY Pet'
   },
   
   // DIRECT SUPPLY SHEET MAPPINGS FOR 8PM
   '8 PM PREMIUM BLACK BLENDED WHISKY': { 
-    family: '8PM', variant: 'PREMIUM_BLACK_BLENDED_WHISKY', size: '750', packaging: 'GLASS',
+    family: '8PM', variant: 'PREMIUM_BLACK_BLENDED_WHISKY', size: '750', packaging: 'GLASS', flavor: 'N/A',
     normalizedKey: '8PM_PREMIUM_BLACK_BLENDED_WHISKY_750', displayName: '8PM Black 750ML',
     fullSupplyName: '8 PM PREMIUM BLACK BLENDED WHISKY'
   },
   '8 PM PREMIUM BLACK BLENDED WHISKY Pet': { 
-    family: '8PM', variant: 'PREMIUM_BLACK_BLENDED_WHISKY', size: '180', packaging: 'PET',
+    family: '8PM', variant: 'PREMIUM_BLACK_BLENDED_WHISKY', size: '180', packaging: 'PET', flavor: 'N/A',
     normalizedKey: '8PM_PREMIUM_BLACK_BLENDED_WHISKY_PET_180', displayName: '8PM Black 180P PET',
     fullSupplyName: '8 PM PREMIUM BLACK BLENDED WHISKY Pet'
   },
   
   // VERVE VODKA FAMILY - GREEN APPLE (GLASS ONLY)
   'VERVE GREEN APPLE': { 
-    family: 'VERVE', variant: 'GREEN_APPLE', size: '750', packaging: 'GLASS',
+    family: 'VERVE', variant: 'GREEN_APPLE', size: '750', packaging: 'GLASS', flavor: 'GREEN_APPLE',
     normalizedKey: 'VERVE_GREEN_APPLE_750', displayName: 'VERVE Green Apple 750ML',
     fullSupplyName: 'M2 MAGIC MOMENTS VERVE GREEN APPLE SUPERIOR FLAVOURED VODKA'
   },
   'VERVE GREEN APPLE 750': { 
-    family: 'VERVE', variant: 'GREEN_APPLE', size: '750', packaging: 'GLASS',
+    family: 'VERVE', variant: 'GREEN_APPLE', size: '750', packaging: 'GLASS', flavor: 'GREEN_APPLE',
     normalizedKey: 'VERVE_GREEN_APPLE_750', displayName: 'VERVE Green Apple 750ML',
     fullSupplyName: 'M2 MAGIC MOMENTS VERVE GREEN APPLE SUPERIOR FLAVOURED VODKA'
   },
   'VERVE GREEN APPLE 375': { 
-    family: 'VERVE', variant: 'GREEN_APPLE', size: '375', packaging: 'GLASS',
+    family: 'VERVE', variant: 'GREEN_APPLE', size: '375', packaging: 'GLASS', flavor: 'GREEN_APPLE',
     normalizedKey: 'VERVE_GREEN_APPLE_375', displayName: 'VERVE Green Apple 375ML',
     fullSupplyName: 'M2 MAGIC MOMENTS VERVE GREEN APPLE SUPERIOR FLAVOURED VODKA'
   },
   
   // VERVE VODKA FAMILY - CRANBERRY (GLASS ONLY)
   'VERVE CRANBERRY': { 
-    family: 'VERVE', variant: 'CRANBERRY', size: '750', packaging: 'GLASS',
+    family: 'VERVE', variant: 'CRANBERRY', size: '750', packaging: 'GLASS', flavor: 'CRANBERRY',
     normalizedKey: 'VERVE_CRANBERRY_750', displayName: 'VERVE Cranberry 750ML',
     fullSupplyName: 'M2 MAGIC MOMENTS VERVE CRANBERRY TEASE SUPERIOR FLAVOUR'
   },
   'VERVE CRANBERRY 750': { 
-    family: 'VERVE', variant: 'CRANBERRY', size: '750', packaging: 'GLASS',
+    family: 'VERVE', variant: 'CRANBERRY', size: '750', packaging: 'GLASS', flavor: 'CRANBERRY',
     normalizedKey: 'VERVE_CRANBERRY_750', displayName: 'VERVE Cranberry 750ML',
     fullSupplyName: 'M2 MAGIC MOMENTS VERVE CRANBERRY TEASE SUPERIOR FLAVOUR'
   },
   'VERVE CRANBERRY 375': { 
-    family: 'VERVE', variant: 'CRANBERRY', size: '375', packaging: 'GLASS',
+    family: 'VERVE', variant: 'CRANBERRY', size: '375', packaging: 'GLASS', flavor: 'CRANBERRY',
     normalizedKey: 'VERVE_CRANBERRY_375', displayName: 'VERVE Cranberry 375ML',
     fullSupplyName: 'M2 MAGIC MOMENTS VERVE CRANBERRY TEASE SUPERIOR FLAVOUR'
   },
   
   // VERVE VODKA FAMILY - LEMON LUSH (GLASS ONLY)
   'VERVE LEMON LUSH': { 
-    family: 'VERVE', variant: 'LEMON_LUSH', size: '750', packaging: 'GLASS',
+    family: 'VERVE', variant: 'LEMON_LUSH', size: '750', packaging: 'GLASS', flavor: 'LEMON_LUSH',
     normalizedKey: 'VERVE_LEMON_LUSH_750', displayName: 'VERVE Lemon Lush 750ML',
     fullSupplyName: 'M2 MAGIC MOMENTS VERVE LEMON LUSH SUPERIOR FLAVOURED VODKA'
   },
   'VERVE LEMON LUSH 750': { 
-    family: 'VERVE', variant: 'LEMON_LUSH', size: '750', packaging: 'GLASS',
+    family: 'VERVE', variant: 'LEMON_LUSH', size: '750', packaging: 'GLASS', flavor: 'LEMON_LUSH',
     normalizedKey: 'VERVE_LEMON_LUSH_750', displayName: 'VERVE Lemon Lush 750ML',
     fullSupplyName: 'M2 MAGIC MOMENTS VERVE LEMON LUSH SUPERIOR FLAVOURED VODKA'
   },
   'VERVE LEMON LUSH 375': { 
-    family: 'VERVE', variant: 'LEMON_LUSH', size: '375', packaging: 'GLASS',
+    family: 'VERVE', variant: 'LEMON_LUSH', size: '375', packaging: 'GLASS', flavor: 'LEMON_LUSH',
     normalizedKey: 'VERVE_LEMON_LUSH_375', displayName: 'VERVE Lemon Lush 375ML',
     fullSupplyName: 'M2 MAGIC MOMENTS VERVE LEMON LUSH SUPERIOR FLAVOURED VODKA'
   },
   
   // VERVE VODKA FAMILY - GRAIN (GLASS ONLY)
   'VERVE GRAIN': { 
-    family: 'VERVE', variant: 'GRAIN', size: '750', packaging: 'GLASS',
+    family: 'VERVE', variant: 'GRAIN', size: '750', packaging: 'GLASS', flavor: 'GRAIN',
     normalizedKey: 'VERVE_GRAIN_750', displayName: 'VERVE Grain 750ML',
     fullSupplyName: 'M2 MAGIC MOMENTS VERVE SUPERIOR GRAIN VODKA'
   },
   'VERVE GRAIN 750': { 
-    family: 'VERVE', variant: 'GRAIN', size: '750', packaging: 'GLASS',
+    family: 'VERVE', variant: 'GRAIN', size: '750', packaging: 'GLASS', flavor: 'GRAIN',
     normalizedKey: 'VERVE_GRAIN_750', displayName: 'VERVE Grain 750ML',
     fullSupplyName: 'M2 MAGIC MOMENTS VERVE SUPERIOR GRAIN VODKA'
   },
   'VERVE GRAIN 375': { 
-    family: 'VERVE', variant: 'GRAIN', size: '375', packaging: 'GLASS',
+    family: 'VERVE', variant: 'GRAIN', size: '375', packaging: 'GLASS', flavor: 'GRAIN',
     normalizedKey: 'VERVE_GRAIN_375', displayName: 'VERVE Grain 375ML',
     fullSupplyName: 'M2 MAGIC MOMENTS VERVE SUPERIOR GRAIN VODKA'
   },
   
   // DIRECT SUPPLY SHEET MAPPINGS FOR VERVE
   'M2 MAGIC MOMENTS VERVE GREEN APPLE SUPERIOR FLAVOURED VODKA': { 
-    family: 'VERVE', variant: 'GREEN_APPLE', size: '750', packaging: 'GLASS',
+    family: 'VERVE', variant: 'GREEN_APPLE', size: '750', packaging: 'GLASS', flavor: 'GREEN_APPLE',
     normalizedKey: 'VERVE_GREEN_APPLE_750', displayName: 'VERVE Green Apple 750ML',
     fullSupplyName: 'M2 MAGIC MOMENTS VERVE GREEN APPLE SUPERIOR FLAVOURED VODKA'
   },
   'M2 MAGIC MOMENTS VERVE CRANBERRY TEASE SUPERIOR FLAVOUR': { 
-    family: 'VERVE', variant: 'CRANBERRY', size: '750', packaging: 'GLASS',
+    family: 'VERVE', variant: 'CRANBERRY', size: '750', packaging: 'GLASS', flavor: 'CRANBERRY',
     normalizedKey: 'VERVE_CRANBERRY_750', displayName: 'VERVE Cranberry 750ML',
     fullSupplyName: 'M2 MAGIC MOMENTS VERVE CRANBERRY TEASE SUPERIOR FLAVOUR'
   },
   'M2 MAGIC MOMENTS VERVE LEMON LUSH SUPERIOR FLAVOURED VODKA': { 
-    family: 'VERVE', variant: 'LEMON_LUSH', size: '750', packaging: 'GLASS',
+    family: 'VERVE', variant: 'LEMON_LUSH', size: '750', packaging: 'GLASS', flavor: 'LEMON_LUSH',
     normalizedKey: 'VERVE_LEMON_LUSH_750', displayName: 'VERVE Lemon Lush 750ML',
     fullSupplyName: 'M2 MAGIC MOMENTS VERVE LEMON LUSH SUPERIOR FLAVOURED VODKA'
   },
   'M2 MAGIC MOMENTS VERVE SUPERIOR GRAIN VODKA': { 
-    family: 'VERVE', variant: 'GRAIN', size: '750', packaging: 'GLASS',
+    family: 'VERVE', variant: 'GRAIN', size: '750', packaging: 'GLASS', flavor: 'GRAIN',
     normalizedKey: 'VERVE_GRAIN_750', displayName: 'VERVE Grain 750ML',
     fullSupplyName: 'M2 MAGIC MOMENTS VERVE SUPERIOR GRAIN VODKA'
   }
@@ -228,6 +229,7 @@ export const normalizeBrand = (brandInput: string, sizeInput?: string): BrandInf
     variant: 'UNKNOWN',
     size: size || '750',
     packaging: 'GLASS',
+    flavor: 'N/A',
     normalizedKey: `UNKNOWN_${brand.replace(/\s+/g, '_')}_${size || '750'}`,
     displayName: `${brand} ${size || '750'}ML`,
     fullSupplyName: brand
@@ -263,6 +265,7 @@ const intelligentBrandMapping = (brand: string, size: string): BrandInfo | null 
       variant: 'PREMIUM_BLACK_BLENDED_WHISKY',
       size: cleanSize,
       packaging: isPET ? 'PET' : 'GLASS',
+      flavor: 'N/A',
       normalizedKey: `8PM_PREMIUM_BLACK_BLENDED_WHISKY_${isPET ? 'PET_' : ''}${cleanSize}`,
       displayName: `8PM Black ${cleanSize}ML${isPET ? ' PET' : ''}`,
       fullSupplyName: isPET ? '8 PM PREMIUM BLACK BLENDED WHISKY Pet' : '8 PM PREMIUM BLACK BLENDED WHISKY'
@@ -272,16 +275,20 @@ const intelligentBrandMapping = (brand: string, size: string): BrandInfo | null 
   // VERVE FAMILY DETECTION
   if (brand.includes('VERVE') || brand.includes('M2 MAGIC MOMENTS')) {
     let variant = 'GREEN_APPLE'; // Default
+    let flavor = 'GREEN_APPLE';
     let fullSupplyName = 'M2 MAGIC MOMENTS VERVE GREEN APPLE SUPERIOR FLAVOURED VODKA';
     
     if (brand.includes('CRANBERRY') || brand.includes('TEASE')) {
       variant = 'CRANBERRY';
+      flavor = 'CRANBERRY';
       fullSupplyName = 'M2 MAGIC MOMENTS VERVE CRANBERRY TEASE SUPERIOR FLAVOUR';
     } else if (brand.includes('LEMON') || brand.includes('LUSH')) {
       variant = 'LEMON_LUSH';
+      flavor = 'LEMON_LUSH';
       fullSupplyName = 'M2 MAGIC MOMENTS VERVE LEMON LUSH SUPERIOR FLAVOURED VODKA';
     } else if (brand.includes('GRAIN')) {
       variant = 'GRAIN';
+      flavor = 'GRAIN';
       fullSupplyName = 'M2 MAGIC MOMENTS VERVE SUPERIOR GRAIN VODKA';
     }
     
@@ -292,6 +299,7 @@ const intelligentBrandMapping = (brand: string, size: string): BrandInfo | null 
       variant: variant,
       size: cleanSize,
       packaging: 'GLASS', // VERVE only comes in glass
+      flavor: flavor,
       normalizedKey: `VERVE_${variant}_${cleanSize}`,
       displayName: `VERVE ${variant.replace(/_/g, ' ')} ${cleanSize}ML`,
       fullSupplyName: fullSupplyName
