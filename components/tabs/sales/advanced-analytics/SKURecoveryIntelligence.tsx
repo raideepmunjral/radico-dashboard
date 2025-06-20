@@ -12,7 +12,8 @@ import {
   createMultipleMatchingKeys, 
   getBrandFamily, 
   debugBrandMapping,
-  validateBrandMapping,
+  isSameBrand,
+  getBrandVariations,
   type BrandInfo 
 } from '../../../../utils/brandNormalization';
 
@@ -195,14 +196,6 @@ const fetchRealSKUData = async (lookbackPeriod: number): Promise<Record<string, 
     sheetsConfig: SHEETS_CONFIG
   });
 
-  // Validate brand mapping on startup
-  const validation = validateBrandMapping();
-  if (!validation.success) {
-    console.error('❌ Brand mapping validation failed:', validation.errors);
-  } else {
-    console.log('✅ Brand mapping validation passed');
-  }
-
   if (!SHEETS_CONFIG.apiKey) {
     console.error('❌ Google API key not configured');
     return {};
@@ -328,7 +321,7 @@ const processCombinedSKUData = (
           if (transactionDate && transactionDate >= cutoffDate) {
             // Use UNIFIED brand normalization
             const normalizedBrandInfo = normalizeBrand(brand, size);
-            const matchingKey = createMatchingKey(shopName || shopId, normalizedBrandInfo);
+            const matchingKey = createMatchingKey(shopId, brand, size);
             const shopKey = shopId;
 
             // Special debug logging for NASIR/NASEER shops
@@ -343,7 +336,7 @@ const processCombinedSKUData = (
                 dateStr,
                 cases
               });
-              debugBrandMapping(brand, size, shopName || shopId);
+              debugBrandMapping(shopId, brand, size);
             }
 
             if (!shopSKUTransactions[shopKey]) {
@@ -405,7 +398,7 @@ const processCombinedSKUData = (
             const brandToNormalize = brandShort || brand;
             const normalizedBrandInfo = normalizeBrand(brandToNormalize, size);
             const shopKey = shopId || shopName;
-            const matchingKey = createMatchingKey(shopName || shopId || '', normalizedBrandInfo);
+            const matchingKey = createMatchingKey(shopId || shopName || '', brandToNormalize, size);
 
             // Special debug logging for NASIR/NASEER shops
             if (shopName?.includes('NASIR') || shopName?.includes('NASEER') || shopId?.includes('NASIR') || shopId?.includes('NASEER')) {
@@ -421,7 +414,7 @@ const processCombinedSKUData = (
                 dateStr,
                 cases
               });
-              debugBrandMapping(brandToNormalize, size, shopName || shopId);
+              debugBrandMapping(shopId || shopName || '', brandToNormalize, size);
             }
 
             if (!shopSKUTransactions[shopKey]) {
