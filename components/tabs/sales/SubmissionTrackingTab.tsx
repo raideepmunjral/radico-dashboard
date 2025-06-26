@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Download, RefreshCw, Calendar, Package, CheckCircle, Clock, Users, Building, Filter, X } from 'lucide-react';
+import { Download, RefreshCw, Calendar, Package, CheckCircle, Clock, Users, Building, Filter, X, ChevronDown, ChevronUp, Search } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 
 // ==========================================
@@ -97,6 +97,9 @@ const SubmissionTrackingTab = () => {
   
   // Filter State
   const [selectedSalesman, setSelectedSalesman] = useState<string>('');
+  const [activeTab, setActiveTab] = useState<'summary' | 'collected' | 'pending'>('summary');
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [expandedSalesmen, setExpandedSalesmen] = useState<Set<string>>(new Set());
   
   // Initialize default date range (current week)
   useEffect(() => {
@@ -342,7 +345,7 @@ const SubmissionTrackingTab = () => {
   };
 
   // ==========================================
-  // CSV EXPORT FUNCTION (NO XLSX DEPENDENCY)
+  // CSV EXPORT FUNCTION
   // ==========================================
 
   const exportToExcel = () => {
@@ -416,6 +419,35 @@ const SubmissionTrackingTab = () => {
   }, [submissionData, selectedSalesman]);
 
   // ==========================================
+  // SEARCH FILTERED DATA
+  // ==========================================
+
+  const getFilteredChallans = (challans: ChallanData[]) => {
+    if (!searchTerm) return challans;
+    
+    return challans.filter(challan =>
+      challan.challanNo.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      challan.shopName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      challan.department.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      challan.salesman.toLowerCase().includes(searchTerm.toLowerCase())
+    );
+  };
+
+  // ==========================================
+  // TOGGLE SALESMAN EXPANSION
+  // ==========================================
+
+  const toggleSalesmanExpansion = (salesmanName: string) => {
+    const newExpanded = new Set(expandedSalesmen);
+    if (newExpanded.has(salesmanName)) {
+      newExpanded.delete(salesmanName);
+    } else {
+      newExpanded.add(salesmanName);
+    }
+    setExpandedSalesmen(newExpanded);
+  };
+
+  // ==========================================
   // EFFECTS
   // ==========================================
 
@@ -426,50 +458,172 @@ const SubmissionTrackingTab = () => {
   }, [startDate, endDate]);
 
   // ==========================================
-  // MOBILE CARD COMPONENT
+  // DETAILED CHALLAN TABLE COMPONENT
   // ==========================================
 
-  const MobileSalesmanCard = ({ salesman }: { salesman: SalesmanSummary }) => (
-    <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
-      <div className="flex justify-between items-start mb-3">
-        <div className="flex-1">
-          <h3 className="font-medium text-gray-900 text-base">{salesman.salesmanName}</h3>
-          <p className="text-sm text-gray-500">{salesman.totalShops} shops • {salesman.totalChallans} challans</p>
-        </div>
-        <div className="text-right">
-          <div className="text-lg font-bold text-green-600">{salesman.collectedChallans}</div>
-          <div className="text-xs text-gray-500">Collected</div>
+  const ChallanTable = ({ challans, type }: { challans: ChallanData[], type: 'collected' | 'pending' }) => {
+    const filteredChallans = getFilteredChallans(challans);
+    
+    return (
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-200">
+          <thead className="bg-gray-50">
+            <tr>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Challan No
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Date
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Shop Name
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Department
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Salesman
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white divide-y divide-gray-200">
+            {filteredChallans.map((challan, index) => (
+              <tr key={challan.challanNo} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  {challan.challanNo}
+                </td>
+                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {formatDate(challan.challanDate)}
+                </td>
+                <td className="px-4 py-4 text-sm text-gray-900">
+                  {challan.shopName}
+                </td>
+                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {challan.department}
+                </td>
+                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {challan.salesman}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        
+        {filteredChallans.length === 0 && (
+          <div className="text-center py-8 text-gray-500">
+            No {type} challans found {searchTerm && `matching "${searchTerm}"`}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // ==========================================
+  // MOBILE CHALLAN CARD COMPONENT
+  // ==========================================
+
+  const MobileChallanCard = ({ challan }: { challan: ChallanData }) => (
+    <div className="bg-white border border-gray-200 rounded-lg p-4 mb-3">
+      <div className="flex justify-between items-start mb-2">
+        <div className="font-medium text-gray-900">{challan.challanNo}</div>
+        <div className={`px-2 py-1 rounded-full text-xs font-medium ${
+          challan.isScanned ? 'bg-green-100 text-green-800' : 'bg-orange-100 text-orange-800'
+        }`}>
+          {challan.isScanned ? 'Collected' : 'Pending'}
         </div>
       </div>
       
-      {/* Status Grid */}
-      <div className="grid grid-cols-2 gap-3 mb-3">
-        <div className="text-center p-3 bg-green-50 rounded-lg">
-          <div className="text-lg font-bold text-green-600">{salesman.collectedChallans}</div>
-          <div className="text-xs text-gray-500">Collected Challans</div>
-          <div className="text-xs text-gray-400">{salesman.collectedShops} shops</div>
-        </div>
-        <div className="text-center p-3 bg-orange-50 rounded-lg">
-          <div className="text-lg font-bold text-orange-600">{salesman.pendingChallans}</div>
-          <div className="text-xs text-gray-500">Pending Challans</div>
-          <div className="text-xs text-gray-400">{salesman.pendingShops} shops</div>
-        </div>
-      </div>
-
-      {/* Progress Bar */}
-      <div className="w-full bg-gray-200 rounded-full h-3 mb-2">
-        <div 
-          className="bg-green-600 h-3 rounded-full transition-all duration-500" 
-          style={{ 
-            width: `${salesman.totalChallans > 0 ? (salesman.collectedChallans / salesman.totalChallans) * 100 : 0}%` 
-          }}
-        ></div>
-      </div>
-      <div className="text-center text-xs text-gray-500">
-        {salesman.totalChallans > 0 ? Math.round((salesman.collectedChallans / salesman.totalChallans) * 100) : 0}% Complete
+      <div className="text-sm text-gray-600 space-y-1">
+        <div><span className="font-medium">Date:</span> {formatDate(challan.challanDate)}</div>
+        <div><span className="font-medium">Shop:</span> {challan.shopName}</div>
+        <div><span className="font-medium">Department:</span> {challan.department}</div>
+        <div><span className="font-medium">Salesman:</span> {challan.salesman}</div>
       </div>
     </div>
   );
+
+  // ==========================================
+  // MOBILE SALESMAN CARD COMPONENT
+  // ==========================================
+
+  const MobileSalesmanCard = ({ salesman }: { salesman: SalesmanSummary }) => {
+    const isExpanded = expandedSalesmen.has(salesman.salesmanName);
+    
+    return (
+      <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
+        <div 
+          className="flex justify-between items-start mb-3 cursor-pointer"
+          onClick={() => toggleSalesmanExpansion(salesman.salesmanName)}
+        >
+          <div className="flex-1">
+            <h3 className="font-medium text-gray-900 text-base">{salesman.salesmanName}</h3>
+            <p className="text-sm text-gray-500">{salesman.totalShops} shops • {salesman.totalChallans} challans</p>
+          </div>
+          <div className="flex items-center space-x-2">
+            <div className="text-right">
+              <div className="text-lg font-bold text-green-600">{salesman.collectedChallans}</div>
+              <div className="text-xs text-gray-500">Collected</div>
+            </div>
+            {isExpanded ? <ChevronUp className="w-5 h-5 text-gray-400" /> : <ChevronDown className="w-5 h-5 text-gray-400" />}
+          </div>
+        </div>
+        
+        {/* Status Grid */}
+        <div className="grid grid-cols-2 gap-3 mb-3">
+          <div className="text-center p-3 bg-green-50 rounded-lg">
+            <div className="text-lg font-bold text-green-600">{salesman.collectedChallans}</div>
+            <div className="text-xs text-gray-500">Collected Challans</div>
+            <div className="text-xs text-gray-400">{salesman.collectedShops} shops</div>
+          </div>
+          <div className="text-center p-3 bg-orange-50 rounded-lg">
+            <div className="text-lg font-bold text-orange-600">{salesman.pendingChallans}</div>
+            <div className="text-xs text-gray-500">Pending Challans</div>
+            <div className="text-xs text-gray-400">{salesman.pendingShops} shops</div>
+          </div>
+        </div>
+
+        {/* Progress Bar */}
+        <div className="w-full bg-gray-200 rounded-full h-3 mb-2">
+          <div 
+            className="bg-green-600 h-3 rounded-full transition-all duration-500" 
+            style={{ 
+              width: `${salesman.totalChallans > 0 ? (salesman.collectedChallans / salesman.totalChallans) * 100 : 0}%` 
+            }}
+          ></div>
+        </div>
+        <div className="text-center text-xs text-gray-500">
+          {salesman.totalChallans > 0 ? Math.round((salesman.collectedChallans / salesman.totalChallans) * 100) : 0}% Complete
+        </div>
+
+        {/* Expanded Challan Details */}
+        {isExpanded && (
+          <div className="mt-4 pt-4 border-t border-gray-200">
+            {salesman.collectedChallans > 0 && (
+              <div className="mb-4">
+                <h4 className="font-medium text-green-700 mb-2">Collected Challans ({salesman.collectedChallans})</h4>
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {getFilteredChallans(salesman.collectedChallansList).map(challan => (
+                    <MobileChallanCard key={challan.challanNo} challan={challan} />
+                  ))}
+                </div>
+              </div>
+            )}
+            
+            {salesman.pendingChallans > 0 && (
+              <div>
+                <h4 className="font-medium text-orange-700 mb-2">Pending Challans ({salesman.pendingChallans})</h4>
+                <div className="space-y-2 max-h-60 overflow-y-auto">
+                  {getFilteredChallans(salesman.pendingChallansList).map(challan => (
+                    <MobileChallanCard key={challan.challanNo} challan={challan} />
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    );
+  };
 
   // ==========================================
   // RENDER
@@ -654,142 +808,261 @@ const SubmissionTrackingTab = () => {
             </div>
           </div>
 
-          {/* Filters and Export */}
-          <div className="bg-white p-4 rounded-lg shadow">
-            <div className="flex flex-col sm:flex-row justify-between items-center space-y-3 sm:space-y-0">
-              <div className="flex items-center space-x-3">
-                <Filter className="w-5 h-5 text-gray-400" />
-                <select
-                  value={selectedSalesman}
-                  onChange={(e) => setSelectedSalesman(e.target.value)}
-                  className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+          {/* Tab Navigation */}
+          <div className="bg-white rounded-lg shadow">
+            <div className="border-b border-gray-200">
+              <nav className="-mb-px flex space-x-8 px-6">
+                <button
+                  onClick={() => setActiveTab('summary')}
+                  className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                    activeTab === 'summary'
+                      ? 'border-blue-500 text-blue-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
                 >
-                  <option value="">All Salesmen</option>
-                  {submissionData.salesmanSummaries.map(s => (
-                    <option key={s.salesmanName} value={s.salesmanName}>
-                      {s.salesmanName}
-                    </option>
-                  ))}
-                </select>
-                
-                {selectedSalesman && (
-                  <button
-                    onClick={() => setSelectedSalesman('')}
-                    className="text-gray-400 hover:text-gray-600"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-              
-              <button
-                onClick={exportToExcel}
-                className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center space-x-2"
-              >
-                <Download className="w-4 h-4" />
-                <span>Export Data</span>
-              </button>
+                  Summary
+                </button>
+                <button
+                  onClick={() => setActiveTab('collected')}
+                  className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                    activeTab === 'collected'
+                      ? 'border-green-500 text-green-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  Collected Challans ({submissionData.totalCollectedChallans})
+                </button>
+                <button
+                  onClick={() => setActiveTab('pending')}
+                  className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                    activeTab === 'pending'
+                      ? 'border-orange-500 text-orange-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  Pending Challans ({submissionData.totalPendingChallans})
+                </button>
+              </nav>
             </div>
-          </div>
 
-          {/* Mobile View */}
-          <div className="block lg:hidden">
-            <div className="bg-white rounded-lg shadow">
-              <div className="px-4 py-4 border-b border-gray-200">
-                <h3 className="text-lg font-medium text-gray-900">
-                  Salesman Summary - Mobile View
-                </h3>
-                <p className="text-sm text-gray-500">
-                  {filteredSummaries.length} salesmen • {submissionData.weekRange}
-                </p>
-              </div>
-              
-              <div className="p-4">
-                {filteredSummaries.map((salesman) => (
-                  <MobileSalesmanCard key={salesman.salesmanName} salesman={salesman} />
-                ))}
-              </div>
-            </div>
-          </div>
+            {/* Tab Content */}
+            <div className="p-6">
+              {activeTab === 'summary' && (
+                <>
+                  {/* Filters and Export */}
+                  <div className="flex flex-col sm:flex-row justify-between items-center space-y-3 sm:space-y-0 mb-6">
+                    <div className="flex items-center space-x-3">
+                      <Filter className="w-5 h-5 text-gray-400" />
+                      <select
+                        value={selectedSalesman}
+                        onChange={(e) => setSelectedSalesman(e.target.value)}
+                        className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+                      >
+                        <option value="">All Salesmen</option>
+                        {submissionData.salesmanSummaries.map(s => (
+                          <option key={s.salesmanName} value={s.salesmanName}>
+                            {s.salesmanName}
+                          </option>
+                        ))}
+                      </select>
+                      
+                      {selectedSalesman && (
+                        <button
+                          onClick={() => setSelectedSalesman('')}
+                          className="text-gray-400 hover:text-gray-600"
+                        >
+                          <X className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                    
+                    <button
+                      onClick={exportToExcel}
+                      className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center space-x-2"
+                    >
+                      <Download className="w-4 h-4" />
+                      <span>Export Data</span>
+                    </button>
+                  </div>
 
-          {/* Desktop Table */}
-          <div className="hidden lg:block bg-white rounded-lg shadow">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h3 className="text-lg font-medium text-gray-900">
-                Detailed Submission Status - {submissionData.weekRange}
-              </h3>
-              <p className="text-sm text-gray-500">
-                Salesman-wise breakdown of collected vs pending challans
-              </p>
-            </div>
-            
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Salesman
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Collected Challans
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Collected Shops
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Pending Challans
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Pending Shops
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Total Challans
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Completion %
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {filteredSummaries.map((salesman, index) => (
-                    <tr key={salesman.salesmanName} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {salesman.salesmanName}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">
-                        {salesman.collectedChallans}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {salesman.collectedShops}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600 font-medium">
-                        {salesman.pendingChallans}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                        {salesman.pendingShops}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-blue-600">
-                        {salesman.totalChallans}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <div className="flex items-center">
-                          <div className="w-full bg-gray-200 rounded-full h-2 mr-2">
-                            <div 
-                              className="bg-green-600 h-2 rounded-full transition-all duration-500" 
-                              style={{ 
-                                width: `${salesman.totalChallans > 0 ? (salesman.collectedChallans / salesman.totalChallans) * 100 : 0}%` 
-                              }}
-                            ></div>
-                          </div>
-                          <span className="text-xs font-medium">
-                            {salesman.totalChallans > 0 ? Math.round((salesman.collectedChallans / salesman.totalChallans) * 100) : 0}%
-                          </span>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                  {/* Mobile View */}
+                  <div className="block lg:hidden">
+                    <div className="space-y-4">
+                      {filteredSummaries.map((salesman) => (
+                        <MobileSalesmanCard key={salesman.salesmanName} salesman={salesman} />
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Desktop Table */}
+                  <div className="hidden lg:block">
+                    <div className="overflow-x-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50">
+                          <tr>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Salesman
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Collected Challans
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Collected Shops
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Pending Challans
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Pending Shops
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Total Challans
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Completion %
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {filteredSummaries.map((salesman, index) => (
+                            <tr key={salesman.salesmanName} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                {salesman.salesmanName}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-medium">
+                                {salesman.collectedChallans}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {salesman.collectedShops}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600 font-medium">
+                                {salesman.pendingChallans}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                                {salesman.pendingShops}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-blue-600">
+                                {salesman.totalChallans}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                <div className="flex items-center">
+                                  <div className="w-full bg-gray-200 rounded-full h-2 mr-2">
+                                    <div 
+                                      className="bg-green-600 h-2 rounded-full transition-all duration-500" 
+                                      style={{ 
+                                        width: `${salesman.totalChallans > 0 ? (salesman.collectedChallans / salesman.totalChallans) * 100 : 0}%` 
+                                      }}
+                                    ></div>
+                                  </div>
+                                  <span className="text-xs font-medium">
+                                    {salesman.totalChallans > 0 ? Math.round((salesman.collectedChallans / salesman.totalChallans) * 100) : 0}%
+                                  </span>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {activeTab === 'collected' && (
+                <>
+                  {/* Search Bar */}
+                  <div className="mb-6">
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Search className="h-5 w-5 text-gray-400" />
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Search by challan number, shop name, department, or salesman..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-green-500 focus:border-green-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Collected Challans Table */}
+                  <div className="bg-white border border-gray-200 rounded-lg">
+                    <div className="px-4 py-4 border-b border-gray-200">
+                      <h3 className="text-lg font-medium text-green-700">
+                        Collected Challans ({submissionData.totalCollectedChallans})
+                      </h3>
+                      <p className="text-sm text-gray-500">
+                        Challans that have been scanned and submitted
+                      </p>
+                    </div>
+                    
+                    <div className="hidden sm:block">
+                      <ChallanTable 
+                        challans={filteredSummaries.flatMap(s => s.collectedChallansList)} 
+                        type="collected" 
+                      />
+                    </div>
+                    
+                    {/* Mobile View */}
+                    <div className="block sm:hidden p-4">
+                      <div className="space-y-3">
+                        {getFilteredChallans(filteredSummaries.flatMap(s => s.collectedChallansList)).map(challan => (
+                          <MobileChallanCard key={challan.challanNo} challan={challan} />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+
+              {activeTab === 'pending' && (
+                <>
+                  {/* Search Bar */}
+                  <div className="mb-6">
+                    <div className="relative">
+                      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                        <Search className="h-5 w-5 text-gray-400" />
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Search by challan number, shop name, department, or salesman..."
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                        className="block w-full pl-10 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-orange-500 focus:border-orange-500"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Pending Challans Table */}
+                  <div className="bg-white border border-gray-200 rounded-lg">
+                    <div className="px-4 py-4 border-b border-gray-200">
+                      <h3 className="text-lg font-medium text-orange-700">
+                        Pending Challans ({submissionData.totalPendingChallans})
+                      </h3>
+                      <p className="text-sm text-gray-500">
+                        Challans that are waiting to be scanned and submitted
+                      </p>
+                    </div>
+                    
+                    <div className="hidden sm:block">
+                      <ChallanTable 
+                        challans={filteredSummaries.flatMap(s => s.pendingChallansList)} 
+                        type="pending" 
+                      />
+                    </div>
+                    
+                    {/* Mobile View */}
+                    <div className="block sm:hidden p-4">
+                      <div className="space-y-3">
+                        {getFilteredChallans(filteredSummaries.flatMap(s => s.pendingChallansList)).map(challan => (
+                          <MobileChallanCard key={challan.challanNo} challan={challan} />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </>
