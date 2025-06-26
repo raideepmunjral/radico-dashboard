@@ -27,6 +27,11 @@ import DepartmentTab from '../components/tabs/sales/DepartmentTab';
 import OverviewTab from '../components/tabs/sales/OverviewTab';
 
 // ==========================================
+// 📋 NEW: SUBMISSION TRACKING IMPORT
+// ==========================================
+import SubmissionTrackingTab from '../components/tabs/sales/SubmissionTrackingTab';
+
+// ==========================================
 // PART 1: ENHANCED TYPE DEFINITIONS & INTERFACES (EXTENDED WITH HISTORICAL DATA) - UNCHANGED
 // ==========================================
 
@@ -1583,6 +1588,7 @@ const ProtectedRadicoDashboard = () => {
                   { id: 'focus-shops', label: 'Focus Shops', icon: Target, roles: ['admin', 'manager', 'salesman'] },
                   { id: 'department', label: 'Department Analysis', icon: Building, roles: ['admin', 'manager'] },
                   { id: 'salesman', label: 'Salesman Performance', icon: Users, roles: ['admin', 'manager', 'salesman'] },
+                  { id: 'submission', label: 'Submission Tracking', icon: Package, roles: ['admin', 'manager', 'salesman'] },
                   { id: 'analytics', label: 'Advanced Analytics', icon: Activity, roles: ['admin', 'manager'] },
                   { id: 'historical', label: 'Historical Analysis', icon: History, roles: ['admin', 'manager'] }
                 ]
@@ -1613,6 +1619,8 @@ const ProtectedRadicoDashboard = () => {
                 {activeTab === 'focus-shops' && <FocusShopsTab data={dashboardData} />}
                 {activeTab === 'department' && <DepartmentTab data={dashboardData} />}
                 {activeTab === 'salesman' && <SalesmanPerformanceTab data={dashboardData} />}
+                {/* 📋 NEW: SUBMISSION TRACKING TAB */}
+                {activeTab === 'submission' && <SubmissionTrackingTab />}
                 {activeTab === 'analytics' && <AdvancedAnalyticsTab data={dashboardData} inventoryData={inventoryData} />}
                 {activeTab === 'historical' && <HistoricalAnalysisTab data={dashboardData} />}
               </>
