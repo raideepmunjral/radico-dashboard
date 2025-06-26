@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { Download, RefreshCw, Calendar, Package, CheckCircle, Clock, Users, Building, Filter, X, ChevronDown, ChevronUp, Search } from 'lucide-react';
+import { Download, RefreshCw, Calendar, Package, CheckCircle, Clock, Users, Building, Filter, X, ChevronDown, ChevronUp, Search, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../../../contexts/AuthContext';
 
 // ==========================================
@@ -100,6 +100,16 @@ const SubmissionTrackingTab = () => {
   const [activeTab, setActiveTab] = useState<'summary' | 'collected' | 'pending'>('summary');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [expandedSalesmen, setExpandedSalesmen] = useState<Set<string>>(new Set());
+  
+  // State for reconciliation report
+  const [reconciliationReport, setReconciliationReport] = useState<{
+    totalScanned: number;
+    foundInRange: number;
+    outsideDateRange: number;
+    notInSheet1: number;
+    missingChallans: string[];
+    outsideRangeChallans: string[];
+  } | null>(null);
   
   // Initialize default date range (current week)
   useEffect(() => {
@@ -391,6 +401,16 @@ const SubmissionTrackingTab = () => {
     if (scannedChallansOutsideDateRange.size > 0) {
       console.log(`   📅 Outside date range (first 10):`, Array.from(scannedChallansOutsideDateRange).slice(0, 10));
     }
+
+    // 🔧 NEW: Set reconciliation report for UI
+    setReconciliationReport({
+      totalScanned: allScannedChallans.length,
+      foundInRange: foundScannedChallans.size,
+      outsideDateRange: scannedChallansOutsideDateRange.size,
+      notInSheet1: scannedChallansNotInSheet1.size,
+      missingChallans: Array.from(scannedChallansNotInSheet1),
+      outsideRangeChallans: Array.from(scannedChallansOutsideDateRange)
+    });
 
     console.log(`📋 Processed ${challanMap.size} unique challans in date range`);
 
@@ -941,6 +961,118 @@ const SubmissionTrackingTab = () => {
               </div>
             </div>
           </div>
+
+          {/* Data Reconciliation Report */}
+          {reconciliationReport && (
+            <div className="bg-white rounded-lg shadow border-l-4 border-blue-500">
+              <div className="px-6 py-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center">
+                      <Search className="w-4 h-4 text-blue-600" />
+                    </div>
+                    <div>
+                      <h3 className="text-lg font-medium text-gray-900">Data Reconciliation Report</h3>
+                      <p className="text-sm text-gray-500">Challan data quality analysis for selected period</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold text-blue-600">
+                      {reconciliationReport.foundInRange}/{reconciliationReport.totalScanned}
+                    </div>
+                    <div className="text-xs text-gray-500">Found/Scanned</div>
+                  </div>
+                </div>
+
+                <div className="mt-6 grid grid-cols-2 lg:grid-cols-4 gap-4">
+                  <div className="bg-blue-50 rounded-lg p-4">
+                    <div className="text-2xl font-bold text-blue-600">{reconciliationReport.totalScanned}</div>
+                    <div className="text-sm text-gray-600">Total Scanned</div>
+                    <div className="text-xs text-gray-500">In "scanned challans" tab</div>
+                  </div>
+                  
+                  <div className="bg-green-50 rounded-lg p-4">
+                    <div className="text-2xl font-bold text-green-600">{reconciliationReport.foundInRange}</div>
+                    <div className="text-sm text-gray-600">Found in Range</div>
+                    <div className="text-xs text-gray-500">Matched in Sheet1</div>
+                  </div>
+                  
+                  <div className="bg-orange-50 rounded-lg p-4">
+                    <div className="text-2xl font-bold text-orange-600">{reconciliationReport.outsideDateRange}</div>
+                    <div className="text-sm text-gray-600">Outside Range</div>
+                    <div className="text-xs text-gray-500">Before/after date filter</div>
+                  </div>
+                  
+                  <div className="bg-red-50 rounded-lg p-4">
+                    <div className="text-2xl font-bold text-red-600">{reconciliationReport.notInSheet1}</div>
+                    <div className="text-sm text-gray-600">Missing Data</div>
+                    <div className="text-xs text-gray-500">Not found in Sheet1</div>
+                  </div>
+                </div>
+
+                {reconciliationReport.notInSheet1 > 0 && (
+                  <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+                    <div className="flex items-start space-x-3">
+                      <AlertTriangle className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1">
+                        <h4 className="text-sm font-medium text-red-800">Missing Challan Data</h4>
+                        <p className="text-sm text-red-700 mt-1">
+                          {reconciliationReport.notInSheet1} challan(s) are marked as scanned but don't have corresponding data in Sheet1.
+                        </p>
+                        <details className="mt-3">
+                          <summary className="text-sm font-medium text-red-800 cursor-pointer hover:text-red-900">
+                            View Missing Challan Numbers ({reconciliationReport.missingChallans.length})
+                          </summary>
+                          <div className="mt-2 p-3 bg-white rounded border">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                              {reconciliationReport.missingChallans.map(challan => (
+                                <div key={challan} className="text-xs font-mono bg-gray-100 px-2 py-1 rounded">
+                                  {challan}
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </details>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {reconciliationReport.outsideDateRange > 0 && (
+                  <div className="mt-4 p-4 bg-orange-50 border border-orange-200 rounded-lg">
+                    <div className="flex items-start space-x-3">
+                      <Calendar className="w-5 h-5 text-orange-500 mt-0.5 flex-shrink-0" />
+                      <div className="flex-1">
+                        <h4 className="text-sm font-medium text-orange-800">Challans Outside Date Range</h4>
+                        <p className="text-sm text-orange-700 mt-1">
+                          {reconciliationReport.outsideDateRange} challan(s) are scanned but fall outside your selected date range.
+                        </p>
+                        <details className="mt-3">
+                          <summary className="text-sm font-medium text-orange-800 cursor-pointer hover:text-orange-900">
+                            View Outside Range Challans ({reconciliationReport.outsideRangeChallans.length})
+                          </summary>
+                          <div className="mt-2 p-3 bg-white rounded border">
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+                              {reconciliationReport.outsideRangeChallans.slice(0, 20).map(challan => (
+                                <div key={challan} className="text-xs font-mono bg-gray-100 px-2 py-1 rounded">
+                                  {challan}
+                                </div>
+                              ))}
+                            </div>
+                            {reconciliationReport.outsideRangeChallans.length > 20 && (
+                              <div className="text-xs text-gray-500 mt-2">
+                                ... and {reconciliationReport.outsideRangeChallans.length - 20} more
+                              </div>
+                            )}
+                          </div>
+                        </details>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
 
           {/* Tab Navigation */}
           <div className="bg-white rounded-lg shadow">
