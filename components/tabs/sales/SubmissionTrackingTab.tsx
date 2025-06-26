@@ -289,103 +289,10 @@ const SubmissionTrackingTab = () => {
   };
 
   // ==========================================
-  // EXCEL EXPORT FUNCTION (WITH FALLBACK TO CSV)
+  // CSV EXPORT FUNCTION (NO XLSX DEPENDENCY)
   // ==========================================
 
-  const exportToExcel = async () => {
-    if (!submissionData) return;
-
-    try {
-      // Try to dynamically import xlsx
-      const XLSX = await import('xlsx').catch(() => null);
-      
-      if (XLSX) {
-        // Excel export using XLSX
-        const wb = XLSX.utils.book_new();
-        
-        // Summary Sheet
-        const summaryData = [
-          ['Radico Submission Tracking Report'],
-          ['Generated:', new Date().toLocaleString()],
-          ['Week:', submissionData.weekRange],
-          [''],
-          ['OVERALL SUMMARY'],
-          ['Total Collected Challans', submissionData.totalCollectedChallans],
-          ['Total Collected Shops', submissionData.totalCollectedShops],
-          ['Total Pending Challans', submissionData.totalPendingChallans],
-          ['Total Pending Shops', submissionData.totalPendingShops],
-          [''],
-          ['SALESMAN SUMMARY'],
-          ['Salesman', 'Collected Challans', 'Collected Shops', 'Pending Challans', 'Pending Shops', 'Total Challans', 'Total Shops'],
-          ...submissionData.salesmanSummaries.map(s => [
-            s.salesmanName,
-            s.collectedChallans,
-            s.collectedShops,
-            s.pendingChallans,
-            s.pendingShops,
-            s.totalChallans,
-            s.totalShops
-          ])
-        ];
-        
-        const summaryWS = XLSX.utils.aoa_to_sheet(summaryData);
-        XLSX.utils.book_append_sheet(wb, summaryWS, 'Summary');
-
-        // Collected Challans Sheet
-        const collectedData = [
-          ['COLLECTED CHALLANS - ' + submissionData.weekRange],
-          ['Salesman', 'Challan No', 'Challan Date', 'Shop Name', 'Department'],
-          ...submissionData.salesmanSummaries.flatMap(s => 
-            s.collectedChallansList.map(c => [
-              s.salesmanName,
-              c.challanNo,
-              c.challanDate,
-              c.shopName,
-              c.department
-            ])
-          )
-        ];
-        
-        const collectedWS = XLSX.utils.aoa_to_sheet(collectedData);
-        XLSX.utils.book_append_sheet(wb, collectedWS, 'Collected');
-
-        // Pending Challans Sheet
-        const pendingData = [
-          ['PENDING CHALLANS - ' + submissionData.weekRange],
-          ['Salesman', 'Challan No', 'Challan Date', 'Shop Name', 'Department'],
-          ...submissionData.salesmanSummaries.flatMap(s => 
-            s.pendingChallansList.map(c => [
-              s.salesmanName,
-              c.challanNo,
-              c.challanDate,
-              c.shopName,
-              c.department
-            ])
-          )
-        ];
-        
-        const pendingWS = XLSX.utils.aoa_to_sheet(pendingData);
-        XLSX.utils.book_append_sheet(wb, pendingWS, 'Pending');
-
-        // Download
-        XLSX.writeFile(wb, `Radico_Submission_Tracking_${startDate}_to_${endDate}.xlsx`);
-      } else {
-        // Fallback to CSV export if XLSX is not available
-        exportToCSV();
-      }
-      
-    } catch (error) {
-      console.error('Error exporting to Excel:', error);
-      // Fallback to CSV if Excel export fails
-      exportToCSV();
-    }
-  };
-
-  // ==========================================
-  // CSV EXPORT FALLBACK FUNCTION
-  // ==========================================
-
-  const exportToCSV = () => {
+  const exportToExcel = () => {
     if (!submissionData) return;
 
     try {
@@ -434,6 +341,8 @@ const SubmissionTrackingTab = () => {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      
+      console.log('✅ CSV export completed successfully');
       
     } catch (error) {
       console.error('Error exporting to CSV:', error);
