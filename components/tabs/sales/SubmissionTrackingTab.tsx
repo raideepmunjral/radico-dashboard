@@ -126,29 +126,82 @@ const SubmissionTrackingTab = () => {
       const apiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
       
       if (!submissionSheetId || !apiKey) {
-        throw new Error('Submission sheet configuration missing');
+        throw new Error('Submission tracking configuration missing. Please check environment variables.');
       }
 
-      // Fetch both tabs
+      console.log('🔧 Fetching submission data:', {
+        submissionSheetId,
+        apiKey: apiKey ? 'Set' : 'Missing',
+        dateRange: `${startDate} to ${endDate}`
+      });
+
+      // Fetch both tabs with detailed error handling
+      const scannedUrl = `https://sheets.googleapis.com/v4/spreadsheets/${submissionSheetId}/values/scanned%20challans?key=${apiKey}`;
+      const detailsUrl = `https://sheets.googleapis.com/v4/spreadsheets/${submissionSheetId}/values/Sheet1?key=${apiKey}`;
+      
+      console.log('📋 Fetching URLs:', { scannedUrl, detailsUrl });
+
       const [scannedResponse, detailsResponse] = await Promise.all([
-        fetch(`https://sheets.googleapis.com/v4/spreadsheets/${submissionSheetId}/values/scanned%20challans?key=${apiKey}`),
-        fetch(`https://sheets.googleapis.com/v4/spreadsheets/${submissionSheetId}/values/Sheet1?key=${apiKey}`)
+        fetch(scannedUrl).catch(err => {
+          console.error('❌ Error fetching scanned challans:', err);
+          throw new Error(`Failed to fetch "scanned challans" tab: ${err.message}`);
+        }),
+        fetch(detailsUrl).catch(err => {
+          console.error('❌ Error fetching sheet1:', err);
+          throw new Error(`Failed to fetch "Sheet1" tab: ${err.message}`);
+        })
       ]);
 
-      if (!scannedResponse.ok || !detailsResponse.ok) {
-        throw new Error('Failed to fetch submission data');
+      // Check response status with detailed error messages
+      if (!scannedResponse.ok) {
+        const errorText = await scannedResponse.text();
+        console.error('❌ Scanned challans response error:', {
+          status: scannedResponse.status,
+          statusText: scannedResponse.statusText,
+          errorText
+        });
+        
+        if (scannedResponse.status === 403) {
+          throw new Error(`Access denied to "scanned challans" tab. Please make sure:\n1. Google Sheet is publicly accessible\n2. Sheet has "scanned challans" tab\n3. API key has proper permissions`);
+        } else if (scannedResponse.status === 404) {
+          throw new Error(`Sheet or "scanned challans" tab not found. Please verify:\n1. Sheet ID is correct\n2. Tab name is exactly "scanned challans"`);
+        } else {
+          throw new Error(`Failed to fetch "scanned challans" tab (${scannedResponse.status}): ${scannedResponse.statusText}`);
+        }
+      }
+
+      if (!detailsResponse.ok) {
+        const errorText = await detailsResponse.text();
+        console.error('❌ Sheet1 response error:', {
+          status: detailsResponse.status,
+          statusText: detailsResponse.statusText,
+          errorText
+        });
+        
+        if (detailsResponse.status === 403) {
+          throw new Error(`Access denied to "Sheet1" tab. Please make sure:\n1. Google Sheet is publicly accessible\n2. Sheet has "Sheet1" tab\n3. API key has proper permissions`);
+        } else if (detailsResponse.status === 404) {
+          throw new Error(`Sheet or "Sheet1" tab not found. Please verify:\n1. Sheet ID is correct\n2. Tab name is exactly "Sheet1"`);
+        } else {
+          throw new Error(`Failed to fetch "Sheet1" tab (${detailsResponse.status}): ${detailsResponse.statusText}`);
+        }
       }
 
       const scannedData = await scannedResponse.json();
       const detailsData = await detailsResponse.json();
+      
+      console.log('✅ Successfully fetched data:', {
+        scannedRows: scannedData.values?.length || 0,
+        detailsRows: detailsData.values?.length || 0
+      });
       
       const processedData = processSubmissionData(scannedData.values || [], detailsData.values || []);
       setSubmissionData(processedData);
       setLastUpdated(new Date());
       
     } catch (error: any) {
-      console.error('Error fetching submission data:', error);
-      setError(error.message);
+      console.error('❌ Error fetching submission data:', error);
+      setError(error.message || 'Unknown error occurred');
     } finally {
       setLoading(false);
     }
@@ -437,15 +490,55 @@ const SubmissionTrackingTab = () => {
   if (error) {
     return (
       <div className="text-center py-12">
-        <div className="bg-red-100 p-6 rounded-lg max-w-md mx-auto">
-          <h3 className="text-lg font-medium text-red-800 mb-2">Error Loading Data</h3>
-          <p className="text-red-700 text-sm mb-4">{error}</p>
-          <button
-            onClick={fetchSubmissionData}
-            className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
-          >
-            Retry
-          </button>
+        <div className="bg-red-100 p-6 rounded-lg max-w-2xl mx-auto">
+          <h3 className="text-lg font-medium text-red-800 mb-4">⚠️ Submission Tracking Configuration Issue</h3>
+          <div className="text-red-700 text-sm mb-6 text-left">
+            <p className="font-medium mb-2">Error Details:</p>
+            <div className="bg-red-50 p-3 rounded border text-xs font-mono whitespace-pre-wrap">
+              {error}
+            </div>
+          </div>
+          
+          <div className="bg-blue-50 p-4 rounded-lg text-left mb-4">
+            <h4 className="font-medium text-blue-800 mb-3">🔧 Quick Fix Checklist:</h4>
+            <ol className="text-sm text-blue-700 space-y-2">
+              <li>
+                <strong>1. Check Google Sheet Access:</strong>
+                <br />• Open: <a href={`https://docs.google.com/spreadsheets/d/${process.env.NEXT_PUBLIC_SUBMISSION_SHEET_ID}`} target="_blank" className="text-blue-600 underline">Your Submission Sheet</a>
+                <br />• Make sure it's set to "Anyone with the link can view"
+              </li>
+              <li>
+                <strong>2. Verify Tab Names:</strong>
+                <br />• Must have tab named exactly: <code className="bg-gray-200 px-1">scanned challans</code>
+                <br />• Must have tab named exactly: <code className="bg-gray-200 px-1">Sheet1</code>
+              </li>
+              <li>
+                <strong>3. Check Environment Variables:</strong>
+                <br />• NEXT_PUBLIC_SUBMISSION_SHEET_ID: {process.env.NEXT_PUBLIC_SUBMISSION_SHEET_ID ? '✅ Set' : '❌ Missing'}
+                <br />• NEXT_PUBLIC_GOOGLE_API_KEY: {process.env.NEXT_PUBLIC_GOOGLE_API_KEY ? '✅ Set' : '❌ Missing'}
+              </li>
+              <li>
+                <strong>4. API Key Permissions:</strong>
+                <br />• Make sure your Google API key has Google Sheets API enabled
+              </li>
+            </ol>
+          </div>
+          
+          <div className="flex space-x-3 justify-center">
+            <button
+              onClick={fetchSubmissionData}
+              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700"
+            >
+              🔄 Retry Connection
+            </button>
+            <a
+              href={`https://docs.google.com/spreadsheets/d/${process.env.NEXT_PUBLIC_SUBMISSION_SHEET_ID}/edit`}
+              target="_blank"
+              className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+            >
+              📋 Open Sheet
+            </a>
+          </div>
         </div>
       </div>
     );
