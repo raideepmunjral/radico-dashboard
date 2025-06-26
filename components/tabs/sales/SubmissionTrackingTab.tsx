@@ -1185,6 +1185,9 @@ const SubmissionTrackingTab = () => {
                               Total Challans
                             </th>
                             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                              Total Shops
+                            </th>
+                            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                               Completion %
                             </th>
                           </tr>
@@ -1209,6 +1212,9 @@ const SubmissionTrackingTab = () => {
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-blue-600">
                                 {salesman.totalChallans}
+                              </td>
+                              <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-purple-600">
+                                {salesman.totalShops}
                               </td>
                               <td className="px-6 py-4 whitespace-nowrap text-sm">
                                 <div className="flex items-center">
