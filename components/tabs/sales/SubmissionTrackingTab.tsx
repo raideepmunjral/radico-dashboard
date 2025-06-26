@@ -289,87 +289,154 @@ const SubmissionTrackingTab = () => {
   };
 
   // ==========================================
-  // EXCEL EXPORT FUNCTION
+  // EXCEL EXPORT FUNCTION (WITH FALLBACK TO CSV)
   // ==========================================
 
   const exportToExcel = async () => {
     if (!submissionData) return;
 
     try {
-      // Dynamic import for client-side usage
-      const XLSX = await import('xlsx');
+      // Try to dynamically import xlsx
+      const XLSX = await import('xlsx').catch(() => null);
       
-      const wb = XLSX.utils.book_new();
-      
-      // Summary Sheet
-      const summaryData = [
-        ['Radico Submission Tracking Report'],
-        ['Generated:', new Date().toLocaleString()],
-        ['Week:', submissionData.weekRange],
-        [''],
-        ['OVERALL SUMMARY'],
-        ['Total Collected Challans', submissionData.totalCollectedChallans],
-        ['Total Collected Shops', submissionData.totalCollectedShops],
-        ['Total Pending Challans', submissionData.totalPendingChallans],
-        ['Total Pending Shops', submissionData.totalPendingShops],
-        [''],
-        ['SALESMAN SUMMARY'],
-        ['Salesman', 'Collected Challans', 'Collected Shops', 'Pending Challans', 'Pending Shops', 'Total Challans', 'Total Shops'],
-        ...submissionData.salesmanSummaries.map(s => [
-          s.salesmanName,
-          s.collectedChallans,
-          s.collectedShops,
-          s.pendingChallans,
-          s.pendingShops,
-          s.totalChallans,
-          s.totalShops
-        ])
-      ];
-      
-      const summaryWS = XLSX.utils.aoa_to_sheet(summaryData);
-      XLSX.utils.book_append_sheet(wb, summaryWS, 'Summary');
-
-      // Collected Challans Sheet
-      const collectedData = [
-        ['COLLECTED CHALLANS - ' + submissionData.weekRange],
-        ['Salesman', 'Challan No', 'Challan Date', 'Shop Name', 'Department'],
-        ...submissionData.salesmanSummaries.flatMap(s => 
-          s.collectedChallansList.map(c => [
+      if (XLSX) {
+        // Excel export using XLSX
+        const wb = XLSX.utils.book_new();
+        
+        // Summary Sheet
+        const summaryData = [
+          ['Radico Submission Tracking Report'],
+          ['Generated:', new Date().toLocaleString()],
+          ['Week:', submissionData.weekRange],
+          [''],
+          ['OVERALL SUMMARY'],
+          ['Total Collected Challans', submissionData.totalCollectedChallans],
+          ['Total Collected Shops', submissionData.totalCollectedShops],
+          ['Total Pending Challans', submissionData.totalPendingChallans],
+          ['Total Pending Shops', submissionData.totalPendingShops],
+          [''],
+          ['SALESMAN SUMMARY'],
+          ['Salesman', 'Collected Challans', 'Collected Shops', 'Pending Challans', 'Pending Shops', 'Total Challans', 'Total Shops'],
+          ...submissionData.salesmanSummaries.map(s => [
             s.salesmanName,
-            c.challanNo,
-            c.challanDate,
-            c.shopName,
-            c.department
+            s.collectedChallans,
+            s.collectedShops,
+            s.pendingChallans,
+            s.pendingShops,
+            s.totalChallans,
+            s.totalShops
           ])
-        )
-      ];
-      
-      const collectedWS = XLSX.utils.aoa_to_sheet(collectedData);
-      XLSX.utils.book_append_sheet(wb, collectedWS, 'Collected');
+        ];
+        
+        const summaryWS = XLSX.utils.aoa_to_sheet(summaryData);
+        XLSX.utils.book_append_sheet(wb, summaryWS, 'Summary');
 
-      // Pending Challans Sheet
-      const pendingData = [
-        ['PENDING CHALLANS - ' + submissionData.weekRange],
-        ['Salesman', 'Challan No', 'Challan Date', 'Shop Name', 'Department'],
-        ...submissionData.salesmanSummaries.flatMap(s => 
-          s.pendingChallansList.map(c => [
-            s.salesmanName,
-            c.challanNo,
-            c.challanDate,
-            c.shopName,
-            c.department
-          ])
-        )
-      ];
-      
-      const pendingWS = XLSX.utils.aoa_to_sheet(pendingData);
-      XLSX.utils.book_append_sheet(wb, pendingWS, 'Pending');
+        // Collected Challans Sheet
+        const collectedData = [
+          ['COLLECTED CHALLANS - ' + submissionData.weekRange],
+          ['Salesman', 'Challan No', 'Challan Date', 'Shop Name', 'Department'],
+          ...submissionData.salesmanSummaries.flatMap(s => 
+            s.collectedChallansList.map(c => [
+              s.salesmanName,
+              c.challanNo,
+              c.challanDate,
+              c.shopName,
+              c.department
+            ])
+          )
+        ];
+        
+        const collectedWS = XLSX.utils.aoa_to_sheet(collectedData);
+        XLSX.utils.book_append_sheet(wb, collectedWS, 'Collected');
 
-      // Download
-      XLSX.writeFile(wb, `Radico_Submission_Tracking_${startDate}_to_${endDate}.xlsx`);
+        // Pending Challans Sheet
+        const pendingData = [
+          ['PENDING CHALLANS - ' + submissionData.weekRange],
+          ['Salesman', 'Challan No', 'Challan Date', 'Shop Name', 'Department'],
+          ...submissionData.salesmanSummaries.flatMap(s => 
+            s.pendingChallansList.map(c => [
+              s.salesmanName,
+              c.challanNo,
+              c.challanDate,
+              c.shopName,
+              c.department
+            ])
+          )
+        ];
+        
+        const pendingWS = XLSX.utils.aoa_to_sheet(pendingData);
+        XLSX.utils.book_append_sheet(wb, pendingWS, 'Pending');
+
+        // Download
+        XLSX.writeFile(wb, `Radico_Submission_Tracking_${startDate}_to_${endDate}.xlsx`);
+      } else {
+        // Fallback to CSV export if XLSX is not available
+        exportToCSV();
+      }
       
     } catch (error) {
       console.error('Error exporting to Excel:', error);
+      // Fallback to CSV if Excel export fails
+      exportToCSV();
+    }
+  };
+
+  // ==========================================
+  // CSV EXPORT FALLBACK FUNCTION
+  // ==========================================
+
+  const exportToCSV = () => {
+    if (!submissionData) return;
+
+    try {
+      let csvContent = "data:text/csv;charset=utf-8,";
+      
+      // Summary data
+      csvContent += "Radico Submission Tracking Report\n";
+      csvContent += `Generated:,${new Date().toLocaleString()}\n`;
+      csvContent += `Week:,${submissionData.weekRange}\n`;
+      csvContent += "\n";
+      csvContent += "OVERALL SUMMARY\n";
+      csvContent += `Total Collected Challans,${submissionData.totalCollectedChallans}\n`;
+      csvContent += `Total Collected Shops,${submissionData.totalCollectedShops}\n`;
+      csvContent += `Total Pending Challans,${submissionData.totalPendingChallans}\n`;
+      csvContent += `Total Pending Shops,${submissionData.totalPendingShops}\n`;
+      csvContent += "\n";
+      csvContent += "SALESMAN SUMMARY\n";
+      csvContent += "Salesman,Collected Challans,Collected Shops,Pending Challans,Pending Shops,Total Challans,Total Shops\n";
+      
+      submissionData.salesmanSummaries.forEach(s => {
+        csvContent += `"${s.salesmanName}",${s.collectedChallans},${s.collectedShops},${s.pendingChallans},${s.pendingShops},${s.totalChallans},${s.totalShops}\n`;
+      });
+
+      csvContent += "\n\nCOLLECTED CHALLANS\n";
+      csvContent += "Salesman,Challan No,Challan Date,Shop Name,Department\n";
+      
+      submissionData.salesmanSummaries.forEach(s => {
+        s.collectedChallansList.forEach(c => {
+          csvContent += `"${s.salesmanName}","${c.challanNo}","${c.challanDate}","${c.shopName}","${c.department}"\n`;
+        });
+      });
+
+      csvContent += "\n\nPENDING CHALLANS\n";
+      csvContent += "Salesman,Challan No,Challan Date,Shop Name,Department\n";
+      
+      submissionData.salesmanSummaries.forEach(s => {
+        s.pendingChallansList.forEach(c => {
+          csvContent += `"${s.salesmanName}","${c.challanNo}","${c.challanDate}","${c.shopName}","${c.department}"\n`;
+        });
+      });
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `Radico_Submission_Tracking_${startDate}_to_${endDate}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+    } catch (error) {
+      console.error('Error exporting to CSV:', error);
       alert('Error exporting data. Please try again.');
     }
   };
@@ -618,7 +685,7 @@ const SubmissionTrackingTab = () => {
                 className="bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 flex items-center space-x-2"
               >
                 <Download className="w-4 h-4" />
-                <span>Export Excel</span>
+                <span>Export Data</span>
               </button>
             </div>
           </div>
