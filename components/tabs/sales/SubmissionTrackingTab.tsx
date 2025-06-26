@@ -276,16 +276,19 @@ const SubmissionTrackingTab = () => {
 
     detailsValues.slice(1).forEach((row, index) => {
       if (row.length >= 15) {
-        const challanNo = row[0]?.toString().trim();
-        const challanDate = row[1]?.toString().trim();
-        const shopName = row[4]?.toString().trim();
-        const shopId = row[7]?.toString().trim();
-        const actualShopName = row[8]?.toString().trim(); // This might be the real shop name
-        const department = row[10]?.toString().trim() === "DSIIDC" ? "DSIDC" : row[10]?.toString().trim();
-        const brand = row[11]?.toString().trim();
-        const cases = parseFloat(row[14]) || 0;
+        const challanNo = row[0]?.toString().trim();  // Column A: Challan_no ✅
+        const challanDate = row[1]?.toString().trim(); // Column B: challandate ✅
+        const shopDept = row[4]?.toString().trim();    // Column E: shop_dep ✅ 
+        const shopId = row[8]?.toString().trim();      // Column I: Shop_Id ✅
+        const shopName = row[9]?.toString().trim();    // Column J: shop_name ✅ (FIXED!)
+        const brand = row[11]?.toString().trim();      // Column L: brand ✅
+        const cases = parseFloat(row[14]) || 0;        // Column O: cases ✅
 
-        // 🔧 ENHANCED: Multiple strategies for salesman mapping with debugging
+        // 🔧 FIXED: Use correct department column and clean it
+        const department = shopDept?.replace(' Limited', '').trim();
+        const cleanDept = department === "DSIIDC" ? "DSIDC" : department;
+
+        // 🔧 ENHANCED: Multiple strategies for salesman mapping
         let salesmanName = 'Unknown';
         let mappingMethod = 'none';
 
@@ -294,23 +297,20 @@ const SubmissionTrackingTab = () => {
           salesmanName = shopDetailsMap[shopId].salesman;
           mappingMethod = 'shopId';
         }
-        // Strategy 2: Direct shop name match (column 4)
+        // Strategy 2: Direct shop name match
         else if (shopName && shopDetailsMap[shopName]) {
           salesmanName = shopDetailsMap[shopName].salesman;
           mappingMethod = 'shopName';
         }
-        // Strategy 3: Try actual shop name (column 8)
-        else if (actualShopName && shopDetailsMap[actualShopName]) {
-          salesmanName = shopDetailsMap[actualShopName].salesman;
-          mappingMethod = 'actualShopName';
-        }
-        // Strategy 4: Partial shop name matching
-        else if (shopName || actualShopName) {
-          const searchName = actualShopName || shopName;
+        // Strategy 3: Partial shop name matching
+        else if (shopName) {
           const matchingShop = Object.keys(shopDetailsMap).find(key => {
             const keyLower = key.toLowerCase();
-            const searchLower = searchName.toLowerCase();
-            return keyLower.includes(searchLower) || searchLower.includes(keyLower);
+            const shopLower = shopName.toLowerCase();
+            // Try exact match, contains, or partial matches
+            return keyLower === shopLower || 
+                   keyLower.includes(shopLower) || 
+                   shopLower.includes(keyLower);
           });
           if (matchingShop && shopDetailsMap[matchingShop]) {
             salesmanName = shopDetailsMap[matchingShop].salesman;
@@ -319,14 +319,15 @@ const SubmissionTrackingTab = () => {
         }
 
         // 🔧 DEBUG: Log mapping details for first few rows
-        if (index < 5) {
-          console.log(`🔍 Row ${index + 1} mapping:`, {
+        if (index < 3) {
+          console.log(`🔍 CORRECTED Row ${index + 1}:`, {
             challanNo,
             shopId,
-            shopName,
-            actualShopName,
+            shopName,        // Now from Column J!
+            department: cleanDept,  // Cleaned department
             salesmanName,
-            mappingMethod
+            mappingMethod,
+            rawShopDept: shopDept
           });
         }
 
@@ -339,9 +340,9 @@ const SubmissionTrackingTab = () => {
             challanMap.set(challanNo, {
               challanNo,
               challanDate,
-              shopName: actualShopName || shopName || 'Unknown Shop',
+              shopName: shopName || 'Unknown Shop', // ✅ Now from Column J!
               shopId: shopId || '',
-              department: department || 'Unknown',
+              department: cleanDept || 'Unknown',   // ✅ Cleaned department!
               salesman: salesmanName,
               brand,
               cases,
