@@ -240,7 +240,7 @@ const SubmissionTrackingTab = () => {
 
     // 🔧 FIXED: Build shop details mapping for proper salesman names
     const shopDetailsMap: Record<string, any> = {};
-    shopDetailsValues.slice(1).forEach(row => {
+    shopDetailsValues.slice(1).forEach((row, index) => {
       const shopId = row[0]?.toString().trim();
       const salesmanEmail = row[1]?.toString().trim();
       const dept = row[2]?.toString().trim() === "DSIIDC" ? "DSIDC" : row[2]?.toString().trim();
@@ -251,10 +251,22 @@ const SubmissionTrackingTab = () => {
         shopDetailsMap[shopId] = { shopName, dept, salesman, salesmanEmail };
         // Also map by shop name for fallback
         shopDetailsMap[shopName] = { shopId, shopName, dept, salesman, salesmanEmail };
+        
+        // 🔧 DEBUG: Log first few shop details mappings
+        if (index < 5) {
+          console.log(`📋 Shop Details Row ${index + 1}:`, {
+            shopId,
+            shopName,
+            salesman,
+            dept
+          });
+        }
       }
     });
 
     console.log(`👥 Found ${Object.keys(shopDetailsMap).length / 2} shops with salesman mapping`);
+    console.log(`🔍 Sample shop IDs:`, Object.keys(shopDetailsMap).filter(key => key.startsWith('01/')).slice(0, 5));
+    console.log(`🔍 Sample shop names:`, Object.keys(shopDetailsMap).filter(key => !key.startsWith('01/')).slice(0, 5));
 
     // Process detailed challan data
     const headers = detailsValues[0] || [];
@@ -262,22 +274,60 @@ const SubmissionTrackingTab = () => {
     const dateRangeStart = new Date(startDate);
     const dateRangeEnd = new Date(endDate);
 
-    detailsValues.slice(1).forEach(row => {
+    detailsValues.slice(1).forEach((row, index) => {
       if (row.length >= 15) {
         const challanNo = row[0]?.toString().trim();
         const challanDate = row[1]?.toString().trim();
         const shopName = row[4]?.toString().trim();
         const shopId = row[7]?.toString().trim();
+        const actualShopName = row[8]?.toString().trim(); // This might be the real shop name
         const department = row[10]?.toString().trim() === "DSIIDC" ? "DSIDC" : row[10]?.toString().trim();
         const brand = row[11]?.toString().trim();
         const cases = parseFloat(row[14]) || 0;
 
-        // 🔧 FIXED: Get salesman name from shop details mapping
+        // 🔧 ENHANCED: Multiple strategies for salesman mapping with debugging
         let salesmanName = 'Unknown';
+        let mappingMethod = 'none';
+
+        // Strategy 1: Direct shop ID match
         if (shopId && shopDetailsMap[shopId]) {
           salesmanName = shopDetailsMap[shopId].salesman;
-        } else if (shopName && shopDetailsMap[shopName]) {
+          mappingMethod = 'shopId';
+        }
+        // Strategy 2: Direct shop name match (column 4)
+        else if (shopName && shopDetailsMap[shopName]) {
           salesmanName = shopDetailsMap[shopName].salesman;
+          mappingMethod = 'shopName';
+        }
+        // Strategy 3: Try actual shop name (column 8)
+        else if (actualShopName && shopDetailsMap[actualShopName]) {
+          salesmanName = shopDetailsMap[actualShopName].salesman;
+          mappingMethod = 'actualShopName';
+        }
+        // Strategy 4: Partial shop name matching
+        else if (shopName || actualShopName) {
+          const searchName = actualShopName || shopName;
+          const matchingShop = Object.keys(shopDetailsMap).find(key => {
+            const keyLower = key.toLowerCase();
+            const searchLower = searchName.toLowerCase();
+            return keyLower.includes(searchLower) || searchLower.includes(keyLower);
+          });
+          if (matchingShop && shopDetailsMap[matchingShop]) {
+            salesmanName = shopDetailsMap[matchingShop].salesman;
+            mappingMethod = 'partial';
+          }
+        }
+
+        // 🔧 DEBUG: Log mapping details for first few rows
+        if (index < 5) {
+          console.log(`🔍 Row ${index + 1} mapping:`, {
+            challanNo,
+            shopId,
+            shopName,
+            actualShopName,
+            salesmanName,
+            mappingMethod
+          });
         }
 
         // Filter by date range
@@ -289,10 +339,10 @@ const SubmissionTrackingTab = () => {
             challanMap.set(challanNo, {
               challanNo,
               challanDate,
-              shopName: shopName || 'Unknown Shop',
+              shopName: actualShopName || shopName || 'Unknown Shop',
               shopId: shopId || '',
               department: department || 'Unknown',
-              salesman: salesmanName, // ✅ Now using proper salesman name!
+              salesman: salesmanName,
               brand,
               cases,
               isScanned
@@ -700,17 +750,23 @@ const SubmissionTrackingTab = () => {
                 <br />• Make sure it's set to "Anyone with the link can view"
               </li>
               <li>
-                <strong>2. Verify Tab Names:</strong>
+                <strong>2. Check Master Sheet Access:</strong>
+                <br />• Open: <a href={`https://docs.google.com/spreadsheets/d/${process.env.NEXT_PUBLIC_MASTER_SHEET_ID}`} target="_blank" className="text-blue-600 underline">Your Master Sheet (Shop Details)</a>
+                <br />• Make sure "Shop Details" tab is accessible for salesman mapping
+              </li>
+              <li>
+                <strong>3. Verify Tab Names:</strong>
                 <br />• Must have tab named exactly: <code className="bg-gray-200 px-1">scanned challans</code>
                 <br />• Must have tab named exactly: <code className="bg-gray-200 px-1">Sheet1</code>
               </li>
               <li>
-                <strong>3. Check Environment Variables:</strong>
+                <strong>4. Check Environment Variables:</strong>
                 <br />• NEXT_PUBLIC_SUBMISSION_SHEET_ID: {process.env.NEXT_PUBLIC_SUBMISSION_SHEET_ID ? '✅ Set' : '❌ Missing'}
+                <br />• NEXT_PUBLIC_MASTER_SHEET_ID: {process.env.NEXT_PUBLIC_MASTER_SHEET_ID ? '✅ Set' : '❌ Missing'}
                 <br />• NEXT_PUBLIC_GOOGLE_API_KEY: {process.env.NEXT_PUBLIC_GOOGLE_API_KEY ? '✅ Set' : '❌ Missing'}
               </li>
               <li>
-                <strong>4. API Key Permissions:</strong>
+                <strong>5. API Key Permissions:</strong>
                 <br />• Make sure your Google API key has Google Sheets API enabled
               </li>
             </ol>
