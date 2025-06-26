@@ -230,13 +230,16 @@ const SubmissionTrackingTab = () => {
   const processSubmissionData = (scannedValues: any[][], detailsValues: any[][], shopDetailsValues: any[][]): SubmissionSummary => {
     // Extract scanned challan numbers
     const scannedChallans = new Set<string>();
+    const allScannedChallans: string[] = [];
     scannedValues.slice(1).forEach(row => {
       if (row[0]) {
-        scannedChallans.add(row[0].toString().trim());
+        const challanNo = row[0].toString().trim();
+        scannedChallans.add(challanNo);
+        allScannedChallans.push(challanNo);
       }
     });
 
-    console.log(`📦 Found ${scannedChallans.size} scanned challans`);
+    console.log(`📦 Found ${scannedChallans.size} unique scanned challans from ${allScannedChallans.length} total rows`);
 
     // 🔧 FIXED: Build shop details mapping for proper salesman names
     const shopDetailsMap: Record<string, any> = {};
@@ -273,6 +276,11 @@ const SubmissionTrackingTab = () => {
     const challanMap = new Map<string, ChallanData>();
     const dateRangeStart = new Date(startDate);
     const dateRangeEnd = new Date(endDate);
+    
+    // 🔍 DEBUG: Track which scanned challans are found/missing
+    const foundScannedChallans = new Set<string>();
+    const scannedChallansOutsideDateRange = new Set<string>();
+    const scannedChallansNotInSheet1 = new Set<string>();
 
     detailsValues.slice(1).forEach((row, index) => {
       if (row.length >= 15) {
@@ -287,6 +295,15 @@ const SubmissionTrackingTab = () => {
         // 🔧 FIXED: Use correct department column and clean it
         const department = shopDept?.replace(' Limited', '').trim();
         const cleanDept = department === "DSIIDC" ? "DSIDC" : department;
+
+        // 🔍 DEBUG: Track scanned challans
+        if (scannedChallans.has(challanNo)) {
+          if (challanDate && isDateInRange(challanDate, dateRangeStart, dateRangeEnd)) {
+            foundScannedChallans.add(challanNo);
+          } else {
+            scannedChallansOutsideDateRange.add(challanNo);
+          }
+        }
 
         // 🔧 ENHANCED: Multiple strategies for salesman mapping
         let salesmanName = 'Unknown';
@@ -352,6 +369,28 @@ const SubmissionTrackingTab = () => {
         }
       }
     });
+
+    // 🔍 DEBUG: Find missing scanned challans
+    allScannedChallans.forEach(challanNo => {
+      if (!foundScannedChallans.has(challanNo) && !scannedChallansOutsideDateRange.has(challanNo)) {
+        scannedChallansNotInSheet1.add(challanNo);
+      }
+    });
+
+    // 🔍 DEBUG: Report missing challans
+    console.log(`📊 CHALLAN RECONCILIATION REPORT:`);
+    console.log(`   📦 Total scanned challans: ${allScannedChallans.length}`);
+    console.log(`   ✅ Found in date range: ${foundScannedChallans.size}`);
+    console.log(`   📅 Outside date range: ${scannedChallansOutsideDateRange.size}`);
+    console.log(`   ❌ Not in Sheet1: ${scannedChallansNotInSheet1.size}`);
+    
+    if (scannedChallansNotInSheet1.size > 0) {
+      console.log(`   🔍 Missing challan numbers:`, Array.from(scannedChallansNotInSheet1).slice(0, 10));
+    }
+    
+    if (scannedChallansOutsideDateRange.size > 0) {
+      console.log(`   📅 Outside date range (first 10):`, Array.from(scannedChallansOutsideDateRange).slice(0, 10));
+    }
 
     console.log(`📋 Processed ${challanMap.size} unique challans in date range`);
 
