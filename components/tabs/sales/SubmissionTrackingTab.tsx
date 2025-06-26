@@ -126,25 +126,28 @@ const SubmissionTrackingTab = () => {
     
     try {
       const submissionSheetId = process.env.NEXT_PUBLIC_SUBMISSION_SHEET_ID;
+      const masterSheetId = process.env.NEXT_PUBLIC_MASTER_SHEET_ID;
       const apiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
       
-      if (!submissionSheetId || !apiKey) {
+      if (!submissionSheetId || !masterSheetId || !apiKey) {
         throw new Error('Submission tracking configuration missing. Please check environment variables.');
       }
 
       console.log('🔧 Fetching submission data:', {
         submissionSheetId,
+        masterSheetId,
         apiKey: apiKey ? 'Set' : 'Missing',
         dateRange: `${startDate} to ${endDate}`
       });
 
-      // Fetch both tabs with detailed error handling
+      // Fetch submission data AND shop details for proper salesman mapping
       const scannedUrl = `https://sheets.googleapis.com/v4/spreadsheets/${submissionSheetId}/values/scanned%20challans?key=${apiKey}`;
       const detailsUrl = `https://sheets.googleapis.com/v4/spreadsheets/${submissionSheetId}/values/Sheet1?key=${apiKey}`;
+      const shopDetailsUrl = `https://sheets.googleapis.com/v4/spreadsheets/${masterSheetId}/values/Shop%20Details?key=${apiKey}`;
       
-      console.log('📋 Fetching URLs:', { scannedUrl, detailsUrl });
+      console.log('📋 Fetching URLs:', { scannedUrl, detailsUrl, shopDetailsUrl });
 
-      const [scannedResponse, detailsResponse] = await Promise.all([
+      const [scannedResponse, detailsResponse, shopDetailsResponse] = await Promise.all([
         fetch(scannedUrl).catch(err => {
           console.error('❌ Error fetching scanned challans:', err);
           throw new Error(`Failed to fetch "scanned challans" tab: ${err.message}`);
@@ -152,6 +155,10 @@ const SubmissionTrackingTab = () => {
         fetch(detailsUrl).catch(err => {
           console.error('❌ Error fetching sheet1:', err);
           throw new Error(`Failed to fetch "Sheet1" tab: ${err.message}`);
+        }),
+        fetch(shopDetailsUrl).catch(err => {
+          console.error('❌ Error fetching shop details:', err);
+          throw new Error(`Failed to fetch "Shop Details" tab: ${err.message}`);
         })
       ]);
 
@@ -190,15 +197,21 @@ const SubmissionTrackingTab = () => {
         }
       }
 
+      if (!shopDetailsResponse.ok) {
+        console.warn('⚠️ Shop Details not accessible, continuing with limited salesman mapping');
+      }
+
       const scannedData = await scannedResponse.json();
       const detailsData = await detailsResponse.json();
+      const shopDetailsData = shopDetailsResponse.ok ? await shopDetailsResponse.json() : { values: [] };
       
       console.log('✅ Successfully fetched data:', {
         scannedRows: scannedData.values?.length || 0,
-        detailsRows: detailsData.values?.length || 0
+        detailsRows: detailsData.values?.length || 0,
+        shopDetailsRows: shopDetailsData.values?.length || 0
       });
       
-      const processedData = processSubmissionData(scannedData.values || [], detailsData.values || []);
+      const processedData = processSubmissionData(scannedData.values || [], detailsData.values || [], shopDetailsData.values || []);
       setSubmissionData(processedData);
       setLastUpdated(new Date());
       
@@ -214,7 +227,7 @@ const SubmissionTrackingTab = () => {
   // DATA PROCESSING FUNCTION
   // ==========================================
 
-  const processSubmissionData = (scannedValues: any[][], detailsValues: any[][]): SubmissionSummary => {
+  const processSubmissionData = (scannedValues: any[][], detailsValues: any[][], shopDetailsValues: any[][]): SubmissionSummary => {
     // Extract scanned challan numbers
     const scannedChallans = new Set<string>();
     scannedValues.slice(1).forEach(row => {
@@ -224,6 +237,24 @@ const SubmissionTrackingTab = () => {
     });
 
     console.log(`📦 Found ${scannedChallans.size} scanned challans`);
+
+    // 🔧 FIXED: Build shop details mapping for proper salesman names
+    const shopDetailsMap: Record<string, any> = {};
+    shopDetailsValues.slice(1).forEach(row => {
+      const shopId = row[0]?.toString().trim();
+      const salesmanEmail = row[1]?.toString().trim();
+      const dept = row[2]?.toString().trim() === "DSIIDC" ? "DSIDC" : row[2]?.toString().trim();
+      const shopName = row[3]?.toString().trim();
+      const salesman = row[4]?.toString().trim(); // ✅ This is the correct salesman name column!
+      
+      if (shopId && shopName && salesman) {
+        shopDetailsMap[shopId] = { shopName, dept, salesman, salesmanEmail };
+        // Also map by shop name for fallback
+        shopDetailsMap[shopName] = { shopId, shopName, dept, salesman, salesmanEmail };
+      }
+    });
+
+    console.log(`👥 Found ${Object.keys(shopDetailsMap).length / 2} shops with salesman mapping`);
 
     // Process detailed challan data
     const headers = detailsValues[0] || [];
@@ -238,9 +269,16 @@ const SubmissionTrackingTab = () => {
         const shopName = row[4]?.toString().trim();
         const shopId = row[7]?.toString().trim();
         const department = row[10]?.toString().trim() === "DSIIDC" ? "DSIDC" : row[10]?.toString().trim();
-        const salesman = row[5]?.toString().trim();
         const brand = row[11]?.toString().trim();
         const cases = parseFloat(row[14]) || 0;
+
+        // 🔧 FIXED: Get salesman name from shop details mapping
+        let salesmanName = 'Unknown';
+        if (shopId && shopDetailsMap[shopId]) {
+          salesmanName = shopDetailsMap[shopId].salesman;
+        } else if (shopName && shopDetailsMap[shopName]) {
+          salesmanName = shopDetailsMap[shopName].salesman;
+        }
 
         // Filter by date range
         if (challanNo && challanDate && isDateInRange(challanDate, dateRangeStart, dateRangeEnd)) {
@@ -254,7 +292,7 @@ const SubmissionTrackingTab = () => {
               shopName: shopName || 'Unknown Shop',
               shopId: shopId || '',
               department: department || 'Unknown',
-              salesman: salesman || 'Unknown',
+              salesman: salesmanName, // ✅ Now using proper salesman name!
               brand,
               cases,
               isScanned
