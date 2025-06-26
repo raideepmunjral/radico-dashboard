@@ -20,6 +20,9 @@ const nextConfig = {
     
     // 🔐 NEW: Authentication Support (uses same master sheet)
     NEXT_PUBLIC_USER_SHEET_ID: '1pRz9CgOoamTrFipnmF-XuBCg9IZON9br5avgRlKYtxM',
+    
+    // 📋 NEW: Submission Tracking Sheet ID
+    NEXT_PUBLIC_SUBMISSION_SHEET_ID: '1M1efTPrPwvpY2nRbkGms5171vT5PXf1zoB2NRRM5m5E',
   },
   // Suppress build warnings for better performance
   typescript: {
