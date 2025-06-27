@@ -42,7 +42,7 @@ interface SubmissionSummary {
 }
 
 // ==========================================
-// HELPER FUNCTIONS
+// 🔧 FIXED HELPER FUNCTIONS
 // ==========================================
 
 const formatDate = (dateStr: string): string => {
@@ -61,21 +61,71 @@ const formatDate = (dateStr: string): string => {
   }
 };
 
+// 🔧 COMPLETELY REWRITTEN DATE COMPARISON FUNCTION
 const isDateInRange = (dateStr: string, startDate: Date, endDate: Date): boolean => {
-  if (!dateStr) return false;
-  try {
-    const parts = dateStr.split('-');
-    if (parts.length === 3) {
-      const day = parseInt(parts[0]);
-      const month = parseInt(parts[1]) - 1; // Month is 0-indexed
-      const year = parseInt(parts[2]);
-      const date = new Date(year, month, day);
-      return date >= startDate && date <= endDate;
-    }
-    return false;
-  } catch {
+  if (!dateStr) {
+    console.log('❌ Empty date string');
     return false;
   }
+  
+  try {
+    const parts = dateStr.trim().split('-');
+    if (parts.length !== 3) {
+      console.log('❌ Invalid date format:', dateStr);
+      return false;
+    }
+    
+    const day = parseInt(parts[0]);
+    const month = parseInt(parts[1]) - 1; // Month is 0-indexed in JavaScript
+    const year = parseInt(parts[2]);
+    
+    // Validate parsed values
+    if (isNaN(day) || isNaN(month) || isNaN(year) || day < 1 || day > 31 || month < 0 || month > 11) {
+      console.log('❌ Invalid date values:', { day, month: month + 1, year, original: dateStr });
+      return false;
+    }
+    
+    // Create date object and normalize to start of day
+    const date = new Date(year, month, day);
+    date.setHours(0, 0, 0, 0);
+    
+    // Normalize comparison dates to start of day
+    const normalizedStartDate = new Date(startDate);
+    normalizedStartDate.setHours(0, 0, 0, 0);
+    
+    const normalizedEndDate = new Date(endDate);
+    normalizedEndDate.setHours(23, 59, 59, 999); // End of day for inclusive comparison
+    
+    const isInRange = date >= normalizedStartDate && date <= normalizedEndDate;
+    
+    // 🔍 DEBUG: Log first few date comparisons
+    if (Math.random() < 0.1) { // Log 10% of dates for debugging
+      console.log('🔍 DATE CHECK:', {
+        original: dateStr,
+        parsed: `${day}-${month + 1}-${year}`,
+        dateObj: date.toDateString(),
+        startDate: normalizedStartDate.toDateString(),
+        endDate: normalizedEndDate.toDateString(),
+        isInRange
+      });
+    }
+    
+    return isInRange;
+  } catch (error) {
+    console.error('❌ Date parsing error:', error, 'for date:', dateStr);
+    return false;
+  }
+};
+
+// 🔧 NEW: Create date from YYYY-MM-DD input with proper handling
+const createDateFromInput = (inputDateStr: string): Date => {
+  if (!inputDateStr) return new Date();
+  
+  // Input is in YYYY-MM-DD format from HTML date input
+  const [year, month, day] = inputDateStr.split('-').map(num => parseInt(num));
+  const date = new Date(year, month - 1, day); // month - 1 because JS months are 0-indexed
+  date.setHours(0, 0, 0, 0);
+  return date;
 };
 
 // ==========================================
@@ -234,10 +284,22 @@ const SubmissionTrackingTab = () => {
   };
 
   // ==========================================
-  // DATA PROCESSING FUNCTION
+  // 🔧 COMPLETELY REWRITTEN DATA PROCESSING FUNCTION
   // ==========================================
 
   const processSubmissionData = (scannedValues: any[][], detailsValues: any[][], shopDetailsValues: any[][]): SubmissionSummary => {
+    console.log('🔧 PROCESSING SUBMISSION DATA WITH ENHANCED DATE LOGIC');
+    console.log('📅 Selected Date Range:', { startDate, endDate });
+    
+    // 🔧 FIXED: Create proper Date objects from input strings
+    const dateRangeStart = createDateFromInput(startDate);
+    const dateRangeEnd = createDateFromInput(endDate);
+    
+    console.log('📅 Normalized Date Range:', {
+      start: dateRangeStart.toDateString(),
+      end: dateRangeEnd.toDateString()
+    });
+
     // Extract scanned challan numbers
     const scannedChallans = new Set<string>();
     const allScannedChallans: string[] = [];
@@ -258,14 +320,12 @@ const SubmissionTrackingTab = () => {
       const salesmanEmail = row[1]?.toString().trim();
       const dept = row[2]?.toString().trim() === "DSIIDC" ? "DSIDC" : row[2]?.toString().trim();
       const shopName = row[3]?.toString().trim();
-      const salesman = row[4]?.toString().trim(); // ✅ This is the correct salesman name column!
+      const salesman = row[4]?.toString().trim();
       
       if (shopId && shopName && salesman) {
         shopDetailsMap[shopId] = { shopName, dept, salesman, salesmanEmail };
-        // Also map by shop name for fallback
         shopDetailsMap[shopName] = { shopId, shopName, dept, salesman, salesmanEmail };
         
-        // 🔧 DEBUG: Log first few shop details mappings
         if (index < 5) {
           console.log(`📋 Shop Details Row ${index + 1}:`, {
             shopId,
@@ -278,33 +338,44 @@ const SubmissionTrackingTab = () => {
     });
 
     console.log(`👥 Found ${Object.keys(shopDetailsMap).length / 2} shops with salesman mapping`);
-    console.log(`🔍 Sample shop IDs:`, Object.keys(shopDetailsMap).filter(key => key.startsWith('01/')).slice(0, 5));
-    console.log(`🔍 Sample shop names:`, Object.keys(shopDetailsMap).filter(key => !key.startsWith('01/')).slice(0, 5));
 
     // Process detailed challan data
-    const headers = detailsValues[0] || [];
+    const headers = detailsData.values[0] || [];
     const challanMap = new Map<string, ChallanData>();
-    const dateRangeStart = new Date(startDate);
-    const dateRangeEnd = new Date(endDate);
     
     // 🔍 DEBUG: Track which scanned challans are found/missing
     const foundScannedChallans = new Set<string>();
     const scannedChallansOutsideDateRange = new Set<string>();
     const scannedChallansNotInSheet1 = new Set<string>();
+    
+    let totalRowsProcessed = 0;
+    let dateFilteredRows = 0;
+    let validChallansCreated = 0;
+
+    console.log('🔍 PROCESSING CHALLAN DATA WITH ENHANCED FILTERING...');
 
     detailsValues.slice(1).forEach((row, index) => {
       if (row.length >= 15) {
-        const challanNo = row[0]?.toString().trim();  // Column A: Challan_no ✅
-        const challanDate = row[1]?.toString().trim(); // Column B: challandate ✅
-        const shopDept = row[4]?.toString().trim();    // Column E: shop_dep ✅ 
-        const shopId = row[8]?.toString().trim();      // Column I: Shop_Id ✅
-        const shopName = row[9]?.toString().trim();    // Column J: shop_name ✅ (FIXED!)
-        const brand = row[11]?.toString().trim();      // Column L: brand ✅
-        const cases = parseFloat(row[14]) || 0;        // Column O: cases ✅
+        totalRowsProcessed++;
+        
+        const challanNo = row[0]?.toString().trim();
+        const challanDate = row[1]?.toString().trim();
+        const shopDept = row[4]?.toString().trim();
+        const shopId = row[8]?.toString().trim();
+        const shopName = row[9]?.toString().trim();
+        const brand = row[11]?.toString().trim();
+        const cases = parseFloat(row[14]) || 0;
 
-        // 🔧 FIXED: Use correct department column and clean it
-        const department = shopDept?.replace(' Limited', '').trim();
-        const cleanDept = department === "DSIIDC" ? "DSIDC" : department;
+        // 🔧 ENHANCED: Log first 10 rows for debugging
+        if (index < 10) {
+          console.log(`🔍 DETAILED Row ${index + 1}:`, {
+            challanNo,
+            challanDate,
+            shopId,
+            shopName,
+            dateInRange: challanDate ? isDateInRange(challanDate, dateRangeStart, dateRangeEnd) : 'NO_DATE'
+          });
+        }
 
         // 🔍 DEBUG: Track scanned challans
         if (scannedChallans.has(challanNo)) {
@@ -315,65 +386,88 @@ const SubmissionTrackingTab = () => {
           }
         }
 
-        // 🔧 ENHANCED: Multiple strategies for salesman mapping
-        let salesmanName = 'Unknown';
-        let mappingMethod = 'none';
-
-        // Strategy 1: Direct shop ID match
-        if (shopId && shopDetailsMap[shopId]) {
-          salesmanName = shopDetailsMap[shopId].salesman;
-          mappingMethod = 'shopId';
-        }
-        // Strategy 2: Direct shop name match
-        else if (shopName && shopDetailsMap[shopName]) {
-          salesmanName = shopDetailsMap[shopName].salesman;
-          mappingMethod = 'shopName';
-        }
-        // Strategy 3: Partial shop name matching
-        else if (shopName) {
-          const matchingShop = Object.keys(shopDetailsMap).find(key => {
-            const keyLower = key.toLowerCase();
-            const shopLower = shopName.toLowerCase();
-            // Try exact match, contains, or partial matches
-            return keyLower === shopLower || 
-                   keyLower.includes(shopLower) || 
-                   shopLower.includes(keyLower);
-          });
-          if (matchingShop && shopDetailsMap[matchingShop]) {
-            salesmanName = shopDetailsMap[matchingShop].salesman;
-            mappingMethod = 'partial';
-          }
-        }
-
-        // 🔧 DEBUG: Log mapping details for first few rows
-        if (index < 3) {
-          console.log(`🔍 CORRECTED Row ${index + 1}:`, {
-            challanNo,
-            shopId,
-            shopName,        // Now from Column J!
-            department: cleanDept,  // Cleaned department
-            salesmanName,
-            mappingMethod,
-            rawShopDept: shopDept
-          });
-        }
-
-        // Filter by date range
-        if (challanNo && challanDate && isDateInRange(challanDate, dateRangeStart, dateRangeEnd)) {
-          const isScanned = scannedChallans.has(challanNo);
+        // 🔧 CRITICAL: Date range filtering with enhanced logging
+        if (challanNo && challanDate) {
+          const dateInRange = isDateInRange(challanDate, dateRangeStart, dateRangeEnd);
           
-          // Use challan number as key for deduplication
-          if (!challanMap.has(challanNo)) {
-            challanMap.set(challanNo, {
-              challanNo,
-              challanDate,
-              shopName: shopName || 'Unknown Shop', // ✅ Now from Column J!
-              shopId: shopId || '',
-              department: cleanDept || 'Unknown',   // ✅ Cleaned department!
-              salesman: salesmanName,
-              brand,
-              cases,
-              isScanned
+          if (dateInRange) {
+            dateFilteredRows++;
+            
+            // Department processing
+            const department = shopDept?.replace(' Limited', '').trim();
+            const cleanDept = department === "DSIIDC" ? "DSIDC" : department;
+
+            // Salesman mapping
+            let salesmanName = 'Unknown';
+            let mappingMethod = 'none';
+
+            if (shopId && shopDetailsMap[shopId]) {
+              salesmanName = shopDetailsMap[shopId].salesman;
+              mappingMethod = 'shopId';
+            } else if (shopName && shopDetailsMap[shopName]) {
+              salesmanName = shopDetailsMap[shopName].salesman;
+              mappingMethod = 'shopName';
+            } else if (shopName) {
+              const matchingShop = Object.keys(shopDetailsMap).find(key => {
+                const keyLower = key.toLowerCase();
+                const shopLower = shopName.toLowerCase();
+                return keyLower === shopLower || 
+                       keyLower.includes(shopLower) || 
+                       shopLower.includes(keyLower);
+              });
+              if (matchingShop && shopDetailsMap[matchingShop]) {
+                salesmanName = shopDetailsMap[matchingShop].salesman;
+                mappingMethod = 'partial';
+              }
+            }
+
+            // Log successful mapping for first few rows
+            if (dateFilteredRows <= 5) {
+              console.log(`✅ VALID CHALLAN ${dateFilteredRows}:`, {
+                challanNo,
+                challanDate,
+                shopName,
+                department: cleanDept,
+                salesmanName,
+                mappingMethod,
+                isScanned: scannedChallans.has(challanNo)
+              });
+            }
+
+            // Create challan data
+            const isScanned = scannedChallans.has(challanNo);
+            
+            if (!challanMap.has(challanNo)) {
+              challanMap.set(challanNo, {
+                challanNo,
+                challanDate,
+                shopName: shopName || 'Unknown Shop',
+                shopId: shopId || '',
+                department: cleanDept || 'Unknown',
+                salesman: salesmanName,
+                brand,
+                cases,
+                isScanned
+              });
+              validChallansCreated++;
+            }
+          } else {
+            // Log why date was filtered out for first few
+            if (index < 5) {
+              console.log(`❌ FILTERED OUT Row ${index + 1}:`, {
+                challanNo,
+                challanDate,
+                reason: 'Outside date range'
+              });
+            }
+          }
+        } else {
+          // Log missing required fields for first few
+          if (index < 5) {
+            console.log(`❌ FILTERED OUT Row ${index + 1}:`, {
+              challanNo: challanNo || 'MISSING',
+              challanDate: challanDate || 'MISSING',
+              reason: 'Missing challan number or date'
             });
           }
         }
@@ -387,22 +481,21 @@ const SubmissionTrackingTab = () => {
       }
     });
 
-    // 🔍 DEBUG: Report missing challans
-    console.log(`📊 CHALLAN RECONCILIATION REPORT:`);
+    // 🔍 COMPREHENSIVE DEBUG REPORT
+    console.log(`📊 COMPREHENSIVE PROCESSING REPORT:`);
+    console.log(`   📋 Total rows processed: ${totalRowsProcessed}`);
+    console.log(`   📅 Rows passing date filter: ${dateFilteredRows}`);
+    console.log(`   ✅ Valid challans created: ${validChallansCreated}`);
     console.log(`   📦 Total scanned challans: ${allScannedChallans.length}`);
     console.log(`   ✅ Found in date range: ${foundScannedChallans.size}`);
     console.log(`   📅 Outside date range: ${scannedChallansOutsideDateRange.size}`);
     console.log(`   ❌ Not in Sheet1: ${scannedChallansNotInSheet1.size}`);
     
     if (scannedChallansNotInSheet1.size > 0) {
-      console.log(`   🔍 Missing challan numbers:`, Array.from(scannedChallansNotInSheet1).slice(0, 10));
-    }
-    
-    if (scannedChallansOutsideDateRange.size > 0) {
-      console.log(`   📅 Outside date range (first 10):`, Array.from(scannedChallansOutsideDateRange).slice(0, 10));
+      console.log(`   🔍 Missing challan numbers (first 10):`, Array.from(scannedChallansNotInSheet1).slice(0, 10));
     }
 
-    // 🔧 NEW: Set reconciliation report for UI
+    // Set reconciliation report for UI
     setReconciliationReport({
       totalScanned: allScannedChallans.length,
       foundInRange: foundScannedChallans.size,
@@ -480,7 +573,15 @@ const SubmissionTrackingTab = () => {
     // Sort by total challans descending
     salesmanSummaries.sort((a, b) => b.totalChallans - a.totalChallans);
 
-    const weekRange = `${formatDate(startDate)} to ${formatDate(endDate)}`;
+    const weekRange = `${formatDate(startDate.split('-').reverse().join('-'))} to ${formatDate(endDate.split('-').reverse().join('-'))}`;
+
+    console.log('✅ FINAL SUMMARY:', {
+      totalCollectedChallans,
+      totalPendingChallans,
+      totalCollectedShops: totalCollectedShops.size,
+      totalPendingShops: totalPendingShops.size,
+      salesmenCount: salesmanSummaries.length
+    });
 
     return {
       totalCollectedChallans,
@@ -493,7 +594,7 @@ const SubmissionTrackingTab = () => {
   };
 
   // ==========================================
-  // CSV EXPORT FUNCTION
+  // CSV EXPORT FUNCTION (UNCHANGED)
   // ==========================================
 
   const exportToExcel = () => {
@@ -774,7 +875,7 @@ const SubmissionTrackingTab = () => {
   };
 
   // ==========================================
-  // RENDER
+  // RENDER (UNCHANGED FROM ORIGINAL)
   // ==========================================
 
   if (loading) {
