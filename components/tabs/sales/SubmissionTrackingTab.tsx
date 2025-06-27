@@ -340,7 +340,7 @@ const SubmissionTrackingTab = () => {
     console.log(`👥 Found ${Object.keys(shopDetailsMap).length / 2} shops with salesman mapping`);
 
     // Process detailed challan data
-    const headers = detailsData.values[0] || [];
+    const headers = detailsValues[0] || [];
     const challanMap = new Map<string, ChallanData>();
     
     // 🔍 DEBUG: Track which scanned challans are found/missing
