@@ -1335,6 +1335,57 @@ const SubmissionTrackingTab = () => {
                             </tr>
                           ))}
                         </tbody>
+                        {/* Total Row */}
+                        <tfoot className="bg-blue-50 border-t-2 border-blue-200">
+                          <tr>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                              TOTAL
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-green-600">
+                              {filteredSummaries.reduce((sum, s) => sum + s.collectedChallans, 0)}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                              {filteredSummaries.reduce((sum, s) => sum + s.collectedShops, 0)}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-orange-600">
+                              {filteredSummaries.reduce((sum, s) => sum + s.pendingChallans, 0)}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                              {filteredSummaries.reduce((sum, s) => sum + s.pendingShops, 0)}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-blue-600">
+                              {filteredSummaries.reduce((sum, s) => sum + s.totalChallans, 0)}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-purple-600">
+                              {filteredSummaries.reduce((sum, s) => sum + s.totalShops, 0)}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm">
+                              <div className="flex items-center">
+                                <div className="w-full bg-gray-200 rounded-full h-3 mr-2">
+                                  <div 
+                                    className="bg-blue-600 h-3 rounded-full transition-all duration-500" 
+                                    style={{ 
+                                      width: `${
+                                        filteredSummaries.reduce((sum, s) => sum + s.totalChallans, 0) > 0 
+                                          ? (filteredSummaries.reduce((sum, s) => sum + s.collectedChallans, 0) / 
+                                             filteredSummaries.reduce((sum, s) => sum + s.totalChallans, 0)) * 100 
+                                          : 0
+                                      }%` 
+                                    }}
+                                  ></div>
+                                </div>
+                                <span className="text-sm font-bold text-blue-600">
+                                  {
+                                    filteredSummaries.reduce((sum, s) => sum + s.totalChallans, 0) > 0 
+                                      ? Math.round((filteredSummaries.reduce((sum, s) => sum + s.collectedChallans, 0) / 
+                                                   filteredSummaries.reduce((sum, s) => sum + s.totalChallans, 0)) * 100)
+                                      : 0
+                                  }%
+                                </span>
+                              </div>
+                            </td>
+                          </tr>
+                        </tfoot>
                       </table>
                     </div>
                   </div>
