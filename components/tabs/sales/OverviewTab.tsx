@@ -158,32 +158,124 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
   const coverageVERVE = ((shopsWithVERVE.length / data.summary.totalShops) * 100).toFixed(1);
   const crossSellingRate = shopsWithAnyOrder.length > 0 ? ((shopsWithBothBrands.length / shopsWithAnyOrder.length) * 100).toFixed(1) : '0';
   
-  // Q1 Quarterly Calculations (Mar + Apr + May vs Current Month)
-  const currentQ1_8PM = data.allShopsComparison.reduce((sum, shop) => 
-    sum + (shop.marchEightPM || 0) + (shop.aprilEightPM || 0) + (shop.mayEightPM || 0), 0
-  );
-  const currentQ1_VERVE = data.allShopsComparison.reduce((sum, shop) => 
-    sum + (shop.marchVerve || 0) + (shop.aprilVerve || 0) + (shop.mayVerve || 0), 0
-  );
-  const currentQ1_Total = currentQ1_8PM + currentQ1_VERVE;
+  // ==========================================
+  // ENHANCED QUARTERLY LOGIC: COMPLETED + ONGOING
+  // ==========================================
   
-  // Last Year Q1 (using June last year as proxy for quarterly comparison)
-  const lastYearQ1_8PM = data.summary.lastYearTotal8PM || 0;
-  const lastYearQ1_VERVE = data.summary.lastYearTotalVERVE || 0;
-  const lastYearQ1_Total = lastYearQ1_8PM + lastYearQ1_VERVE;
+  // Helper functions for Indian FY quarters
+  const getCompletedQuarter = (month: string) => {
+    const m = parseInt(month);
+    if (m >= 4 && m <= 6) return m === 6 ? 'Q1' : 'Q4';
+    if (m >= 7 && m <= 9) return m === 9 ? 'Q2' : 'Q1';  
+    if (m >= 10 && m <= 12) return m === 12 ? 'Q3' : 'Q2';
+    return m === 3 ? 'Q4' : 'Q3';
+  };
+
+  const getOngoingQuarter = (month: string) => {
+    const m = parseInt(month);
+    if (m >= 4 && m <= 6) return m === 6 ? null : 'Q1';
+    if (m >= 7 && m <= 9) return m === 9 ? null : 'Q2';
+    if (m >= 10 && m <= 12) return m === 12 ? null : 'Q3';
+    return m === 3 ? null : 'Q4';
+  };
+
+  const getQuarterMonths = (quarter: string, year: string) => {
+    switch(quarter) {
+      case 'Q1': return ['april', 'may', 'june'];
+      case 'Q2': return ['july', 'august', 'september'];
+      case 'Q3': return ['october', 'november', 'december'];
+      case 'Q4': return ['january', 'february', 'march'];
+      default: return [];
+    }
+  };
+
+  const getOngoingQuarterMonths = (quarter: string, currentMonth: string) => {
+    const allMonths = getQuarterMonths(quarter, data.currentYear);
+    const currentMonthIndex = parseInt(currentMonth);
+    
+    // Map month names to numbers for comparison
+    const monthMap: Record<string, number> = {
+      january: 1, february: 2, march: 3, april: 4, may: 5, june: 6,
+      july: 7, august: 8, september: 9, october: 10, november: 11, december: 12
+    };
+    
+    return allMonths.filter(month => monthMap[month] <= currentMonthIndex);
+  };
+
+  // Calculate COMPLETED quarter data
+  const completedQuarter = getCompletedQuarter(data.currentMonth);
+  const completedQuarterMonths = getQuarterMonths(completedQuarter, data.currentYear);
   
-  // Q1 Growth Calculations
-  const q1Growth8PM = lastYearQ1_8PM > 0 ? (((currentQ1_8PM - lastYearQ1_8PM) / lastYearQ1_8PM) * 100).toFixed(1) : '0';
-  const q1GrowthVERVE = lastYearQ1_VERVE > 0 ? (((currentQ1_VERVE - lastYearQ1_VERVE) / lastYearQ1_VERVE) * 100).toFixed(1) : '0';
-  const q1GrowthTotal = lastYearQ1_Total > 0 ? (((currentQ1_Total - lastYearQ1_Total) / lastYearQ1_Total) * 100).toFixed(1) : '0';
+  const completedQ_8PM = data.allShopsComparison.reduce((sum, shop) => {
+    return sum + completedQuarterMonths.reduce((monthSum, month) => {
+      const key = `${month}EightPM` as keyof ShopData;
+      return monthSum + ((shop[key] as number) || 0);
+    }, 0);
+  }, 0);
+  
+  const completedQ_VERVE = data.allShopsComparison.reduce((sum, shop) => {
+    return sum + completedQuarterMonths.reduce((monthSum, month) => {
+      const key = `${month}Verve` as keyof ShopData;
+      return monthSum + ((shop[key] as number) || 0);
+    }, 0);
+  }, 0);
+  
+  const completedQ_Total = completedQ_8PM + completedQ_VERVE;
+
+  // Last year completed quarter (using available data)
+  const lastYearCompletedQ_8PM = data.summary.lastYearTotal8PM || 0;
+  const lastYearCompletedQ_VERVE = data.summary.lastYearTotalVERVE || 0;
+  const lastYearCompletedQ_Total = lastYearCompletedQ_8PM + lastYearCompletedQ_VERVE;
+
+  // Calculate ONGOING quarter data (if exists)
+  const ongoingQuarter = getOngoingQuarter(data.currentMonth);
+  let ongoingQ_8PM = 0, ongoingQ_VERVE = 0, ongoingQ_Total = 0;
+  let lastYearOngoingQ_8PM = 0, lastYearOngoingQ_VERVE = 0, lastYearOngoingQ_Total = 0;
+  
+  if (ongoingQuarter) {
+    const ongoingMonths = getOngoingQuarterMonths(ongoingQuarter, data.currentMonth);
+    
+    ongoingQ_8PM = data.allShopsComparison.reduce((sum, shop) => {
+      return sum + ongoingMonths.reduce((monthSum, month) => {
+        const key = `${month}EightPM` as keyof ShopData;
+        return monthSum + ((shop[key] as number) || 0);
+      }, 0);
+    }, 0);
+    
+    ongoingQ_VERVE = data.allShopsComparison.reduce((sum, shop) => {
+      return sum + ongoingMonths.reduce((monthSum, month) => {
+        const key = `${month}Verve` as keyof ShopData;
+        return monthSum + ((shop[key] as number) || 0);
+      }, 0);
+    }, 0);
+    
+    ongoingQ_Total = ongoingQ_8PM + ongoingQ_VERVE;
+
+    // For ongoing quarter, use proportional last year data
+    lastYearOngoingQ_8PM = ongoingMonths.length === 1 ? (data.summary.lastYearTotal8PM || 0) : 
+                          (data.summary.lastYearTotal8PM || 0) * (ongoingMonths.length / 3);
+    lastYearOngoingQ_VERVE = ongoingMonths.length === 1 ? (data.summary.lastYearTotalVERVE || 0) : 
+                            (data.summary.lastYearTotalVERVE || 0) * (ongoingMonths.length / 3);
+    lastYearOngoingQ_Total = lastYearOngoingQ_8PM + lastYearOngoingQ_VERVE;
+  }
+
+  // Growth Calculations
+  const completedQGrowth8PM = lastYearCompletedQ_8PM > 0 ? (((completedQ_8PM - lastYearCompletedQ_8PM) / lastYearCompletedQ_8PM) * 100).toFixed(1) : '0';
+  const completedQGrowthVERVE = lastYearCompletedQ_VERVE > 0 ? (((completedQ_VERVE - lastYearCompletedQ_VERVE) / lastYearCompletedQ_VERVE) * 100).toFixed(1) : '0';
+  const completedQGrowthTotal = lastYearCompletedQ_Total > 0 ? (((completedQ_Total - lastYearCompletedQ_Total) / lastYearCompletedQ_Total) * 100).toFixed(1) : '0';
+
+  const ongoingQGrowth8PM = ongoingQuarter && lastYearOngoingQ_8PM > 0 ? (((ongoingQ_8PM - lastYearOngoingQ_8PM) / lastYearOngoingQ_8PM) * 100).toFixed(1) : '0';
+  const ongoingQGrowthVERVE = ongoingQuarter && lastYearOngoingQ_VERVE > 0 ? (((ongoingQ_VERVE - lastYearOngoingQ_VERVE) / lastYearOngoingQ_VERVE) * 100).toFixed(1) : '0';
+  const ongoingQGrowthTotal = ongoingQuarter && lastYearOngoingQ_Total > 0 ? (((ongoingQ_Total - lastYearOngoingQ_Total) / lastYearOngoingQ_Total) * 100).toFixed(1) : '0';
   
   // Average Cases per Shop by Brand
   const avg8PMPerShop = shopsWith8PM.length > 0 ? (data.summary.total8PM / shopsWith8PM.length).toFixed(1) : '0';
   const avgVERVEPerShop = shopsWithVERVE.length > 0 ? (data.summary.totalVERVE / shopsWithVERVE.length).toFixed(1) : '0';
   
-  // Sales Velocity (current month vs 3-month average)
-  const threeMonthAvg8PM = currentQ1_8PM / 3;
-  const threeMonthAvgVERVE = currentQ1_VERVE / 3;
+  // Sales Velocity (current month vs 3-month average) - FIXED to use correct Q1
+  const threeMonthAvg8PM = completedQ_8PM / 3;
+  const threeMonthAvgVERVE = completedQ_VERVE / 3;
+  // Sales Velocity (current month vs completed quarter average)
   const velocity8PM = threeMonthAvg8PM > 0 ? ((data.summary.total8PM / threeMonthAvg8PM) * 100).toFixed(0) : '0';
   const velocityVERVE = threeMonthAvgVERVE > 0 ? ((data.summary.totalVERVE / threeMonthAvgVERVE) * 100).toFixed(0) : '0';
 
@@ -232,83 +324,196 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
         />
       </div>
 
-      {/* NEW: Q1 Quarterly Performance Comparison */}
+      {/* NEW: DUAL-VIEW QUARTERLY PERFORMANCE - COMPLETED + ONGOING */}
       <div className="bg-white p-4 sm:p-6 rounded-lg shadow">
-        <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
+        <h3 className="text-lg font-medium text-gray-900 mb-6 flex items-center">
           <BarChart3 className="w-5 h-5 mr-2" />
-          Q1 Performance: 2024 vs 2025 (Mar-Apr-May)
+          Quarterly Performance Analysis - Indian FY (Apr-Mar)
         </h3>
         
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* 8PM Q1 Comparison */}
-          <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
-            <h4 className="font-medium text-purple-800 mb-3">8PM Quarterly Performance</h4>
-            <div className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Q1 FY2024:</span>
-                <span className="font-medium text-gray-900">{lastYearQ1_8PM.toLocaleString()} cases</span>
+        {/* COMPLETED QUARTER SECTION */}
+        <div className="mb-8">
+          <h4 className="text-md font-medium text-gray-800 mb-4 flex items-center">
+            🏆 Latest Completed Quarter: {completedQuarter} FY{data.currentYear} vs {completedQuarter} FY{parseInt(data.currentYear)-1}
+          </h4>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* 8PM Completed Quarter */}
+            <div className="bg-purple-50 p-4 rounded-lg border border-purple-200">
+              <h5 className="font-medium text-purple-800 mb-3">8PM {completedQuarter} Performance</h5>
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600">{completedQuarter} FY{parseInt(data.currentYear)-1}:</span>
+                  <span className="font-medium text-gray-900">{lastYearCompletedQ_8PM.toLocaleString()} cases</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600">{completedQuarter} FY{data.currentYear}:</span>
+                  <span className="font-bold text-purple-600">{completedQ_8PM.toLocaleString()} cases</span>
+                </div>
+                <div className="flex justify-between border-t pt-2">
+                  <span className="text-sm font-medium text-gray-700">YoY Growth:</span>
+                  <span className={`font-bold ${parseFloat(completedQGrowth8PM) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {parseFloat(completedQGrowth8PM) >= 0 ? '+' : ''}{completedQGrowth8PM}%
+                  </span>
+                </div>
+                <div className="text-xs text-gray-500">
+                  {completedQuarterMonths.map(m => m.charAt(0).toUpperCase() + m.slice(1)).join(' + ')}
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Q1 FY2025:</span>
-                <span className="font-bold text-purple-600">{currentQ1_8PM.toLocaleString()} cases</span>
+            </div>
+
+            {/* VERVE Completed Quarter */}
+            <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
+              <h5 className="font-medium text-orange-800 mb-3">VERVE {completedQuarter} Performance</h5>
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600">{completedQuarter} FY{parseInt(data.currentYear)-1}:</span>
+                  <span className="font-medium text-gray-900">{lastYearCompletedQ_VERVE.toLocaleString()} cases</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600">{completedQuarter} FY{data.currentYear}:</span>
+                  <span className="font-bold text-orange-600">{completedQ_VERVE.toLocaleString()} cases</span>
+                </div>
+                <div className="flex justify-between border-t pt-2">
+                  <span className="text-sm font-medium text-gray-700">YoY Growth:</span>
+                  <span className={`font-bold ${parseFloat(completedQGrowthVERVE) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {parseFloat(completedQGrowthVERVE) >= 0 ? '+' : ''}{completedQGrowthVERVE}%
+                  </span>
+                </div>
+                <div className="text-xs text-gray-500">
+                  {completedQuarterMonths.map(m => m.charAt(0).toUpperCase() + m.slice(1)).join(' + ')}
+                </div>
               </div>
-              <div className="flex justify-between border-t pt-2">
-                <span className="text-sm font-medium text-gray-700">YoY Growth:</span>
-                <span className={`font-bold ${parseFloat(q1Growth8PM) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {parseFloat(q1Growth8PM) >= 0 ? '+' : ''}{q1Growth8PM}%
-                </span>
-              </div>
-              <div className="text-xs text-gray-500">
-                Current month: {data.summary.total8PM.toLocaleString()} cases
+            </div>
+
+            {/* Combined Completed Quarter */}
+            <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
+              <h5 className="font-medium text-blue-800 mb-3">Combined {completedQuarter} Performance</h5>
+              <div className="space-y-3">
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600">{completedQuarter} FY{parseInt(data.currentYear)-1}:</span>
+                  <span className="font-medium text-gray-900">{lastYearCompletedQ_Total.toLocaleString()} cases</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-sm text-gray-600">{completedQuarter} FY{data.currentYear}:</span>
+                  <span className="font-bold text-blue-600">{completedQ_Total.toLocaleString()} cases</span>
+                </div>
+                <div className="flex justify-between border-t pt-2">
+                  <span className="text-sm font-medium text-gray-700">YoY Growth:</span>
+                  <span className={`font-bold ${parseFloat(completedQGrowthTotal) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                    {parseFloat(completedQGrowthTotal) >= 0 ? '+' : ''}{completedQGrowthTotal}%
+                  </span>
+                </div>
+                <div className="text-xs text-gray-500">
+                  Total quarter performance
+                </div>
               </div>
             </div>
           </div>
+        </div>
 
-          {/* VERVE Q1 Comparison */}
-          <div className="bg-orange-50 p-4 rounded-lg border border-orange-200">
-            <h4 className="font-medium text-orange-800 mb-3">VERVE Quarterly Performance</h4>
-            <div className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Q1 FY2024:</span>
-                <span className="font-medium text-gray-900">{lastYearQ1_VERVE.toLocaleString()} cases</span>
+        {/* ONGOING QUARTER SECTION */}
+        {ongoingQuarter && (
+          <div className="border-t pt-6">
+            <h4 className="text-md font-medium text-gray-800 mb-4 flex items-center">
+              📈 Ongoing Quarter Progress: {ongoingQuarter} FY{data.currentYear} (Month-to-Date)
+            </h4>
+            
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* 8PM Ongoing Quarter */}
+              <div className="bg-purple-100 p-4 rounded-lg border border-purple-300">
+                <h5 className="font-medium text-purple-800 mb-3">8PM {ongoingQuarter} Progress</h5>
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Same period last year:</span>
+                    <span className="font-medium text-gray-900">{Math.round(lastYearOngoingQ_8PM).toLocaleString()} cases</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Current progress:</span>
+                    <span className="font-bold text-purple-600">{ongoingQ_8PM.toLocaleString()} cases</span>
+                  </div>
+                  <div className="flex justify-between border-t pt-2">
+                    <span className="text-sm font-medium text-gray-700">YoY Tracking:</span>
+                    <span className={`font-bold ${parseFloat(ongoingQGrowth8PM) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {parseFloat(ongoingQGrowth8PM) >= 0 ? '+' : ''}{ongoingQGrowth8PM}%
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {getOngoingQuarterMonths(ongoingQuarter, data.currentMonth).length} of 3 months
+                  </div>
+                </div>
               </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Q1 FY2025:</span>
-                <span className="font-bold text-orange-600">{currentQ1_VERVE.toLocaleString()} cases</span>
+
+              {/* VERVE Ongoing Quarter */}
+              <div className="bg-orange-100 p-4 rounded-lg border border-orange-300">
+                <h5 className="font-medium text-orange-800 mb-3">VERVE {ongoingQuarter} Progress</h5>
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Same period last year:</span>
+                    <span className="font-medium text-gray-900">{Math.round(lastYearOngoingQ_VERVE).toLocaleString()} cases</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Current progress:</span>
+                    <span className="font-bold text-orange-600">{ongoingQ_VERVE.toLocaleString()} cases</span>
+                  </div>
+                  <div className="flex justify-between border-t pt-2">
+                    <span className="text-sm font-medium text-gray-700">YoY Tracking:</span>
+                    <span className={`font-bold ${parseFloat(ongoingQGrowthVERVE) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {parseFloat(ongoingQGrowthVERVE) >= 0 ? '+' : ''}{ongoingQGrowthVERVE}%
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    {getOngoingQuarterMonths(ongoingQuarter, data.currentMonth).length} of 3 months
+                  </div>
+                </div>
               </div>
-              <div className="flex justify-between border-t pt-2">
-                <span className="text-sm font-medium text-gray-700">YoY Growth:</span>
-                <span className={`font-bold ${parseFloat(q1GrowthVERVE) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {parseFloat(q1GrowthVERVE) >= 0 ? '+' : ''}{q1GrowthVERVE}%
-                </span>
-              </div>
-              <div className="text-xs text-gray-500">
-                Current month: {data.summary.totalVERVE.toLocaleString()} cases
+
+              {/* Combined Ongoing Quarter */}
+              <div className="bg-indigo-100 p-4 rounded-lg border border-indigo-300">
+                <h5 className="font-medium text-indigo-800 mb-3">Combined {ongoingQuarter} Progress</h5>
+                <div className="space-y-3">
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Same period last year:</span>
+                    <span className="font-medium text-gray-900">{Math.round(lastYearOngoingQ_Total).toLocaleString()} cases</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-sm text-gray-600">Current progress:</span>
+                    <span className="font-bold text-indigo-600">{ongoingQ_Total.toLocaleString()} cases</span>
+                  </div>
+                  <div className="flex justify-between border-t pt-2">
+                    <span className="text-sm font-medium text-gray-700">YoY Tracking:</span>
+                    <span className={`font-bold ${parseFloat(ongoingQGrowthTotal) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+                      {parseFloat(ongoingQGrowthTotal) >= 0 ? '+' : ''}{ongoingQGrowthTotal}%
+                    </span>
+                  </div>
+                  <div className="text-xs text-gray-500">
+                    Quarter progress tracking
+                  </div>
+                </div>
               </div>
             </div>
           </div>
+        )}
 
-          {/* Combined Q1 Performance */}
-          <div className="bg-blue-50 p-4 rounded-lg border border-blue-200">
-            <h4 className="font-medium text-blue-800 mb-3">Combined Q1 Performance</h4>
-            <div className="space-y-3">
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Q1 FY2024:</span>
-                <span className="font-medium text-gray-900">{lastYearQ1_Total.toLocaleString()} cases</span>
-              </div>
-              <div className="flex justify-between">
-                <span className="text-sm text-gray-600">Q1 FY2025:</span>
-                <span className="font-bold text-blue-600">{currentQ1_Total.toLocaleString()} cases</span>
-              </div>
-              <div className="flex justify-between border-t pt-2">
-                <span className="text-sm font-medium text-gray-700">YoY Growth:</span>
-                <span className={`font-bold ${parseFloat(q1GrowthTotal) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                  {parseFloat(q1GrowthTotal) >= 0 ? '+' : ''}{q1GrowthTotal}%
-                </span>
-              </div>
-              <div className="text-xs text-gray-500">
-                Current month: {data.summary.totalSales.toLocaleString()} cases
-              </div>
+        {/* Quarter Info Banner */}
+        <div className="mt-6 bg-gray-50 p-4 rounded-lg">
+          <h5 className="font-medium text-gray-800 mb-2">Indian Financial Year Quarters:</h5>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <div className={`text-center p-2 rounded ${completedQuarter === 'Q1' ? 'bg-blue-100 border border-blue-300' : 'bg-white'}`}>
+              <div className="font-medium">Q1</div>
+              <div className="text-xs text-gray-600">Apr-May-Jun</div>
+            </div>
+            <div className={`text-center p-2 rounded ${completedQuarter === 'Q2' ? 'bg-blue-100 border border-blue-300' : 'bg-white'}`}>
+              <div className="font-medium">Q2</div>
+              <div className="text-xs text-gray-600">Jul-Aug-Sep</div>
+            </div>
+            <div className={`text-center p-2 rounded ${completedQuarter === 'Q3' ? 'bg-blue-100 border border-blue-300' : 'bg-white'}`}>
+              <div className="font-medium">Q3</div>
+              <div className="text-xs text-gray-600">Oct-Nov-Dec</div>
+            </div>
+            <div className={`text-center p-2 rounded ${completedQuarter === 'Q4' ? 'bg-blue-100 border border-blue-300' : 'bg-white'}`}>
+              <div className="font-medium">Q4</div>
+              <div className="text-xs text-gray-600">Jan-Feb-Mar</div>
             </div>
           </div>
         </div>
@@ -558,10 +763,10 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
             <div className="text-xs text-gray-400">Both brands</div>
           </div>
           <div className="text-center">
-            <div className={`text-2xl font-bold ${parseFloat(q1GrowthTotal) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {parseFloat(q1GrowthTotal) >= 0 ? '+' : ''}{q1GrowthTotal}%
+            <div className={`text-2xl font-bold ${parseFloat(completedQGrowthTotal) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {parseFloat(completedQGrowthTotal) >= 0 ? '+' : ''}{completedQGrowthTotal}%
             </div>
-            <div className="text-xs text-gray-600">Q1 YoY Growth</div>
+            <div className="text-xs text-gray-600">{completedQuarter} YoY Growth</div>
             <div className="text-xs text-gray-400">vs last year</div>
           </div>
         </div>
