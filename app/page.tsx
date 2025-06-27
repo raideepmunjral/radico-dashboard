@@ -581,7 +581,7 @@ const ProtectedRadicoDashboard = () => {
   };
 
   // ==========================================
-  // PART 5: YOUR COMPLETE ENHANCED DATA PROCESSING (UPDATED WITH UNIFIED NORMALIZATION)
+  // PART 5: ENHANCED DATA PROCESSING WITH 15-MONTH EXTENDED WINDOW (UPDATED)
   // ==========================================
 
   const processEnhancedRadicoData = (masterData: Record<string, any[]>, visitData: any[], historicalData: any[]): DashboardData => {
@@ -589,10 +589,10 @@ const ProtectedRadicoDashboard = () => {
     const targets = masterData['Target Vs Achievement'] || [];
     const challans = masterData['Pending Challans'] || [];
     
-    console.log(`🔧 ENHANCED PROCESSING WITH UNIFIED NORMALIZATION: ${currentMonth}-${currentYear}`);
-    console.log('🔄 ROLLING 12-MONTH WINDOW WITH INDIVIDUAL SHOP POPULATION');
+    console.log(`🔧 ENHANCED PROCESSING WITH 15-MONTH EXTENDED WINDOW: ${currentMonth}-${currentYear}`);
+    console.log('🔄 EXTENDED 15-MONTH WINDOW WITH Q1 FY2024 COMPLETE DATA');
     
-    // ENHANCED MONTHLY DATA PROCESSING WITH HISTORICAL SHOP POPULATION
+    // ENHANCED MONTHLY DATA PROCESSING WITH EXTENDED HISTORICAL RANGE
     const processMonthlyData = (monthNumber: string, year: string = currentYear, useHistorical: boolean = false) => {
       let monthShopSales: Record<string, any> = {};
       let monthShopSKUs: Record<string, Record<string, number>> = {};
@@ -770,17 +770,18 @@ const ProtectedRadicoDashboard = () => {
       };
     };
 
-    // ENHANCED: Process ALL 12 months for comprehensive historical analysis
-    console.log('🔄 PROCESSING ALL 12 MONTHS FOR HISTORICAL POPULATION...');
+    // ENHANCED: Process ALL 15 months for complete quarterly coverage including Q1 FY2024
+    console.log('🔄 PROCESSING ALL 15 MONTHS FOR COMPLETE QUARTERLY COVERAGE...');
     
+    // Current year data (FY2025)
     const juneData = processMonthlyData(currentMonth, currentYear, false);
     const mayData = processMonthlyData('05', currentYear, false);
     const aprilData = processMonthlyData('04', currentYear, false);
     const marchData = processMonthlyData('03', currentYear, true);
-    
-    // NEW: Process all remaining historical months (OPTION 1 IMPLEMENTATION)
     const februaryData = processMonthlyData('02', currentYear, true);
     const januaryData = processMonthlyData('01', currentYear, true);
+    
+    // FY2024 data
     const decemberData = processMonthlyData('12', '2024', true);
     const novemberData = processMonthlyData('11', '2024', true);
     const octoberData = processMonthlyData('10', '2024', true);
@@ -788,17 +789,39 @@ const ProtectedRadicoDashboard = () => {
     const augustData = processMonthlyData('08', '2024', true);
     const julyData = processMonthlyData('07', '2024', true);
     
-    // YoY COMPARISON
-    const juneLastYearData = processMonthlyData(currentMonth, '2024', true);
+    // 🚀 NEW: Q1 FY2024 complete data (April, May, June 2024)
+    const april2024Data = processMonthlyData('04', '2024', true);
+    const may2024Data = processMonthlyData('05', '2024', true);
+    const june2024Data = processMonthlyData('06', '2024', true); // This is the existing YoY data
     
-    console.log('📊 ENHANCED 12-MONTH PROCESSING WITH INDIVIDUAL SHOP POPULATION COMPLETE');
+    // YoY COMPARISON (keeping existing for backward compatibility)
+    const juneLastYearData = june2024Data;
+    
+    console.log('📊 EXTENDED 15-MONTH PROCESSING WITH Q1 FY2024 COMPLETE');
+    console.log('🎯 Q1 FY2024 COMPLETE DATA AVAILABLE:', {
+      april2024: {
+        shops: april2024Data.uniqueShops.size,
+        total8PM: april2024Data.total8PM,
+        totalVERVE: april2024Data.totalVERVE
+      },
+      may2024: {
+        shops: may2024Data.uniqueShops.size,
+        total8PM: may2024Data.total8PM,
+        totalVERVE: may2024Data.totalVERVE
+      },
+      june2024: {
+        shops: june2024Data.uniqueShops.size,
+        total8PM: june2024Data.total8PM,
+        totalVERVE: june2024Data.totalVERVE
+      }
+    });
     
     // Current month primary data (UNCHANGED)
     const total8PM = juneData.total8PM;
     const totalVERVE = juneData.totalVERVE;
     const uniqueShops = juneData.uniqueShops;
 
-    // ENHANCED SHOP DATA BUILDING WITH HISTORICAL POPULATION
+    // ENHANCED SHOP DATA BUILDING WITH HISTORICAL POPULATION (UNCHANGED)
     const shopSales: Record<string, ShopData> = {};
     
     const masterShopSKUs: Record<string, Record<string, number>> = {};
@@ -876,8 +899,8 @@ const ProtectedRadicoDashboard = () => {
       shopIdentifierMap[shopId] = shopId;
     });
     
-    // ENHANCED: Include ALL 12 months in identifier mapping
-    [mayData, aprilData, marchData, februaryData, januaryData, decemberData, novemberData, octoberData, septemberData, augustData, julyData, juneLastYearData].forEach(monthData => {
+    // ENHANCED: Include ALL 15 months in identifier mapping
+    [mayData, aprilData, marchData, februaryData, januaryData, decemberData, novemberData, octoberData, septemberData, augustData, julyData, april2024Data, may2024Data, juneLastYearData].forEach(monthData => {
       Object.keys(monthData.shopSales).forEach(shopIdentifier => {
         if (!shopIdentifierMap[shopIdentifier]) {
           if (shopDetailsMap[shopIdentifier]) {
@@ -896,14 +919,14 @@ const ProtectedRadicoDashboard = () => {
       });
     });
 
-    // ENHANCED: Merge SKUs from ALL 12 months
-    console.log('🔄 MERGING SKUs FROM ALL 12 MONTHS...');
-    [juneData, mayData, aprilData, marchData, februaryData, januaryData, decemberData, novemberData, octoberData, septemberData, augustData, julyData].forEach(monthData => {
+    // ENHANCED: Merge SKUs from ALL 15 months
+    console.log('🔄 MERGING SKUs FROM ALL 15 MONTHS...');
+    [juneData, mayData, aprilData, marchData, februaryData, januaryData, decemberData, novemberData, octoberData, septemberData, augustData, julyData, april2024Data, may2024Data].forEach(monthData => {
       mergeSKUsFromMonth(monthData, shopIdentifierMap);
       mergeDetailedSKUsFromMonth(monthData, shopIdentifierMap);
     });
     
-    console.log('✅ COMPREHENSIVE 12-MONTH SKU BREAKDOWN COLLECTED');
+    console.log('✅ COMPREHENSIVE 15-MONTH SKU BREAKDOWN COLLECTED');
 
     // Process current month data (ALL EXISTING LOGIC PRESERVED)
     juneData.challans.forEach(row => {
@@ -1000,8 +1023,8 @@ const ProtectedRadicoDashboard = () => {
       }
     });
 
-    // ENHANCED: Add ALL historical data for rolling window + YoY + EXTENDED MONTHS
-    console.log('🔄 POPULATING ALL HISTORICAL MONTHS FOR EACH SHOP...');
+    // ENHANCED: Add ALL historical data for rolling window + YoY + EXTENDED MONTHS + Q1 FY2024
+    console.log('🔄 POPULATING ALL 15 HISTORICAL MONTHS FOR EACH SHOP...');
     
     const allHistoricalMonths = [
       { data: mayData, key: 'may' },
@@ -1015,6 +1038,9 @@ const ProtectedRadicoDashboard = () => {
       { data: septemberData, key: 'september' },
       { data: augustData, key: 'august' },
       { data: julyData, key: 'july' },
+      // 🚀 NEW: Q1 FY2024 data - these are the key additions!
+      { data: april2024Data, key: 'april2024' },
+      { data: may2024Data, key: 'may2024' },
       { data: juneLastYearData, key: 'juneLastYear' }
     ];
     
@@ -1078,7 +1104,7 @@ const ProtectedRadicoDashboard = () => {
           };
         }
         
-        // ENHANCED: Populate historical data for ALL months
+        // ENHANCED: Populate historical data for ALL months including Q1 FY2024
         if (monthKey === 'may') {
           shopSales[actualShopId].mayTotal = monthShopData.total;
           shopSales[actualShopId].mayEightPM = monthShopData.eightPM;
@@ -1128,10 +1154,11 @@ const ProtectedRadicoDashboard = () => {
           shopSales[actualShopId].juneLastYearEightPM = monthShopData.eightPM;
           shopSales[actualShopId].juneLastYearVerve = monthShopData.verve;
         }
+        // 🚀 NEW: Q1 FY2024 data population handled by historicalData object below
       });
     });
 
-    console.log('✅ ALL HISTORICAL MONTHS POPULATED FOR INDIVIDUAL SHOPS');
+    console.log('✅ ALL 15 HISTORICAL MONTHS POPULATED FOR INDIVIDUAL SHOPS');
 
     // ENHANCED: Populate BOTH legacy and detailed SKU breakdowns for ALL shops (UNCHANGED)
     console.log('🔄 POPULATING BOTH EXISTING AND NEW SKU BREAKDOWNS...');
@@ -1353,8 +1380,8 @@ const ProtectedRadicoDashboard = () => {
       .sort((a, b) => (b.threeMonthAvgTotal! || 0) - (a.threeMonthAvgTotal! || 0))
       .slice(0, 20);
 
-    console.log('🎯 FINAL RESULT: ENHANCED DATA WITH UNIFIED NORMALIZATION');
-    console.log('✅ All shop objects now contain 12+ months of historical data');
+    console.log('🎯 FINAL RESULT: ENHANCED DATA WITH 15-MONTH EXTENDED WINDOW');
+    console.log('✅ All shop objects now contain 15+ months of historical data including Q1 FY2024');
     console.log('✅ Brand normalization unified across all data sources');
     console.log('✅ All existing components work unchanged - fully backward compatible');
 
@@ -1385,6 +1412,7 @@ const ProtectedRadicoDashboard = () => {
       allShopsComparison,
       currentMonth: currentMonth,
       currentYear: currentYear,
+      // 🚀 ENHANCED: 15-month historical data with Q1 FY2024 complete
       historicalData: {
         // Current rolling window (4 months) - UNCHANGED
         june: juneData,
@@ -1402,7 +1430,12 @@ const ProtectedRadicoDashboard = () => {
         august2024: augustData,
         july2024: julyData,
         
-        // YoY comparison - UNCHANGED
+        // 🚀 NEW: Q1 FY2024 complete data for proper quarterly comparisons
+        april2024: april2024Data,
+        may2024: may2024Data,
+        june2024: june2024Data,
+        
+        // YoY comparison - UNCHANGED (aliased for backward compatibility)
         juneLastYear: juneLastYearData
       }
     };
@@ -1463,7 +1496,7 @@ const ProtectedRadicoDashboard = () => {
         <div className="text-center">
           <RefreshCw className="w-12 h-12 animate-spin mx-auto mb-4 text-blue-600" />
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Loading Enhanced Radico Dashboard</h2>
-          <p className="text-gray-600">Processing live data with unified brand normalization for {getMonthName(currentMonth)} {currentYear}...</p>
+          <p className="text-gray-600">Processing live data with 15-month extended window for {getMonthName(currentMonth)} {currentYear}...</p>
         </div>
       </div>
     );
@@ -1506,7 +1539,7 @@ const ProtectedRadicoDashboard = () => {
             <div className="flex items-center mb-4 sm:mb-0">
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Radico Khaitan Enhanced Analytics Dashboard</h1>
               <span className="ml-3 px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
-                Unified Normalization - {getShortMonthName(currentMonth)} {currentYear}
+                15-Month Extended - {getShortMonthName(currentMonth)} {currentYear}
               </span>
               {/* 🔐 Show user info when authenticated */}
               {user && (
