@@ -257,14 +257,14 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
   if (completedQuarter === 'Q1' && hasExtendedData) {
     // PROPER Q1 FY2024: April 2024 + May 2024 + June 2024
     lastYearCompletedQ_8PM = 
-      (data.historicalData.april2024?.total8PM || 0) +
-      (data.historicalData.may2024?.total8PM || 0) +
-      (data.historicalData.juneLastYear?.total8PM || 0);
+      (data.historicalData?.april2024?.total8PM || 0) +
+      (data.historicalData?.may2024?.total8PM || 0) +
+      (data.historicalData?.juneLastYear?.total8PM || 0);
     
     lastYearCompletedQ_VERVE = 
-      (data.historicalData.april2024?.totalVERVE || 0) +
-      (data.historicalData.may2024?.totalVERVE || 0) +
-      (data.historicalData.juneLastYear?.totalVERVE || 0);
+      (data.historicalData?.april2024?.totalVERVE || 0) +
+      (data.historicalData?.may2024?.totalVERVE || 0) +
+      (data.historicalData?.juneLastYear?.totalVERVE || 0);
     
     lastYearDataLabel = 'Full Q1 FY2024 (Apr+May+Jun)';
   } else if (completedQuarter === 'Q1') {
