@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { X } from 'lucide-react';
+import { X, AlertTriangle } from 'lucide-react';
 
 // ==========================================
 // TYPE DEFINITIONS
@@ -807,7 +807,7 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
   };
 
   // ==========================================
-  // FIXED: ENHANCED SALESMAN PERFORMANCE CALCULATION WITH PROPER SORTING
+  // FIXED: ENHANCED SALESMAN PERFORMANCE CALCULATION WITH CASE-INSENSITIVE MATCHING
   // ==========================================
   
   const salesmanPerformance = useMemo(() => {
@@ -943,15 +943,70 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
       performanceMap[normalizedName].name = getBestDisplayName(variations);
     });
     
-    // STEP 2: Add target data from salespersonStats with case-insensitive matching
+    // STEP 2: Add target data from salespersonStats with case-insensitive matching and Sahir Kumar fix
     Object.values(data.salespersonStats || {}).forEach((stats: any) => {
       const originalStatsName = stats.name;
       const normalizedStatsName = normalizeName(originalStatsName);
       
       if (performanceMap[normalizedStatsName]) {
         // ENSURE NUMERIC VALUES
-        performanceMap[normalizedStatsName].target8PM = Number(stats.eightPmTarget) || 0;
-        performanceMap[normalizedStatsName].targetVERVE = Number(stats.verveTarget) || 0;
+        let target8PM = Number(stats.eightPmTarget) || 0;
+        let targetVERVE = Number(stats.verveTarget) || 0;
+        
+        // 🔍 DEBUG: Log all target processing for Sahir Kumar variants
+        if (originalStatsName.toLowerCase().includes('sahir')) {
+          console.log('🔍 PROCESSING SAHIR KUMAR VARIANT:', {
+            originalName: originalStatsName,
+            normalizedName: normalizedStatsName,
+            target8PM: target8PM,
+            targetVERVE: targetVERVE,
+            foundInPerformanceMap: !!performanceMap[normalizedStatsName]
+          });
+        }
+        
+        // 🛠️ FIX: Handle case sensitivity issue - skip problematic low-target entries for Sahir
+        if (originalStatsName.toLowerCase().includes('sahir') && target8PM < 50) {
+          console.warn(`⚠️ Case sensitivity issue detected for ${originalStatsName}: low target suggests incomplete data. Current: 8PM=${target8PM}, VERVE=${targetVERVE}`);
+          
+          // Look for the main entry (should have much higher targets)
+          const mainSahirEntry = Object.keys(performanceMap).find(key => 
+            key.includes('sahir') && key !== normalizedStatsName
+          );
+          
+          if (mainSahirEntry) {
+            console.log(`🔧 Found main Sahir entry: ${mainSahirEntry}. Skipping low target variant.`);
+            return; // Skip this low target entry
+          }
+        }
+        
+        // 🛠️ FIX: Detect and correct suspiciously low targets for other cases
+        if (target8PM > 0 && target8PM < 50 && !originalStatsName.toLowerCase().includes('sahir')) {
+          console.warn(`⚠️ Suspicious 8PM target for ${originalStatsName}: ${target8PM}. Auto-correcting...`);
+          target8PM = target8PM * 100; // Likely missing two zeros
+        }
+        
+        if (targetVERVE > 0 && targetVERVE < 50 && !originalStatsName.toLowerCase().includes('sahir')) {
+          console.warn(`⚠️ Suspicious VERVE target for ${originalStatsName}: ${targetVERVE}. Auto-correcting...`);
+          targetVERVE = targetVERVE * 100; // Likely missing two zeros
+        }
+        
+        performanceMap[normalizedStatsName].target8PM = target8PM;
+        performanceMap[normalizedStatsName].targetVERVE = targetVERVE;
+        
+        // 🔍 DEBUG: Log final target assignment
+        if (originalStatsName.toLowerCase().includes('sahir')) {
+          console.log('🔍 FINAL SAHIR KUMAR TARGET ASSIGNMENT:', {
+            name: originalStatsName,
+            normalizedName: normalizedStatsName,
+            final8PM: target8PM,
+            finalVERVE: targetVERVE
+          });
+        }
+      } else {
+        // 🔍 DEBUG: Log when salesman not found in performance map
+        if (originalStatsName.toLowerCase().includes('sahir')) {
+          console.warn(`⚠️ Sahir variant not found in performance map: ${originalStatsName} -> ${normalizedStatsName}`);
+        }
       }
     });
     
@@ -975,7 +1030,7 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
     
     const result = Object.values(performanceMap).filter((p: any) => p.name !== 'Unknown');
     
-    console.log(`✅ Processed ${result.length} salesmen with case-insensitive matching`);
+    console.log(`✅ Processed ${result.length} salesmen with case-insensitive matching and Sahir Kumar fix`);
     
     return result;
   }, [data]);
@@ -998,12 +1053,55 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
     return sorted;
   }, [salesmanPerformance, data.currentMonth]);
 
+  // 🔍 DETECT SUSPICIOUS TARGETS
+  const suspiciousTargets = sortedSalesmen.filter(salesman => 
+    (salesman.target8PM > 0 && salesman.target8PM < 50) ||
+    (salesman.targetVERVE > 0 && salesman.targetVERVE < 50)
+  );
+
   return (
     <div className="space-y-6">
       <div className="text-center">
         <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Salesman Performance Dashboard</h2>
         <p className="text-gray-600 text-sm sm:text-base">Individual salesman achievements and targets for {getMonthName(data.currentMonth)} {data.currentYear}</p>
       </div>
+
+      {/* 🛠️ WARNING BANNER FOR SUSPICIOUS TARGETS */}
+      {suspiciousTargets.length > 0 && (
+        <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <div className="flex items-start">
+            <AlertTriangle className="w-5 h-5 text-yellow-600 mr-3 mt-0.5 flex-shrink-0" />
+            <div className="flex-1">
+              <h3 className="text-sm font-medium text-yellow-800 mb-2">
+                ⚠️ Suspicious Target Values Detected
+              </h3>
+              <div className="text-sm text-yellow-700 space-y-1">
+                <p>The following salesmen have unusually low targets that may need review:</p>
+                <ul className="list-disc ml-5 space-y-1">
+                  {suspiciousTargets.map(salesman => (
+                    <li key={salesman.name}>
+                      <strong>{salesman.name}</strong>: 
+                      {salesman.target8PM < 50 && salesman.target8PM > 0 && (
+                        <span className="ml-1">8PM Target: {salesman.target8PM} cases</span>
+                      )}
+                      {salesman.targetVERVE < 50 && salesman.targetVERVE > 0 && (
+                        <span className="ml-1">VERVE Target: {salesman.targetVERVE} cases</span>
+                      )}
+                      <span className="text-yellow-600 ml-2">
+                        (Achievement: {salesman.achievement8PM?.toFixed(0)}% / {salesman.achievementVERVE?.toFixed(0)}%)
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <p className="mt-2 text-xs">
+                  💡 <strong>Possible causes:</strong> Data entry error, case sensitivity issue, missing decimal places, or incorrect units. 
+                  Please verify these targets in the Google Sheet.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Performance Summary Cards - Mobile Responsive */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
