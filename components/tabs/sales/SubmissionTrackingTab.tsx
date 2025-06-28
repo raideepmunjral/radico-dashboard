@@ -128,7 +128,7 @@ const createDateFromInput = (inputDateStr: string): Date => {
   return date;
 };
 
-// 🔧 COMPLETELY REWRITTEN: Exact scanning date match function
+// 🔧 COMPLETELY REWRITTEN: Exact scanning date match function with extensive debugging
 const isScanningDateMatch = (scanningDateStr: string, targetDateInput: string): boolean => {
   if (!scanningDateStr || !targetDateInput) {
     return false;
@@ -141,7 +141,6 @@ const isScanningDateMatch = (scanningDateStr: string, targetDateInput: string): 
     // Parse scanning date (DD-MM-YYYY)
     const scanParts = scanningDateStr.trim().split('-');
     if (scanParts.length !== 3) {
-      console.log(`❌ Invalid scanning date format: ${scanningDateStr}`);
       return false;
     }
     
@@ -152,7 +151,6 @@ const isScanningDateMatch = (scanningDateStr: string, targetDateInput: string): 
     // Parse target date (YYYY-MM-DD)
     const targetParts = targetDateInput.split('-');
     if (targetParts.length !== 3) {
-      console.log(`❌ Invalid target date format: ${targetDateInput}`);
       return false;
     }
     
@@ -166,11 +164,13 @@ const isScanningDateMatch = (scanningDateStr: string, targetDateInput: string): 
     
     const isMatch = normalizedScanDate === normalizedTargetDate;
     
-    // Debug logging for first few comparisons
-    if (Math.random() < 0.01) { // Log 1% of comparisons
-      console.log(`🔍 DATE MATCH CHECK:`, {
+    // Enhanced debugging for date matching issues
+    if (scanningDateStr === "21-06-2025" || targetDateInput === "2025-06-21") {
+      console.log(`🔍 CRITICAL DATE MATCH DEBUG:`, {
         scanningDate: scanningDateStr,
         targetInput: targetDateInput,
+        scanParts: { day: scanDay, month: scanMonth, year: scanYear },
+        targetParts: { day: targetDay, month: targetMonth, year: targetYear },
         normalizedScan: normalizedScanDate,
         normalizedTarget: normalizedTargetDate,
         isMatch
@@ -351,12 +351,14 @@ const SubmissionTrackingTab = () => {
     console.log(`👥 Shop details mapping built: ${Object.keys(shopDetailsMap).length / 2} shops`);
 
     // 🔧 FIXED: Get challans scanned on EXACT target date with better logging
-    const scannedChallansOnDate = new Set<string>();
+    const scannedChallansOnTargetDate = new Set<string>();
     const scanningDateMap: Record<string, string> = {}; // challan -> scanning date
     let totalScannedChallans = 0;
     let matchedScannedChallans = 0;
     
     console.log('🔍 ANALYZING SCANNED CHALLANS DATA...');
+    console.log('🎯 Target scanning date (input):', scanningDate);
+    console.log('🎯 Target scanning date (display):', formatDateForDisplay(scanningDate));
     
     scannedValues.slice(1).forEach((row, index) => {
       if (row.length >= 2) {
@@ -378,10 +380,10 @@ const SubmissionTrackingTab = () => {
           }
           
           if (isScanningDateMatch(scanDateStr, scanningDate)) {
-            scannedChallansOnDate.add(challanNo);
+            scannedChallansOnTargetDate.add(challanNo);
             matchedScannedChallans++;
             
-            if (matchedScannedChallans <= 5) {
+            if (matchedScannedChallans <= 10) {
               console.log(`✅ MATCHED CHALLAN ${matchedScannedChallans}:`, {
                 challanNo,
                 scanDateStr,
@@ -393,26 +395,34 @@ const SubmissionTrackingTab = () => {
       }
     });
 
-    console.log(`📦 SCANNING MATCH RESULTS:`, {
+    console.log(`📦 CRITICAL - SCANNING MATCH RESULTS:`, {
       totalScannedChallans,
       matchedScannedChallans,
       targetDate: scanningDate,
-      formattedTargetDate: formatDateForDisplay(scanningDate)
+      formattedTargetDate: formatDateForDisplay(scanningDate),
+      scannedOnTargetDateSet: scannedChallansOnTargetDate.size
     });
 
     if (matchedScannedChallans === 0) {
-      console.log('⚠️ NO CHALLANS FOUND for target date - this might be the issue!');
+      console.log('🚨 NO CHALLANS FOUND for target date!');
       console.log('🔍 Sample scanning dates from CSV:', 
-        scannedValues.slice(1, 6).map(row => row[1]?.toString().trim()).filter(Boolean)
+        scannedValues.slice(1, 10).map((row, i) => `Row ${i+1}: ${row[1]?.toString().trim()}`).filter(x => x.includes(': '))
       );
+      console.log('🔍 First 5 challan numbers:', 
+        scannedValues.slice(1, 6).map(row => row[0]?.toString().trim()).filter(Boolean)
+      );
+    } else {
+      console.log('✅ Found challans scanned on target date:', Array.from(scannedChallansOnTargetDate).slice(0, 5));
     }
 
     // 🔧 FIXED: Process detailed challan data ONLY for exactly matched scanned challans
     const dailyChallans: ChallanData[] = [];
+    const uniqueChallansProcessed = new Set<string>(); // Track unique challans
     let totalDetailRows = 0;
     let processedDetailRows = 0;
+    let duplicateRowsSkipped = 0;
 
-    console.log('🔍 PROCESSING DETAILED CHALLAN DATA...');
+    console.log('🔍 PROCESSING DETAILED CHALLAN DATA (GROUPING BY UNIQUE CHALLAN)...');
 
     detailsValues.slice(1).forEach((row, index) => {
       if (row.length >= 15) {
@@ -425,18 +435,38 @@ const SubmissionTrackingTab = () => {
         const brand = row[11]?.toString().trim();
         const cases = parseFloat(row[14]) || 0;
 
-        // 🎯 CRITICAL: Only include challans that were scanned on the EXACT target date
-        if (challanNo && scannedChallansOnDate.has(challanNo)) {
+        // 🎯 CRITICAL FIX: Only include challans that were scanned on the EXACT target date
+        if (challanNo && scannedChallansOnTargetDate.has(challanNo)) {
+          
+          // 🔧 NEW: Skip duplicate challan numbers (only process first occurrence)
+          if (uniqueChallansProcessed.has(challanNo)) {
+            duplicateRowsSkipped++;
+            if (duplicateRowsSkipped <= 5) {
+              console.log(`⏭️ SKIPPING DUPLICATE ${duplicateRowsSkipped}:`, {
+                challanNo,
+                brand,
+                cases,
+                reason: 'Already processed this challan number'
+              });
+            }
+            return; // Skip this row as we've already processed this challan
+          }
+          
+          // Mark this challan as processed
+          uniqueChallansProcessed.add(challanNo);
           processedDetailRows++;
           
           // Log first few processed challans
-          if (processedDetailRows <= 5) {
-            console.log(`✅ PROCESSING CHALLAN ${processedDetailRows}:`, {
+          if (processedDetailRows <= 10) {
+            console.log(`✅ PROCESSING UNIQUE CHALLAN ${processedDetailRows}:`, {
               challanNo,
               challanDate,
               shopName,
+              brand,
+              cases,
               isScanned: true,
-              scanningDate: scanningDateMap[challanNo]
+              scanningDate: scanningDateMap[challanNo],
+              isInTargetDateSet: scannedChallansOnTargetDate.has(challanNo)
             });
           }
           
@@ -479,10 +509,12 @@ const SubmissionTrackingTab = () => {
       }
     });
 
-    console.log(`📊 DETAILED PROCESSING RESULTS:`, {
+    console.log(`📊 DETAILED PROCESSING RESULTS (UNIQUE CHALLANS ONLY):`, {
       totalDetailRows,
       processedDetailRows,
+      duplicateRowsSkipped,
       dailyChallansCreated: dailyChallans.length,
+      uniqueChallansProcessed: uniqueChallansProcessed.size,
       shouldMatch: matchedScannedChallans
     });
 
@@ -542,10 +574,38 @@ const SubmissionTrackingTab = () => {
       }))
     });
 
-    // 🚨 VALIDATION CHECK
+    // 🚨 CRITICAL VALIDATION CHECK
+    console.log(`🚨 VALIDATION CHECK (UNIQUE CHALLANS):`, {
+      expectedFromScanning: matchedScannedChallans,
+      actualInReport: grandTotal,
+      uniqueChallansProcessed: uniqueChallansProcessed.size,
+      duplicateRowsSkipped: duplicateRowsSkipped,
+      difference: grandTotal - matchedScannedChallans,
+      isCorrect: grandTotal === matchedScannedChallans
+    });
+    
     if (grandTotal !== matchedScannedChallans) {
-      console.log(`⚠️ POTENTIAL ISSUE: Expected ${matchedScannedChallans} challans, got ${grandTotal}`);
-      console.log('🔍 This could indicate data mismatch between scanned challans and detailed data');
+      console.log(`🚨 ISSUE DETECTED:`);
+      console.log(`   Expected: ${matchedScannedChallans} challans (from scanning data)`);
+      console.log(`   Got: ${grandTotal} challans (from detailed processing)`);
+      console.log(`   Unique challans processed: ${uniqueChallansProcessed.size}`);
+      console.log(`   Duplicate rows skipped: ${duplicateRowsSkipped}`);
+      console.log(`   Difference: ${grandTotal - matchedScannedChallans}`);
+      
+      // Debug: Show first few challans in each department to verify
+      Object.keys(departments).forEach(dept => {
+        const deptChallans = departments[dept].challans.slice(0, 3);
+        console.log(`   ${dept} sample challans:`, deptChallans.map(c => ({
+          challanNo: c.challanNo,
+          scanDate: c.scanningDate,
+          isInTargetSet: scannedChallansOnTargetDate.has(c.challanNo)
+        })));
+      });
+    } else {
+      console.log(`✅ PERFECT! Expected and actual counts match exactly!`);
+      console.log(`   📋 ${matchedScannedChallans} unique challans scanned on target date`);
+      console.log(`   📊 ${grandTotal} unique challans in final report`);
+      console.log(`   ⏭️ ${duplicateRowsSkipped} duplicate SKU rows properly skipped`);
     }
 
     return {
