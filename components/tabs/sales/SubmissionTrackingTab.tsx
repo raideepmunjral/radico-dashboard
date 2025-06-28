@@ -226,8 +226,8 @@ const SubmissionTrackingTab = () => {
   const [loadingDailyReport, setLoadingDailyReport] = useState(false);
   const [dailyReconciliation, setDailyReconciliation] = useState<{
     totalScannedOnDate: number;
-    foundInSourceData: number;
-    missingFromSourceData: number;
+    foundInSheet1: number;
+    missingFromSheet1: number;
     missingChallans: string[];
   } | null>(null);
   
@@ -424,7 +424,7 @@ const SubmissionTrackingTab = () => {
     // 🔧 FIXED: Process detailed challan data ONLY for exactly matched scanned challans
     const dailyChallans: ChallanData[] = [];
     const uniqueChallansProcessed = new Set<string>(); // Track unique challans
-    const challansFoundInSourceData = new Set<string>(); // Track which scanned challans have data
+    const challansFoundInSheet1 = new Set<string>(); // Track which scanned challans have data
     let totalDetailRows = 0;
     let processedDetailRows = 0;
     let duplicateRowsSkipped = 0;
@@ -445,8 +445,8 @@ const SubmissionTrackingTab = () => {
         // 🎯 CRITICAL FIX: Only include challans that were scanned on the EXACT target date
         if (challanNo && scannedChallansOnTargetDate.has(challanNo)) {
           
-          // 🆕 Track that this scanned challan has data in source data
-          challansFoundInSourceData.add(challanNo);
+          // 🆕 Track that this scanned challan has data in Sheet1
+          challansFoundInSheet1.add(challanNo);
           
           // 🔧 NEW: Skip duplicate challan numbers (only process first occurrence)
           if (uniqueChallansProcessed.has(challanNo)) {
@@ -525,19 +525,19 @@ const SubmissionTrackingTab = () => {
       duplicateRowsSkipped,
       dailyChallansCreated: dailyChallans.length,
       uniqueChallansProcessed: uniqueChallansProcessed.size,
-      challansFoundInSourceData: challansFoundInSourceData.size,
+      challansFoundInSheet1: challansFoundInSheet1.size,
       shouldMatch: matchedScannedChallans
     });
 
     // 🆕 NEW: Calculate missing challans for reconciliation
     const missingChallans = Array.from(scannedChallansOnTargetDate).filter(
-      challanNo => !challansFoundInSourceData.has(challanNo)
+      challanNo => !challansFoundInSheet1.has(challanNo)
     );
 
     console.log(`📋 RECONCILIATION DATA:`, {
       totalScannedOnDate: scannedChallansOnTargetDate.size,
-      foundInSourceData: challansFoundInSourceData.size,
-      missingFromSourceData: missingChallans.length,
+      foundInSheet1: challansFoundInSheet1.size,
+      missingFromSheet1: missingChallans.length,
       missingChallans: missingChallans.slice(0, 10) // Show first 10
     });
 
@@ -634,8 +634,8 @@ const SubmissionTrackingTab = () => {
     // 🆕 NEW: Set reconciliation data for UI
     setDailyReconciliation({
       totalScannedOnDate: scannedChallansOnTargetDate.size,
-      foundInSourceData: challansFoundInSourceData.size,
-      missingFromSourceData: missingChallans.length,
+      foundInSheet1: challansFoundInSheet1.size,
+      missingFromSheet1: missingChallans.length,
       missingChallans: missingChallans
     });
 
@@ -1105,14 +1105,14 @@ const SubmissionTrackingTab = () => {
       csvContent += `Generated:,${new Date().toLocaleString()}\n`;
       csvContent += `Scanning Date:,${formatDateForDisplay(scanningDate)}\n`;
       csvContent += `Total Scanned on Date:,${dailyReconciliation.totalScannedOnDate}\n`;
-      csvContent += `Found in Source Data:,${dailyReconciliation.foundInSourceData}\n`;
-      csvContent += `Missing from Source Data:,${dailyReconciliation.missingFromSourceData}\n`;
+      csvContent += `Found in Sheet1:,${dailyReconciliation.foundInSheet1}\n`;
+      csvContent += `Missing from Sheet1:,${dailyReconciliation.missingFromSheet1}\n`;
       csvContent += "\n";
       csvContent += "MISSING CHALLAN NUMBERS\n";
       csvContent += "Challan Number,Status,Notes\n";
       
       dailyReconciliation.missingChallans.forEach(challanNo => {
-        csvContent += `"${challanNo}","Scanned but no data in source","Requires investigation"\n`;
+        csvContent += `"${challanNo}","Scanned but no data in Sheet1","Requires investigation"\n`;
       });
 
       const encodedUri = encodeURI(csvContent);
@@ -1128,76 +1128,6 @@ const SubmissionTrackingTab = () => {
     } catch (error) {
       console.error('Error exporting missing challans CSV:', error);
       alert('Error exporting missing challans data. Please try again.');
-    }
-  };
-
-  // 🆕 NEW: Export complete reconciliation data CSV (found + missing)
-  const exportCompleteReconciliationCSV = () => {
-    if (!dailyReconciliation || !dailyReport) {
-      alert('No reconciliation data available to export.');
-      return;
-    }
-
-    try {
-      let csvContent = "data:text/csv;charset=utf-8,";
-      
-      // Header
-      csvContent += "Radico Submission Tracking - Complete Reconciliation Report\n";
-      csvContent += `Generated:,${new Date().toLocaleString()}\n`;
-      csvContent += `Scanning Date:,${formatDateForDisplay(scanningDate)}\n`;
-      csvContent += `Total Scanned on Date:,${dailyReconciliation.totalScannedOnDate}\n`;
-      csvContent += `Found in Source Data:,${dailyReconciliation.foundInSourceData}\n`;
-      csvContent += `Missing from Source Data:,${dailyReconciliation.missingFromSourceData}\n`;
-      csvContent += "\n";
-      
-      // Summary statistics
-      csvContent += "RECONCILIATION SUMMARY\n";
-      csvContent += "Metric,Count,Percentage\n";
-      csvContent += `Total Scanned,${dailyReconciliation.totalScannedOnDate},100%\n`;
-      csvContent += `Found in Source Data,${dailyReconciliation.foundInSourceData},${dailyReconciliation.totalScannedOnDate > 0 ? Math.round((dailyReconciliation.foundInSourceData / dailyReconciliation.totalScannedOnDate) * 100) : 0}%\n`;
-      csvContent += `Missing from Source Data,${dailyReconciliation.missingFromSourceData},${dailyReconciliation.totalScannedOnDate > 0 ? Math.round((dailyReconciliation.missingFromSourceData / dailyReconciliation.totalScannedOnDate) * 100) : 0}%\n`;
-      csvContent += "\n";
-
-      // Department breakdown
-      csvContent += "DEPARTMENT BREAKDOWN\n";
-      csvContent += "Department,Challans,Salesmen\n";
-      Object.keys(dailyReport.departments).forEach(dept => {
-        const deptData = dailyReport.departments[dept];
-        csvContent += `"${dept}",${deptData.total},${deptData.salesmen.length}\n`;
-      });
-      csvContent += "\n";
-
-      // Found challans details
-      csvContent += "FOUND CHALLANS (Available in Source Data)\n";
-      csvContent += "Challan Number,Department,Salesman,Shop Name,Challan Date,Scanning Date\n";
-      Object.keys(dailyReport.departments).forEach(dept => {
-        const deptData = dailyReport.departments[dept];
-        deptData.challans.forEach(challan => {
-          csvContent += `"${challan.challanNo}","${challan.department}","${challan.salesman}","${challan.shopName}","${challan.challanDate}","${challan.scanningDate}"\n`;
-        });
-      });
-      csvContent += "\n";
-
-      // Missing challans
-      csvContent += "MISSING CHALLANS (Scanned but no source data)\n";
-      csvContent += "Challan Number,Status,Notes\n";
-      dailyReconciliation.missingChallans.forEach(challanNo => {
-        csvContent += `"${challanNo}","Scanned but no data in source","Requires investigation"\n`;
-      });
-
-      const encodedUri = encodeURI(csvContent);
-      const link = document.createElement("a");
-      link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `Complete_Reconciliation_Report_${formatDateForDisplay(scanningDate).replace(/-/g, '_')}.csv`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      
-      console.log('✅ Complete reconciliation CSV export completed');
-      
-    } catch (error) {
-      console.error('Error exporting complete reconciliation CSV:', error);
-      alert('Error exporting complete reconciliation data. Please try again.');
     }
   };
 
