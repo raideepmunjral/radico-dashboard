@@ -58,7 +58,7 @@ interface DailyScanningReport {
 }
 
 // ==========================================
-// 🔧 FIXED HELPER FUNCTIONS
+// 🔧 COMPLETELY REWRITTEN HELPER FUNCTIONS
 // ==========================================
 
 const formatDate = (dateStr: string): string => {
@@ -77,17 +77,15 @@ const formatDate = (dateStr: string): string => {
   }
 };
 
-// 🔧 COMPLETELY REWRITTEN DATE COMPARISON FUNCTION
+// 🔧 FIXED: Date comparison function with extensive logging
 const isDateInRange = (dateStr: string, startDate: Date, endDate: Date): boolean => {
   if (!dateStr) {
-    console.log('❌ Empty date string');
     return false;
   }
   
   try {
     const parts = dateStr.trim().split('-');
     if (parts.length !== 3) {
-      console.log('❌ Invalid date format:', dateStr);
       return false;
     }
     
@@ -97,7 +95,6 @@ const isDateInRange = (dateStr: string, startDate: Date, endDate: Date): boolean
     
     // Validate parsed values
     if (isNaN(day) || isNaN(month) || isNaN(year) || day < 1 || day > 31 || month < 0 || month > 11) {
-      console.log('❌ Invalid date values:', { day, month: month + 1, year, original: dateStr });
       return false;
     }
     
@@ -114,26 +111,13 @@ const isDateInRange = (dateStr: string, startDate: Date, endDate: Date): boolean
     
     const isInRange = date >= normalizedStartDate && date <= normalizedEndDate;
     
-    // 🔍 DEBUG: Log first few date comparisons
-    if (Math.random() < 0.1) { // Log 10% of dates for debugging
-      console.log('🔍 DATE CHECK:', {
-        original: dateStr,
-        parsed: `${day}-${month + 1}-${year}`,
-        dateObj: date.toDateString(),
-        startDate: normalizedStartDate.toDateString(),
-        endDate: normalizedEndDate.toDateString(),
-        isInRange
-      });
-    }
-    
     return isInRange;
   } catch (error) {
-    console.error('❌ Date parsing error:', error, 'for date:', dateStr);
     return false;
   }
 };
 
-// 🔧 NEW: Create date from YYYY-MM-DD input with proper handling
+// 🔧 FIXED: Create date from YYYY-MM-DD input with proper handling
 const createDateFromInput = (inputDateStr: string): Date => {
   if (!inputDateStr) return new Date();
   
@@ -144,38 +128,74 @@ const createDateFromInput = (inputDateStr: string): Date => {
   return date;
 };
 
-// 🆕 NEW: Check if scanning date matches target date
-const isScanningDateMatch = (scanningDateStr: string, targetDate: Date): boolean => {
-  if (!scanningDateStr) return false;
+// 🔧 COMPLETELY REWRITTEN: Exact scanning date match function
+const isScanningDateMatch = (scanningDateStr: string, targetDateInput: string): boolean => {
+  if (!scanningDateStr || !targetDateInput) {
+    return false;
+  }
   
   try {
-    const parts = scanningDateStr.trim().split('-');
-    if (parts.length !== 3) return false;
+    // scanningDateStr is in DD-MM-YYYY format from CSV (e.g., "21-06-2025")
+    // targetDateInput is in YYYY-MM-DD format from HTML input (e.g., "2025-06-21")
     
-    const day = parseInt(parts[0]);
-    const month = parseInt(parts[1]) - 1; // Month is 0-indexed
-    const year = parseInt(parts[2]);
+    // Parse scanning date (DD-MM-YYYY)
+    const scanParts = scanningDateStr.trim().split('-');
+    if (scanParts.length !== 3) {
+      console.log(`❌ Invalid scanning date format: ${scanningDateStr}`);
+      return false;
+    }
     
-    if (isNaN(day) || isNaN(month) || isNaN(year)) return false;
+    const scanDay = scanParts[0].padStart(2, '0');
+    const scanMonth = scanParts[1].padStart(2, '0');
+    const scanYear = scanParts[2];
     
-    const scanDate = new Date(year, month, day);
-    scanDate.setHours(0, 0, 0, 0);
+    // Parse target date (YYYY-MM-DD)
+    const targetParts = targetDateInput.split('-');
+    if (targetParts.length !== 3) {
+      console.log(`❌ Invalid target date format: ${targetDateInput}`);
+      return false;
+    }
     
-    const normalizedTarget = new Date(targetDate);
-    normalizedTarget.setHours(0, 0, 0, 0);
+    const targetYear = targetParts[0];
+    const targetMonth = targetParts[1].padStart(2, '0');
+    const targetDay = targetParts[2].padStart(2, '0');
     
-    return scanDate.getTime() === normalizedTarget.getTime();
+    // Create normalized date strings for comparison
+    const normalizedScanDate = `${scanDay}-${scanMonth}-${scanYear}`;
+    const normalizedTargetDate = `${targetDay}-${targetMonth}-${targetYear}`;
+    
+    const isMatch = normalizedScanDate === normalizedTargetDate;
+    
+    // Debug logging for first few comparisons
+    if (Math.random() < 0.01) { // Log 1% of comparisons
+      console.log(`🔍 DATE MATCH CHECK:`, {
+        scanningDate: scanningDateStr,
+        targetInput: targetDateInput,
+        normalizedScan: normalizedScanDate,
+        normalizedTarget: normalizedTargetDate,
+        isMatch
+      });
+    }
+    
+    return isMatch;
+    
   } catch (error) {
-    console.error('Error parsing scanning date:', error, 'for date:', scanningDateStr);
+    console.error('❌ Error in date matching:', error);
     return false;
   }
 };
 
-// 🆕 NEW: Format date for display (DD-MM-YYYY)
+// 🆕 FIXED: Format date for display (DD-MM-YYYY)
 const formatDateForDisplay = (dateStr: string): string => {
   if (!dateStr) return '';
   
   try {
+    // If it's already in DD-MM-YYYY format, return as is
+    if (dateStr.includes('-') && dateStr.split('-')[0].length <= 2) {
+      return dateStr;
+    }
+    
+    // If it's in YYYY-MM-DD format, convert to DD-MM-YYYY
     const [year, month, day] = dateStr.split('-');
     return `${day.padStart(2, '0')}-${month.padStart(2, '0')}-${year}`;
   } catch {
@@ -233,10 +253,13 @@ const SubmissionTrackingTab = () => {
     
     setStartDate(monday.toISOString().split('T')[0]);
     setEndDate(sunday.toISOString().split('T')[0]);
+    
+    // Set today's date as default scanning date
+    setScanningDate(today.toISOString().split('T')[0]);
   }, []);
 
   // ==========================================
-  // 🆕 NEW: DAILY SCANNING REPORT FUNCTIONS
+  // 🆕 COMPLETELY REWRITTEN: DAILY SCANNING REPORT FUNCTIONS
   // ==========================================
 
   const fetchDailyScanningData = async () => {
@@ -257,7 +280,8 @@ const SubmissionTrackingTab = () => {
         throw new Error('Daily scanning report configuration missing. Please check environment variables.');
       }
 
-      console.log('🆕 Fetching daily scanning data for:', scanningDate);
+      console.log('🆕 FIXED: Fetching daily scanning data for:', scanningDate);
+      console.log('🎯 Target date format (YYYY-MM-DD):', scanningDate);
 
       // Fetch the same data sources
       const scannedUrl = `https://sheets.googleapis.com/v4/spreadsheets/${submissionSheetId}/values/scanned%20challans?key=${apiKey}`;
@@ -277,6 +301,12 @@ const SubmissionTrackingTab = () => {
       const scannedData = await scannedResponse.json();
       const detailsData = await detailsResponse.json();
       const shopDetailsData = shopDetailsResponse.ok ? await shopDetailsResponse.json() : { values: [] };
+      
+      console.log('📊 Raw data fetched:', {
+        scannedRows: scannedData.values?.length || 0,
+        detailsRows: detailsData.values?.length || 0,
+        shopDetailsRows: shopDetailsData.values?.length || 0
+      });
       
       const processedDailyReport = processDailyScanningReport(
         scannedData.values || [], 
@@ -299,13 +329,11 @@ const SubmissionTrackingTab = () => {
     detailsValues: any[][], 
     shopDetailsValues: any[][]
   ): DailyScanningReport => {
-    console.log('🆕 PROCESSING DAILY SCANNING REPORT');
-    console.log('📅 Target Scanning Date:', scanningDate);
-    
-    const targetScanDate = createDateFromInput(scanningDate);
-    console.log('📅 Normalized Target Date:', targetScanDate.toDateString());
+    console.log('🆕 COMPLETELY REWRITTEN: PROCESSING DAILY SCANNING REPORT');
+    console.log('📅 Target Scanning Date (YYYY-MM-DD):', scanningDate);
+    console.log('📅 Target Scanning Date (Display):', formatDateForDisplay(scanningDate));
 
-    // Build shop details mapping (same as existing logic)
+    // Build shop details mapping
     const shopDetailsMap: Record<string, any> = {};
     shopDetailsValues.slice(1).forEach((row) => {
       const shopId = row[0]?.toString().trim();
@@ -320,34 +348,75 @@ const SubmissionTrackingTab = () => {
       }
     });
 
-    // Get challans scanned on target date
+    console.log(`👥 Shop details mapping built: ${Object.keys(shopDetailsMap).length / 2} shops`);
+
+    // 🔧 FIXED: Get challans scanned on EXACT target date with better logging
     const scannedChallansOnDate = new Set<string>();
     const scanningDateMap: Record<string, string> = {}; // challan -> scanning date
+    let totalScannedChallans = 0;
+    let matchedScannedChallans = 0;
     
-    scannedValues.slice(1).forEach(row => {
+    console.log('🔍 ANALYZING SCANNED CHALLANS DATA...');
+    
+    scannedValues.slice(1).forEach((row, index) => {
       if (row.length >= 2) {
+        totalScannedChallans++;
         const challanNo = row[0]?.toString().trim();
-        const scanDateStr = row[1]?.toString().trim(); // Column B contains scanning date
+        const scanDateStr = row[1]?.toString().trim(); // Column B contains scanning date in DD-MM-YYYY format
         
         if (challanNo && scanDateStr) {
           scanningDateMap[challanNo] = scanDateStr;
           
-          if (isScanningDateMatch(scanDateStr, targetScanDate)) {
+          // Log first 10 rows for debugging
+          if (index < 10) {
+            console.log(`🔍 Scanned Row ${index + 1}:`, {
+              challanNo,
+              scanDateStr,
+              targetDate: scanningDate,
+              isMatch: isScanningDateMatch(scanDateStr, scanningDate)
+            });
+          }
+          
+          if (isScanningDateMatch(scanDateStr, scanningDate)) {
             scannedChallansOnDate.add(challanNo);
-            console.log(`✅ Found challan scanned on target date: ${challanNo}`);
+            matchedScannedChallans++;
+            
+            if (matchedScannedChallans <= 5) {
+              console.log(`✅ MATCHED CHALLAN ${matchedScannedChallans}:`, {
+                challanNo,
+                scanDateStr,
+                targetDate: scanningDate
+              });
+            }
           }
         }
       }
     });
 
-    console.log(`📦 Found ${scannedChallansOnDate.size} challans scanned on ${formatDateForDisplay(scanningDate)}`);
+    console.log(`📦 SCANNING MATCH RESULTS:`, {
+      totalScannedChallans,
+      matchedScannedChallans,
+      targetDate: scanningDate,
+      formattedTargetDate: formatDateForDisplay(scanningDate)
+    });
 
-    // Process detailed challan data for scanned challans
+    if (matchedScannedChallans === 0) {
+      console.log('⚠️ NO CHALLANS FOUND for target date - this might be the issue!');
+      console.log('🔍 Sample scanning dates from CSV:', 
+        scannedValues.slice(1, 6).map(row => row[1]?.toString().trim()).filter(Boolean)
+      );
+    }
+
+    // 🔧 FIXED: Process detailed challan data ONLY for exactly matched scanned challans
     const dailyChallans: ChallanData[] = [];
-    const headers = detailsValues[0] || [];
+    let totalDetailRows = 0;
+    let processedDetailRows = 0;
 
-    detailsValues.slice(1).forEach((row) => {
+    console.log('🔍 PROCESSING DETAILED CHALLAN DATA...');
+
+    detailsValues.slice(1).forEach((row, index) => {
       if (row.length >= 15) {
+        totalDetailRows++;
         const challanNo = row[0]?.toString().trim();
         const challanDate = row[1]?.toString().trim();
         const shopDept = row[4]?.toString().trim();
@@ -356,13 +425,26 @@ const SubmissionTrackingTab = () => {
         const brand = row[11]?.toString().trim();
         const cases = parseFloat(row[14]) || 0;
 
-        // Only include challans scanned on target date
+        // 🎯 CRITICAL: Only include challans that were scanned on the EXACT target date
         if (challanNo && scannedChallansOnDate.has(challanNo)) {
+          processedDetailRows++;
+          
+          // Log first few processed challans
+          if (processedDetailRows <= 5) {
+            console.log(`✅ PROCESSING CHALLAN ${processedDetailRows}:`, {
+              challanNo,
+              challanDate,
+              shopName,
+              isScanned: true,
+              scanningDate: scanningDateMap[challanNo]
+            });
+          }
+          
           // Department processing
           const department = shopDept?.replace(' Limited', '').trim();
           const cleanDept = department === "DSIIDC" ? "DSIDC" : department;
 
-          // Salesman mapping (same logic as existing)
+          // Salesman mapping
           let salesmanName = 'Unknown';
           if (shopId && shopDetailsMap[shopId]) {
             salesmanName = shopDetailsMap[shopId].salesman;
@@ -397,6 +479,13 @@ const SubmissionTrackingTab = () => {
       }
     });
 
+    console.log(`📊 DETAILED PROCESSING RESULTS:`, {
+      totalDetailRows,
+      processedDetailRows,
+      dailyChallansCreated: dailyChallans.length,
+      shouldMatch: matchedScannedChallans
+    });
+
     // Apply role-based filtering
     const filteredChallans = dailyChallans.filter(challan => {
       if (user && user.role === 'salesman') {
@@ -406,6 +495,8 @@ const SubmissionTrackingTab = () => {
       }
       return true;
     });
+
+    console.log(`🔐 ROLE FILTERING: ${dailyChallans.length} -> ${filteredChallans.length} challans`);
 
     // Group by department
     const departments: Record<string, DepartmentScanningData> = {};
@@ -439,12 +530,23 @@ const SubmissionTrackingTab = () => {
     const grandTotal = filteredChallans.length;
     const formattedScanningDate = formatDateForDisplay(scanningDate);
 
-    console.log('✅ DAILY SCANNING REPORT PROCESSED:', {
-      scanningDate: formattedScanningDate,
+    console.log('✅ FINAL DAILY SCANNING REPORT RESULTS:', {
+      scanningDate,
+      formattedScanningDate,
       departments: Object.keys(departments).length,
       grandTotal,
-      totalSalesmen: allSalesmen.size
+      totalSalesmen: allSalesmen.size,
+      departmentBreakdown: Object.keys(departments).map(dept => ({
+        dept,
+        count: departments[dept].total
+      }))
     });
+
+    // 🚨 VALIDATION CHECK
+    if (grandTotal !== matchedScannedChallans) {
+      console.log(`⚠️ POTENTIAL ISSUE: Expected ${matchedScannedChallans} challans, got ${grandTotal}`);
+      console.log('🔍 This could indicate data mismatch between scanned challans and detailed data');
+    }
 
     return {
       scanningDate,
@@ -455,7 +557,7 @@ const SubmissionTrackingTab = () => {
     };
   };
 
-  // 🆕 NEW: Generate PDF for Daily Scanning Report
+  // 🆕 FIXED: Generate PDF for Daily Scanning Report
   const generateDailyScanningPDF = async () => {
     if (!dailyReport) {
       alert('No daily report data available. Please fetch the report first.');
@@ -544,7 +646,7 @@ const SubmissionTrackingTab = () => {
   };
 
   // ==========================================
-  // DATA FETCHING FUNCTIONS
+  // DATA FETCHING FUNCTIONS (UNCHANGED)
   // ==========================================
 
   const fetchSubmissionData = async () => {
@@ -652,10 +754,6 @@ const SubmissionTrackingTab = () => {
     }
   };
 
-  // ==========================================
-  // 🔧 COMPLETELY REWRITTEN DATA PROCESSING FUNCTION
-  // ==========================================
-
   const processSubmissionData = (scannedValues: any[][], detailsValues: any[][], shopDetailsValues: any[][]): SubmissionSummary => {
     console.log('🔧 PROCESSING SUBMISSION DATA WITH ENHANCED DATE LOGIC');
     console.log('📅 Selected Date Range:', { startDate, endDate });
@@ -694,15 +792,6 @@ const SubmissionTrackingTab = () => {
       if (shopId && shopName && salesman) {
         shopDetailsMap[shopId] = { shopName, dept, salesman, salesmanEmail };
         shopDetailsMap[shopName] = { shopId, shopName, dept, salesman, salesmanEmail };
-        
-        if (index < 5) {
-          console.log(`📋 Shop Details Row ${index + 1}:`, {
-            shopId,
-            shopName,
-            salesman,
-            dept
-          });
-        }
       }
     });
 
@@ -734,17 +823,6 @@ const SubmissionTrackingTab = () => {
         const shopName = row[9]?.toString().trim();
         const brand = row[11]?.toString().trim();
         const cases = parseFloat(row[14]) || 0;
-
-        // 🔧 ENHANCED: Log first 10 rows for debugging
-        if (index < 10) {
-          console.log(`🔍 DETAILED Row ${index + 1}:`, {
-            challanNo,
-            challanDate,
-            shopId,
-            shopName,
-            dateInRange: challanDate ? isDateInRange(challanDate, dateRangeStart, dateRangeEnd) : 'NO_DATE'
-          });
-        }
 
         // 🔍 DEBUG: Track scanned challans
         if (scannedChallans.has(challanNo)) {
@@ -790,19 +868,6 @@ const SubmissionTrackingTab = () => {
               }
             }
 
-            // Log successful mapping for first few rows
-            if (dateFilteredRows <= 5) {
-              console.log(`✅ VALID CHALLAN ${dateFilteredRows}:`, {
-                challanNo,
-                challanDate,
-                shopName,
-                department: cleanDept,
-                salesmanName,
-                mappingMethod,
-                isScanned: scannedChallans.has(challanNo)
-              });
-            }
-
             // Create challan data
             const isScanned = scannedChallans.has(challanNo);
             
@@ -820,24 +885,6 @@ const SubmissionTrackingTab = () => {
               });
               validChallansCreated++;
             }
-          } else {
-            // Log why date was filtered out for first few
-            if (index < 5) {
-              console.log(`❌ FILTERED OUT Row ${index + 1}:`, {
-                challanNo,
-                challanDate,
-                reason: 'Outside date range'
-              });
-            }
-          }
-        } else {
-          // Log missing required fields for first few
-          if (index < 5) {
-            console.log(`❌ FILTERED OUT Row ${index + 1}:`, {
-              challanNo: challanNo || 'MISSING',
-              challanDate: challanDate || 'MISSING',
-              reason: 'Missing challan number or date'
-            });
           }
         }
       }
@@ -849,20 +896,6 @@ const SubmissionTrackingTab = () => {
         scannedChallansNotInSheet1.add(challanNo);
       }
     });
-
-    // 🔍 COMPREHENSIVE DEBUG REPORT
-    console.log(`📊 COMPREHENSIVE PROCESSING REPORT:`);
-    console.log(`   📋 Total rows processed: ${totalRowsProcessed}`);
-    console.log(`   📅 Rows passing date filter: ${dateFilteredRows}`);
-    console.log(`   ✅ Valid challans created: ${validChallansCreated}`);
-    console.log(`   📦 Total scanned challans: ${allScannedChallans.length}`);
-    console.log(`   ✅ Found in date range: ${foundScannedChallans.size}`);
-    console.log(`   📅 Outside date range: ${scannedChallansOutsideDateRange.size}`);
-    console.log(`   ❌ Not in Sheet1: ${scannedChallansNotInSheet1.size}`);
-    
-    if (scannedChallansNotInSheet1.size > 0) {
-      console.log(`   🔍 Missing challan numbers (first 10):`, Array.from(scannedChallansNotInSheet1).slice(0, 10));
-    }
 
     // Set reconciliation report for UI
     setReconciliationReport({
@@ -1086,6 +1119,18 @@ const SubmissionTrackingTab = () => {
     }
   }, [startDate, endDate]);
 
+  // 🆕 NEW: Auto-fetch daily report when scanning date changes
+  useEffect(() => {
+    if (scanningDate && activeTab === 'daily-report') {
+      // Small delay to prevent rapid API calls
+      const timeoutId = setTimeout(() => {
+        fetchDailyScanningData();
+      }, 500);
+      
+      return () => clearTimeout(timeoutId);
+    }
+  }, [scanningDate, activeTab]);
+
   // ==========================================
   // DETAILED CHALLAN TABLE COMPONENT
   // ==========================================
@@ -1255,7 +1300,7 @@ const SubmissionTrackingTab = () => {
   };
 
   // ==========================================
-  // RENDER (UNCHANGED FROM ORIGINAL)
+  // RENDER
   // ==========================================
 
   if (loading) {
@@ -1878,7 +1923,7 @@ const SubmissionTrackingTab = () => {
                 </>
               )}
 
-              {/* 🆕 NEW: Daily Report Tab */}
+              {/* 🆕 FIXED: Daily Report Tab */}
               {activeTab === 'daily-report' && (
                 <>
                   {/* Date Selection for Daily Report */}
