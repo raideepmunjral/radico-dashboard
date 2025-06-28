@@ -1087,8 +1087,49 @@ const SubmissionTrackingTab = () => {
   };
 
   // ==========================================
-  // CSV EXPORT FUNCTION (UNCHANGED)
+  // CSV EXPORT FUNCTIONS
   // ==========================================
+
+  // 🆕 NEW: Export missing challans CSV for internal reconciliation
+  const exportMissingChallansCSV = () => {
+    if (!dailyReconciliation || dailyReconciliation.missingChallans.length === 0) {
+      alert('No missing challans to export.');
+      return;
+    }
+
+    try {
+      let csvContent = "data:text/csv;charset=utf-8,";
+      
+      // Header
+      csvContent += "Radico Submission Tracking - Missing Challan Reconciliation\n";
+      csvContent += `Generated:,${new Date().toLocaleString()}\n`;
+      csvContent += `Scanning Date:,${formatDateForDisplay(scanningDate)}\n`;
+      csvContent += `Total Scanned on Date:,${dailyReconciliation.totalScannedOnDate}\n`;
+      csvContent += `Found in Sheet1:,${dailyReconciliation.foundInSheet1}\n`;
+      csvContent += `Missing from Sheet1:,${dailyReconciliation.missingFromSheet1}\n`;
+      csvContent += "\n";
+      csvContent += "MISSING CHALLAN NUMBERS\n";
+      csvContent += "Challan Number,Status,Notes\n";
+      
+      dailyReconciliation.missingChallans.forEach(challanNo => {
+        csvContent += `"${challanNo}","Scanned but no data in Sheet1","Requires investigation"\n`;
+      });
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `Missing_Challans_Reconciliation_${formatDateForDisplay(scanningDate).replace(/-/g, '_')}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      console.log('✅ Missing challans CSV export completed');
+      
+    } catch (error) {
+      console.error('Error exporting missing challans CSV:', error);
+      alert('Error exporting missing challans data. Please try again.');
+    }
+  };
 
   const exportToExcel = () => {
     if (!submissionData) return;
