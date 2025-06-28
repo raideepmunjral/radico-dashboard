@@ -18,6 +18,7 @@ interface ChallanData {
   brand: string;
   cases: number;
   isScanned: boolean;
+  scanningDate?: string; // New field for scanning date
 }
 
 interface SalesmanSummary {
@@ -39,6 +40,21 @@ interface SubmissionSummary {
   totalPendingShops: number;
   weekRange: string;
   salesmanSummaries: SalesmanSummary[];
+}
+
+// 🆕 NEW: Daily Scanning Report Types
+interface DepartmentScanningData {
+  challans: ChallanData[];
+  total: number;
+  salesmen: string[];
+}
+
+interface DailyScanningReport {
+  scanningDate: string;
+  formattedScanningDate: string; // DD-MM-YYYY format for display
+  departments: Record<string, DepartmentScanningData>;
+  grandTotal: number;
+  totalSalesmen: number;
 }
 
 // ==========================================
@@ -128,6 +144,45 @@ const createDateFromInput = (inputDateStr: string): Date => {
   return date;
 };
 
+// 🆕 NEW: Check if scanning date matches target date
+const isScanningDateMatch = (scanningDateStr: string, targetDate: Date): boolean => {
+  if (!scanningDateStr) return false;
+  
+  try {
+    const parts = scanningDateStr.trim().split('-');
+    if (parts.length !== 3) return false;
+    
+    const day = parseInt(parts[0]);
+    const month = parseInt(parts[1]) - 1; // Month is 0-indexed
+    const year = parseInt(parts[2]);
+    
+    if (isNaN(day) || isNaN(month) || isNaN(year)) return false;
+    
+    const scanDate = new Date(year, month, day);
+    scanDate.setHours(0, 0, 0, 0);
+    
+    const normalizedTarget = new Date(targetDate);
+    normalizedTarget.setHours(0, 0, 0, 0);
+    
+    return scanDate.getTime() === normalizedTarget.getTime();
+  } catch (error) {
+    console.error('Error parsing scanning date:', error, 'for date:', scanningDateStr);
+    return false;
+  }
+};
+
+// 🆕 NEW: Format date for display (DD-MM-YYYY)
+const formatDateForDisplay = (dateStr: string): string => {
+  if (!dateStr) return '';
+  
+  try {
+    const [year, month, day] = dateStr.split('-');
+    return `${day.padStart(2, '0')}-${month.padStart(2, '0')}-${year}`;
+  } catch {
+    return dateStr;
+  }
+};
+
 // ==========================================
 // MAIN COMPONENT
 // ==========================================
@@ -145,11 +200,17 @@ const SubmissionTrackingTab = () => {
   const [startDate, setStartDate] = useState<string>('');
   const [endDate, setEndDate] = useState<string>('');
   
+  // 🆕 NEW: Daily Scanning Report State
+  const [scanningDate, setScanningDate] = useState<string>('');
+  const [dailyReport, setDailyReport] = useState<DailyScanningReport | null>(null);
+  const [loadingDailyReport, setLoadingDailyReport] = useState(false);
+  
   // Filter State
   const [selectedSalesman, setSelectedSalesman] = useState<string>('');
-  const [activeTab, setActiveTab] = useState<'summary' | 'collected' | 'pending'>('summary');
+  const [activeTab, setActiveTab] = useState<'summary' | 'collected' | 'pending' | 'daily-report'>('summary');
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [expandedSalesmen, setExpandedSalesmen] = useState<Set<string>>(new Set());
+  const [expandedDepartments, setExpandedDepartments] = useState<Set<string>>(new Set());
   
   // State for reconciliation report
   const [reconciliationReport, setReconciliationReport] = useState<{
@@ -173,6 +234,314 @@ const SubmissionTrackingTab = () => {
     setStartDate(monday.toISOString().split('T')[0]);
     setEndDate(sunday.toISOString().split('T')[0]);
   }, []);
+
+  // ==========================================
+  // 🆕 NEW: DAILY SCANNING REPORT FUNCTIONS
+  // ==========================================
+
+  const fetchDailyScanningData = async () => {
+    if (!scanningDate) {
+      alert('Please select a scanning date first.');
+      return;
+    }
+    
+    setLoadingDailyReport(true);
+    setError(null);
+    
+    try {
+      const submissionSheetId = process.env.NEXT_PUBLIC_SUBMISSION_SHEET_ID;
+      const masterSheetId = process.env.NEXT_PUBLIC_MASTER_SHEET_ID;
+      const apiKey = process.env.NEXT_PUBLIC_GOOGLE_API_KEY;
+      
+      if (!submissionSheetId || !masterSheetId || !apiKey) {
+        throw new Error('Daily scanning report configuration missing. Please check environment variables.');
+      }
+
+      console.log('🆕 Fetching daily scanning data for:', scanningDate);
+
+      // Fetch the same data sources
+      const scannedUrl = `https://sheets.googleapis.com/v4/spreadsheets/${submissionSheetId}/values/scanned%20challans?key=${apiKey}`;
+      const detailsUrl = `https://sheets.googleapis.com/v4/spreadsheets/${submissionSheetId}/values/Sheet1?key=${apiKey}`;
+      const shopDetailsUrl = `https://sheets.googleapis.com/v4/spreadsheets/${masterSheetId}/values/Shop%20Details?key=${apiKey}`;
+      
+      const [scannedResponse, detailsResponse, shopDetailsResponse] = await Promise.all([
+        fetch(scannedUrl),
+        fetch(detailsUrl),
+        fetch(shopDetailsUrl)
+      ]);
+
+      if (!scannedResponse.ok || !detailsResponse.ok) {
+        throw new Error('Failed to fetch daily scanning data from Google Sheets');
+      }
+
+      const scannedData = await scannedResponse.json();
+      const detailsData = await detailsResponse.json();
+      const shopDetailsData = shopDetailsResponse.ok ? await shopDetailsResponse.json() : { values: [] };
+      
+      const processedDailyReport = processDailyScanningReport(
+        scannedData.values || [], 
+        detailsData.values || [], 
+        shopDetailsData.values || []
+      );
+      
+      setDailyReport(processedDailyReport);
+      
+    } catch (error: any) {
+      console.error('❌ Error fetching daily scanning data:', error);
+      setError(error.message || 'Unknown error occurred while fetching daily report');
+    } finally {
+      setLoadingDailyReport(false);
+    }
+  };
+
+  const processDailyScanningReport = (
+    scannedValues: any[][], 
+    detailsValues: any[][], 
+    shopDetailsValues: any[][]
+  ): DailyScanningReport => {
+    console.log('🆕 PROCESSING DAILY SCANNING REPORT');
+    console.log('📅 Target Scanning Date:', scanningDate);
+    
+    const targetScanDate = createDateFromInput(scanningDate);
+    console.log('📅 Normalized Target Date:', targetScanDate.toDateString());
+
+    // Build shop details mapping (same as existing logic)
+    const shopDetailsMap: Record<string, any> = {};
+    shopDetailsValues.slice(1).forEach((row) => {
+      const shopId = row[0]?.toString().trim();
+      const salesmanEmail = row[1]?.toString().trim();
+      const dept = row[2]?.toString().trim() === "DSIIDC" ? "DSIDC" : row[2]?.toString().trim();
+      const shopName = row[3]?.toString().trim();
+      const salesman = row[4]?.toString().trim();
+      
+      if (shopId && shopName && salesman) {
+        shopDetailsMap[shopId] = { shopName, dept, salesman, salesmanEmail };
+        shopDetailsMap[shopName] = { shopId, shopName, dept, salesman, salesmanEmail };
+      }
+    });
+
+    // Get challans scanned on target date
+    const scannedChallansOnDate = new Set<string>();
+    const scanningDateMap: Record<string, string> = {}; // challan -> scanning date
+    
+    scannedValues.slice(1).forEach(row => {
+      if (row.length >= 2) {
+        const challanNo = row[0]?.toString().trim();
+        const scanDateStr = row[1]?.toString().trim(); // Column B contains scanning date
+        
+        if (challanNo && scanDateStr) {
+          scanningDateMap[challanNo] = scanDateStr;
+          
+          if (isScanningDateMatch(scanDateStr, targetScanDate)) {
+            scannedChallansOnDate.add(challanNo);
+            console.log(`✅ Found challan scanned on target date: ${challanNo}`);
+          }
+        }
+      }
+    });
+
+    console.log(`📦 Found ${scannedChallansOnDate.size} challans scanned on ${formatDateForDisplay(scanningDate)}`);
+
+    // Process detailed challan data for scanned challans
+    const dailyChallans: ChallanData[] = [];
+    const headers = detailsValues[0] || [];
+
+    detailsValues.slice(1).forEach((row) => {
+      if (row.length >= 15) {
+        const challanNo = row[0]?.toString().trim();
+        const challanDate = row[1]?.toString().trim();
+        const shopDept = row[4]?.toString().trim();
+        const shopId = row[8]?.toString().trim();
+        const shopName = row[9]?.toString().trim();
+        const brand = row[11]?.toString().trim();
+        const cases = parseFloat(row[14]) || 0;
+
+        // Only include challans scanned on target date
+        if (challanNo && scannedChallansOnDate.has(challanNo)) {
+          // Department processing
+          const department = shopDept?.replace(' Limited', '').trim();
+          const cleanDept = department === "DSIIDC" ? "DSIDC" : department;
+
+          // Salesman mapping (same logic as existing)
+          let salesmanName = 'Unknown';
+          if (shopId && shopDetailsMap[shopId]) {
+            salesmanName = shopDetailsMap[shopId].salesman;
+          } else if (shopName && shopDetailsMap[shopName]) {
+            salesmanName = shopDetailsMap[shopName].salesman;
+          } else if (shopName) {
+            const matchingShop = Object.keys(shopDetailsMap).find(key => {
+              const keyLower = key.toLowerCase();
+              const shopLower = shopName.toLowerCase();
+              return keyLower === shopLower || 
+                     keyLower.includes(shopLower) || 
+                     shopLower.includes(keyLower);
+            });
+            if (matchingShop && shopDetailsMap[matchingShop]) {
+              salesmanName = shopDetailsMap[matchingShop].salesman;
+            }
+          }
+
+          dailyChallans.push({
+            challanNo,
+            challanDate,
+            shopName: shopName || 'Unknown Shop',
+            shopId: shopId || '',
+            department: cleanDept || 'Unknown',
+            salesman: salesmanName,
+            brand,
+            cases,
+            isScanned: true,
+            scanningDate: scanningDateMap[challanNo] || ''
+          });
+        }
+      }
+    });
+
+    // Apply role-based filtering
+    const filteredChallans = dailyChallans.filter(challan => {
+      if (user && user.role === 'salesman') {
+        return challan.salesman === user.name || 
+               challan.salesman === user.email ||
+               challan.salesman?.toLowerCase() === user.name?.toLowerCase();
+      }
+      return true;
+    });
+
+    // Group by department
+    const departments: Record<string, DepartmentScanningData> = {};
+    const allSalesmen = new Set<string>();
+
+    filteredChallans.forEach(challan => {
+      const dept = challan.department;
+      
+      if (!departments[dept]) {
+        departments[dept] = {
+          challans: [],
+          total: 0,
+          salesmen: []
+        };
+      }
+      
+      departments[dept].challans.push(challan);
+      departments[dept].total++;
+      allSalesmen.add(challan.salesman);
+    });
+
+    // Update salesmen list for each department
+    Object.keys(departments).forEach(dept => {
+      const deptSalesmen = new Set<string>();
+      departments[dept].challans.forEach(challan => {
+        deptSalesmen.add(challan.salesman);
+      });
+      departments[dept].salesmen = Array.from(deptSalesmen);
+    });
+
+    const grandTotal = filteredChallans.length;
+    const formattedScanningDate = formatDateForDisplay(scanningDate);
+
+    console.log('✅ DAILY SCANNING REPORT PROCESSED:', {
+      scanningDate: formattedScanningDate,
+      departments: Object.keys(departments).length,
+      grandTotal,
+      totalSalesmen: allSalesmen.size
+    });
+
+    return {
+      scanningDate,
+      formattedScanningDate,
+      departments,
+      grandTotal,
+      totalSalesmen: allSalesmen.size
+    };
+  };
+
+  // 🆕 NEW: Generate PDF for Daily Scanning Report
+  const generateDailyScanningPDF = async () => {
+    if (!dailyReport) {
+      alert('No daily report data available. Please fetch the report first.');
+      return;
+    }
+
+    try {
+      const { jsPDF } = await import('jspdf');
+      await import('jspdf-autotable');
+
+      const doc = new jsPDF();
+      
+      // Header
+      doc.setFontSize(16);
+      doc.text('PHYSICAL CHALLANS SENT TO RADICO KHAITAN', 20, 20);
+      doc.setFontSize(14);
+      doc.text(`ON ${dailyReport.formattedScanningDate}`, 20, 30);
+      
+      // Formal greeting
+      doc.setFontSize(12);
+      doc.text(`Dear Sir,`, 20, 50);
+      doc.text(`Please see below details of Physical challans collected and`, 20, 60);
+      doc.text(`handed over to you on ${dailyReport.formattedScanningDate}.`, 20, 70);
+      
+      let yPosition = 90;
+      
+      // Department-wise data
+      Object.keys(dailyReport.departments)
+        .sort() // Sort departments alphabetically
+        .forEach(deptName => {
+          const deptData = dailyReport.departments[deptName];
+          
+          // Department header
+          doc.setFontSize(14);
+          doc.text(`${deptName}:`, 20, yPosition);
+          yPosition += 10;
+          
+          // Department table
+          const tableData = deptData.challans.map(challan => [
+            challan.salesman,
+            challan.challanNo,
+            formatDate(challan.challanDate),
+            challan.shopName,
+            challan.department
+          ]);
+          
+          (doc as any).autoTable({
+            head: [['Salesman', 'Challan No', 'Challan Date', 'Shop Name', 'Department']],
+            body: tableData,
+            startY: yPosition,
+            theme: 'grid',
+            styles: { fontSize: 10 },
+            headStyles: { fillColor: [200, 200, 200] }
+          });
+          
+          yPosition = (doc as any).lastAutoTable.finalY + 10;
+          
+          // Department total
+          doc.setFontSize(12);
+          doc.text(`Total ${deptName}: ${deptData.total} challans`, 20, yPosition);
+          yPosition += 15;
+          
+          // Add page break if needed
+          if (yPosition > 250) {
+            doc.addPage();
+            yPosition = 20;
+          }
+        });
+      
+      // Grand total
+      doc.setFontSize(14);
+      doc.text(`GRAND TOTAL: ${dailyReport.grandTotal} challans`, 20, yPosition + 10);
+      
+      // Footer
+      doc.setFontSize(10);
+      doc.text(`Generated on: ${new Date().toLocaleString()}`, 20, yPosition + 30);
+      
+      doc.save(`Physical_Challans_Handover_${dailyReport.formattedScanningDate.replace(/-/g, '_')}.pdf`);
+      
+      console.log('✅ Daily scanning PDF generated successfully');
+      
+    } catch (error) {
+      console.error('Error generating daily scanning PDF:', error);
+      alert('Error generating PDF report. Please try again.');
+    }
+  };
 
   // ==========================================
   // DATA FETCHING FUNCTIONS
@@ -683,7 +1052,7 @@ const SubmissionTrackingTab = () => {
   };
 
   // ==========================================
-  // TOGGLE SALESMAN EXPANSION
+  // TOGGLE FUNCTIONS
   // ==========================================
 
   const toggleSalesmanExpansion = (salesmanName: string) => {
@@ -694,6 +1063,17 @@ const SubmissionTrackingTab = () => {
       newExpanded.add(salesmanName);
     }
     setExpandedSalesmen(newExpanded);
+  };
+
+  // 🆕 NEW: Toggle department expansion for daily report
+  const toggleDepartmentExpansion = (deptName: string) => {
+    const newExpanded = new Set(expandedDepartments);
+    if (newExpanded.has(deptName)) {
+      newExpanded.delete(deptName);
+    } else {
+      newExpanded.add(deptName);
+    }
+    setExpandedDepartments(newExpanded);
   };
 
   // ==========================================
@@ -1178,10 +1558,10 @@ const SubmissionTrackingTab = () => {
           {/* Tab Navigation */}
           <div className="bg-white rounded-lg shadow">
             <div className="border-b border-gray-200">
-              <nav className="-mb-px flex space-x-8 px-6">
+              <nav className="-mb-px flex space-x-8 px-6 overflow-x-auto">
                 <button
                   onClick={() => setActiveTab('summary')}
-                  className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
                     activeTab === 'summary'
                       ? 'border-blue-500 text-blue-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -1191,7 +1571,7 @@ const SubmissionTrackingTab = () => {
                 </button>
                 <button
                   onClick={() => setActiveTab('collected')}
-                  className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
                     activeTab === 'collected'
                       ? 'border-green-500 text-green-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
@@ -1201,13 +1581,23 @@ const SubmissionTrackingTab = () => {
                 </button>
                 <button
                   onClick={() => setActiveTab('pending')}
-                  className={`py-4 px-1 border-b-2 font-medium text-sm ${
+                  className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
                     activeTab === 'pending'
                       ? 'border-orange-500 text-orange-600'
                       : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
                   }`}
                 >
                   Pending Challans ({submissionData.totalPendingChallans})
+                </button>
+                <button
+                  onClick={() => setActiveTab('daily-report')}
+                  className={`py-4 px-1 border-b-2 font-medium text-sm whitespace-nowrap ${
+                    activeTab === 'daily-report'
+                      ? 'border-purple-500 text-purple-600'
+                      : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  }`}
+                >
+                  Physical Handover Report
                 </button>
               </nav>
             </div>
@@ -1485,6 +1875,295 @@ const SubmissionTrackingTab = () => {
                       </div>
                     </div>
                   </div>
+                </>
+              )}
+
+              {/* 🆕 NEW: Daily Report Tab */}
+              {activeTab === 'daily-report' && (
+                <>
+                  {/* Date Selection for Daily Report */}
+                  <div className="mb-6">
+                    <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
+                      <div className="flex flex-col sm:flex-row items-center justify-between space-y-3 sm:space-y-0 sm:space-x-4">
+                        <div className="flex items-center space-x-3">
+                          <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
+                            <Calendar className="w-4 h-4 text-purple-600" />
+                          </div>
+                          <div>
+                            <h3 className="text-lg font-medium text-purple-800">Physical Handover Report</h3>
+                            <p className="text-sm text-purple-600">Select scanning date to generate report</p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex flex-col sm:flex-row items-center space-y-2 sm:space-y-0 sm:space-x-3">
+                          <label className="text-sm font-medium text-purple-700">Scanning Date:</label>
+                          <input
+                            type="date"
+                            value={scanningDate}
+                            onChange={(e) => setScanningDate(e.target.value)}
+                            className="border border-purple-300 rounded-lg px-3 py-2 text-sm focus:ring-purple-500 focus:border-purple-500"
+                          />
+                          
+                          <button
+                            onClick={fetchDailyScanningData}
+                            disabled={!scanningDate || loadingDailyReport}
+                            className={`px-4 py-2 rounded-lg flex items-center space-x-2 text-sm font-medium ${
+                              !scanningDate || loadingDailyReport
+                                ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                                : 'bg-purple-600 text-white hover:bg-purple-700'
+                            }`}
+                          >
+                            {loadingDailyReport ? (
+                              <RefreshCw className="w-4 h-4 animate-spin" />
+                            ) : (
+                              <Search className="w-4 h-4" />
+                            )}
+                            <span>{loadingDailyReport ? 'Loading...' : 'Generate Report'}</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Daily Report Content */}
+                  {loadingDailyReport && (
+                    <div className="flex items-center justify-center py-12">
+                      <div className="text-center">
+                        <RefreshCw className="w-8 h-8 animate-spin mx-auto mb-4 text-purple-600" />
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">Generating Daily Report</h3>
+                        <p className="text-gray-600">Processing challans for {formatDateForDisplay(scanningDate)}...</p>
+                      </div>
+                    </div>
+                  )}
+
+                  {dailyReport && !loadingDailyReport && (
+                    <div className="space-y-6">
+                      {/* Report Header */}
+                      <div className="bg-white border border-gray-200 rounded-lg p-6">
+                        <div className="text-center mb-6">
+                          <h2 className="text-xl font-bold text-gray-900 mb-2">
+                            PHYSICAL CHALLANS SENT TO RADICO KHAITAN
+                          </h2>
+                          <h3 className="text-lg font-semibold text-gray-800 mb-4">
+                            ON {dailyReport.formattedScanningDate}
+                          </h3>
+                          
+                          <div className="text-left max-w-2xl mx-auto bg-gray-50 p-4 rounded-lg">
+                            <p className="text-gray-700 mb-2"><strong>Dear Sir,</strong></p>
+                            <p className="text-gray-700">
+                              Please see below details of Physical challans collected and handed over to you on {' '}
+                              <span className="font-semibold text-purple-700">{dailyReport.formattedScanningDate}</span>.
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* Summary Stats */}
+                        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+                          <div className="bg-purple-50 rounded-lg p-4 text-center">
+                            <div className="text-2xl font-bold text-purple-600">{dailyReport.grandTotal}</div>
+                            <div className="text-sm text-gray-600">Total Challans</div>
+                          </div>
+                          <div className="bg-blue-50 rounded-lg p-4 text-center">
+                            <div className="text-2xl font-bold text-blue-600">{Object.keys(dailyReport.departments).length}</div>
+                            <div className="text-sm text-gray-600">Departments</div>
+                          </div>
+                          <div className="bg-green-50 rounded-lg p-4 text-center">
+                            <div className="text-2xl font-bold text-green-600">{dailyReport.totalSalesmen}</div>
+                            <div className="text-sm text-gray-600">Salesmen</div>
+                          </div>
+                          <div className="bg-orange-50 rounded-lg p-4 text-center">
+                            <div className="text-2xl font-bold text-orange-600">{dailyReport.formattedScanningDate}</div>
+                            <div className="text-sm text-gray-600">Scanning Date</div>
+                          </div>
+                        </div>
+
+                        {/* Export PDF Button */}
+                        <div className="text-center">
+                          <button
+                            onClick={generateDailyScanningPDF}
+                            className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 flex items-center space-x-2 mx-auto"
+                          >
+                            <Download className="w-5 h-5" />
+                            <span>Export PDF Report</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Department-wise Breakdown */}
+                      <div className="space-y-4">
+                        {Object.keys(dailyReport.departments)
+                          .sort() // Sort departments alphabetically
+                          .map(deptName => {
+                            const deptData = dailyReport.departments[deptName];
+                            const isExpanded = expandedDepartments.has(deptName);
+                            
+                            return (
+                              <div key={deptName} className="bg-white border border-gray-200 rounded-lg">
+                                <div 
+                                  className="px-6 py-4 border-b border-gray-200 cursor-pointer hover:bg-gray-50"
+                                  onClick={() => toggleDepartmentExpansion(deptName)}
+                                >
+                                  <div className="flex justify-between items-center">
+                                    <div className="flex items-center space-x-3">
+                                      <Building className="w-5 h-5 text-purple-600" />
+                                      <div>
+                                        <h3 className="text-lg font-medium text-gray-900">{deptName}</h3>
+                                        <p className="text-sm text-gray-500">
+                                          {deptData.total} challans • {deptData.salesmen.length} salesmen
+                                        </p>
+                                      </div>
+                                    </div>
+                                    <div className="flex items-center space-x-3">
+                                      <div className="text-right">
+                                        <div className="text-xl font-bold text-purple-600">{deptData.total}</div>
+                                        <div className="text-xs text-gray-500">Challans</div>
+                                      </div>
+                                      {isExpanded ? 
+                                        <ChevronUp className="w-5 h-5 text-gray-400" /> : 
+                                        <ChevronDown className="w-5 h-5 text-gray-400" />
+                                      }
+                                    </div>
+                                  </div>
+                                </div>
+
+                                {/* Expanded Department Details */}
+                                {isExpanded && (
+                                  <div className="px-6 py-4">
+                                    {/* Desktop Table */}
+                                    <div className="hidden md:block">
+                                      <div className="overflow-x-auto">
+                                        <table className="min-w-full divide-y divide-gray-200">
+                                          <thead className="bg-gray-50">
+                                            <tr>
+                                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Salesman
+                                              </th>
+                                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Challan No
+                                              </th>
+                                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Challan Date
+                                              </th>
+                                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Shop Name
+                                              </th>
+                                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Scanning Date
+                                              </th>
+                                            </tr>
+                                          </thead>
+                                          <tbody className="bg-white divide-y divide-gray-200">
+                                            {deptData.challans.map((challan, index) => (
+                                              <tr key={challan.challanNo} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                                                  {challan.salesman}
+                                                </td>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-purple-600 font-medium">
+                                                  {challan.challanNo}
+                                                </td>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                  {formatDate(challan.challanDate)}
+                                                </td>
+                                                <td className="px-4 py-4 text-sm text-gray-900">
+                                                  {challan.shopName}
+                                                </td>
+                                                <td className="px-4 py-4 whitespace-nowrap text-sm text-green-600">
+                                                  {formatDate(challan.scanningDate || '')}
+                                                </td>
+                                              </tr>
+                                            ))}
+                                          </tbody>
+                                        </table>
+                                      </div>
+                                    </div>
+
+                                    {/* Mobile Cards */}
+                                    <div className="block md:hidden space-y-3">
+                                      {deptData.challans.map(challan => (
+                                        <div key={challan.challanNo} className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+                                          <div className="flex justify-between items-start mb-2">
+                                            <div className="font-medium text-purple-600">{challan.challanNo}</div>
+                                            <div className="px-2 py-1 bg-green-100 text-green-800 rounded-full text-xs font-medium">
+                                              Scanned
+                                            </div>
+                                          </div>
+                                          
+                                          <div className="text-sm text-gray-600 space-y-1">
+                                            <div><span className="font-medium">Salesman:</span> {challan.salesman}</div>
+                                            <div><span className="font-medium">Challan Date:</span> {formatDate(challan.challanDate)}</div>
+                                            <div><span className="font-medium">Shop:</span> {challan.shopName}</div>
+                                            <div><span className="font-medium">Scanning Date:</span> {formatDate(challan.scanningDate || '')}</div>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+
+                                    {/* Department Total */}
+                                    <div className="mt-4 pt-4 border-t border-gray-200">
+                                      <div className="flex justify-between items-center">
+                                        <span className="text-lg font-medium text-gray-900">
+                                          Total {deptName}:
+                                        </span>
+                                        <span className="text-xl font-bold text-purple-600">
+                                          {deptData.total} challans
+                                        </span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                      </div>
+
+                      {/* Grand Total */}
+                      <div className="bg-gradient-to-r from-purple-600 to-blue-600 text-white rounded-lg p-6">
+                        <div className="text-center">
+                          <h3 className="text-2xl font-bold mb-2">GRAND TOTAL</h3>
+                          <div className="text-4xl font-bold mb-2">{dailyReport.grandTotal}</div>
+                          <div className="text-lg">Total Challans Handed Over</div>
+                          <div className="text-sm opacity-90 mt-2">
+                            Generated on: {new Date().toLocaleString()}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* No Data State */}
+                  {!dailyReport && !loadingDailyReport && scanningDate && (
+                    <div className="text-center py-12">
+                      <div className="bg-gray-100 rounded-lg p-8 max-w-md mx-auto">
+                        <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">No Data Found</h3>
+                        <p className="text-gray-600 mb-4">
+                          No challans were scanned on {formatDateForDisplay(scanningDate)}.
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          Please verify the scanning date or check if the data is available in the Google Sheet.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Instructions */}
+                  {!scanningDate && !dailyReport && (
+                    <div className="text-center py-12">
+                      <div className="bg-purple-50 rounded-lg p-8 max-w-lg mx-auto">
+                        <Calendar className="w-12 h-12 text-purple-500 mx-auto mb-4" />
+                        <h3 className="text-lg font-medium text-purple-800 mb-2">Generate Physical Handover Report</h3>
+                        <p className="text-purple-700 mb-4">
+                          Select a scanning date above to generate a detailed report of all challans physically handed over to Radico Khaitan on that date.
+                        </p>
+                        <div className="text-sm text-purple-600 space-y-1">
+                          <p>• Report includes department-wise breakdown</p>
+                          <p>• Shows salesman details and challan information</p>
+                          <p>• Can be exported as professional PDF</p>
+                          <p>• Includes formal greeting for business correspondence</p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </>
               )}
             </div>
