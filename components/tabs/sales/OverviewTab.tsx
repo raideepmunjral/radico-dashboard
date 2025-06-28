@@ -363,12 +363,49 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
   const avg8PMPerShop = shopsWith8PM.length > 0 ? (data.summary.total8PM / shopsWith8PM.length).toFixed(1) : '0';
   const avgVERVEPerShop = shopsWithVERVE.length > 0 ? (data.summary.totalVERVE / shopsWithVERVE.length).toFixed(1) : '0';
   
-  // Sales Velocity (current month vs 3-month average) - FIXED to use correct Q1
-  const threeMonthAvg8PM = completedQ_8PM / 3;
-  const threeMonthAvgVERVE = completedQ_VERVE / 3;
-  // Sales Velocity (current month vs completed quarter average)
-  const velocity8PM = threeMonthAvg8PM > 0 ? ((data.summary.total8PM / threeMonthAvg8PM) * 100).toFixed(0) : '0';
-  const velocityVERVE = threeMonthAvgVERVE > 0 ? ((data.summary.totalVERVE / threeMonthAvgVERVE) * 100).toFixed(0) : '0';
+  // Sales Velocity (current month vs PREVIOUS completed quarter average)
+  const getPreviousQuarter = (quarter: string) => {
+    switch(quarter) {
+      case 'Q1': return 'Q4';
+      case 'Q2': return 'Q1';
+      case 'Q3': return 'Q2';
+      case 'Q4': return 'Q3';
+      default: return 'Q4';
+    }
+  };
+  
+  const getCurrentQuarter = (month: string) => {
+    const m = parseInt(month);
+    if (m >= 4 && m <= 6) return 'Q1';
+    if (m >= 7 && m <= 9) return 'Q2';
+    if (m >= 10 && m <= 12) return 'Q3';
+    return 'Q4';
+  };
+  
+  const currentQuarter = getCurrentQuarter(data.currentMonth);
+  const previousQuarter = getPreviousQuarter(currentQuarter);
+  const previousQuarterMonths = getQuarterMonths(previousQuarter, data.currentYear);
+  
+  // Calculate previous quarter totals for velocity comparison
+  const prevQ_8PM = data.allShopsComparison.reduce((sum, shop) => {
+    return sum + previousQuarterMonths.reduce((monthSum, month) => {
+      const key = `${month}EightPM` as keyof ShopData;
+      return monthSum + ((shop[key] as number) || 0);
+    }, 0);
+  }, 0);
+  
+  const prevQ_VERVE = data.allShopsComparison.reduce((sum, shop) => {
+    return sum + previousQuarterMonths.reduce((monthSum, month) => {
+      const key = `${month}Verve` as keyof ShopData;
+      return monthSum + ((shop[key] as number) || 0);
+    }, 0);
+  }, 0);
+  
+  // Calculate velocity against previous quarter's monthly average
+  const prevQuarterAvg8PM = prevQ_8PM / 3;
+  const prevQuarterAvgVERVE = prevQ_VERVE / 3;
+  const velocity8PM = prevQuarterAvg8PM > 0 ? ((data.summary.total8PM / prevQuarterAvg8PM) * 100).toFixed(0) : '0';
+  const velocityVERVE = prevQuarterAvgVERVE > 0 ? ((data.summary.totalVERVE / prevQuarterAvgVERVE) * 100).toFixed(0) : '0';
 
   return (
     <div className="space-y-6">
@@ -683,7 +720,7 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
               </div>
             </div>
 
-            {/* Enhanced metrics */}
+            {/* Enhanced metrics with velocity explanation */}
             <div className="grid grid-cols-2 gap-4 pt-3 border-t text-center">
               <div>
                 <div className="text-lg font-bold text-purple-600">{shopsWith8PM.length}</div>
@@ -692,7 +729,14 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
               <div>
                 <div className="text-lg font-bold text-purple-600">{velocity8PM}%</div>
                 <div className="text-xs text-gray-500">Sales Velocity</div>
-                <div className="text-xs text-gray-400">(vs quarter avg)</div>
+                <div className="text-xs text-gray-400">(vs {previousQuarter} avg) 🚀</div>
+              </div>
+            </div>
+            
+            {/* Velocity Explanation */}
+            <div className="bg-purple-50 p-3 rounded-lg">
+              <div className="text-xs text-purple-700">
+                <strong>🚀 Sales Velocity:</strong> How fast you're selling now vs your {previousQuarter} momentum!
               </div>
             </div>
             
@@ -741,7 +785,7 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
               </div>
             </div>
 
-            {/* Enhanced metrics */}
+            {/* Enhanced metrics with velocity explanation */}
             <div className="grid grid-cols-2 gap-4 pt-3 border-t text-center">
               <div>
                 <div className="text-lg font-bold text-orange-600">{shopsWithVERVE.length}</div>
@@ -750,7 +794,14 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
               <div>
                 <div className="text-lg font-bold text-orange-600">{velocityVERVE}%</div>
                 <div className="text-xs text-gray-500">Sales Velocity</div>
-                <div className="text-xs text-gray-400">(vs quarter avg)</div>
+                <div className="text-xs text-gray-400">(vs {previousQuarter} avg) ⚡</div>
+              </div>
+            </div>
+            
+            {/* Velocity Explanation */}
+            <div className="bg-orange-50 p-3 rounded-lg">
+              <div className="text-xs text-orange-700">
+                <strong>⚡ Sales Velocity:</strong> Your current energy vs {previousQuarter} baseline!
               </div>
             </div>
             
