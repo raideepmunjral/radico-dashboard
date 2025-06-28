@@ -249,7 +249,6 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
   let lastYearCompletedQ_8PM = 0;
   let lastYearCompletedQ_VERVE = 0;
   let lastYearCompletedQ_Total = 0;
-  let lastYearDataLabel = '';
   
   // Check if we have extended historical data for proper Q1 FY2024 calculation
   const hasExtendedData = data.historicalData?.april2024 && data.historicalData?.may2024;
@@ -265,13 +264,10 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
       (data.historicalData?.april2024?.totalVERVE || 0) +
       (data.historicalData?.may2024?.totalVERVE || 0) +
       (data.historicalData?.juneLastYear?.totalVERVE || 0);
-    
-    lastYearDataLabel = 'Full Q1 FY2024 (Apr+May+Jun)';
   } else if (completedQuarter === 'Q1') {
     // FALLBACK: Use available June 2024 data only
     lastYearCompletedQ_8PM = data.summary.lastYearTotal8PM || 0;
     lastYearCompletedQ_VERVE = data.summary.lastYearTotalVERVE || 0;
-    lastYearDataLabel = 'June 2024 only (limited data)';
   } else if (completedQuarter === 'Q2') {
     // Q2 FY2024: July 2024 + August 2024 + September 2024
     lastYearCompletedQ_8PM = 
@@ -283,8 +279,6 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
       (data.historicalData?.july2024?.totalVERVE || 0) +
       (data.historicalData?.august2024?.totalVERVE || 0) +
       (data.historicalData?.september2024?.totalVERVE || 0);
-    
-    lastYearDataLabel = 'Full Q2 FY2024 (Jul+Aug+Sep)';
   } else if (completedQuarter === 'Q3') {
     // Q3 FY2024: October 2024 + November 2024 + December 2024
     lastYearCompletedQ_8PM = 
@@ -296,13 +290,10 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
       (data.historicalData?.october2024?.totalVERVE || 0) +
       (data.historicalData?.november2024?.totalVERVE || 0) +
       (data.historicalData?.december2024?.totalVERVE || 0);
-    
-    lastYearDataLabel = 'Full Q3 FY2024 (Oct+Nov+Dec)';
   } else if (completedQuarter === 'Q4') {
     // Q4 FY2024: January 2024 + February 2024 + March 2024 (would need even more historical data)
     lastYearCompletedQ_8PM = data.summary.lastYearTotal8PM || 0;
     lastYearCompletedQ_VERVE = data.summary.lastYearTotalVERVE || 0;
-    lastYearDataLabel = 'Limited Q4 data available';
   }
   
   lastYearCompletedQ_Total = lastYearCompletedQ_8PM + lastYearCompletedQ_VERVE;
@@ -424,41 +415,18 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
         />
       </div>
 
-      {/* NEW: DUAL-VIEW QUARTERLY PERFORMANCE - COMPLETED + ONGOING */}
+      {/* QUARTERLY PERFORMANCE SECTION */}
       <div className="bg-white p-4 sm:p-6 rounded-lg shadow">
         <h3 className="text-lg font-medium text-gray-900 mb-6 flex items-center">
           <BarChart3 className="w-5 h-5 mr-2" />
-          Quarterly Performance Analysis - Indian FY (Apr-Mar)
+          Quarterly Performance Analysis
         </h3>
         
         {/* COMPLETED QUARTER SECTION */}
         <div className="mb-8">
-          <h4 className="text-md font-medium text-gray-800 mb-2 flex items-center">
+          <h4 className="text-md font-medium text-gray-800 mb-4 flex items-center">
             🏆 Latest Completed Quarter: {completedQuarter} FY{data.currentYear} vs {completedQuarter} FY{parseInt(data.currentYear)-1}
           </h4>
-          
-          {/* Data Source Indicator */}
-          <div className={`mb-4 p-3 rounded-lg text-sm ${
-            lastYearDataLabel.includes('Full') ? 'bg-green-50 border border-green-200' : 'bg-yellow-50 border border-yellow-200'
-          }`}>
-            <div className="flex items-center">
-              {lastYearDataLabel.includes('Full') ? (
-                <>
-                  <span className="text-green-600 mr-2">✅</span>
-                  <span className="text-green-800">
-                    <strong>Complete Data:</strong> {lastYearDataLabel}
-                  </span>
-                </>
-              ) : (
-                <>
-                  <span className="text-yellow-600 mr-2">⚠️</span>
-                  <span className="text-yellow-800">
-                    <strong>Limited Data:</strong> {lastYearDataLabel} - Full quarterly data pending main dashboard update
-                  </span>
-                </>
-              )}
-            </div>
-          </div>
           
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* 8PM Completed Quarter */}
@@ -542,17 +510,7 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
               📈 Ongoing Quarter Progress: {ongoingQuarter} FY{data.currentYear} (Month-to-Date)
             </h4>
             
-            {/* Ongoing Data Source Indicator */}
-            <div className="mb-4 p-3 rounded-lg text-sm bg-blue-50 border border-blue-200">
-              <div className="flex items-center">
-                <span className="text-blue-600 mr-2">📊</span>
-                <span className="text-blue-800">
-                  <strong>Progress Tracking:</strong> {ongoingDataLabel}
-                </span>
-              </div>
-            </div>
-            
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
               {/* 8PM Ongoing Quarter */}
               <div className="bg-purple-100 p-4 rounded-lg border border-purple-300">
                 <h5 className="font-medium text-purple-800 mb-3">8PM {ongoingQuarter} Progress</h5>
@@ -628,54 +586,67 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
           </div>
         )}
 
-        {/* Quarter Info Banner with Data Status */}
+        {/* Quarter Info Banner */}
         <div className="mt-6 bg-gray-50 p-4 rounded-lg">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div>
-              <h5 className="font-medium text-gray-800 mb-2">Indian Financial Year Quarters:</h5>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                <div className={`text-center p-2 rounded ${completedQuarter === 'Q1' ? 'bg-blue-100 border border-blue-300' : 'bg-white'}`}>
-                  <div className="font-medium">Q1</div>
-                  <div className="text-xs text-gray-600">Apr-May-Jun</div>
-                </div>
-                <div className={`text-center p-2 rounded ${completedQuarter === 'Q2' ? 'bg-blue-100 border border-blue-300' : 'bg-white'}`}>
-                  <div className="font-medium">Q2</div>
-                  <div className="text-xs text-gray-600">Jul-Aug-Sep</div>
-                </div>
-                <div className={`text-center p-2 rounded ${completedQuarter === 'Q3' ? 'bg-blue-100 border border-blue-300' : 'bg-white'}`}>
-                  <div className="font-medium">Q3</div>
-                  <div className="text-xs text-gray-600">Oct-Nov-Dec</div>
-                </div>
-                <div className={`text-center p-2 rounded ${completedQuarter === 'Q4' ? 'bg-blue-100 border border-blue-300' : 'bg-white'}`}>
-                  <div className="font-medium">Q4</div>
-                  <div className="text-xs text-gray-600">Jan-Feb-Mar</div>
-                </div>
+          <div>
+            <h5 className="font-medium text-gray-800 mb-2">Financial Year Quarters:</h5>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+              <div className={`text-center p-2 rounded ${completedQuarter === 'Q1' ? 'bg-blue-100 border border-blue-300' : 'bg-white'}`}>
+                <div className="font-medium">Q1</div>
+                <div className="text-xs text-gray-600">Apr-May-Jun</div>
+              </div>
+              <div className={`text-center p-2 rounded ${completedQuarter === 'Q2' ? 'bg-blue-100 border border-blue-300' : 'bg-white'}`}>
+                <div className="font-medium">Q2</div>
+                <div className="text-xs text-gray-600">Jul-Aug-Sep</div>
+              </div>
+              <div className={`text-center p-2 rounded ${completedQuarter === 'Q3' ? 'bg-blue-100 border border-blue-300' : 'bg-white'}`}>
+                <div className="font-medium">Q3</div>
+                <div className="text-xs text-gray-600">Oct-Nov-Dec</div>
+              </div>
+              <div className={`text-center p-2 rounded ${completedQuarter === 'Q4' ? 'bg-blue-100 border border-blue-300' : 'bg-white'}`}>
+                <div className="font-medium">Q4</div>
+                <div className="text-xs text-gray-600">Jan-Feb-Mar</div>
               </div>
             </div>
-            
-            <div>
-              <h5 className="font-medium text-gray-800 mb-2">Historical Data Availability:</h5>
-              <div className="space-y-2 text-sm">
-                <div className="flex items-center justify-between">
-                  <span>Q1 FY2024 Complete:</span>
-                  <span className={hasExtendedData ? 'text-green-600' : 'text-red-600'}>
-                    {hasExtendedData ? '✅ Available' : '❌ Pending'}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Current Window:</span>
-                  <span className="text-blue-600">
-                    {hasExtendedData ? '15 months' : '12 months'}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between">
-                  <span>Data Quality:</span>
-                  <span className={lastYearDataLabel.includes('Full') ? 'text-green-600' : 'text-yellow-600'}>
-                    {lastYearDataLabel.includes('Full') ? 'Complete' : 'Limited'}
-                  </span>
-                </div>
-              </div>
+          </div>
+        </div>
+      </div>
+
+      {/* EXECUTIVE SUMMARY - MOVED HERE */}
+      <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 sm:p-6 rounded-lg">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Executive Summary - {getMonthName(data.currentMonth)} {data.currentYear}</h3>
+        <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+          <div className="text-center">
+            <div className="text-2xl font-bold text-blue-600">{data.summary.totalSales.toLocaleString()}</div>
+            <div className="text-xs text-gray-600">Total Cases</div>
+            <div className="text-xs text-gray-400">This month</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-green-600">{data.summary.coverage}%</div>
+            <div className="text-xs text-gray-600">Market Coverage</div>
+            <div className="text-xs text-gray-400">Overall reach</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-purple-600">{coverage8PM}%</div>
+            <div className="text-xs text-gray-600">8PM Penetration</div>
+            <div className="text-xs text-gray-400">Brand reach</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-orange-600">{coverageVERVE}%</div>
+            <div className="text-xs text-gray-600">VERVE Penetration</div>
+            <div className="text-xs text-gray-400">Brand reach</div>
+          </div>
+          <div className="text-center">
+            <div className="text-2xl font-bold text-indigo-600">{crossSellingRate}%</div>
+            <div className="text-xs text-gray-600">Cross-Selling</div>
+            <div className="text-xs text-gray-400">Both brands</div>
+          </div>
+          <div className="text-center">
+            <div className={`text-2xl font-bold ${parseFloat(completedQGrowthTotal) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
+              {parseFloat(completedQGrowthTotal) >= 0 ? '+' : ''}{completedQGrowthTotal}%
             </div>
+            <div className="text-xs text-gray-600">{completedQuarter} YoY Growth</div>
+            <div className="text-xs text-gray-400">vs last year</div>
           </div>
         </div>
       </div>
@@ -712,7 +683,7 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
               </div>
             </div>
 
-            {/* NEW: Enhanced metrics */}
+            {/* Enhanced metrics */}
             <div className="grid grid-cols-2 gap-4 pt-3 border-t text-center">
               <div>
                 <div className="text-lg font-bold text-purple-600">{shopsWith8PM.length}</div>
@@ -721,6 +692,7 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
               <div>
                 <div className="text-lg font-bold text-purple-600">{velocity8PM}%</div>
                 <div className="text-xs text-gray-500">Sales Velocity</div>
+                <div className="text-xs text-gray-400">(vs quarter avg)</div>
               </div>
             </div>
             
@@ -769,7 +741,7 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
               </div>
             </div>
 
-            {/* NEW: Enhanced metrics */}
+            {/* Enhanced metrics */}
             <div className="grid grid-cols-2 gap-4 pt-3 border-t text-center">
               <div>
                 <div className="text-lg font-bold text-orange-600">{shopsWithVERVE.length}</div>
@@ -778,6 +750,7 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
               <div>
                 <div className="text-lg font-bold text-orange-600">{velocityVERVE}%</div>
                 <div className="text-xs text-gray-500">Sales Velocity</div>
+                <div className="text-xs text-gray-400">(vs quarter avg)</div>
               </div>
             </div>
             
@@ -797,7 +770,7 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-      {/* NEW: Market Intelligence Dashboard */}
+      {/* Market Intelligence Dashboard */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         <div className="bg-white p-4 sm:p-6 rounded-lg shadow">
           <h3 className="text-lg font-medium text-gray-900 mb-4 flex items-center">
@@ -890,45 +863,6 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
                 </div>
               </div>
             </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Performance Summary - Enhanced */}
-      <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 sm:p-6 rounded-lg">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">Executive Summary - {getMonthName(data.currentMonth)} {data.currentYear}</h3>
-        <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
-          <div className="text-center">
-            <div className="text-2xl font-bold text-blue-600">{data.summary.totalSales.toLocaleString()}</div>
-            <div className="text-xs text-gray-600">Total Cases</div>
-            <div className="text-xs text-gray-400">This month</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-green-600">{data.summary.coverage}%</div>
-            <div className="text-xs text-gray-600">Market Coverage</div>
-            <div className="text-xs text-gray-400">Overall reach</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-purple-600">{coverage8PM}%</div>
-            <div className="text-xs text-gray-600">8PM Penetration</div>
-            <div className="text-xs text-gray-400">Brand reach</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-orange-600">{coverageVERVE}%</div>
-            <div className="text-xs text-gray-600">VERVE Penetration</div>
-            <div className="text-xs text-gray-400">Brand reach</div>
-          </div>
-          <div className="text-center">
-            <div className="text-2xl font-bold text-indigo-600">{crossSellingRate}%</div>
-            <div className="text-xs text-gray-600">Cross-Selling</div>
-            <div className="text-xs text-gray-400">Both brands</div>
-          </div>
-          <div className="text-center">
-            <div className={`text-2xl font-bold ${parseFloat(completedQGrowthTotal) >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-              {parseFloat(completedQGrowthTotal) >= 0 ? '+' : ''}{completedQGrowthTotal}%
-            </div>
-            <div className="text-xs text-gray-600">{completedQuarter} YoY Growth</div>
-            <div className="text-xs text-gray-400">vs last year</div>
           </div>
         </div>
       </div>
