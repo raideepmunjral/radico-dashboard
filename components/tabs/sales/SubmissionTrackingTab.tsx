@@ -882,19 +882,22 @@ const SubmissionTrackingTab = () => {
             didDrawPage: (data: any) => {
               // Add letterhead to new pages with proper spacing
               if (data.pageNumber > 1) {
-                doc.setFontSize(14);
-                doc.setFont('helvetica', 'bold');
-                doc.setTextColor(20, 184, 166);
-                doc.text('MUNJRAL BROTHERS DISTRIBUTION PVT LTD', 20, 25);
-                doc.setTextColor(0, 0, 0);
-                doc.setFont('helvetica', 'normal');
-                doc.setLineWidth(0.5);
-                doc.setDrawColor(20, 184, 166);
-                doc.line(20, 32, 190, 32);
-                doc.setFontSize(9);
-                doc.setTextColor(100, 100, 100);
-                doc.text(`Physical Challans Handover - ${dailyReport.formattedScanningDate} (Continued)`, 20, 42);
-                doc.setTextColor(0, 0, 0);
+                // Only add letterhead if we're starting a new page, not mid-table
+                if (data.cursor && data.cursor.y < 50) {
+                  doc.setFontSize(14);
+                  doc.setFont('helvetica', 'bold');
+                  doc.setTextColor(20, 184, 166);
+                  doc.text('MUNJRAL BROTHERS DISTRIBUTION PVT LTD', 20, 20);
+                  doc.setTextColor(0, 0, 0);
+                  doc.setFont('helvetica', 'normal');
+                  doc.setLineWidth(0.5);
+                  doc.setDrawColor(20, 184, 166);
+                  doc.line(20, 27, 190, 27);
+                  doc.setFontSize(9);
+                  doc.setTextColor(100, 100, 100);
+                  doc.text(`Physical Challans Handover - ${dailyReport.formattedScanningDate} (Continued)`, 20, 35);
+                  doc.setTextColor(0, 0, 0);
+                }
               }
             },
             didDrawCell: (data: any) => {
@@ -944,12 +947,6 @@ const SubmissionTrackingTab = () => {
       
       doc.setFontSize(10);
       doc.text(`Authorized Signatory`, 20, closingYPosition + 45);
-      
-      // Footer with generation info
-      doc.setFontSize(9);
-      doc.setTextColor(128, 128, 128);
-      doc.text(`Report generated on: ${new Date().toLocaleString()}`, 20, closingYPosition + 60);
-      doc.text(`System: Radico Analytics Dashboard`, 20, closingYPosition + 70);
       
       doc.save(`Physical_Challans_Handover_${dailyReport.formattedScanningDate.replace(/-/g, '_')}.pdf`);
       
