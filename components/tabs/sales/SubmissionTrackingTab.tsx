@@ -203,6 +203,45 @@ const formatDateForDisplay = (dateStr: string): string => {
   }
 };
 
+// 🆕 HELPER: Calculate Monday-Sunday week range for a given date
+const getWeekRange = (dateStr: string): string => {
+  if (!dateStr) return 'Unknown Week';
+  
+  try {
+    const parts = dateStr.split('-');
+    if (parts.length !== 3) return 'Invalid Date';
+    
+    const day = parseInt(parts[0]);
+    const month = parseInt(parts[1]) - 1; // Month is 0-indexed in JavaScript
+    const year = parseInt(parts[2]);
+    
+    const date = new Date(year, month, day);
+    
+    // Calculate Monday of the week
+    const dayOfWeek = date.getDay();
+    const mondayOffset = dayOfWeek === 0 ? -6 : 1 - dayOfWeek; // Handle Sunday (0) as 7
+    const monday = new Date(date);
+    monday.setDate(date.getDate() + mondayOffset);
+    
+    // Calculate Sunday of the week
+    const sunday = new Date(monday);
+    sunday.setDate(monday.getDate() + 6);
+    
+    // Format as DD-MM-YYYY
+    const formatDate = (d: Date) => {
+      const day = d.getDate().toString().padStart(2, '0');
+      const month = (d.getMonth() + 1).toString().padStart(2, '0');
+      const year = d.getFullYear().toString();
+      return `${day}-${month}-${year}`;
+    };
+    
+    return `${formatDate(monday)} to ${formatDate(sunday)}`;
+  } catch (error) {
+    console.error('Error calculating week range:', error);
+    return 'Invalid Date';
+  }
+};
+
 // ==========================================
 // MAIN COMPONENT
 // ==========================================
@@ -733,6 +772,187 @@ const SubmissionTrackingTab = () => {
     } catch (error) {
       console.error('Error generating daily scanning PDF:', error);
       alert('Error generating PDF report. Please try again.');
+    }
+  };
+
+  // 🆕 NEW: Export daily scanning CSV with salesmanwise weekly summary
+  const exportDailyScanningCSV = () => {
+    if (!dailyReport) {
+      alert('No daily report data available. Please fetch the report first.');
+      return;
+    }
+
+    try {
+      let csvContent = "data:text/csv;charset=utf-8,";
+      
+      // Header Section
+      csvContent += "Physical Challans Handover Report\n";
+      csvContent += `Scanning Date,${dailyReport.formattedScanningDate}\n`;
+      csvContent += `Generated,${new Date().toLocaleString()}\n`;
+      csvContent += `Total Challans,${dailyReport.grandTotal}\n`;
+      csvContent += `Total Departments,${Object.keys(dailyReport.departments).length}\n`;
+      csvContent += `Total Salesmen,${dailyReport.totalSalesmen}\n`;
+      csvContent += "\n";
+      
+      // Data Quality Section
+      if (dailyReconciliation) {
+        csvContent += "DATA RECONCILIATION\n";
+        csvContent += `Total Scanned on Date,${dailyReconciliation.totalScannedOnDate}\n`;
+        csvContent += `Found in Sheet1,${dailyReconciliation.foundInSheet1}\n`;
+        csvContent += `Missing from Sheet1,${dailyReconciliation.missingFromSheet1}\n`;
+        csvContent += "\n";
+      }
+      
+      // Detailed Challan Data Section
+      csvContent += "DETAILED CHALLAN DATA\n";
+      csvContent += "Department,Salesman,Challan Number,Challan Date,Shop Name,Shop ID,Brand,Cases,Scanning Date,Week Range\n";
+      
+      // Sort departments alphabetically and then challans by salesman
+      const sortedDepartments = Object.keys(dailyReport.departments).sort();
+      
+      sortedDepartments.forEach(deptName => {
+        const deptData = dailyReport.departments[deptName];
+        const sortedChallans = deptData.challans.sort((a, b) => a.salesman.localeCompare(b.salesman));
+        
+        sortedChallans.forEach(challan => {
+          const weekRange = getWeekRange(challan.challanDate);
+          csvContent += `"${deptName}","${challan.salesman}","${challan.challanNo}","${challan.challanDate}","${challan.shopName}","${challan.shopId}","${challan.brand}",${challan.cases},"${challan.scanningDate || ''}","${weekRange}"\n`;
+        });
+      });
+      
+      csvContent += "\n";
+      
+      // Salesmanwise Weekly Summary Section
+      csvContent += "SALESMANWISE WEEKLY SUMMARY\n";
+      csvContent += `Challans by week for scanning date: ${dailyReport.formattedScanningDate}\n`;
+      csvContent += "Salesman,Week Range,Challan Count,Challan Numbers\n";
+      
+      // Collect all challans from all departments
+      const allChallans: ChallanData[] = [];
+      Object.values(dailyReport.departments).forEach(deptData => {
+        allChallans.push(...deptData.challans);
+      });
+      
+      // Group by salesman
+      const salesmanWeekMap = new Map<string, Map<string, ChallanData[]>>();
+      
+      allChallans.forEach(challan => {
+        const salesmanName = challan.salesman;
+        const weekRange = getWeekRange(challan.challanDate);
+        
+        if (!salesmanWeekMap.has(salesmanName)) {
+          salesmanWeekMap.set(salesmanName, new Map());
+        }
+        
+        const salesmanWeeks = salesmanWeekMap.get(salesmanName)!;
+        if (!salesmanWeeks.has(weekRange)) {
+          salesmanWeeks.set(weekRange, []);
+        }
+        
+        salesmanWeeks.get(weekRange)!.push(challan);
+      });
+      
+      // Sort salesmen alphabetically and output weekly summary
+      const sortedSalesmen = Array.from(salesmanWeekMap.keys()).sort();
+      
+      sortedSalesmen.forEach(salesmanName => {
+        const salesmanWeeks = salesmanWeekMap.get(salesmanName)!;
+        
+        // Sort weeks chronologically (by first date in range)
+        const sortedWeeks = Array.from(salesmanWeeks.keys()).sort((a, b) => {
+          // Extract first date from week range for sorting
+          const dateA = a.split(' to ')[0];
+          const dateB = b.split(' to ')[0];
+          
+          // Convert DD-MM-YYYY to comparable format
+          const [dayA, monthA, yearA] = dateA.split('-').map(Number);
+          const [dayB, monthB, yearB] = dateB.split('-').map(Number);
+          
+          const dateObjA = new Date(yearA, monthA - 1, dayA);
+          const dateObjB = new Date(yearB, monthB - 1, dayB);
+          
+          return dateObjA.getTime() - dateObjB.getTime();
+        });
+        
+        sortedWeeks.forEach(weekRange => {
+          const weekChallans = salesmanWeeks.get(weekRange)!;
+          const challanNumbers = weekChallans.map(c => c.challanNo).sort().join('; ');
+          
+          csvContent += `"${salesmanName}","${weekRange}",${weekChallans.length},"${challanNumbers}"\n`;
+        });
+      });
+      
+      csvContent += "\n";
+      
+      // Salesmanwise Total Summary
+      csvContent += "SALESMANWISE TOTALS\n";
+      csvContent += "Salesman,Total Challans,Week Count,Departments\n";
+      
+      sortedSalesmen.forEach(salesmanName => {
+        const salesmanWeeks = salesmanWeekMap.get(salesmanName)!;
+        const totalChallans = Array.from(salesmanWeeks.values()).reduce((sum, challans) => sum + challans.length, 0);
+        const weekCount = salesmanWeeks.size;
+        
+        // Get unique departments for this salesman
+        const departments = new Set<string>();
+        Array.from(salesmanWeeks.values()).forEach(challans => {
+          challans.forEach(challan => departments.add(challan.department));
+        });
+        const departmentList = Array.from(departments).sort().join('; ');
+        
+        csvContent += `"${salesmanName}",${totalChallans},${weekCount},"${departmentList}"\n`;
+      });
+      
+      csvContent += "\n";
+      
+      // Department Summary Section
+      csvContent += "DEPARTMENT SUMMARY\n";
+      csvContent += "Department,Total Challans,Unique Salesmen,Unique Weeks\n";
+      
+      sortedDepartments.forEach(deptName => {
+        const deptData = dailyReport.departments[deptName];
+        const uniqueSalesmen = new Set(deptData.challans.map(c => c.salesman));
+        const uniqueWeeks = new Set(deptData.challans.map(c => getWeekRange(c.challanDate)));
+        
+        csvContent += `"${deptName}",${deptData.total},${uniqueSalesmen.size},${uniqueWeeks.size}\n`;
+      });
+      
+      csvContent += "\n";
+      
+      // Missing Challans Section (Not Tracked in Master)
+      if (dailyReconciliation && dailyReconciliation.missingChallans.length > 0) {
+        csvContent += "NOT TRACKED IN MASTER SHEET1\n";
+        csvContent += `Total Missing Challans,${dailyReconciliation.missingChallans.length}\n`;
+        csvContent += "Challan Number,Status,Notes\n";
+        
+        dailyReconciliation.missingChallans.forEach(challanNo => {
+          csvContent += `"${challanNo}","Scanned but no data in Sheet1","Requires investigation"\n`;
+        });
+        
+        csvContent += "\n";
+      }
+      
+      // Footer
+      csvContent += "REPORT SUMMARY\n";
+      csvContent += `Grand Total Challans,${dailyReport.grandTotal}\n`;
+      csvContent += `Scanning Date,${dailyReport.formattedScanningDate}\n`;
+      csvContent += `Total Departments,${Object.keys(dailyReport.departments).length}\n`;
+      csvContent += `Total Salesmen,${dailyReport.totalSalesmen}\n`;
+      csvContent += `Report Generated,${new Date().toLocaleString()}\n`;
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `Physical_Challans_Handover_${dailyReport.formattedScanningDate.replace(/-/g, '_')}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      console.log('✅ Daily scanning CSV export completed with weekly summary');
+      
+    } catch (error) {
+      console.error('Error exporting daily scanning CSV:', error);
+      alert('Error generating CSV report. Please try again.');
     }
   };
 
@@ -2277,15 +2497,29 @@ const SubmissionTrackingTab = () => {
                           </div>
                         )}
 
-                        {/* Export PDF Button */}
+                        {/* Export Buttons */}
                         <div className="text-center">
-                          <button
-                            onClick={generateDailyScanningPDF}
-                            className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 flex items-center space-x-2 mx-auto"
-                          >
-                            <Download className="w-5 h-5" />
-                            <span>Export PDF Report</span>
-                          </button>
+                          <div className="flex flex-col sm:flex-row justify-center space-y-3 sm:space-y-0 sm:space-x-4">
+                            <button
+                              onClick={generateDailyScanningPDF}
+                              className="bg-purple-600 text-white px-6 py-3 rounded-lg hover:bg-purple-700 flex items-center space-x-2 justify-center"
+                            >
+                              <Download className="w-5 h-5" />
+                              <span>Export PDF Report</span>
+                            </button>
+                            
+                            <button
+                              onClick={exportDailyScanningCSV}
+                              className="bg-green-600 text-white px-6 py-3 rounded-lg hover:bg-green-700 flex items-center space-x-2 justify-center"
+                            >
+                              <Download className="w-5 h-5" />
+                              <span>Export CSV Data</span>
+                            </button>
+                          </div>
+                          
+                          <p className="text-sm text-gray-500 mt-3">
+                            PDF: Formal handover document | CSV: Detailed data with weekly summary
+                          </p>
                         </div>
                       </div>
 
