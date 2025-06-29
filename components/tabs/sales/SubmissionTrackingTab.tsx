@@ -850,21 +850,34 @@ const SubmissionTrackingTab = () => {
             startY: yPosition,
             theme: 'striped',
             styles: { 
-              fontSize: 9,
+              fontSize: 8,
               cellPadding: 3,
               lineColor: [200, 200, 200],
-              lineWidth: 0.1
+              lineWidth: 0.1,
+              overflow: 'linebreak',
+              cellWidth: 'wrap'
             },
             headStyles: { 
               fillColor: [20, 184, 166], // Teal header
               textColor: [255, 255, 255],
-              fontSize: 10,
-              fontStyle: 'bold'
+              fontSize: 9,
+              fontStyle: 'bold',
+              halign: 'center',
+              valign: 'middle',
+              cellPadding: 4
+            },
+            columnStyles: {
+              0: { cellWidth: 35, halign: 'left' },   // Salesman
+              1: { cellWidth: 30, halign: 'center' }, // Challan No
+              2: { cellWidth: 25, halign: 'center' }, // Challan Date
+              3: { cellWidth: 70, halign: 'left' },   // Shop Name
+              4: { cellWidth: 25, halign: 'center' }  // Department
             },
             alternateRowStyles: {
               fillColor: [248, 250, 252] // Light gray alternate rows
             },
-            margin: { left: 20, right: 20 },
+            margin: { left: 10, right: 10 },
+            tableWidth: 'auto',
             didDrawPage: (data: any) => {
               // Add letterhead to new pages
               if (data.pageNumber > 1) {
