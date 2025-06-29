@@ -988,7 +988,7 @@ const SubmissionTrackingTab = () => {
       
       // Detailed Challan Data Section
       csvContent += "DETAILED CHALLAN DATA\n";
-      csvContent += "Department,Salesman,Challan Number,Challan Date,Shop Name,Shop ID,Cases,Scanning Date,Week Range\n";
+      csvContent += "Department,Salesman,Challan Number,Challan Date,Shop Name,Shop ID,Scanning Date,Week Range\n";
       
       // Sort departments alphabetically and then challans by salesman
       const sortedDepartments = Object.keys(dailyReport.departments).sort();
@@ -999,7 +999,7 @@ const SubmissionTrackingTab = () => {
         
         sortedChallans.forEach(challan => {
           const weekRange = getWeekRange(challan.challanDate);
-          csvContent += `"${deptName}","${challan.salesman}","${challan.challanNo}","${challan.challanDate}","${challan.shopName}","${challan.shopId}",${challan.cases},"${challan.scanningDate || ''}","${weekRange}"\n`;
+          csvContent += `"${deptName}","${challan.salesman}","${challan.challanNo}","${challan.challanDate}","${challan.shopName}","${challan.shopId}","${challan.scanningDate || ''}","${weekRange}"\n`;
         });
       });
       
