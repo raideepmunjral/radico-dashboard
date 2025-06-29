@@ -851,7 +851,7 @@ const SubmissionTrackingTab = () => {
             theme: 'striped',
             styles: { 
               fontSize: 8,
-              cellPadding: 3,
+              cellPadding: 4,
               lineColor: [200, 200, 200],
               lineWidth: 0.1,
               overflow: 'linebreak',
@@ -860,18 +860,19 @@ const SubmissionTrackingTab = () => {
             headStyles: { 
               fillColor: [20, 184, 166], // Teal header
               textColor: [255, 255, 255],
-              fontSize: 9,
+              fontSize: 10,
               fontStyle: 'bold',
               halign: 'center',
               valign: 'middle',
-              cellPadding: 4
+              cellPadding: 5,
+              minCellHeight: 12
             },
             columnStyles: {
-              0: { cellWidth: 35, halign: 'left' },   // Salesman
-              1: { cellWidth: 30, halign: 'center' }, // Challan No
-              2: { cellWidth: 25, halign: 'center' }, // Challan Date
-              3: { cellWidth: 70, halign: 'left' },   // Shop Name
-              4: { cellWidth: 25, halign: 'center' }  // Department
+              0: { cellWidth: 32, halign: 'left' },   // Salesman
+              1: { cellWidth: 28, halign: 'center' }, // Challan No
+              2: { cellWidth: 22, halign: 'center' }, // Challan Date
+              3: { cellWidth: 75, halign: 'left' },   // Shop Name
+              4: { cellWidth: 23, halign: 'center' }  // Department
             },
             alternateRowStyles: {
               fillColor: [248, 250, 252] // Light gray alternate rows
@@ -879,19 +880,27 @@ const SubmissionTrackingTab = () => {
             margin: { left: 10, right: 10 },
             tableWidth: 'auto',
             didDrawPage: (data: any) => {
-              // Add letterhead to new pages
+              // Add letterhead to new pages with proper spacing
               if (data.pageNumber > 1) {
-                doc.setFontSize(12);
+                doc.setFontSize(14);
                 doc.setFont('helvetica', 'bold');
                 doc.setTextColor(20, 184, 166);
-                doc.text('MUNJRAL BROTHERS DISTRIBUTION PVT LTD', 20, 20);
+                doc.text('MUNJRAL BROTHERS DISTRIBUTION PVT LTD', 20, 25);
                 doc.setTextColor(0, 0, 0);
                 doc.setFont('helvetica', 'normal');
                 doc.setLineWidth(0.5);
                 doc.setDrawColor(20, 184, 166);
-                doc.line(20, 25, 190, 25);
-                doc.setFontSize(10);
-                doc.text(`Physical Challans Handover - ${dailyReport.formattedScanningDate} (Continued)`, 20, 35);
+                doc.line(20, 32, 190, 32);
+                doc.setFontSize(9);
+                doc.setTextColor(100, 100, 100);
+                doc.text(`Physical Challans Handover - ${dailyReport.formattedScanningDate} (Continued)`, 20, 42);
+                doc.setTextColor(0, 0, 0);
+              }
+            },
+            didDrawCell: (data: any) => {
+              // Ensure headers are clearly visible
+              if (data.section === 'head') {
+                doc.setFont('helvetica', 'bold');
               }
             }
           });
