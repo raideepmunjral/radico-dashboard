@@ -687,7 +687,7 @@ const SubmissionTrackingTab = () => {
     };
   };
 
-  // 🆕 FIXED: Generate PDF for Daily Scanning Report
+  // 🆕 FIXED: Generate PDF for Daily Scanning Report with Professional Letterhead
   const generateDailyScanningPDF = async () => {
     if (!dailyReport) {
       alert('No daily report data available. Please fetch the report first.');
@@ -700,19 +700,125 @@ const SubmissionTrackingTab = () => {
 
       const doc = new jsPDF();
       
-      // Header
-      doc.setFontSize(16);
-      doc.text('PHYSICAL CHALLANS SENT TO RADICO KHAITAN', 20, 20);
-      doc.setFontSize(14);
-      doc.text(`ON ${dailyReport.formattedScanningDate}`, 20, 30);
+      // Professional Letterhead Header
+      try {
+        // Try to add company logo
+        const logoResponse = await fetch('/radico-dashboard/munjral-logo.png');
+        if (logoResponse.ok) {
+          const logoBlob = await logoResponse.blob();
+          const logoDataUrl = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.readAsDataURL(logoBlob);
+          });
+          
+          // Add logo (top-left, professional size)
+          doc.addImage(logoDataUrl, 'PNG', 20, 15, 25, 25);
+        }
+      } catch (error) {
+        console.log('Logo not found, proceeding without image');
+      }
+      
+      // Company Name and Header
+      doc.setFontSize(18);
+      doc.setFont(undefined, 'bold');
+      doc.setTextColor(20, 184, 166); // Teal color matching login
+      doc.text('MUNJRAL BROTHERS DISTRIBUTION PVT LTD', 55, 25);
+      
+      // Reset text color
+      doc.setTextColor(0, 0, 0);
+      doc.setFont(undefined, 'normal');
+      
+      // Elegant separator line
+      doc.setLineWidth(0.5);
+      doc.setDrawColor(20, 184, 166); // Teal line
+      doc.line(20, 45, 190, 45);
+      
+      // Date and recipient information
+      doc.setFontSize(11);
+      const currentDate = new Date().toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: '2-digit', 
+        year: 'numeric'
+      });
+      doc.text(`Date: ${currentDate}`, 20, 60);
+      doc.text(`To: M/s Radico Khaitan Limited`, 20, 70);
+      
+      // Subject line
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'bold');
+      doc.text('SUBJECT:', 20, 85);
+      doc.setFont(undefined, 'normal');
+      doc.text(`PHYSICAL CHALLANS SENT TO RADICO KHAITAN ON ${dailyReport.formattedScanningDate}`, 50, 85);
       
       // Formal greeting
-      doc.setFontSize(12);
-      doc.text(`Dear Sir,`, 20, 50);
-      doc.text(`Please see below details of Physical challans collected and`, 20, 60);
-      doc.text(`handed over to you on ${dailyReport.formattedScanningDate}.`, 20, 70);
+      doc.setFontSize(11);
+      doc.text(`Dear Sir,`, 20, 105);
+      doc.text(`Please see below details of Physical challans collected and`, 20, 115);
+      doc.text(`handed over to you on ${dailyReport.formattedScanningDate}.`, 20, 125);
       
-      let yPosition = 90;
+      // Summary Table
+      const summaryTableData = Object.keys(dailyReport.departments)
+        .sort() // Sort departments alphabetically
+        .map(deptName => [
+          deptName,
+          dailyReport.departments[deptName].total.toString()
+        ]);
+      
+      // Add grand total row
+      summaryTableData.push(['GRAND TOTAL', dailyReport.grandTotal.toString()]);
+      
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'bold');
+      doc.text('SUMMARY:', 20, 145);
+      doc.setFont(undefined, 'normal');
+      
+      (doc as any).autoTable({
+        head: [['Department', 'Total Challans']],
+        body: summaryTableData,
+        startY: 155,
+        theme: 'striped',
+        styles: { 
+          fontSize: 11,
+          cellPadding: 4,
+          lineColor: [200, 200, 200],
+          lineWidth: 0.1,
+          halign: 'center'
+        },
+        headStyles: { 
+          fillColor: [20, 184, 166], // Teal header
+          textColor: [255, 255, 255],
+          fontSize: 12,
+          fontStyle: 'bold',
+          halign: 'center'
+        },
+        alternateRowStyles: {
+          fillColor: [248, 250, 252] // Light gray alternate rows
+        },
+        columnStyles: {
+          0: { halign: 'left', fontStyle: 'normal' },
+          1: { halign: 'center', fontStyle: 'bold' }
+        },
+        margin: { left: 60, right: 60 }, // Center the summary table
+        didParseCell: (data: any) => {
+          // Style the grand total row differently
+          if (data.row.index === summaryTableData.length - 1) {
+            data.cell.styles.fillColor = [20, 184, 166]; // Teal background for grand total
+            data.cell.styles.textColor = [255, 255, 255]; // White text
+            data.cell.styles.fontStyle = 'bold';
+            data.cell.styles.fontSize = 12;
+          }
+        }
+      });
+      
+      let yPosition = (doc as any).lastAutoTable.finalY + 20;
+      
+      // Detailed breakdown header
+      doc.setFontSize(12);
+      doc.setFont(undefined, 'bold');
+      doc.text('DETAILED BREAKDOWN:', 20, yPosition);
+      doc.setFont(undefined, 'normal');
+      yPosition += 15;
       
       // Department-wise data
       Object.keys(dailyReport.departments)
@@ -721,11 +827,15 @@ const SubmissionTrackingTab = () => {
           const deptData = dailyReport.departments[deptName];
           
           // Department header
-          doc.setFontSize(14);
+          doc.setFontSize(13);
+          doc.setFont(undefined, 'bold');
+          doc.setTextColor(20, 184, 166); // Teal color for department headers
           doc.text(`${deptName}:`, 20, yPosition);
+          doc.setTextColor(0, 0, 0); // Reset to black
+          doc.setFont(undefined, 'normal');
           yPosition += 10;
           
-          // Department table
+          // Department table with professional styling
           const tableData = deptData.challans.map(challan => [
             challan.salesman,
             challan.challanNo,
@@ -738,32 +848,86 @@ const SubmissionTrackingTab = () => {
             head: [['Salesman', 'Challan No', 'Challan Date', 'Shop Name', 'Department']],
             body: tableData,
             startY: yPosition,
-            theme: 'grid',
-            styles: { fontSize: 10 },
-            headStyles: { fillColor: [200, 200, 200] }
+            theme: 'striped',
+            styles: { 
+              fontSize: 9,
+              cellPadding: 3,
+              lineColor: [200, 200, 200],
+              lineWidth: 0.1
+            },
+            headStyles: { 
+              fillColor: [20, 184, 166], // Teal header
+              textColor: [255, 255, 255],
+              fontSize: 10,
+              fontStyle: 'bold'
+            },
+            alternateRowStyles: {
+              fillColor: [248, 250, 252] // Light gray alternate rows
+            },
+            margin: { left: 20, right: 20 },
+            didDrawPage: (data: any) => {
+              // Add letterhead to new pages
+              if (data.pageNumber > 1) {
+                doc.setFontSize(12);
+                doc.setFont(undefined, 'bold');
+                doc.setTextColor(20, 184, 166);
+                doc.text('MUNJRAL BROTHERS DISTRIBUTION PVT LTD', 20, 20);
+                doc.setTextColor(0, 0, 0);
+                doc.setFont(undefined, 'normal');
+                doc.setLineWidth(0.5);
+                doc.setDrawColor(20, 184, 166);
+                doc.line(20, 25, 190, 25);
+                doc.setFontSize(10);
+                doc.text(`Physical Challans Handover - ${dailyReport.formattedScanningDate} (Continued)`, 20, 35);
+              }
+            }
           });
           
           yPosition = (doc as any).lastAutoTable.finalY + 10;
           
-          // Department total
-          doc.setFontSize(12);
+          // Department total with professional styling
+          doc.setFontSize(11);
+          doc.setFont(undefined, 'bold');
+          doc.setTextColor(20, 184, 166);
           doc.text(`Total ${deptName}: ${deptData.total} challans`, 20, yPosition);
+          doc.setTextColor(0, 0, 0);
+          doc.setFont(undefined, 'normal');
           yPosition += 15;
           
-          // Add page break if needed
-          if (yPosition > 250) {
+          // Add page break if needed (leaving space for closing)
+          if (yPosition > 220) {
             doc.addPage();
-            yPosition = 20;
+            yPosition = 50; // Start position on new page (after letterhead space)
           }
         });
       
       // Grand total
       doc.setFontSize(14);
+      doc.setFont(undefined, 'bold');
       doc.text(`GRAND TOTAL: ${dailyReport.grandTotal} challans`, 20, yPosition + 10);
       
-      // Footer
+      // Professional closing
+      const closingYPosition = yPosition + 35;
+      doc.setFontSize(11);
+      doc.setFont(undefined, 'normal');
+      doc.text(`Yours faithfully,`, 20, closingYPosition);
+      
+      // Signature space
+      doc.text(`For Munjral Brothers Distribution Pvt Ltd`, 20, closingYPosition + 25);
+      
+      // Signature line
+      doc.setLineWidth(0.3);
+      doc.setDrawColor(0, 0, 0);
+      doc.line(20, closingYPosition + 35, 80, closingYPosition + 35);
+      
       doc.setFontSize(10);
-      doc.text(`Generated on: ${new Date().toLocaleString()}`, 20, yPosition + 30);
+      doc.text(`Authorized Signatory`, 20, closingYPosition + 45);
+      
+      // Footer with generation info
+      doc.setFontSize(9);
+      doc.setTextColor(128, 128, 128);
+      doc.text(`Report generated on: ${new Date().toLocaleString()}`, 20, closingYPosition + 60);
+      doc.text(`System: Radico Analytics Dashboard`, 20, closingYPosition + 70);
       
       doc.save(`Physical_Challans_Handover_${dailyReport.formattedScanningDate.replace(/-/g, '_')}.pdf`);
       
