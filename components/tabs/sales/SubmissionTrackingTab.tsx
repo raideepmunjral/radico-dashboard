@@ -721,13 +721,13 @@ const SubmissionTrackingTab = () => {
       
       // Company Name and Header
       doc.setFontSize(18);
-      doc.setFont(undefined, 'bold');
+      doc.setFont('helvetica', 'bold');
       doc.setTextColor(20, 184, 166); // Teal color matching login
       doc.text('MUNJRAL BROTHERS DISTRIBUTION PVT LTD', 55, 25);
       
       // Reset text color
       doc.setTextColor(0, 0, 0);
-      doc.setFont(undefined, 'normal');
+      doc.setFont('helvetica', 'normal');
       
       // Elegant separator line
       doc.setLineWidth(0.5);
@@ -746,9 +746,9 @@ const SubmissionTrackingTab = () => {
       
       // Subject line
       doc.setFontSize(12);
-      doc.setFont(undefined, 'bold');
+      doc.setFont('helvetica', 'bold');
       doc.text('SUBJECT:', 20, 85);
-      doc.setFont(undefined, 'normal');
+      doc.setFont('helvetica', 'normal');
       doc.text(`PHYSICAL CHALLANS SENT TO RADICO KHAITAN ON ${dailyReport.formattedScanningDate}`, 50, 85);
       
       // Formal greeting
@@ -769,9 +769,9 @@ const SubmissionTrackingTab = () => {
       summaryTableData.push(['GRAND TOTAL', dailyReport.grandTotal.toString()]);
       
       doc.setFontSize(12);
-      doc.setFont(undefined, 'bold');
+      doc.setFont('helvetica', 'bold');
       doc.text('SUMMARY:', 20, 145);
-      doc.setFont(undefined, 'normal');
+      doc.setFont('helvetica', 'normal');
       
       (doc as any).autoTable({
         head: [['Department', 'Total Challans']],
@@ -815,9 +815,9 @@ const SubmissionTrackingTab = () => {
       
       // Detailed breakdown header
       doc.setFontSize(12);
-      doc.setFont(undefined, 'bold');
+      doc.setFont('helvetica', 'bold');
       doc.text('DETAILED BREAKDOWN:', 20, yPosition);
-      doc.setFont(undefined, 'normal');
+      doc.setFont('helvetica', 'normal');
       yPosition += 15;
       
       // Department-wise data
@@ -828,11 +828,11 @@ const SubmissionTrackingTab = () => {
           
           // Department header
           doc.setFontSize(13);
-          doc.setFont(undefined, 'bold');
+          doc.setFont('helvetica', 'bold');
           doc.setTextColor(20, 184, 166); // Teal color for department headers
           doc.text(`${deptName}:`, 20, yPosition);
           doc.setTextColor(0, 0, 0); // Reset to black
-          doc.setFont(undefined, 'normal');
+          doc.setFont('helvetica', 'normal');
           yPosition += 10;
           
           // Department table with professional styling
@@ -869,11 +869,11 @@ const SubmissionTrackingTab = () => {
               // Add letterhead to new pages
               if (data.pageNumber > 1) {
                 doc.setFontSize(12);
-                doc.setFont(undefined, 'bold');
+                doc.setFont('helvetica', 'bold');
                 doc.setTextColor(20, 184, 166);
                 doc.text('MUNJRAL BROTHERS DISTRIBUTION PVT LTD', 20, 20);
                 doc.setTextColor(0, 0, 0);
-                doc.setFont(undefined, 'normal');
+                doc.setFont('helvetica', 'normal');
                 doc.setLineWidth(0.5);
                 doc.setDrawColor(20, 184, 166);
                 doc.line(20, 25, 190, 25);
@@ -887,11 +887,11 @@ const SubmissionTrackingTab = () => {
           
           // Department total with professional styling
           doc.setFontSize(11);
-          doc.setFont(undefined, 'bold');
+          doc.setFont('helvetica', 'bold');
           doc.setTextColor(20, 184, 166);
           doc.text(`Total ${deptName}: ${deptData.total} challans`, 20, yPosition);
           doc.setTextColor(0, 0, 0);
-          doc.setFont(undefined, 'normal');
+          doc.setFont('helvetica', 'normal');
           yPosition += 15;
           
           // Add page break if needed (leaving space for closing)
@@ -903,13 +903,13 @@ const SubmissionTrackingTab = () => {
       
       // Grand total
       doc.setFontSize(14);
-      doc.setFont(undefined, 'bold');
+      doc.setFont('helvetica', 'bold');
       doc.text(`GRAND TOTAL: ${dailyReport.grandTotal} challans`, 20, yPosition + 10);
       
       // Professional closing
       const closingYPosition = yPosition + 35;
       doc.setFontSize(11);
-      doc.setFont(undefined, 'normal');
+      doc.setFont('helvetica', 'normal');
       doc.text(`Yours faithfully,`, 20, closingYPosition);
       
       // Signature space
