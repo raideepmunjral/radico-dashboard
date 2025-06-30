@@ -700,6 +700,9 @@ const SubmissionTrackingTab = () => {
 
       const doc = new jsPDF();
       
+      // Elegant woody color scheme
+      const woodyBrown = [101, 67, 33]; // Elegant dark wood color
+      
       // Professional Letterhead Header
       try {
         // Try to add company logo
@@ -712,18 +715,47 @@ const SubmissionTrackingTab = () => {
             reader.readAsDataURL(logoBlob);
           });
           
-          // Add logo (top-left, professional size)
+          // Add Munjral logo (top-left, professional size)
           doc.addImage(logoDataUrl, 'PNG', 20, 15, 25, 25);
         }
       } catch (error) {
-        console.log('Logo not found, proceeding without image');
+        console.log('Munjral logo not found, proceeding without image');
       }
       
       // Company Name and Header
       doc.setFontSize(18);
       doc.setFont('helvetica', 'bold');
-      doc.setTextColor(20, 184, 166); // Teal color matching login
+      doc.setTextColor(woodyBrown[0], woodyBrown[1], woodyBrown[2]); // Elegant woody brown
       doc.text('MUNJRAL BROTHERS DISTRIBUTION PVT LTD', 55, 25);
+      
+      // Service Branding Section
+      doc.setFontSize(10);
+      doc.setTextColor(woodyBrown[0], woodyBrown[1], woodyBrown[2]);
+      doc.setFont('helvetica', 'bold');
+      doc.text('TERTIARY SALES MANAGEMENT', 55, 33);
+      
+      // Client information with Radico logo
+      try {
+        const radicoLogoResponse = await fetch('/radico-dashboard/radico-logo.png');
+        if (radicoLogoResponse.ok) {
+          const radicoLogoBlob = await radicoLogoResponse.blob();
+          const radicoLogoDataUrl = await new Promise<string>((resolve) => {
+            const reader = new FileReader();
+            reader.onload = () => resolve(reader.result as string);
+            reader.readAsDataURL(radicoLogoBlob);
+          });
+          
+          // Add small Radico logo next to client text
+          doc.addImage(radicoLogoDataUrl, 'PNG', 55, 37, 12, 12);
+        }
+      } catch (error) {
+        console.log('Radico logo not found, proceeding without image');
+      }
+      
+      doc.setFontSize(9);
+      doc.setFont('helvetica', 'normal');
+      doc.setTextColor(woodyBrown[0], woodyBrown[1], woodyBrown[2]);
+      doc.text('Client: Radico Khaitan Limited', 70, 43);
       
       // Reset text color
       doc.setTextColor(0, 0, 0);
@@ -731,8 +763,8 @@ const SubmissionTrackingTab = () => {
       
       // Elegant separator line
       doc.setLineWidth(0.5);
-      doc.setDrawColor(20, 184, 166); // Teal line
-      doc.line(20, 45, 190, 45);
+      doc.setDrawColor(woodyBrown[0], woodyBrown[1], woodyBrown[2]); // Woody brown line
+      doc.line(20, 50, 190, 50);
       
       // Date and recipient information
       doc.setFontSize(11);
@@ -741,21 +773,21 @@ const SubmissionTrackingTab = () => {
         month: '2-digit', 
         year: 'numeric'
       });
-      doc.text(`Date: ${currentDate}`, 20, 60);
-      doc.text(`To: M/s Radico Khaitan Limited`, 20, 70);
+      doc.text(`Date: ${currentDate}`, 20, 65);
+      doc.text(`To: M/s Radico Khaitan Limited`, 20, 75);
       
       // Subject line
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
-      doc.text('SUBJECT:', 20, 85);
+      doc.text('SUBJECT:', 20, 90);
       doc.setFont('helvetica', 'normal');
-      doc.text(`PHYSICAL CHALLANS SENT TO RADICO KHAITAN ON ${dailyReport.formattedScanningDate}`, 50, 85);
+      doc.text(`PHYSICAL CHALLANS SENT TO RADICO KHAITAN ON ${dailyReport.formattedScanningDate}`, 50, 90);
       
       // Formal greeting
       doc.setFontSize(11);
-      doc.text(`Dear Sir,`, 20, 105);
-      doc.text(`Please see below details of Physical challans collected and`, 20, 115);
-      doc.text(`handed over to you on ${dailyReport.formattedScanningDate}.`, 20, 125);
+      doc.text(`Dear Sir,`, 20, 110);
+      doc.text(`Please see below details of Physical challans collected and`, 20, 120);
+      doc.text(`handed over to you on ${dailyReport.formattedScanningDate}.`, 20, 130);
       
       // Summary Table
       const summaryTableData = Object.keys(dailyReport.departments)
@@ -770,13 +802,13 @@ const SubmissionTrackingTab = () => {
       
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
-      doc.text('SUMMARY:', 20, 145);
+      doc.text('SUMMARY:', 20, 150);
       doc.setFont('helvetica', 'normal');
       
       (doc as any).autoTable({
         head: [['Department', 'Total Challans']],
         body: summaryTableData,
-        startY: 155,
+        startY: 160,
         theme: 'striped',
         styles: { 
           fontSize: 11,
@@ -786,14 +818,14 @@ const SubmissionTrackingTab = () => {
           halign: 'center'
         },
         headStyles: { 
-          fillColor: [20, 184, 166], // Teal header
+          fillColor: woodyBrown, // Woody brown header
           textColor: [255, 255, 255],
           fontSize: 12,
           fontStyle: 'bold',
           halign: 'center'
         },
         alternateRowStyles: {
-          fillColor: [248, 250, 252] // Light gray alternate rows
+          fillColor: [248, 246, 244] // Light woody alternate rows
         },
         columnStyles: {
           0: { halign: 'left', fontStyle: 'normal' },
@@ -803,7 +835,7 @@ const SubmissionTrackingTab = () => {
         didParseCell: (data: any) => {
           // Style the grand total row differently
           if (data.row.index === summaryTableData.length - 1) {
-            data.cell.styles.fillColor = [20, 184, 166]; // Teal background for grand total
+            data.cell.styles.fillColor = woodyBrown; // Woody brown background for grand total
             data.cell.styles.textColor = [255, 255, 255]; // White text
             data.cell.styles.fontStyle = 'bold';
             data.cell.styles.fontSize = 12;
@@ -829,7 +861,7 @@ const SubmissionTrackingTab = () => {
           // Department header
           doc.setFontSize(13);
           doc.setFont('helvetica', 'bold');
-          doc.setTextColor(20, 184, 166); // Teal color for department headers
+          doc.setTextColor(woodyBrown[0], woodyBrown[1], woodyBrown[2]); // Woody brown color for department headers
           doc.text(`${deptName}:`, 20, yPosition);
           doc.setTextColor(0, 0, 0); // Reset to black
           doc.setFont('helvetica', 'normal');
@@ -858,7 +890,7 @@ const SubmissionTrackingTab = () => {
               cellWidth: 'wrap'
             },
             headStyles: { 
-              fillColor: [20, 184, 166], // Teal header
+              fillColor: woodyBrown, // Woody brown header
               textColor: [255, 255, 255],
               fontSize: 10,
               fontStyle: 'bold',
@@ -875,7 +907,7 @@ const SubmissionTrackingTab = () => {
               4: { cellWidth: 23, halign: 'center' }  // Department
             },
             alternateRowStyles: {
-              fillColor: [248, 250, 252] // Light gray alternate rows
+              fillColor: [248, 246, 244] // Light woody alternate rows
             },
             margin: { left: 10, right: 10 },
             tableWidth: 'auto',
@@ -886,12 +918,12 @@ const SubmissionTrackingTab = () => {
                 if (data.cursor && data.cursor.y < 50) {
                   doc.setFontSize(14);
                   doc.setFont('helvetica', 'bold');
-                  doc.setTextColor(20, 184, 166);
+                  doc.setTextColor(woodyBrown[0], woodyBrown[1], woodyBrown[2]);
                   doc.text('MUNJRAL BROTHERS DISTRIBUTION PVT LTD', 20, 20);
                   doc.setTextColor(0, 0, 0);
                   doc.setFont('helvetica', 'normal');
                   doc.setLineWidth(0.5);
-                  doc.setDrawColor(20, 184, 166);
+                  doc.setDrawColor(woodyBrown[0], woodyBrown[1], woodyBrown[2]);
                   doc.line(20, 27, 190, 27);
                   doc.setFontSize(9);
                   doc.setTextColor(100, 100, 100);
@@ -913,7 +945,7 @@ const SubmissionTrackingTab = () => {
           // Department total with professional styling
           doc.setFontSize(11);
           doc.setFont('helvetica', 'bold');
-          doc.setTextColor(20, 184, 166);
+          doc.setTextColor(woodyBrown[0], woodyBrown[1], woodyBrown[2]);
           doc.text(`Total ${deptName}: ${deptData.total} challans`, 20, yPosition);
           doc.setTextColor(0, 0, 0);
           doc.setFont('helvetica', 'normal');
