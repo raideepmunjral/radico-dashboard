@@ -734,7 +734,16 @@ const SubmissionTrackingTab = () => {
       doc.setFont('helvetica', 'bold');
       doc.text('TERTIARY SALES MANAGEMENT', 55, 33);
       
-      // Client information with Radico logo
+      // Reset text color
+      doc.setTextColor(0, 0, 0);
+      doc.setFont('helvetica', 'normal');
+      
+      // Elegant separator line
+      doc.setLineWidth(0.5);
+      doc.setDrawColor(woodyBrown[0], woodyBrown[1], woodyBrown[2]); // Woody brown line
+      doc.line(20, 40, 190, 40);
+      
+      // Client branding - centered under header line
       try {
         const radicoLogoResponse = await fetch('/radico-dashboard/radico-logo.png');
         if (radicoLogoResponse.ok) {
@@ -745,49 +754,45 @@ const SubmissionTrackingTab = () => {
             reader.readAsDataURL(radicoLogoBlob);
           });
           
-          // Add small Radico logo next to client text
-          doc.addImage(radicoLogoDataUrl, 'PNG', 55, 37, 12, 12);
+          // Add centered Radico logo under the header line
+          doc.addImage(radicoLogoDataUrl, 'PNG', 85, 45, 12, 12);
         }
       } catch (error) {
         console.log('Radico logo not found, proceeding without image');
       }
       
-      doc.setFontSize(9);
-      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(10);
+      doc.setFont('helvetica', 'bold');
       doc.setTextColor(woodyBrown[0], woodyBrown[1], woodyBrown[2]);
-      doc.text('Client: Radico Khaitan Limited', 70, 43);
+      // Center the text (approximate center at x=105, accounting for logo width)
+      doc.text('RADICO KHAITAN LTD', 100, 51);
       
       // Reset text color
       doc.setTextColor(0, 0, 0);
       doc.setFont('helvetica', 'normal');
       
-      // Elegant separator line
-      doc.setLineWidth(0.5);
-      doc.setDrawColor(woodyBrown[0], woodyBrown[1], woodyBrown[2]); // Woody brown line
-      doc.line(20, 50, 190, 50);
-      
-      // Date and recipient information
+      // Date and recipient information (moved down to accommodate new layout)
       doc.setFontSize(11);
       const currentDate = new Date().toLocaleDateString('en-GB', {
         day: '2-digit',
         month: '2-digit', 
         year: 'numeric'
       });
-      doc.text(`Date: ${currentDate}`, 20, 65);
-      doc.text(`To: M/s Radico Khaitan Limited`, 20, 75);
+      doc.text(`Date: ${currentDate}`, 20, 70);
+      doc.text(`To: M/s Radico Khaitan Limited`, 20, 80);
       
       // Subject line
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
-      doc.text('SUBJECT:', 20, 90);
+      doc.text('SUBJECT:', 20, 95);
       doc.setFont('helvetica', 'normal');
-      doc.text(`PHYSICAL CHALLANS SENT TO RADICO KHAITAN ON ${dailyReport.formattedScanningDate}`, 50, 90);
+      doc.text(`PHYSICAL CHALLANS SENT TO RADICO KHAITAN ON ${dailyReport.formattedScanningDate}`, 50, 95);
       
       // Formal greeting
       doc.setFontSize(11);
-      doc.text(`Dear Sir,`, 20, 110);
-      doc.text(`Please see below details of Physical challans collected and`, 20, 120);
-      doc.text(`handed over to you on ${dailyReport.formattedScanningDate}.`, 20, 130);
+      doc.text(`Dear Sir,`, 20, 115);
+      doc.text(`Please see below details of Physical challans collected and`, 20, 125);
+      doc.text(`handed over to you on ${dailyReport.formattedScanningDate}.`, 20, 135);
       
       // Summary Table
       const summaryTableData = Object.keys(dailyReport.departments)
@@ -802,13 +807,13 @@ const SubmissionTrackingTab = () => {
       
       doc.setFontSize(12);
       doc.setFont('helvetica', 'bold');
-      doc.text('SUMMARY:', 20, 150);
+      doc.text('SUMMARY:', 20, 155);
       doc.setFont('helvetica', 'normal');
       
       (doc as any).autoTable({
         head: [['Department', 'Total Challans']],
         body: summaryTableData,
-        startY: 160,
+        startY: 165,
         theme: 'striped',
         styles: { 
           fontSize: 11,
