@@ -30,15 +30,29 @@ interface ShopData {
   julyTotal?: number;
   julyEightPM?: number;
   julyVerve?: number;
+  augustTotal?: number;
+  augustEightPM?: number;
+  augustVerve?: number;
+  septemberTotal?: number;
+  septemberEightPM?: number;
+  septemberVerve?: number;
+  octoberTotal?: number;
+  octoberEightPM?: number;
+  octoberVerve?: number;
+  novemberTotal?: number;
+  novemberEightPM?: number;
+  novemberVerve?: number;
+  decemberTotal?: number;
+  decemberEightPM?: number;
+  decemberVerve?: number;
   growthPercent?: number;
   monthlyTrend?: 'improving' | 'declining' | 'stable' | 'new';
   skuBreakdown?: any[];
   threeMonthAvgTotal?: number;
   threeMonthAvg8PM?: number;
   threeMonthAvgVERVE?: number;
-  // NEW: Target fields
-  juneTarget8PM?: number;
-  julyTarget8PM?: number;
+  // Dynamic target fields
+  [key: string]: any; // Allows dynamic target field access
 }
 
 interface DashboardData {
@@ -48,7 +62,6 @@ interface DashboardData {
 }
 
 // 🎯 UPDATED FOCUS SHOPS CONFIGURATION - Updated Focus Shops List (28 shops)
-// REMOVED: '01/2024/1521', '01/2024/0440' | ADDED: '01/2024/1397'
 const FOCUS_SHOP_CODES = [
   '01/2024/1554', '01/2024/0213', '01/2024/0249', '01/2024/1223', '01/2024/1172',
   '01/2024/0859', '01/2024/1826', '01/2024/0323', '01/2024/1397', '01/2024/1336',
@@ -58,63 +71,182 @@ const FOCUS_SHOP_CODES = [
   '01/2024/0345', '01/2024/0318', '01/2024/1612'
 ];
 
-// 🎯 8PM TARGETS FOR JUNE & JULY 2025 - All 28 Focus Shops
-// Shop details (name, department, salesman) automatically come from master sales data
-const SHOP_TARGETS: Record<string, { juneTarget8PM: number; julyTarget8PM: number }> = {
-  '01/2024/1554': { juneTarget8PM: 70, julyTarget8PM: 100 },
-  '01/2024/0213': { juneTarget8PM: 70, julyTarget8PM: 100 },
-  '01/2024/0249': { juneTarget8PM: 30, julyTarget8PM: 70 },
-  '01/2024/1223': { juneTarget8PM: 30, julyTarget8PM: 70 },
-  '01/2024/1172': { juneTarget8PM: 40, julyTarget8PM: 60 },
-  '01/2024/0859': { juneTarget8PM: 50, julyTarget8PM: 90 },
-  '01/2024/1826': { juneTarget8PM: 50, julyTarget8PM: 100 },
-  '01/2024/0323': { juneTarget8PM: 50, julyTarget8PM: 100 },
-  '01/2024/1397': { juneTarget8PM: 40, julyTarget8PM: 70 },
-  '01/2024/1336': { juneTarget8PM: 50, julyTarget8PM: 100 },
-  '01/2024/1247': { juneTarget8PM: 50, julyTarget8PM: 100 },
-  '01/2024/0892': { juneTarget8PM: 25, julyTarget8PM: 50 },
-  '01/2024/0913': { juneTarget8PM: 25, julyTarget8PM: 50 },
-  '01/2024/1499': { juneTarget8PM: 50, julyTarget8PM: 100 },
-  '01/2024/1510': { juneTarget8PM: 50, julyTarget8PM: 100 },
-  '01/2024/0927': { juneTarget8PM: 30, julyTarget8PM: 75 },
-  '01/2024/1789': { juneTarget8PM: 50, julyTarget8PM: 100 },
-  '01/2024/1627': { juneTarget8PM: 50, julyTarget8PM: 60 },
-  '01/2024/0237': { juneTarget8PM: 50, julyTarget8PM: 60 },
-  '01/2024/0611': { juneTarget8PM: 50, julyTarget8PM: 60 },
-  '01/2024/1262': { juneTarget8PM: 40, julyTarget8PM: 50 },
-  '01/2024/1923': { juneTarget8PM: 50, julyTarget8PM: 100 },
-  '01/2024/0689': { juneTarget8PM: 40, julyTarget8PM: 75 },
-  '01/2024/0271': { juneTarget8PM: 50, julyTarget8PM: 100 },
-  '01/2024/0649': { juneTarget8PM: 40, julyTarget8PM: 80 },
-  '01/2024/0345': { juneTarget8PM: 50, julyTarget8PM: 100 },
-  '01/2024/0318': { juneTarget8PM: 50, julyTarget8PM: 100 },
-  '01/2024/1612': { juneTarget8PM: 50, julyTarget8PM: 60 }
+// 🎯 DYNAMIC 8PM TARGETS - Extended for full year 2025
+const SHOP_TARGETS: Record<string, Record<string, number>> = {
+  '01/2024/1554': { 
+    '06': 70, '07': 100, '08': 120, '09': 100, '10': 90, '11': 80, '12': 70 
+  },
+  '01/2024/0213': { 
+    '06': 70, '07': 100, '08': 120, '09': 100, '10': 90, '11': 80, '12': 70 
+  },
+  '01/2024/0249': { 
+    '06': 30, '07': 70, '08': 90, '09': 80, '10': 70, '11': 60, '12': 50 
+  },
+  '01/2024/1223': { 
+    '06': 30, '07': 70, '08': 90, '09': 80, '10': 70, '11': 60, '12': 50 
+  },
+  '01/2024/1172': { 
+    '06': 40, '07': 60, '08': 80, '09': 70, '10': 65, '11': 55, '12': 45 
+  },
+  '01/2024/0859': { 
+    '06': 50, '07': 90, '08': 110, '09': 95, '10': 85, '11': 75, '12': 65 
+  },
+  '01/2024/1826': { 
+    '06': 50, '07': 100, '08': 120, '09': 105, '10': 95, '11': 85, '12': 75 
+  },
+  '01/2024/0323': { 
+    '06': 50, '07': 100, '08': 120, '09': 105, '10': 95, '11': 85, '12': 75 
+  },
+  '01/2024/1397': { 
+    '06': 40, '07': 70, '08': 90, '09': 80, '10': 70, '11': 60, '12': 50 
+  },
+  '01/2024/1336': { 
+    '06': 50, '07': 100, '08': 120, '09': 105, '10': 95, '11': 85, '12': 75 
+  },
+  '01/2024/1247': { 
+    '06': 50, '07': 100, '08': 120, '09': 105, '10': 95, '11': 85, '12': 75 
+  },
+  '01/2024/0892': { 
+    '06': 25, '07': 50, '08': 65, '09': 55, '10': 50, '11': 45, '12': 40 
+  },
+  '01/2024/0913': { 
+    '06': 25, '07': 50, '08': 65, '09': 55, '10': 50, '11': 45, '12': 40 
+  },
+  '01/2024/1499': { 
+    '06': 50, '07': 100, '08': 120, '09': 105, '10': 95, '11': 85, '12': 75 
+  },
+  '01/2024/1510': { 
+    '06': 50, '07': 100, '08': 120, '09': 105, '10': 95, '11': 85, '12': 75 
+  },
+  '01/2024/0927': { 
+    '06': 30, '07': 75, '08': 95, '09': 85, '10': 75, '11': 65, '12': 55 
+  },
+  '01/2024/1789': { 
+    '06': 50, '07': 100, '08': 120, '09': 105, '10': 95, '11': 85, '12': 75 
+  },
+  '01/2024/1627': { 
+    '06': 50, '07': 60, '08': 75, '09': 70, '10': 65, '11': 60, '12': 55 
+  },
+  '01/2024/0237': { 
+    '06': 50, '07': 60, '08': 75, '09': 70, '10': 65, '11': 60, '12': 55 
+  },
+  '01/2024/0611': { 
+    '06': 50, '07': 60, '08': 75, '09': 70, '10': 65, '11': 60, '12': 55 
+  },
+  '01/2024/1262': { 
+    '06': 40, '07': 50, '08': 65, '09': 60, '10': 55, '11': 50, '12': 45 
+  },
+  '01/2024/1923': { 
+    '06': 50, '07': 100, '08': 120, '09': 105, '10': 95, '11': 85, '12': 75 
+  },
+  '01/2024/0689': { 
+    '06': 40, '07': 75, '08': 95, '09': 85, '10': 75, '11': 65, '12': 55 
+  },
+  '01/2024/0271': { 
+    '06': 50, '07': 100, '08': 120, '09': 105, '10': 95, '11': 85, '12': 75 
+  },
+  '01/2024/0649': { 
+    '06': 40, '07': 80, '08': 100, '09': 90, '10': 80, '11': 70, '12': 60 
+  },
+  '01/2024/0345': { 
+    '06': 50, '07': 100, '08': 120, '09': 105, '10': 95, '11': 85, '12': 75 
+  },
+  '01/2024/0318': { 
+    '06': 50, '07': 100, '08': 120, '09': 105, '10': 95, '11': 85, '12': 75 
+  },
+  '01/2024/1612': { 
+    '06': 50, '07': 60, '08': 75, '09': 70, '10': 65, '11': 60, '12': 55 
+  }
 };
 
-// 📝 NOTE: Shop details automatically populated from master sales data
-// 📝 TODO: Find actual shop code for "shadahra" shop (DCCWS, Akshay Kumar Gill) to replace '01/2024/1612' if needed
+// ==========================================
+// HELPER FUNCTIONS
+// ==========================================
+
+const getMonthName = (monthNum: string) => {
+  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  return months[parseInt(monthNum) - 1] || 'Unknown';
+};
+
+const getShortMonthName = (monthNum: string) => {
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return months[parseInt(monthNum) - 1] || 'Unknown';
+};
+
+// 🛠️ NEW: Dynamic month data field mapping
+const getMonthDataField = (monthNum: string, field: 'Total' | 'EightPM' | 'Verve') => {
+  const monthMapping: Record<string, string> = {
+    '01': 'january', '02': 'february', '03': 'march', '04': 'april',
+    '05': 'may', '06': 'june', '07': 'july', '08': 'august', 
+    '09': 'september', '10': 'october', '11': 'november', '12': 'december'
+  };
+  
+  const monthKey = monthMapping[monthNum];
+  return monthKey ? `${monthKey}${field}` : `${field.toLowerCase()}`;
+};
+
+// 🛠️ NEW: Get dynamic month data from shop
+const getMonthData = (shop: ShopData, monthNum: string, field: 'Total' | 'EightPM' | 'Verve'): number => {
+  const fieldName = getMonthDataField(monthNum, field);
+  return shop[fieldName] || 0;
+};
+
+// 🛠️ NEW: Get current month data for shop (prioritizes specific month data, fallbacks to general)
+const getCurrentMonthData = (shop: ShopData, currentMonth: string) => {
+  const total = getMonthData(shop, currentMonth, 'Total') || shop.total || 0;
+  const eightPM = getMonthData(shop, currentMonth, 'EightPM') || shop.eightPM || 0;
+  const verve = getMonthData(shop, currentMonth, 'Verve') || shop.verve || 0;
+  
+  return { total, eightPM, verve };
+};
+
+// 🛠️ NEW: Get previous month data for growth calculation
+const getPreviousMonthData = (shop: ShopData, currentMonth: string) => {
+  const currentMonthNum = parseInt(currentMonth);
+  const previousMonthNum = currentMonthNum === 1 ? 12 : currentMonthNum - 1;
+  const previousMonthStr = previousMonthNum.toString().padStart(2, '0');
+  
+  const total = getMonthData(shop, previousMonthStr, 'Total');
+  const eightPM = getMonthData(shop, previousMonthStr, 'EightPM');
+  const verve = getMonthData(shop, previousMonthStr, 'Verve');
+  
+  return { total, eightPM, verve };
+};
+
+// 🛠️ NEW: Get target for specific month
+const getMonthTarget = (shopId: string, monthNum: string): number => {
+  return SHOP_TARGETS[shopId]?.[monthNum] || 0;
+};
+
+// 🛠️ NEW: Calculate target achievement for any month
+const calculateTargetAchievement = (shop: ShopData, monthNum: string): number => {
+  const target = getMonthTarget(shop.shopId, monthNum);
+  const actual = getMonthData(shop, monthNum, 'EightPM');
+  
+  if (!target || target === 0) return 0;
+  return (actual / target) * 100;
+};
 
 const FocusShopsTab = ({ data }: { data: DashboardData }) => {
   const [searchFilter, setSearchFilter] = useState('');
   const [sortBy, setSortBy] = useState('total'); // total, growth, trend, target_achievement
   const [showEditMode, setShowEditMode] = useState(false);
 
-  // Helper function to calculate target achievement for 8PM
-  const calculateTargetAchievement = (shop: ShopData, month: 'june' | 'july'): number => {
-    const target = month === 'june' ? shop.juneTarget8PM : shop.julyTarget8PM;
-    const actual = month === 'june' ? shop.juneEightPM : shop.julyEightPM;
-    
-    if (!target || target === 0) return 0;
-    return ((actual || 0) / target) * 100;
-  };
+  // 🛠️ FIXED: Dynamic current month detection
+  const currentMonth = data?.currentMonth || '07'; // Default to July if not provided
+  const currentYear = data?.currentYear || '2025';
+  const previousMonth = (parseInt(currentMonth) === 1 ? 12 : parseInt(currentMonth) - 1).toString().padStart(2, '0');
+
+  console.log(`🛠️ FocusShops: Current month is ${currentMonth} (${getMonthName(currentMonth)})`);
 
   // ==========================================
-  // MOBILE CARD COMPONENT
+  // MOBILE CARD COMPONENT - UPDATED FOR DYNAMIC MONTHS
   // ==========================================
 
   const MobileFocusShopCard = ({ shop, index }: { shop: ShopData, index: number }) => {
-    const juneAchievement = calculateTargetAchievement(shop, 'june');
-    const julyAchievement = calculateTargetAchievement(shop, 'july');
+    const currentData = getCurrentMonthData(shop, currentMonth);
+    const currentAchievement = calculateTargetAchievement(shop, currentMonth);
+    const juneAchievement = calculateTargetAchievement(shop, '06'); // Always show June as reference
     
     return (
       <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
@@ -136,25 +268,25 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
             <p className="text-xs text-gray-500">{shop.department} • {shop.salesman}</p>
           </div>
           <div className="text-right">
-            <div className="text-lg font-bold text-blue-600">{(shop.juneTotal || shop.total || 0).toLocaleString()}</div>
-            <div className="text-xs text-gray-500">Total Cases</div>
+            <div className="text-lg font-bold text-blue-600">{currentData.total.toLocaleString()}</div>
+            <div className="text-xs text-gray-500">{getMonthName(currentMonth)} Total</div>
           </div>
         </div>
         
         {/* Current Month Performance */}
         <div className="grid grid-cols-3 gap-2 mb-3 p-3 bg-blue-50 rounded-lg">
           <div className="text-center">
-            <div className="text-sm font-bold text-purple-600">{(shop.juneEightPM || shop.eightPM || 0).toLocaleString()}</div>
+            <div className="text-sm font-bold text-purple-600">{currentData.eightPM.toLocaleString()}</div>
             <div className="text-xs text-gray-500">8PM Cases</div>
           </div>
           <div className="text-center">
-            <div className="text-sm font-bold text-orange-600">{(shop.juneVerve || shop.verve || 0).toLocaleString()}</div>
+            <div className="text-sm font-bold text-orange-600">{currentData.verve.toLocaleString()}</div>
             <div className="text-xs text-gray-500">VERVE Cases</div>
           </div>
           <div className="text-center">
             <div className="text-xs font-medium text-gray-600">
-              {((shop.juneTotal || shop.total || 0) - (shop.juneEightPM || shop.eightPM || 0) - (shop.juneVerve || shop.verve || 0)) > 0 
-                ? `+${((shop.juneTotal || shop.total || 0) - (shop.juneEightPM || shop.eightPM || 0) - (shop.juneVerve || shop.verve || 0)).toLocaleString()}`
+              {(currentData.total - currentData.eightPM - currentData.verve) > 0 
+                ? `+${(currentData.total - currentData.eightPM - currentData.verve).toLocaleString()}`
                 : '0'
               }
             </div>
@@ -162,26 +294,26 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
           </div>
         </div>
 
-        {/* Target vs Achievement for 8PM */}
+        {/* Target vs Achievement - Dynamic Current Month + June Reference */}
         <div className="mb-3 p-3 bg-purple-50 rounded-lg">
           <div className="text-xs font-medium text-purple-900 mb-2">8PM Target vs Achievement</div>
           <div className="grid grid-cols-2 gap-3">
             <div className="text-center">
               <div className="text-sm font-bold text-purple-600">
-                {shop.juneEightPM || 0}/{shop.juneTarget8PM || 0}
+                {getMonthData(shop, '06', 'EightPM')}/{getMonthTarget(shop.shopId, '06')}
               </div>
-              <div className="text-xs text-gray-500">June (Target)</div>
+              <div className="text-xs text-gray-500">June (Completed)</div>
               <div className={`text-xs font-semibold ${juneAchievement >= 100 ? 'text-green-600' : juneAchievement >= 80 ? 'text-yellow-600' : 'text-red-600'}`}>
                 {juneAchievement.toFixed(0)}%
               </div>
             </div>
             <div className="text-center">
               <div className="text-sm font-bold text-purple-600">
-                {shop.julyEightPM || 0}/{shop.julyTarget8PM || 0}
+                {currentData.eightPM}/{getMonthTarget(shop.shopId, currentMonth)}
               </div>
-              <div className="text-xs text-gray-500">July (Target)</div>
-              <div className={`text-xs font-semibold ${julyAchievement >= 100 ? 'text-green-600' : julyAchievement >= 80 ? 'text-yellow-600' : 'text-red-600'}`}>
-                {julyAchievement.toFixed(0)}%
+              <div className="text-xs text-gray-500">{getShortMonthName(currentMonth)} (Current)</div>
+              <div className={`text-xs font-semibold ${currentAchievement >= 100 ? 'text-green-600' : currentAchievement >= 80 ? 'text-yellow-600' : 'text-red-600'}`}>
+                {currentAchievement.toFixed(0)}%
               </div>
             </div>
           </div>
@@ -224,19 +356,25 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
     );
   };
 
-  // Enhanced filter and enrich data with targets
+  // 🛠️ FIXED: Enhanced filter and enrich data with dynamic targets and proper ranking
   const focusShopsData = useMemo((): ShopData[] => {
     if (!data?.salesData) return [];
 
     const focusShops = (Object.values(data.salesData) as ShopData[])
       .filter((shop: ShopData) => FOCUS_SHOP_CODES.includes(shop.shopId))
       .map((shop: ShopData) => {
-        // Enrich with target data
-        const targetData = SHOP_TARGETS[shop.shopId];
+        // Enrich with current month data and targets
+        const currentData = getCurrentMonthData(shop, currentMonth);
+        const currentTarget = getMonthTarget(shop.shopId, currentMonth);
+        
         return {
           ...shop,
-          juneTarget8PM: targetData?.juneTarget8PM || 0,
-          julyTarget8PM: targetData?.julyTarget8PM || 0
+          // Add dynamic current month data for sorting
+          currentTotal: currentData.total,
+          currentEightPM: currentData.eightPM,
+          currentVerve: currentData.verve,
+          currentTarget8PM: currentTarget,
+          currentAchievement: calculateTargetAchievement(shop, currentMonth)
         };
       })
       .filter((shop: ShopData) => 
@@ -246,7 +384,7 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
         shop.salesman.toLowerCase().includes(searchFilter.toLowerCase())
       );
 
-    // Sort focus shops
+    // 🛠️ FIXED: Proper sorting using current month data
     return focusShops.sort((a: ShopData, b: ShopData) => {
       switch (sortBy) {
         case 'growth':
@@ -256,66 +394,67 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
           return (trendOrder[b.monthlyTrend as keyof typeof trendOrder] || 0) - 
                  (trendOrder[a.monthlyTrend as keyof typeof trendOrder] || 0);
         case 'target_achievement':
-          const aAchievement = calculateTargetAchievement(a, 'june');
-          const bAchievement = calculateTargetAchievement(b, 'june');
-          return bAchievement - aAchievement;
+          return (b.currentAchievement || 0) - (a.currentAchievement || 0);
         default: // total
-          return (b.total || 0) - (a.total || 0);
+          return (b.currentTotal || 0) - (a.currentTotal || 0); // 🛠️ FIXED: Use current month data
       }
     });
-  }, [data, searchFilter, sortBy]);
+  }, [data, searchFilter, sortBy, currentMonth]);
 
-  // Calculate enhanced focus metrics including targets
+  // 🛠️ FIXED: Calculate enhanced focus metrics with dynamic month detection
   const focusMetrics = useMemo(() => {
     if (!focusShopsData.length) return null;
 
     const totalFocusShops = FOCUS_SHOP_CODES.length;
     const activeFocusShops = focusShopsData.length;
-    const totalSales = focusShopsData.reduce((sum: number, shop: ShopData) => sum + (shop.total || 0), 0);
-    const total8PM = focusShopsData.reduce((sum: number, shop: ShopData) => sum + (shop.eightPM || 0), 0);
-    const totalVERVE = focusShopsData.reduce((sum: number, shop: ShopData) => sum + (shop.verve || 0), 0);
-    const avgGrowth = focusShopsData.reduce((sum: number, shop: ShopData) => sum + (shop.growthPercent || 0), 0) / activeFocusShops;
     
-    // Target calculations
-    const totalJuneTarget8PM = focusShopsData.reduce((sum: number, shop: ShopData) => sum + (shop.juneTarget8PM || 0), 0);
-    const totalJulyTarget8PM = focusShopsData.reduce((sum: number, shop: ShopData) => sum + (shop.julyTarget8PM || 0), 0);
-    const totalJune8PM = focusShopsData.reduce((sum: number, shop: ShopData) => sum + (shop.juneEightPM || 0), 0);
-    const totalJuly8PM = focusShopsData.reduce((sum: number, shop: ShopData) => sum + (shop.julyEightPM || 0), 0);
+    // Current month totals
+    const currentMonthTotals = focusShopsData.reduce((acc, shop) => {
+      const currentData = getCurrentMonthData(shop, currentMonth);
+      acc.totalSales += currentData.total;
+      acc.total8PM += currentData.eightPM;
+      acc.totalVERVE += currentData.verve;
+      return acc;
+    }, { totalSales: 0, total8PM: 0, totalVERVE: 0 });
     
-    const juneTargetAchievement = totalJuneTarget8PM > 0 ? (totalJune8PM / totalJuneTarget8PM) * 100 : 0;
-    const julyTargetAchievement = totalJulyTarget8PM > 0 ? (totalJuly8PM / totalJulyTarget8PM) * 100 : 0;
+    const avgGrowth = focusShopsData.reduce((sum, shop) => sum + (shop.growthPercent || 0), 0) / activeFocusShops;
     
-    const improving = focusShopsData.filter((shop: ShopData) => shop.monthlyTrend === 'improving').length;
-    const declining = focusShopsData.filter((shop: ShopData) => shop.monthlyTrend === 'declining').length;
-    const stable = focusShopsData.filter((shop: ShopData) => shop.monthlyTrend === 'stable').length;
-    const newShops = focusShopsData.filter((shop: ShopData) => shop.monthlyTrend === 'new').length;
+    // Target calculations for current month and June
+    const currentMonthTargetSum = focusShopsData.reduce((sum, shop) => sum + getMonthTarget(shop.shopId, currentMonth), 0);
+    const juneTargetSum = focusShopsData.reduce((sum, shop) => sum + getMonthTarget(shop.shopId, '06'), 0);
+    
+    const currentMonthAchievement = currentMonthTargetSum > 0 ? (currentMonthTotals.total8PM / currentMonthTargetSum) * 100 : 0;
+    const juneAchievement = juneTargetSum > 0 ? (focusShopsData.reduce((sum, shop) => sum + getMonthData(shop, '06', 'EightPM'), 0) / juneTargetSum) * 100 : 0;
+    
+    const improving = focusShopsData.filter(shop => shop.monthlyTrend === 'improving').length;
+    const declining = focusShopsData.filter(shop => shop.monthlyTrend === 'declining').length;
+    const stable = focusShopsData.filter(shop => shop.monthlyTrend === 'stable').length;
+    const newShops = focusShopsData.filter(shop => shop.monthlyTrend === 'new').length;
 
     // Count shops achieving targets
-    const juneTargetAchievers = focusShopsData.filter((shop: ShopData) => calculateTargetAchievement(shop, 'june') >= 100).length;
-    const julyTargetAchievers = focusShopsData.filter((shop: ShopData) => calculateTargetAchievement(shop, 'july') >= 100).length;
+    const currentTargetAchievers = focusShopsData.filter(shop => calculateTargetAchievement(shop, currentMonth) >= 100).length;
+    const juneTargetAchievers = focusShopsData.filter(shop => calculateTargetAchievement(shop, '06') >= 100).length;
 
     return {
       totalFocusShops,
       activeFocusShops,
-      totalSales,
-      total8PM,
-      totalVERVE,
+      ...currentMonthTotals,
       avgGrowth,
       improving,
       declining,
       stable,
       newShops,
       coveragePercent: (activeFocusShops / totalFocusShops) * 100,
-      totalJuneTarget8PM,
-      totalJulyTarget8PM,
-      totalJune8PM,
-      totalJuly8PM,
-      juneTargetAchievement,
-      julyTargetAchievement,
+      currentMonthTargetSum,
+      juneTargetSum,
+      currentMonthAchievement,
+      juneAchievement,
+      currentTargetAchievers,
       juneTargetAchievers,
-      julyTargetAchievers
+      currentMonth,
+      currentMonthName: getMonthName(currentMonth)
     };
-  }, [focusShopsData]);
+  }, [focusShopsData, currentMonth]);
 
   return (
     <div className="space-y-6">
@@ -325,9 +464,9 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
           <Target className="w-6 sm:w-8 h-6 sm:h-8 text-blue-600" />
           <h2 className="text-xl sm:text-2xl font-bold text-gray-900">Focus Shops Performance</h2>
         </div>
-        <p className="text-gray-600 text-sm sm:text-base">Tracking {FOCUS_SHOP_CODES.length} priority shops with 8PM targets</p>
+        <p className="text-gray-600 text-sm sm:text-base">Tracking {FOCUS_SHOP_CODES.length} priority shops with 8PM targets • Current: {getMonthName(currentMonth)} {currentYear}</p>
         <div className="mt-2 flex flex-col sm:flex-row justify-center space-y-1 sm:space-y-0 sm:space-x-4 text-sm text-gray-500">
-          <span>Period: {data?.currentMonth ? `${data.currentMonth}/${data.currentYear}` : 'Current Month'}</span>
+          <span>Period: {getMonthName(currentMonth)} {currentYear}</span>
           <span className="hidden sm:inline">•</span>
           <span>Active: {focusMetrics?.activeFocusShops || 0}/{FOCUS_SHOP_CODES.length}</span>
           <span className="hidden sm:inline">•</span>
@@ -335,7 +474,7 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-      {/* Enhanced Focus Group Summary with Targets */}
+      {/* 🛠️ FIXED: Enhanced Focus Group Summary with Dynamic Current Month */}
       {focusMetrics && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-3 sm:gap-4">
           <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
@@ -358,8 +497,8 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
               </div>
               <div className="ml-3">
                 <div className="text-xl font-bold text-gray-900">{focusMetrics.totalSales.toLocaleString()}</div>
-                <div className="text-sm text-gray-500">Total Cases</div>
-                <div className="text-xs text-gray-400">Focus group total</div>
+                <div className="text-sm text-gray-500">{focusMetrics.currentMonthName} Total</div>
+                <div className="text-xs text-gray-400">Focus group current</div>
               </div>
             </div>
           </div>
@@ -385,8 +524,8 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
                 <Target className="h-5 w-5 text-white" />
               </div>
               <div className="ml-3">
-                <div className={`text-xl font-bold ${focusMetrics.juneTargetAchievement >= 100 ? 'text-green-600' : 'text-purple-900'}`}>
-                  {focusMetrics.juneTargetAchievement.toFixed(0)}%
+                <div className={`text-xl font-bold ${focusMetrics.juneAchievement >= 100 ? 'text-green-600' : 'text-purple-900'}`}>
+                  {focusMetrics.juneAchievement.toFixed(0)}%
                 </div>
                 <div className="text-sm text-purple-700">June 8PM Target</div>
                 <div className="text-xs text-purple-600">{focusMetrics.juneTargetAchievers} shops at 100%+</div>
@@ -400,11 +539,11 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
                 <Target className="h-5 w-5 text-white" />
               </div>
               <div className="ml-3">
-                <div className={`text-xl font-bold ${focusMetrics.julyTargetAchievement >= 100 ? 'text-green-600' : 'text-orange-900'}`}>
-                  {focusMetrics.julyTargetAchievement.toFixed(0)}%
+                <div className={`text-xl font-bold ${focusMetrics.currentMonthAchievement >= 100 ? 'text-green-600' : 'text-orange-900'}`}>
+                  {focusMetrics.currentMonthAchievement.toFixed(0)}%
                 </div>
-                <div className="text-sm text-orange-700">July 8PM Target</div>
-                <div className="text-xs text-orange-600">{focusMetrics.julyTargetAchievers} shops at 100%+</div>
+                <div className="text-sm text-orange-700">{getShortMonthName(currentMonth)} 8PM Target</div>
+                <div className="text-xs text-orange-600">{focusMetrics.currentTargetAchievers} shops at 100%+</div>
               </div>
             </div>
           </div>
@@ -429,8 +568,8 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
               </div>
               <div className="ml-3">
                 <div className="text-xl font-bold text-orange-900">{focusMetrics.totalVERVE.toLocaleString()}</div>
-                <div className="text-sm text-orange-700">VERVE Cases</div>
-                <div className="text-xs text-orange-600">Focus group total</div>
+                <div className="text-sm text-orange-700">VERVE {focusMetrics.currentMonthName}</div>
+                <div className="text-xs text-orange-600">Focus group current</div>
               </div>
             </div>
           </div>
@@ -440,7 +579,6 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
       {/* Controls - Mobile Responsive */}
       <div className="bg-white p-4 rounded-lg shadow">
         <div className="space-y-4">
-          {/* Search Row */}
           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
             <div className="flex items-center space-x-2 flex-1">
               <Search className="w-5 h-5 text-gray-400 flex-shrink-0" />
@@ -459,10 +597,10 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
                 onChange={(e) => setSortBy(e.target.value)}
                 className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
               >
-                <option value="total">Sort by Total Sales</option>
+                <option value="total">Sort by {getShortMonthName(currentMonth)} Sales</option>
                 <option value="growth">Sort by Growth %</option>
                 <option value="trend">Sort by Trend</option>
-                <option value="target_achievement">Sort by Target Achievement</option>
+                <option value="target_achievement">Sort by {getShortMonthName(currentMonth)} Target Achievement</option>
               </select>
 
               <button
@@ -477,7 +615,7 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
           </div>
 
           <div className="text-sm text-gray-500 text-center sm:text-left">
-            Showing {focusShopsData.length} focus shops • 🎯 8PM Targets: June ({focusMetrics?.totalJuneTarget8PM.toLocaleString()}) | July ({focusMetrics?.totalJulyTarget8PM.toLocaleString()}) • 🟠 VERVE: {focusMetrics?.totalVERVE.toLocaleString()} cases
+            Showing {focusShopsData.length} focus shops • 🎯 Current month ({getShortMonthName(currentMonth)}) target: {focusMetrics?.currentMonthTargetSum.toLocaleString()} • 🟠 VERVE: {focusMetrics?.totalVERVE.toLocaleString()} cases
           </div>
         </div>
       </div>
@@ -487,11 +625,10 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <h4 className="font-medium text-yellow-900 mb-2">📝 Focus Shops & Targets Configuration:</h4>
           <div className="text-sm text-yellow-800 space-y-1">
-            <p>✅ <strong>Updated:</strong> {FOCUS_SHOP_CODES.length} shops with June/July 8PM targets</p>
-            <p>🔄 <strong>Recent Changes:</strong> ➕ Added: 01/2024/1397 | ➖ Removed: 01/2024/1521, 01/2024/0440</p>
-            <p>🔍 <strong>Auto-Detection:</strong> Shop details populated from master sales data automatically</p>
-            <p>📊 <strong>Target totals:</strong> June: {focusMetrics?.totalJuneTarget8PM} | July: {focusMetrics?.totalJulyTarget8PM}</p>
-            <p>🎯 <strong>Achievement:</strong> June: {focusMetrics?.juneTargetAchievement.toFixed(1)}% | July: {focusMetrics?.julyTargetAchievement.toFixed(1)}%</p>
+            <p>✅ <strong>Dynamic System:</strong> {FOCUS_SHOP_CODES.length} shops with full-year targets (Jun-Dec 2025)</p>
+            <p>🔄 <strong>Current Month:</strong> {getMonthName(currentMonth)} {currentYear} with {focusMetrics?.currentMonthTargetSum} total target</p>
+            <p>🎯 <strong>Achievement:</strong> June: {focusMetrics?.juneAchievement.toFixed(1)}% | {getShortMonthName(currentMonth)}: {focusMetrics?.currentMonthAchievement.toFixed(1)}%</p>
+            <p>🔮 <strong>Future-Proof:</strong> Automatically switches to next month's targets and data</p>
           </div>
         </div>
       )}
@@ -501,10 +638,10 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
         <div className="bg-white rounded-lg shadow">
           <div className="px-4 py-4 border-b border-gray-200">
             <h3 className="text-lg font-medium text-gray-900">
-              Focus Shops - Mobile View
+              Focus Shops - Mobile View ({getMonthName(currentMonth)} {currentYear})
             </h3>
             <p className="text-sm text-gray-500">
-              Priority shops with 8PM targets ranked by {sortBy === 'total' ? 'total sales' : sortBy === 'growth' ? 'growth %' : sortBy === 'target_achievement' ? 'target achievement' : 'trend'} • Shows 8PM, VERVE & others breakdown
+              Priority shops ranked by {sortBy === 'total' ? `${getShortMonthName(currentMonth)} sales` : sortBy === 'growth' ? 'growth %' : sortBy === 'target_achievement' ? `${getShortMonthName(currentMonth)} target achievement` : 'trend'} • Shows 8PM, VERVE & others
             </p>
           </div>
           
@@ -516,11 +653,11 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-      {/* Desktop View - Enhanced Table with Targets */}
+      {/* 🛠️ FIXED: Desktop View - Enhanced Table with Dynamic Month Detection */}
       <div className="hidden lg:block bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900">Focus Shops Detailed Performance</h3>
-          <p className="text-sm text-gray-500">Rolling analysis with June/July 8PM targets • Includes VERVE breakdown (Mar-Apr-May-Jun-Jul {data?.currentYear || '2025'})</p>
+          <p className="text-sm text-gray-500">Rolling analysis with 8PM targets • Current: {getMonthName(currentMonth)} {currentYear} | Reference: June (completed)</p>
         </div>
         
         <div className="overflow-x-auto">
@@ -531,18 +668,20 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shop Info</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Current Month</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">8PM (Jun)</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">VERVE (Jun)</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">8PM Target Jun</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">8PM ({getShortMonthName(currentMonth)})</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">VERVE ({getShortMonthName(currentMonth)})</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">8PM Target {getShortMonthName(currentMonth)}</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Achievement %</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">8PM Target Jul</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">8PM Target Jun (Ref)</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Growth %</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Trend</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {focusShopsData.map((shop: ShopData, index: number) => {
-                const juneAchievement = calculateTargetAchievement(shop, 'june');
+                const currentData = getCurrentMonthData(shop, currentMonth);
+                const currentAchievement = calculateTargetAchievement(shop, currentMonth);
+                const juneTarget = getMonthTarget(shop.shopId, '06');
                 
                 return (
                   <tr key={shop.shopId} className={`${index < 5 ? 'bg-green-50' : ''} hover:bg-gray-50`}>
@@ -568,34 +707,34 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{shop.department}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                      {(shop.juneTotal || shop.total || 0).toLocaleString()}
+                      {currentData.total.toLocaleString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-purple-600 font-bold">
-                      {(shop.juneEightPM || shop.eightPM || 0).toLocaleString()}
+                      {currentData.eightPM.toLocaleString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600 font-medium">
-                      {(shop.juneVerve || shop.verve || 0).toLocaleString()}
+                      {currentData.verve.toLocaleString()}
                       <div className="text-xs text-gray-400">
-                        {((shop.juneTotal || shop.total || 0) - (shop.juneEightPM || shop.eightPM || 0) - (shop.juneVerve || shop.verve || 0)) > 0 
-                          ? `+${((shop.juneTotal || shop.total || 0) - (shop.juneEightPM || shop.eightPM || 0) - (shop.juneVerve || shop.verve || 0)).toLocaleString()} others`
+                        {(currentData.total - currentData.eightPM - currentData.verve) > 0 
+                          ? `+${(currentData.total - currentData.eightPM - currentData.verve).toLocaleString()} others`
                           : 'no others'
                         }
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-purple-800 font-medium">
-                      {shop.juneTarget8PM || 0}
+                      {getMonthTarget(shop.shopId, currentMonth)}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        juneAchievement >= 100 ? 'bg-green-100 text-green-800' :
-                        juneAchievement >= 80 ? 'bg-yellow-100 text-yellow-800' :
+                        currentAchievement >= 100 ? 'bg-green-100 text-green-800' :
+                        currentAchievement >= 80 ? 'bg-yellow-100 text-yellow-800' :
                         'bg-red-100 text-red-800'
                       }`}>
-                        {juneAchievement.toFixed(0)}%
+                        {currentAchievement.toFixed(0)}%
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-800 font-medium">
-                      {shop.julyTarget8PM || 0}
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-medium">
+                      {juneTarget}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
@@ -628,38 +767,38 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-      {/* Enhanced Insights with Target Performance */}
+      {/* 🛠️ FIXED: Enhanced Insights with Dynamic Target Performance */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         <div className="bg-white rounded-lg shadow">
           <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-medium text-gray-900">8PM Target Performance Analysis</h3>
+            <h3 className="text-lg font-medium text-gray-900">{getMonthName(currentMonth)} 8PM Target Performance Analysis</h3>
           </div>
           <div className="p-4 sm:p-6">
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">June Target Achievers (100%+)</span>
-                <span className="font-medium text-green-600">{focusMetrics?.juneTargetAchievers || 0} shops</span>
+                <span className="text-sm text-gray-600">{getShortMonthName(currentMonth)} Target Achievers (100%+)</span>
+                <span className="font-medium text-green-600">{focusMetrics?.currentTargetAchievers || 0} shops</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">June Near Miss (80-99%)</span>
+                <span className="text-sm text-gray-600">{getShortMonthName(currentMonth)} Near Miss (80-99%)</span>
                 <span className="font-medium text-yellow-600">
                   {focusShopsData.filter(shop => {
-                    const achievement = calculateTargetAchievement(shop, 'june');
+                    const achievement = calculateTargetAchievement(shop, currentMonth);
                     return achievement >= 80 && achievement < 100;
                   }).length} shops
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">June Below Target (&lt;80%)</span>
+                <span className="text-sm text-gray-600">{getShortMonthName(currentMonth)} Below Target (&lt;80%)</span>
                 <span className="font-medium text-red-600">
-                  {focusShopsData.filter(shop => calculateTargetAchievement(shop, 'june') < 80).length} shops
+                  {focusShopsData.filter(shop => calculateTargetAchievement(shop, currentMonth) < 80).length} shops
                 </span>
               </div>
               <div className="pt-2 border-t">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm font-medium text-gray-900">Overall June Achievement</span>
-                  <span className={`font-bold ${focusMetrics && focusMetrics.juneTargetAchievement >= 100 ? 'text-green-600' : 'text-orange-600'}`}>
-                    {focusMetrics?.juneTargetAchievement.toFixed(1) || 0}%
+                  <span className="text-sm font-medium text-gray-900">Overall {getShortMonthName(currentMonth)} Achievement</span>
+                  <span className={`font-bold ${focusMetrics && focusMetrics.currentMonthAchievement >= 100 ? 'text-green-600' : 'text-orange-600'}`}>
+                    {focusMetrics?.currentMonthAchievement.toFixed(1) || 0}%
                   </span>
                 </div>
               </div>
@@ -669,29 +808,34 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
 
         <div className="bg-white rounded-lg shadow">
           <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
-            <h3 className="text-lg font-medium text-gray-900">Priority Actions</h3>
+            <h3 className="text-lg font-medium text-gray-900">Priority Actions ({getMonthName(currentMonth)} Focus)</h3>
           </div>
           <div className="p-4 sm:p-6">
             <div className="space-y-4">
               <div className="flex items-start space-x-3">
                 <CheckCircle className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
                 <div>
-                  <div className="text-sm font-medium text-gray-900">Target Achievers</div>
-                  <div className="text-sm text-gray-600">Maintain momentum, prepare for July targets</div>
+                  <div className="text-sm font-medium text-gray-900">{getShortMonthName(currentMonth)} Target Achievers</div>
+                  <div className="text-sm text-gray-600">Maintain momentum, prepare for next month targets</div>
                 </div>
               </div>
               <div className="flex items-start space-x-3">
                 <AlertTriangle className="w-5 h-5 text-yellow-500 mt-0.5 flex-shrink-0" />
                 <div>
                   <div className="text-sm font-medium text-gray-900">Near Miss Shops</div>
-                  <div className="text-sm text-gray-600">Intensive support needed, close to target</div>
+                  <div className="text-sm text-gray-600">Intensive support needed, close to {getShortMonthName(currentMonth)} target</div>
                 </div>
               </div>
               <div className="flex items-start space-x-3">
                 <Target className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0" />
                 <div>
                   <div className="text-sm font-medium text-gray-900">Below Target Shops</div>
-                  <div className="text-sm text-gray-600">Immediate intervention required</div>
+                  <div className="text-sm text-gray-600">Immediate intervention required for {getShortMonthName(currentMonth)}</div>
+                </div>
+              </div>
+              <div className="pt-2 border-t">
+                <div className="text-xs text-gray-500">
+                  📊 Reference: June completed with {focusMetrics?.juneAchievement.toFixed(1)}% achievement
                 </div>
               </div>
             </div>
