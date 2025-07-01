@@ -149,16 +149,18 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
   }, [data]);
 
   // 🔧 FIXED: Generate monthly data array dynamically from available data
-  const monthlyData = debugInfo?.monthlyTotals ? (() => {
-    const months: Array<{
-      month: string;
-      total: number;
-      total8PM: number;
-      totalVERVE: number;
-      shops: number;
-      quarter: string;
-      growth: number;
-    }> = [];
+  interface MonthlyDataItem {
+    month: string;
+    total: number;
+    total8PM: number;
+    totalVERVE: number;
+    shops: number;
+    quarter: string;
+    growth: number;
+  }
+
+  const monthlyData: MonthlyDataItem[] = debugInfo?.monthlyTotals ? (() => {
+    const months: MonthlyDataItem[] = [];
     const monthOrder = [
       'apr2024', 'may2024', 'jun2024', 'jul2024', 'aug2024', 'sep2024',
       'oct2024', 'nov2024', 'dec2024', 'jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul'
@@ -204,15 +206,7 @@ const HistoricalAnalysisTab = ({ data }: { data: DashboardData }) => {
     });
     
     return months;
-  })() : [] as Array<{
-    month: string;
-    total: number;
-    total8PM: number;
-    totalVERVE: number;
-    shops: number;
-    quarter: string;
-    growth: number;
-  }>;
+  })() : [];
 
   // 🔧 FIXED: Quarterly analysis with dynamic data
   const quarterlyData = data.historicalData ? {
