@@ -581,7 +581,7 @@ const ProtectedRadicoDashboard = () => {
   };
 
   // ==========================================
-  // PART 5: ENHANCED DATA PROCESSING WITH 15-MONTH EXTENDED WINDOW (FIXED VERSION)
+  // PART 5: ENHANCED DATA PROCESSING WITH 15-MONTH EXTENDED WINDOW (UPDATED)
   // ==========================================
 
   const processEnhancedRadicoData = (masterData: Record<string, any[]>, visitData: any[], historicalData: any[]): DashboardData => {
@@ -589,8 +589,8 @@ const ProtectedRadicoDashboard = () => {
     const targets = masterData['Target Vs Achievement'] || [];
     const challans = masterData['Pending Challans'] || [];
     
-    console.log(`🔧 FIXED PROCESSING WITH 15-MONTH EXTENDED WINDOW: ${currentMonth}-${currentYear}`);
-    console.log('🔄 FIXED 15-MONTH WINDOW WITH Q1 FY2024 COMPLETE DATA');
+    console.log(`🔧 ENHANCED PROCESSING WITH 15-MONTH EXTENDED WINDOW: ${currentMonth}-${currentYear}`);
+    console.log('🔄 EXTENDED 15-MONTH WINDOW WITH Q1 FY2024 COMPLETE DATA');
     
     // ENHANCED MONTHLY DATA PROCESSING WITH EXTENDED HISTORICAL RANGE
     const processMonthlyData = (monthNumber: string, year: string = currentYear, useHistorical: boolean = false) => {
@@ -775,8 +775,8 @@ const ProtectedRadicoDashboard = () => {
     
     // Current year data (FY2025)
     const juneData = processMonthlyData(currentMonth, currentYear, false);
-    const mayData = processMonthlyData('05', currentYear, true);
-    const aprilData = processMonthlyData('04', currentYear, true);
+    const mayData = processMonthlyData('05', currentYear, false);
+    const aprilData = processMonthlyData('04', currentYear, false);
     const marchData = processMonthlyData('03', currentYear, true);
     const februaryData = processMonthlyData('02', currentYear, true);
     const januaryData = processMonthlyData('01', currentYear, true);
@@ -928,7 +928,7 @@ const ProtectedRadicoDashboard = () => {
     
     console.log('✅ COMPREHENSIVE 15-MONTH SKU BREAKDOWN COLLECTED');
 
-    // FIXED: Process current month data with DYNAMIC month assignment
+    // Process current month data (ALL EXISTING LOGIC PRESERVED)
     juneData.challans.forEach(row => {
       if (row.length >= 15) {
         const shopId = row[8]?.toString().trim();
@@ -1010,34 +1010,14 @@ const ProtectedRadicoDashboard = () => {
           const parentBrand = brandInfo.family;
           
           shopSales[shopId].total += cases;
-          
-          // 🔧 FIXED: Dynamic assignment to current month properties
-          const currentMonthNames: Record<string, string> = {
-            '01': 'january', '02': 'february', '03': 'march', '04': 'april',
-            '05': 'may', '06': 'june', '07': 'july', '08': 'august',
-            '09': 'september', '10': 'october', '11': 'november', '12': 'december'
-          };
-          
-          const currentMonthName = currentMonthNames[currentMonth];
-          const totalKey = `${currentMonthName}Total` as keyof ShopData;
-          const eightPMKey = `${currentMonthName}EightPM` as keyof ShopData;
-          const verveKey = `${currentMonthName}Verve` as keyof ShopData;
-          
-          // Add to current month properties
-          if (shopSales[shopId][totalKey] !== undefined) {
-            (shopSales[shopId][totalKey] as number) += cases;
-          }
+          shopSales[shopId].juneTotal! += cases;
           
           if (parentBrand === "8PM") {
             shopSales[shopId].eightPM += cases;
-            if (shopSales[shopId][eightPMKey] !== undefined) {
-              (shopSales[shopId][eightPMKey] as number) += cases;
-            }
+            shopSales[shopId].juneEightPM! += cases;
           } else if (parentBrand === "VERVE") {
             shopSales[shopId].verve += cases;
-            if (shopSales[shopId][verveKey] !== undefined) {
-              (shopSales[shopId][verveKey] as number) += cases;
-            }
+            shopSales[shopId].juneVerve! += cases;
           }
         }
       }
@@ -1227,18 +1207,6 @@ const ProtectedRadicoDashboard = () => {
     // ENHANCED GROWTH AND TREND CALCULATION WITH YoY + 3-MONTH AVERAGES (UNCHANGED)
     Object.keys(shopSales).forEach(shopId => {
       const shop = shopSales[shopId];
-      
-      // 🔧 FIXED: Use dynamic current month for calculations
-      const currentMonthNames: Record<string, string> = {
-        '01': 'january', '02': 'february', '03': 'march', '04': 'april',
-        '05': 'may', '06': 'june', '07': 'july', '08': 'august',
-        '09': 'september', '10': 'october', '11': 'november', '12': 'december'
-      };
-      
-      const currentMonthName = currentMonthNames[currentMonth];
-      const currentMonthTotal = (shop[`${currentMonthName}Total` as keyof ShopData] as number) || 0;
-      
-      // For now, keep existing logic for backward compatibility
       const june = shop.juneTotal || 0;
       const may = shop.mayTotal || 0;
       const april = shop.aprilTotal || 0;
@@ -1368,10 +1336,10 @@ const ProtectedRadicoDashboard = () => {
         
         const isCurrentMonthTarget = targetMonth && (
           targetMonth.includes(`${currentMonth}-${currentYear}`) ||
-          targetMonth.includes(`01-${getShortMonthName(currentMonth)}-${currentYear.slice(-2)}`) ||
-          targetMonth.includes(`${getShortMonthName(currentMonth)}-${currentYear.slice(-2)}`) ||
-          targetMonth.toLowerCase().includes(`${getMonthName(currentMonth).toLowerCase()} ${currentYear}`) ||
-          targetMonth.toLowerCase().includes(`${getShortMonthName(currentMonth).toLowerCase()} ${currentYear}`)
+          targetMonth.includes(`01-Jun-${currentYear.slice(-2)}`) ||
+          targetMonth.includes(`Jun-${currentYear.slice(-2)}`) ||
+          targetMonth.toLowerCase().includes(`june ${currentYear}`) ||
+          targetMonth.toLowerCase().includes(`jun ${currentYear}`)
         );
         
         if (isCurrentMonthTarget && shopId) {
@@ -1412,9 +1380,9 @@ const ProtectedRadicoDashboard = () => {
       .sort((a, b) => (b.threeMonthAvgTotal! || 0) - (a.threeMonthAvgTotal! || 0))
       .slice(0, 20);
 
-    console.log('🎯 FINAL RESULT: FIXED DATA WITH 15-MONTH EXTENDED WINDOW');
+    console.log('🎯 FINAL RESULT: ENHANCED DATA WITH 15-MONTH EXTENDED WINDOW');
     console.log('✅ All shop objects now contain 15+ months of historical data including Q1 FY2024');
-    console.log('✅ Current month data correctly assigned to dynamic month properties');
+    console.log('✅ Brand normalization unified across all data sources');
     console.log('✅ All existing components work unchanged - fully backward compatible');
 
     return {
@@ -1438,7 +1406,7 @@ const ProtectedRadicoDashboard = () => {
       deptPerformance,
       salesData: shopSales,
       visitData: visitData.length > 1 ? visitData.length - 1 : 0,
-      lastUpdated: new Date(),
+      lastUpdated,
       salespersonStats,
       customerInsights,
       allShopsComparison,
@@ -1571,7 +1539,7 @@ const ProtectedRadicoDashboard = () => {
             <div className="flex items-center mb-4 sm:mb-0">
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Radico Khaitan Enhanced Analytics Dashboard</h1>
               <span className="ml-3 px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
-                FIXED - {getShortMonthName(currentMonth)} {currentYear}
+                15-Month Extended - {getShortMonthName(currentMonth)} {currentYear}
               </span>
               {/* 🔐 Show user info when authenticated */}
               {user && (
