@@ -15,6 +15,8 @@ interface ShopData {
   total: number;
   eightPM: number;
   verve: number;
+  
+  // EXISTING: Rolling 4 months (UNCHANGED)
   marchTotal?: number;
   marchEightPM?: number;
   marchVerve?: number;
@@ -27,9 +29,34 @@ interface ShopData {
   juneTotal?: number;
   juneEightPM?: number;
   juneVerve?: number;
+  
+  // NEW: Extended Historical Data (12+ months) - OPTION 1 IMPLEMENTATION
+  februaryTotal?: number;
+  februaryEightPM?: number;
+  februaryVerve?: number;
+  januaryTotal?: number;
+  januaryEightPM?: number;
+  januaryVerve?: number;
+  decemberTotal?: number;
+  decemberEightPM?: number;
+  decemberVerve?: number;
+  novemberTotal?: number;
+  novemberEightPM?: number;
+  novemberVerve?: number;
+  octoberTotal?: number;
+  octoberEightPM?: number;
+  octoberVerve?: number;
+  septemberTotal?: number;
+  septemberEightPM?: number;
+  septemberVerve?: number;
+  augustTotal?: number;
+  augustEightPM?: number;
+  augustVerve?: number;
   julyTotal?: number;
   julyEightPM?: number;
   julyVerve?: number;
+  
+  // EXISTING: YoY comparison (UNCHANGED)
   juneLastYearTotal?: number;
   juneLastYearEightPM?: number;
   juneLastYearVerve?: number;
@@ -37,6 +64,10 @@ interface ShopData {
   growthPercent?: number;
   monthlyTrend?: 'improving' | 'declining' | 'stable' | 'new';
   skuBreakdown?: SKUData[];
+  detailedSKUBreakdown?: DetailedSKUData[];
+  historicalData?: MonthlyData[];
+  
+  // EXISTING: 3-month averages (UNCHANGED)
   threeMonthAvgTotal?: number;
   threeMonthAvg8PM?: number;
   threeMonthAvgVERVE?: number;
@@ -47,6 +78,25 @@ interface SKUData {
   cases: number;
   percentage: number;
   month?: string;
+}
+
+interface DetailedSKUData {
+  originalBrand: string;
+  displayName: string;
+  family: string;
+  variant: string;
+  size: string;
+  cases: number;
+  percentage: number;
+  month?: string;
+}
+
+interface MonthlyData {
+  month: string;
+  total: number;
+  eightPM: number;
+  verve: number;
+  skuBreakdown: SKUData[];
 }
 
 interface DashboardData {
