@@ -1,3 +1,15 @@
+// ==========================================
+// 🎯 DYNAMIC FOCUS SHOPS TAB - FULLY FUTURE-PROOF
+// ==========================================
+// ✅ FEATURES:
+// - Shows June COMPLETED performance (cases sold + achievement %)
+// - Shows current month LIVE progress (July, August, etc.)
+// - Dynamic month detection - works for any month automatically
+// - Fixed ranking - shops ranked by current month performance
+// - Real targets only (June & July 2025) - no fabricated data
+// - Future-ready - easily extend targets via Google Sheets/database
+// ==========================================
+
 'use client';
 
 import React, { useState, useMemo } from 'react';
@@ -71,92 +83,36 @@ const FOCUS_SHOP_CODES = [
   '01/2024/0345', '01/2024/0318', '01/2024/1612'
 ];
 
-// 🎯 DYNAMIC 8PM TARGETS - Extended for full year 2025
+// 🎯 REAL 8PM TARGETS - Only June & July 2025 (actual targets from your data)
 const SHOP_TARGETS: Record<string, Record<string, number>> = {
-  '01/2024/1554': { 
-    '06': 70, '07': 100, '08': 120, '09': 100, '10': 90, '11': 80, '12': 70 
-  },
-  '01/2024/0213': { 
-    '06': 70, '07': 100, '08': 120, '09': 100, '10': 90, '11': 80, '12': 70 
-  },
-  '01/2024/0249': { 
-    '06': 30, '07': 70, '08': 90, '09': 80, '10': 70, '11': 60, '12': 50 
-  },
-  '01/2024/1223': { 
-    '06': 30, '07': 70, '08': 90, '09': 80, '10': 70, '11': 60, '12': 50 
-  },
-  '01/2024/1172': { 
-    '06': 40, '07': 60, '08': 80, '09': 70, '10': 65, '11': 55, '12': 45 
-  },
-  '01/2024/0859': { 
-    '06': 50, '07': 90, '08': 110, '09': 95, '10': 85, '11': 75, '12': 65 
-  },
-  '01/2024/1826': { 
-    '06': 50, '07': 100, '08': 120, '09': 105, '10': 95, '11': 85, '12': 75 
-  },
-  '01/2024/0323': { 
-    '06': 50, '07': 100, '08': 120, '09': 105, '10': 95, '11': 85, '12': 75 
-  },
-  '01/2024/1397': { 
-    '06': 40, '07': 70, '08': 90, '09': 80, '10': 70, '11': 60, '12': 50 
-  },
-  '01/2024/1336': { 
-    '06': 50, '07': 100, '08': 120, '09': 105, '10': 95, '11': 85, '12': 75 
-  },
-  '01/2024/1247': { 
-    '06': 50, '07': 100, '08': 120, '09': 105, '10': 95, '11': 85, '12': 75 
-  },
-  '01/2024/0892': { 
-    '06': 25, '07': 50, '08': 65, '09': 55, '10': 50, '11': 45, '12': 40 
-  },
-  '01/2024/0913': { 
-    '06': 25, '07': 50, '08': 65, '09': 55, '10': 50, '11': 45, '12': 40 
-  },
-  '01/2024/1499': { 
-    '06': 50, '07': 100, '08': 120, '09': 105, '10': 95, '11': 85, '12': 75 
-  },
-  '01/2024/1510': { 
-    '06': 50, '07': 100, '08': 120, '09': 105, '10': 95, '11': 85, '12': 75 
-  },
-  '01/2024/0927': { 
-    '06': 30, '07': 75, '08': 95, '09': 85, '10': 75, '11': 65, '12': 55 
-  },
-  '01/2024/1789': { 
-    '06': 50, '07': 100, '08': 120, '09': 105, '10': 95, '11': 85, '12': 75 
-  },
-  '01/2024/1627': { 
-    '06': 50, '07': 60, '08': 75, '09': 70, '10': 65, '11': 60, '12': 55 
-  },
-  '01/2024/0237': { 
-    '06': 50, '07': 60, '08': 75, '09': 70, '10': 65, '11': 60, '12': 55 
-  },
-  '01/2024/0611': { 
-    '06': 50, '07': 60, '08': 75, '09': 70, '10': 65, '11': 60, '12': 55 
-  },
-  '01/2024/1262': { 
-    '06': 40, '07': 50, '08': 65, '09': 60, '10': 55, '11': 50, '12': 45 
-  },
-  '01/2024/1923': { 
-    '06': 50, '07': 100, '08': 120, '09': 105, '10': 95, '11': 85, '12': 75 
-  },
-  '01/2024/0689': { 
-    '06': 40, '07': 75, '08': 95, '09': 85, '10': 75, '11': 65, '12': 55 
-  },
-  '01/2024/0271': { 
-    '06': 50, '07': 100, '08': 120, '09': 105, '10': 95, '11': 85, '12': 75 
-  },
-  '01/2024/0649': { 
-    '06': 40, '07': 80, '08': 100, '09': 90, '10': 80, '11': 70, '12': 60 
-  },
-  '01/2024/0345': { 
-    '06': 50, '07': 100, '08': 120, '09': 105, '10': 95, '11': 85, '12': 75 
-  },
-  '01/2024/0318': { 
-    '06': 50, '07': 100, '08': 120, '09': 105, '10': 95, '11': 85, '12': 75 
-  },
-  '01/2024/1612': { 
-    '06': 50, '07': 60, '08': 75, '09': 70, '10': 65, '11': 60, '12': 55 
-  }
+  '01/2024/1554': { '06': 70, '07': 100 },
+  '01/2024/0213': { '06': 70, '07': 100 },
+  '01/2024/0249': { '06': 30, '07': 70 },
+  '01/2024/1223': { '06': 30, '07': 70 },
+  '01/2024/1172': { '06': 40, '07': 60 },
+  '01/2024/0859': { '06': 50, '07': 90 },
+  '01/2024/1826': { '06': 50, '07': 100 },
+  '01/2024/0323': { '06': 50, '07': 100 },
+  '01/2024/1397': { '06': 40, '07': 70 },
+  '01/2024/1336': { '06': 50, '07': 100 },
+  '01/2024/1247': { '06': 50, '07': 100 },
+  '01/2024/0892': { '06': 25, '07': 50 },
+  '01/2024/0913': { '06': 25, '07': 50 },
+  '01/2024/1499': { '06': 50, '07': 100 },
+  '01/2024/1510': { '06': 50, '07': 100 },
+  '01/2024/0927': { '06': 30, '07': 75 },
+  '01/2024/1789': { '06': 50, '07': 100 },
+  '01/2024/1627': { '06': 50, '07': 60 },
+  '01/2024/0237': { '06': 50, '07': 60 },
+  '01/2024/0611': { '06': 50, '07': 60 },
+  '01/2024/1262': { '06': 40, '07': 50 },
+  '01/2024/1923': { '06': 50, '07': 100 },
+  '01/2024/0689': { '06': 40, '07': 75 },
+  '01/2024/0271': { '06': 50, '07': 100 },
+  '01/2024/0649': { '06': 40, '07': 80 },
+  '01/2024/0345': { '06': 50, '07': 100 },
+  '01/2024/0318': { '06': 50, '07': 100 },
+  '01/2024/1612': { '06': 50, '07': 60 }
 };
 
 // ==========================================
@@ -213,9 +169,16 @@ const getPreviousMonthData = (shop: ShopData, currentMonth: string) => {
   return { total, eightPM, verve };
 };
 
-// 🛠️ NEW: Get target for specific month
+// 🛠️ NEW: Get target for specific month (only June & July 2025 available)
 const getMonthTarget = (shopId: string, monthNum: string): number => {
-  return SHOP_TARGETS[shopId]?.[monthNum] || 0;
+  const target = SHOP_TARGETS[shopId]?.[monthNum];
+  if (target) return target;
+  
+  // For months beyond July 2025, return 0 until real targets are set
+  if (parseInt(monthNum) > 7) {
+    console.log(`⚠️ No target set for shop ${shopId} month ${monthNum} - only June/July targets available`);
+  }
+  return 0;
 };
 
 // 🛠️ NEW: Calculate target achievement for any month
@@ -294,27 +257,48 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
           </div>
         </div>
 
-        {/* Target vs Achievement - Dynamic Current Month + June Reference */}
-        <div className="mb-3 p-3 bg-purple-50 rounded-lg">
-          <div className="text-xs font-medium text-purple-900 mb-2">8PM Target vs Achievement</div>
-          <div className="grid grid-cols-2 gap-3">
+        {/* June Completed Performance */}
+        <div className="mb-3 p-3 bg-green-50 rounded-lg border border-green-200">
+          <div className="text-xs font-medium text-green-900 mb-2">✅ June 2025 (Completed)</div>
+          <div className="grid grid-cols-3 gap-2">
             <div className="text-center">
-              <div className="text-sm font-bold text-purple-600">
-                {getMonthData(shop, '06', 'EightPM')}/{getMonthTarget(shop.shopId, '06')}
-              </div>
-              <div className="text-xs text-gray-500">June (Completed)</div>
-              <div className={`text-xs font-semibold ${juneAchievement >= 100 ? 'text-green-600' : juneAchievement >= 80 ? 'text-yellow-600' : 'text-red-600'}`}>
-                {juneAchievement.toFixed(0)}%
-              </div>
+              <div className="text-sm font-bold text-green-700">{getMonthData(shop, '06', 'EightPM')}</div>
+              <div className="text-xs text-green-600">8PM Sold</div>
             </div>
             <div className="text-center">
-              <div className="text-sm font-bold text-purple-600">
-                {currentData.eightPM}/{getMonthTarget(shop.shopId, currentMonth)}
+              <div className="text-sm font-bold text-green-700">{getMonthTarget(shop.shopId, '06')}</div>
+              <div className="text-xs text-green-600">Target</div>
+            </div>
+            <div className="text-center">
+              <div className={`text-sm font-bold ${juneAchievement >= 100 ? 'text-green-800' : juneAchievement >= 80 ? 'text-yellow-700' : 'text-red-700'}`}>
+                {juneAchievement.toFixed(0)}%
               </div>
-              <div className="text-xs text-gray-500">{getShortMonthName(currentMonth)} (Current)</div>
-              <div className={`text-xs font-semibold ${currentAchievement >= 100 ? 'text-green-600' : currentAchievement >= 80 ? 'text-yellow-600' : 'text-red-600'}`}>
-                {currentAchievement.toFixed(0)}%
-              </div>
+              <div className="text-xs text-green-600">Achievement</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Current Month Progress */}
+        <div className="mb-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+          <div className="text-xs font-medium text-blue-900 mb-2">🔄 {getMonthName(currentMonth)} 2025 (Current)</div>
+          <div className="grid grid-cols-3 gap-2">
+            <div className="text-center">
+              <div className="text-sm font-bold text-blue-700">{currentData.eightPM}</div>
+              <div className="text-xs text-blue-600">8PM Current</div>
+            </div>
+            <div className="text-center">
+              <div className="text-sm font-bold text-blue-700">{getMonthTarget(shop.shopId, currentMonth) || 'No Target'}</div>
+              <div className="text-xs text-blue-600">Target</div>
+            </div>
+            <div className="text-center">
+              {getMonthTarget(shop.shopId, currentMonth) > 0 ? (
+                <div className={`text-sm font-bold ${currentAchievement >= 100 ? 'text-green-700' : currentAchievement >= 80 ? 'text-yellow-700' : 'text-red-700'}`}>
+                  {currentAchievement.toFixed(0)}%
+                </div>
+              ) : (
+                <div className="text-xs text-gray-500 italic">Target needed</div>
+              )}
+              <div className="text-xs text-blue-600">Achievement</div>
             </div>
           </div>
         </div>
@@ -540,10 +524,15 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
               </div>
               <div className="ml-3">
                 <div className={`text-xl font-bold ${focusMetrics.currentMonthAchievement >= 100 ? 'text-green-600' : 'text-orange-900'}`}>
-                  {focusMetrics.currentMonthAchievement.toFixed(0)}%
+                  {focusMetrics.currentMonthTargetSum > 0 ? `${focusMetrics.currentMonthAchievement.toFixed(0)}%` : 'No Target'}
                 </div>
                 <div className="text-sm text-orange-700">{getShortMonthName(currentMonth)} 8PM Target</div>
-                <div className="text-xs text-orange-600">{focusMetrics.currentTargetAchievers} shops at 100%+</div>
+                <div className="text-xs text-orange-600">
+                  {focusMetrics.currentMonthTargetSum > 0 
+                    ? `${focusMetrics.currentTargetAchievers} shops at 100%+`
+                    : 'Target needed'
+                  }
+                </div>
               </div>
             </div>
           </div>
@@ -615,7 +604,7 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
           </div>
 
           <div className="text-sm text-gray-500 text-center sm:text-left">
-            Showing {focusShopsData.length} focus shops • 🎯 Current month ({getShortMonthName(currentMonth)}) target: {focusMetrics?.currentMonthTargetSum.toLocaleString()} • 🟠 VERVE: {focusMetrics?.totalVERVE.toLocaleString()} cases
+            Showing {focusShopsData.length} focus shops • 🎯 Targets available: June & July only • Current: {focusMetrics?.currentMonthTargetSum.toLocaleString()} | 🟠 VERVE: {focusMetrics?.totalVERVE.toLocaleString()} cases
           </div>
         </div>
       </div>
@@ -625,10 +614,11 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
         <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
           <h4 className="font-medium text-yellow-900 mb-2">📝 Focus Shops & Targets Configuration:</h4>
           <div className="text-sm text-yellow-800 space-y-1">
-            <p>✅ <strong>Dynamic System:</strong> {FOCUS_SHOP_CODES.length} shops with full-year targets (Jun-Dec 2025)</p>
-            <p>🔄 <strong>Current Month:</strong> {getMonthName(currentMonth)} {currentYear} with {focusMetrics?.currentMonthTargetSum} total target</p>
-            <p>🎯 <strong>Achievement:</strong> June: {focusMetrics?.juneAchievement.toFixed(1)}% | {getShortMonthName(currentMonth)}: {focusMetrics?.currentMonthAchievement.toFixed(1)}%</p>
-            <p>🔮 <strong>Future-Proof:</strong> Automatically switches to next month's targets and data</p>
+            <p>✅ <strong>Real Targets:</strong> {FOCUS_SHOP_CODES.length} shops with June & July 2025 targets only</p>
+            <p>🎯 <strong>Available:</strong> June: {Object.values(SHOP_TARGETS).reduce((sum, shop) => sum + (shop['06'] || 0), 0)} total | July: {Object.values(SHOP_TARGETS).reduce((sum, shop) => sum + (shop['07'] || 0), 0)} total</p>
+            <p>🔄 <strong>Current Month:</strong> {getMonthName(currentMonth)} {currentYear}</p>
+            <p>⚠️ <strong>Future Months:</strong> August+ targets need to be set (currently showing 0)</p>
+            <p>📊 <strong>Achievement:</strong> June: {focusMetrics?.juneAchievement.toFixed(1)}% | {getShortMonthName(currentMonth)}: {focusMetrics?.currentMonthAchievement.toFixed(1)}%</p>
           </div>
         </div>
       )}
@@ -653,39 +643,45 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-      {/* 🛠️ FIXED: Desktop View - Enhanced Table with Dynamic Month Detection */}
+      {/* 🛠️ FIXED: Desktop View - Enhanced Table with June + Current Month Data */}
       <div className="hidden lg:block bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900">Focus Shops Detailed Performance</h3>
-          <p className="text-sm text-gray-500">Rolling analysis with 8PM targets • Current: {getMonthName(currentMonth)} {currentYear} | Reference: June (completed)</p>
+          <p className="text-sm text-gray-500">Complete June performance vs Current {getMonthName(currentMonth)} {currentYear} progress • 8PM targets and achievements</p>
         </div>
         
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rank</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shop Info</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Current Month</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">8PM ({getShortMonthName(currentMonth)})</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">VERVE ({getShortMonthName(currentMonth)})</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">8PM Target {getShortMonthName(currentMonth)}</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Achievement %</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">8PM Target Jun (Ref)</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Growth %</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Trend</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Rank</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shop Info</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
+                {/* June Completed Performance */}
+                <th className="px-3 py-3 text-center text-xs font-medium text-green-700 uppercase bg-green-50">June 8PM Sold</th>
+                <th className="px-3 py-3 text-center text-xs font-medium text-green-700 uppercase bg-green-50">June Target</th>
+                <th className="px-3 py-3 text-center text-xs font-medium text-green-700 uppercase bg-green-50">June Achievement</th>
+                {/* Current Month Performance */}
+                <th className="px-3 py-3 text-center text-xs font-medium text-blue-700 uppercase bg-blue-50">{getShortMonthName(currentMonth)} Total</th>
+                <th className="px-3 py-3 text-center text-xs font-medium text-blue-700 uppercase bg-blue-50">{getShortMonthName(currentMonth)} 8PM</th>
+                <th className="px-3 py-3 text-center text-xs font-medium text-blue-700 uppercase bg-blue-50">{getShortMonthName(currentMonth)} VERVE</th>
+                <th className="px-3 py-3 text-center text-xs font-medium text-blue-700 uppercase bg-blue-50">{getShortMonthName(currentMonth)} Target</th>
+                <th className="px-3 py-3 text-center text-xs font-medium text-blue-700 uppercase bg-blue-50">{getShortMonthName(currentMonth)} Achievement</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Growth %</th>
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Trend</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {focusShopsData.map((shop: ShopData, index: number) => {
                 const currentData = getCurrentMonthData(shop, currentMonth);
                 const currentAchievement = calculateTargetAchievement(shop, currentMonth);
+                const juneData = getMonthData(shop, '06', 'EightPM');
                 const juneTarget = getMonthTarget(shop.shopId, '06');
+                const juneAchievement = calculateTargetAchievement(shop, '06');
                 
                 return (
-                  <tr key={shop.shopId} className={`${index < 5 ? 'bg-green-50' : ''} hover:bg-gray-50`}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                  <tr key={shop.shopId} className={`${index < 5 ? 'bg-yellow-50' : ''} hover:bg-gray-50`}>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                       <div className="flex items-center">
                         {index + 1}
                         {index < 3 && (
@@ -698,45 +694,64 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
                         {index < 5 && <Star className="w-4 h-4 text-yellow-500 ml-1" />}
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm">
+                    <td className="px-4 py-4 text-sm">
                       <div>
                         <div className="font-medium text-gray-900 max-w-xs truncate">{shop.shopName}</div>
                         <div className="text-gray-500 text-xs">{shop.shopId}</div>
                         <div className="text-gray-500 text-xs">{shop.salesman}</div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{shop.department}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
-                      {currentData.total.toLocaleString()}
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">{shop.department}</td>
+                    
+                    {/* June Completed Performance - Green Theme */}
+                    <td className="px-3 py-4 whitespace-nowrap text-center text-sm font-bold text-green-800 bg-green-50">
+                      {juneData.toLocaleString()}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-purple-600 font-bold">
-                      {currentData.eightPM.toLocaleString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-orange-600 font-medium">
-                      {currentData.verve.toLocaleString()}
-                      <div className="text-xs text-gray-400">
-                        {(currentData.total - currentData.eightPM - currentData.verve) > 0 
-                          ? `+${(currentData.total - currentData.eightPM - currentData.verve).toLocaleString()} others`
-                          : 'no others'
-                        }
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-purple-800 font-medium">
-                      {getMonthTarget(shop.shopId, currentMonth)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        currentAchievement >= 100 ? 'bg-green-100 text-green-800' :
-                        currentAchievement >= 80 ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-red-100 text-red-800'
-                      }`}>
-                        {currentAchievement.toFixed(0)}%
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-medium">
+                    <td className="px-3 py-4 whitespace-nowrap text-center text-sm font-medium text-green-700 bg-green-50">
                       {juneTarget}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <td className="px-3 py-4 whitespace-nowrap text-center text-sm bg-green-50">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        juneAchievement >= 100 ? 'bg-green-200 text-green-900' :
+                        juneAchievement >= 80 ? 'bg-yellow-200 text-yellow-900' :
+                        'bg-red-200 text-red-900'
+                      }`}>
+                        {juneAchievement.toFixed(0)}%
+                      </span>
+                    </td>
+                    
+                    {/* Current Month Performance - Blue Theme */}
+                    <td className="px-3 py-4 whitespace-nowrap text-center text-sm font-bold text-blue-800 bg-blue-50">
+                      {currentData.total.toLocaleString()}
+                    </td>
+                    <td className="px-3 py-4 whitespace-nowrap text-center text-sm font-bold text-purple-600 bg-blue-50">
+                      {currentData.eightPM.toLocaleString()}
+                    </td>
+                    <td className="px-3 py-4 whitespace-nowrap text-center text-sm font-medium text-orange-600 bg-blue-50">
+                      {currentData.verve.toLocaleString()}
+                      {(currentData.total - currentData.eightPM - currentData.verve) > 0 && (
+                        <div className="text-xs text-gray-500">+{(currentData.total - currentData.eightPM - currentData.verve)} others</div>
+                      )}
+                    </td>
+                    <td className="px-3 py-4 whitespace-nowrap text-center text-sm font-medium text-blue-700 bg-blue-50">
+                      {getMonthTarget(shop.shopId, currentMonth) || 'No Target'}
+                    </td>
+                    <td className="px-3 py-4 whitespace-nowrap text-center text-sm bg-blue-50">
+                      {getMonthTarget(shop.shopId, currentMonth) > 0 ? (
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          currentAchievement >= 100 ? 'bg-green-200 text-green-900' :
+                          currentAchievement >= 80 ? 'bg-yellow-200 text-yellow-900' :
+                          'bg-red-200 text-red-900'
+                        }`}>
+                          {currentAchievement.toFixed(0)}%
+                        </span>
+                      ) : (
+                        <span className="text-xs text-gray-500 italic">Target needed</span>
+                      )}
+                    </td>
+                    
+                    {/* Growth and Trend */}
+                    <td className="px-4 py-4 whitespace-nowrap text-sm">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                         (shop.growthPercent || 0) > 0 
                           ? 'bg-green-100 text-green-800' 
@@ -747,7 +762,7 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
                         {(shop.growthPercent || 0) >= 0 ? '+' : ''}{(shop.growthPercent || 0).toFixed(1)}%
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <td className="px-4 py-4 whitespace-nowrap text-sm">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                         shop.monthlyTrend === 'improving' ? 'bg-green-100 text-green-800' :
                         shop.monthlyTrend === 'declining' ? 'bg-red-100 text-red-800' :
