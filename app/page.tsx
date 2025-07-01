@@ -770,61 +770,20 @@ const ProtectedRadicoDashboard = () => {
       };
     };
 
-    // 🔧 FIXED: SMART MONTH TRANSITION LOGIC
-    console.log('🔄 PROCESSING WITH SMART MONTH TRANSITION LOGIC...');
+    // 🔧 SIMPLIFIED: NATURAL MONTH TRANSITION LOGIC
+    console.log('🔄 PROCESSING WITH NATURAL MONTH TRANSITION...');
     
-    const getCurrentMonthData = () => {
-      const currentMonthNum = parseInt(currentMonth);
-      
-      // If we're in July and have less than substantial data, use June as "current"
-      if (currentMonthNum === 7) {
-        const julyData = processMonthlyData('07', currentYear, false);
-        const julyTotal = julyData.total8PM + julyData.totalVERVE;
-        const julyActiveShops = julyData.uniqueShops.size;
-        
-        console.log(`🔍 July data check:`, {
-          julyTotal,
-          julyActiveShops,
-          julyCases: julyData.total8PM + julyData.totalVERVE,
-          julyShops: julyData.uniqueShops.size
-        });
-        
-        // If July has minimal data (less than 100 cases OR less than 10 shops), use June
-        if (julyTotal < 100 || julyActiveShops < 10) {
-          console.log('🔄 July data minimal, using June as current month for display');
-          return {
-            data: processMonthlyData('06', currentYear, false),
-            displayMonth: '06',
-            isJuneData: true
-          };
-        }
-        
-        console.log('✅ July has substantial data, using July as current');
-        return {
-          data: julyData,
-          displayMonth: '07',
-          isJuneData: false
-        };
-      }
-      
-      // For other months, use current month normally
-      return {
-        data: processMonthlyData(currentMonth, currentYear, false),
-        displayMonth: currentMonth,
-        isJuneData: false
-      };
-    };
-
-    const currentMonthResult = getCurrentMonthData();
-    const currentMonthData = currentMonthResult.data;
-    const effectiveDisplayMonth = currentMonthResult.displayMonth;
-    const isShowingJuneData = currentMonthResult.isJuneData;
+    // Simple: Always show current month data (even if 0 on 1st of month)
+    const currentMonthData = processMonthlyData(currentMonth, currentYear, false);
+    const effectiveDisplayMonth = currentMonth;
     
-    if (isShowingJuneData) {
-      console.log('📅 MONTH TRANSITION: Showing June data until July builds up');
-    } else {
-      console.log(`📅 NORMAL OPERATION: Showing ${getMonthName(effectiveDisplayMonth)} data`);
-    }
+    console.log(`📅 NATURAL TRANSITION: Showing ${getMonthName(effectiveDisplayMonth)} ${currentYear} data`);
+    console.log(`📊 Current month stats:`, {
+      month: effectiveDisplayMonth,
+      total8PM: currentMonthData.total8PM,
+      totalVERVE: currentMonthData.totalVERVE,
+      activeShops: currentMonthData.uniqueShops.size
+    });
 
     // Process other historical months (UNCHANGED)
     const mayData = processMonthlyData('05', currentYear, false);
@@ -1063,8 +1022,8 @@ const ProtectedRadicoDashboard = () => {
           
           shopSales[shopId].total += cases;
           
-          // 🔧 FIXED: Properly assign to June or July based on effective display month
-          if (effectiveDisplayMonth === '06') {
+          // ✅ SIMPLIFIED: Assign to current month based on actual currentMonth
+          if (currentMonth === '06') {
             shopSales[shopId].juneTotal! += cases;
             if (parentBrand === "8PM") {
               shopSales[shopId].eightPM += cases;
@@ -1073,7 +1032,7 @@ const ProtectedRadicoDashboard = () => {
               shopSales[shopId].verve += cases;
               shopSales[shopId].juneVerve! += cases;
             }
-          } else if (effectiveDisplayMonth === '07') {
+          } else if (currentMonth === '07') {
             shopSales[shopId].julyTotal! += cases;
             if (parentBrand === "8PM") {
               shopSales[shopId].eightPM += cases;
@@ -1081,6 +1040,13 @@ const ProtectedRadicoDashboard = () => {
             } else if (parentBrand === "VERVE") {
               shopSales[shopId].verve += cases;
               shopSales[shopId].julyVerve! += cases;
+            }
+          } else {
+            // For other months, just add to current totals
+            if (parentBrand === "8PM") {
+              shopSales[shopId].eightPM += cases;
+            } else if (parentBrand === "VERVE") {
+              shopSales[shopId].verve += cases;
             }
           }
         }
@@ -1090,8 +1056,7 @@ const ProtectedRadicoDashboard = () => {
     // ENHANCED: Add ALL historical data for rolling window + YoY + EXTENDED MONTHS + Q1 FY2024
     console.log('🔄 POPULATING ALL 15 HISTORICAL MONTHS FOR EACH SHOP...');
     
-    // 🔧 FIXED: Include June data processing if we're showing July but June isn't in the effective display
-    let allHistoricalMonths = [
+    const allHistoricalMonths = [
       { data: mayData, key: 'may' },
       { data: aprilData, key: 'april' },
       { data: marchData, key: 'march' },
@@ -1109,13 +1074,10 @@ const ProtectedRadicoDashboard = () => {
       { data: juneLastYearData, key: 'juneLastYear' }
     ];
 
-    // 🔧 CRITICAL FIX: Always process June 2025 data separately to ensure it's captured
-    if (effectiveDisplayMonth === '07') {
-      // If we're showing July, we need to also process June 2025 data for historical calculations
-      const june2025Data = processMonthlyData('06', currentYear, false);
-      allHistoricalMonths.unshift({ data: june2025Data, key: 'june' });
-      console.log('🔧 CRITICAL: Added June 2025 data for historical calculations');
-    }
+    // ✅ CRITICAL: Always process June 2025 data for historical calculations
+    const june2025Data = processMonthlyData('06', currentYear, false);
+    allHistoricalMonths.unshift({ data: june2025Data, key: 'june' });
+    console.log('✅ Added June 2025 data for historical calculations');
     
     allHistoricalMonths.forEach(({ data: monthData, key: monthKey }) => {
       Object.keys(monthData.shopSales).forEach(shopIdentifier => {
@@ -1281,12 +1243,14 @@ const ProtectedRadicoDashboard = () => {
       totalNewDetailedSKUsPopulated: totalDetailedSKUsPopulated
     });
 
-    // ENHANCED GROWTH AND TREND CALCULATION WITH YoY + 3-MONTH AVERAGES (UNCHANGED)
+    // ENHANCED GROWTH AND TREND CALCULATION WITH YoY + 3-MONTH AVERAGES (UPDATED)
     Object.keys(shopSales).forEach(shopId => {
       const shop = shopSales[shopId];
       
-      // 🔧 FIXED: Use proper current month data based on effective display month
-      const currentMonthTotal = effectiveDisplayMonth === '06' ? (shop.juneTotal || 0) : (shop.julyTotal || 0);
+      // ✅ SIMPLIFIED: Use current month data based on actual currentMonth
+      const currentMonthTotal = currentMonth === '06' ? (shop.juneTotal || 0) : 
+                               currentMonth === '07' ? (shop.julyTotal || 0) : 
+                               shop.total;
       const june = shop.juneTotal || 0;
       const may = shop.mayTotal || 0;
       const april = shop.aprilTotal || 0;
@@ -1342,29 +1306,39 @@ const ProtectedRadicoDashboard = () => {
       }
     });
 
-    // ENHANCED CUSTOMER INSIGHTS ANALYSIS (FIXED TO USE CURRENT MONTH DATA)
+    // ENHANCED CUSTOMER INSIGHTS ANALYSIS (UPDATED FOR NATURAL TRANSITION)
     const allCurrentShops = Object.values(shopSales).filter(shop => 
-      effectiveDisplayMonth === '06' ? (shop.juneTotal! > 0) : (shop.julyTotal! > 0)
+      currentMonth === '06' ? (shop.juneTotal! > 0) : 
+      currentMonth === '07' ? (shop.julyTotal! > 0) : 
+      shop.total > 0
     );
     
     const newShops = Object.values(shopSales).filter(shop => {
-      const currentTotal = effectiveDisplayMonth === '06' ? (shop.juneTotal! > 0) : (shop.julyTotal! > 0);
+      const currentTotal = currentMonth === '06' ? (shop.juneTotal! > 0) : 
+                          currentMonth === '07' ? (shop.julyTotal! > 0) : 
+                          shop.total > 0;
       return currentTotal && shop.mayTotal === 0 && shop.aprilTotal === 0 && shop.marchTotal === 0;
     });
     
     const lostShops = Object.values(shopSales).filter(shop => {
-      const currentTotal = effectiveDisplayMonth === '06' ? (shop.juneTotal || 0) : (shop.julyTotal || 0);
+      const currentTotal = currentMonth === '06' ? (shop.juneTotal || 0) : 
+                          currentMonth === '07' ? (shop.julyTotal || 0) : 
+                          shop.total;
       return currentTotal === 0 && shop.mayTotal! > 0;
     });
 
     const consistentShops = Object.values(shopSales).filter(shop => {
-      const currentTotal = effectiveDisplayMonth === '06' ? (shop.juneTotal! > 0) : (shop.julyTotal! > 0);
+      const currentTotal = currentMonth === '06' ? (shop.juneTotal! > 0) : 
+                          currentMonth === '07' ? (shop.julyTotal! > 0) : 
+                          shop.total > 0;
       return currentTotal && shop.mayTotal! > 0 && 
         (shop.monthlyTrend === 'improving' || (shop.monthlyTrend === 'stable' && shop.growthPercent! >= -5));
     });
 
     const decliningShops = Object.values(shopSales).filter(shop => {
-      const currentTotal = effectiveDisplayMonth === '06' ? (shop.juneTotal! > 0) : (shop.julyTotal! > 0);
+      const currentTotal = currentMonth === '06' ? (shop.juneTotal! > 0) : 
+                          currentMonth === '07' ? (shop.julyTotal! > 0) : 
+                          shop.total > 0;
       return shop.monthlyTrend === 'declining' || (currentTotal && shop.growthPercent! < -10);
     });
 
@@ -1374,8 +1348,12 @@ const ProtectedRadicoDashboard = () => {
       consistentPerformers: consistentShops.length,
       decliningPerformers: decliningShops.length,
       newShops: newShops.sort((a, b) => {
-        const aTotal = effectiveDisplayMonth === '06' ? (a.juneTotal! || 0) : (a.julyTotal! || 0);
-        const bTotal = effectiveDisplayMonth === '06' ? (b.juneTotal! || 0) : (b.julyTotal! || 0);
+        const aTotal = currentMonth === '06' ? (a.juneTotal! || 0) : 
+                      currentMonth === '07' ? (a.julyTotal! || 0) : 
+                      a.total;
+        const bTotal = currentMonth === '06' ? (b.juneTotal! || 0) : 
+                      currentMonth === '07' ? (b.julyTotal! || 0) : 
+                      b.total;
         return bTotal - aTotal;
       }),
       lostShops: lostShops.sort((a, b) => b.mayTotal! - a.mayTotal!),
@@ -1406,7 +1384,7 @@ const ProtectedRadicoDashboard = () => {
       }
     });
 
-    // Process targets for current month (FIXED TO USE EFFECTIVE DISPLAY MONTH)
+    // Process targets for current month (SIMPLIFIED FOR NATURAL TRANSITION)
     let total8PMTarget = 0, totalVerveTarget = 0;
     const salespersonStats: Record<string, any> = {};
 
@@ -1424,16 +1402,13 @@ const ProtectedRadicoDashboard = () => {
         const shopId = row[0]?.toString().trim();
         const targetMonth = row[9]?.toString().trim();
         
-        // 🔧 FIXED: Check for targets matching the effective display month
-        const targetMonthToCheck = effectiveDisplayMonth === '06' ? '06' : '07';
-        const yearToCheck = currentYear;
-        
+        // ✅ SIMPLIFIED: Check for targets matching the current month
         const isCurrentMonthTarget = targetMonth && (
-          targetMonth.includes(`${targetMonthToCheck}-${yearToCheck}`) ||
-          targetMonth.includes(`01-${getMonthName(targetMonthToCheck).substring(0,3)}-${yearToCheck.slice(-2)}`) ||
-          targetMonth.includes(`${getMonthName(targetMonthToCheck).substring(0,3)}-${yearToCheck.slice(-2)}`) ||
-          targetMonth.toLowerCase().includes(`${getMonthName(targetMonthToCheck).toLowerCase()} ${yearToCheck}`) ||
-          targetMonth.toLowerCase().includes(`${getMonthName(targetMonthToCheck).substring(0,3).toLowerCase()} ${yearToCheck}`)
+          targetMonth.includes(`${currentMonth}-${currentYear}`) ||
+          targetMonth.includes(`01-${getMonthName(currentMonth).substring(0,3)}-${currentYear.slice(-2)}`) ||
+          targetMonth.includes(`${getMonthName(currentMonth).substring(0,3)}-${currentYear.slice(-2)}`) ||
+          targetMonth.toLowerCase().includes(`${getMonthName(currentMonth).toLowerCase()} ${currentYear}`) ||
+          targetMonth.toLowerCase().includes(`${getMonthName(currentMonth).substring(0,3).toLowerCase()} ${currentYear}`)
         );
         
         if (isCurrentMonthTarget && shopId) {
@@ -1474,11 +1449,11 @@ const ProtectedRadicoDashboard = () => {
       .sort((a, b) => (b.threeMonthAvgTotal! || 0) - (a.threeMonthAvgTotal! || 0))
       .slice(0, 20);
 
-    console.log('🎯 FINAL RESULT: ENHANCED DATA WITH 15-MONTH EXTENDED WINDOW + SMART MONTH TRANSITION');
+    console.log('🎯 FINAL RESULT: ENHANCED DATA WITH 15-MONTH EXTENDED WINDOW + NATURAL MONTH TRANSITION');
     console.log('✅ All shop objects now contain 15+ months of historical data including Q1 FY2024');
     console.log('✅ Brand normalization unified across all data sources');
     console.log('✅ All existing components work unchanged - fully backward compatible');
-    console.log(`✅ MONTH TRANSITION FIXED: Effective display month is ${getMonthName(effectiveDisplayMonth)} ${currentYear}`);
+    console.log(`✅ NATURAL TRANSITION: Showing ${getMonthName(currentMonth)} ${currentYear} data (0s on 1st of month are normal)`);
 
     return {
       summary: {
@@ -1505,12 +1480,12 @@ const ProtectedRadicoDashboard = () => {
       salespersonStats,
       customerInsights,
       allShopsComparison,
-      currentMonth: effectiveDisplayMonth, // 🔧 FIXED: Use effective display month
+      currentMonth: currentMonth, // ✅ SIMPLIFIED: Use actual current month
       currentYear: currentYear,
-      // 🚀 ENHANCED: 15-month historical data with Q1 FY2024 complete + FIXED DATA STRUCTURE
+      // 🚀 ENHANCED: 15-month historical data with Q1 FY2024 complete + SIMPLIFIED DATA STRUCTURE
       historicalData: {
-        // Current rolling window (4 months) - FIXED TO ENSURE JUNE IS ALWAYS INCLUDED
-        june: effectiveDisplayMonth === '06' ? currentMonthData : processMonthlyData('06', currentYear, false),
+        // Current rolling window (4 months) - SIMPLIFIED TO ALWAYS INCLUDE JUNE
+        june: june2025Data,
         may: mayData,
         april: aprilData,
         march: marchData,
