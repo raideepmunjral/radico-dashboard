@@ -27,6 +27,9 @@ interface ShopData {
   juneTotal?: number;
   juneEightPM?: number;
   juneVerve?: number;
+  julyTotal?: number;
+  julyEightPM?: number;
+  julyVerve?: number;
   juneLastYearTotal?: number;
   juneLastYearEightPM?: number;
   juneLastYearVerve?: number;
@@ -90,6 +93,36 @@ const getShortMonthName = (monthNum: string) => {
   return months[parseInt(monthNum) - 1] || 'Unknown';
 };
 
+// 🔧 FIXED: Dynamic month field getter based on current month
+const getDynamicMonthFields = (currentMonth: string, shop: ShopData) => {
+  const currentMonthNum = parseInt(currentMonth);
+  const months = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+  
+  // Get previous 3 months for 3-month average
+  const prevMonths = [];
+  for (let i = 1; i <= 3; i++) {
+    const prevMonthIndex = (currentMonthNum - 1 - i + 12) % 12;
+    prevMonths.push(months[prevMonthIndex]);
+  }
+  
+  // Current month
+  const currentMonthKey = months[currentMonthNum - 1];
+  
+  return {
+    currentMonth: {
+      total: (shop as any)[`${currentMonthKey}Total`] || shop.total,
+      eightPM: (shop as any)[`${currentMonthKey}EightPM`] || shop.eightPM,
+      verve: (shop as any)[`${currentMonthKey}Verve`] || shop.verve
+    },
+    previousMonths: prevMonths.map(month => ({
+      month,
+      total: (shop as any)[`${month}Total`] || 0,
+      eightPM: (shop as any)[`${month}EightPM`] || 0,
+      verve: (shop as any)[`${month}Verve`] || 0
+    }))
+  };
+};
+
 // ==========================================
 // MAIN COMPONENT
 // ==========================================
@@ -140,7 +173,7 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
   const salesmen = [...new Set(data.allShopsComparison.map(shop => shop.salesman))].sort();
 
   // ==========================================
-  // INTERNAL EXPORT FUNCTION
+  // 🔧 FIXED: DYNAMIC EXPORT FUNCTION
   // ==========================================
 
   const exportTopShopsToCSV = async () => {
@@ -149,8 +182,15 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
     try {
       let csvContent = "data:text/csv;charset=utf-8,";
       csvContent += `Radico Top Shops Detailed Analysis Report - ${new Date().toLocaleDateString()}\n`;
-      csvContent += `Report Period: Mar-Apr-May-${getShortMonthName(data.currentMonth)} ${data.currentYear}\n`;
-      csvContent += `Sorted by: 3-Month Average Performance (Mar-Apr-May)\n`;
+      
+      // 🔧 FIXED: Dynamic month period description
+      const currentMonthNum = parseInt(data.currentMonth);
+      const prevMonth3 = getShortMonthName(((currentMonthNum - 3 + 12) % 12 + 1).toString().padStart(2, '0'));
+      const prevMonth2 = getShortMonthName(((currentMonthNum - 2 + 12) % 12 + 1).toString().padStart(2, '0'));
+      const prevMonth1 = getShortMonthName(((currentMonthNum - 1 + 12) % 12 + 1).toString().padStart(2, '0'));
+      
+      csvContent += `Report Period: ${prevMonth3}-${prevMonth2}-${prevMonth1}-${getShortMonthName(data.currentMonth)} ${data.currentYear}\n`;
+      csvContent += `Sorted by: 3-Month Average Performance (${prevMonth3}-${prevMonth2}-${prevMonth1})\n`;
       
       if (filters.department || filters.salesman || filters.searchText || filters.minCases || filters.performanceTrend) {
         csvContent += "APPLIED FILTERS: ";
@@ -168,11 +208,15 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
       csvContent += "Filtered Shops," + filteredShops.length + "\n";
       csvContent += "Top 3-Month Avg," + (filteredShops[0]?.threeMonthAvgTotal?.toFixed(1) || 0) + " cases\n\n";
       
-      csvContent += `DETAILED SHOP ANALYSIS (Mar-Apr-May-${getShortMonthName(data.currentMonth)} ${data.currentYear})\n`;
-      csvContent += `Rank,Shop Name,Department,Salesman,Mar Total,Mar 8PM,Mar VERVE,Apr Total,Apr 8PM,Apr VERVE,May Total,May 8PM,May VERVE,${getShortMonthName(data.currentMonth)} Total,${getShortMonthName(data.currentMonth)} 8PM,${getShortMonthName(data.currentMonth)} VERVE,3M Avg Total,3M Avg 8PM,3M Avg VERVE,Growth %,YoY Growth %,Monthly Trend\n`;
+      // 🔧 FIXED: Dynamic month headers
+      csvContent += `DETAILED SHOP ANALYSIS (${prevMonth3}-${prevMonth2}-${prevMonth1}-${getShortMonthName(data.currentMonth)} ${data.currentYear})\n`;
+      csvContent += `Rank,Shop Name,Department,Salesman,${prevMonth3} Total,${prevMonth3} 8PM,${prevMonth3} VERVE,${prevMonth2} Total,${prevMonth2} 8PM,${prevMonth2} VERVE,${prevMonth1} Total,${prevMonth1} 8PM,${prevMonth1} VERVE,${getShortMonthName(data.currentMonth)} Total,${getShortMonthName(data.currentMonth)} 8PM,${getShortMonthName(data.currentMonth)} VERVE,3M Avg Total,3M Avg 8PM,3M Avg VERVE,Growth %,YoY Growth %,Monthly Trend\n`;
       
       filteredShops.forEach((shop, index) => {
-        csvContent += `${index + 1},"${shop.shopName}","${shop.department}","${shop.salesman}",${shop.marchTotal || 0},${shop.marchEightPM || 0},${shop.marchVerve || 0},${shop.aprilTotal || 0},${shop.aprilEightPM || 0},${shop.aprilVerve || 0},${shop.mayTotal || 0},${shop.mayEightPM || 0},${shop.mayVerve || 0},${shop.juneTotal || shop.total},${shop.juneEightPM || shop.eightPM},${shop.juneVerve || shop.verve},${shop.threeMonthAvgTotal?.toFixed(1) || 0},${shop.threeMonthAvg8PM?.toFixed(1) || 0},${shop.threeMonthAvgVERVE?.toFixed(1) || 0},${shop.growthPercent?.toFixed(1) || 0}%,${shop.yoyGrowthPercent?.toFixed(1) || 0}%,"${shop.monthlyTrend || 'stable'}"\n`;
+        const monthFields = getDynamicMonthFields(data.currentMonth, shop);
+        const prevMonths = monthFields.previousMonths.reverse(); // Reverse to get oldest to newest
+        
+        csvContent += `${index + 1},"${shop.shopName}","${shop.department}","${shop.salesman}",${prevMonths[0]?.total || 0},${prevMonths[0]?.eightPM || 0},${prevMonths[0]?.verve || 0},${prevMonths[1]?.total || 0},${prevMonths[1]?.eightPM || 0},${prevMonths[1]?.verve || 0},${prevMonths[2]?.total || 0},${prevMonths[2]?.eightPM || 0},${prevMonths[2]?.verve || 0},${monthFields.currentMonth.total},${monthFields.currentMonth.eightPM},${monthFields.currentMonth.verve},${shop.threeMonthAvgTotal?.toFixed(1) || 0},${shop.threeMonthAvg8PM?.toFixed(1) || 0},${shop.threeMonthAvgVERVE?.toFixed(1) || 0},${shop.growthPercent?.toFixed(1) || 0}%,${shop.yoyGrowthPercent?.toFixed(1) || 0}%,"${shop.monthlyTrend || 'stable'}"\n`;
       });
 
       const encodedUri = encodeURI(csvContent);
@@ -189,91 +233,90 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
   };
 
   // ==========================================
-  // MOBILE CARD COMPONENT
+  // 🔧 FIXED: MOBILE CARD COMPONENT WITH DYNAMIC MONTHS
   // ==========================================
 
-  const MobileShopCard = ({ shop, index }: { shop: ShopData, index: number }) => (
-    <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
-      <div className="flex justify-between items-start mb-3">
-        <div className="flex-1">
-          <div className="flex items-center mb-1">
-            <span className="text-lg font-bold text-gray-900 mr-2">#{startIndex + index + 1}</span>
-            {startIndex + index < 3 && (
-              <span>
-                {startIndex + index === 0 && '🥇'}
-                {startIndex + index === 1 && '🥈'}
-                {startIndex + index === 2 && '🥉'}
-              </span>
-            )}
+  const MobileShopCard = ({ shop, index }: { shop: ShopData, index: number }) => {
+    const monthFields = getDynamicMonthFields(data.currentMonth, shop);
+    const prevMonths = monthFields.previousMonths.reverse(); // Reverse to get oldest to newest
+    
+    return (
+      <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
+        <div className="flex justify-between items-start mb-3">
+          <div className="flex-1">
+            <div className="flex items-center mb-1">
+              <span className="text-lg font-bold text-gray-900 mr-2">#{startIndex + index + 1}</span>
+              {startIndex + index < 3 && (
+                <span>
+                  {startIndex + index === 0 && '🥇'}
+                  {startIndex + index === 1 && '🥈'}
+                  {startIndex + index === 2 && '🥉'}
+                </span>
+              )}
+            </div>
+            <h3 className="font-medium text-gray-900 text-sm">{shop.shopName}</h3>
+            <p className="text-xs text-gray-500">{shop.department} • {shop.salesman}</p>
           </div>
-          <h3 className="font-medium text-gray-900 text-sm">{shop.shopName}</h3>
-          <p className="text-xs text-gray-500">{shop.department} • {shop.salesman}</p>
+          <div className="text-right">
+            <div className="text-lg font-bold text-blue-600">{shop.threeMonthAvgTotal?.toFixed(1) || '0.0'}</div>
+            <div className="text-xs text-gray-500">3M Avg</div>
+          </div>
         </div>
-        <div className="text-right">
-          <div className="text-lg font-bold text-blue-600">{shop.threeMonthAvgTotal?.toFixed(1) || '0.0'}</div>
-          <div className="text-xs text-gray-500">3M Avg</div>
+        
+        {/* Current Month Performance */}
+        <div className="grid grid-cols-3 gap-3 mb-3 p-3 bg-red-50 rounded-lg">
+          <div className="text-center">
+            <div className="text-sm font-bold text-gray-900">{monthFields.currentMonth.total.toLocaleString()}</div>
+            <div className="text-xs text-gray-500">{getShortMonthName(data.currentMonth)} Total</div>
+          </div>
+          <div className="text-center">
+            <div className="text-sm font-bold text-purple-600">{monthFields.currentMonth.eightPM.toLocaleString()}</div>
+            <div className="text-xs text-gray-500">8PM</div>
+          </div>
+          <div className="text-center">
+            <div className="text-sm font-bold text-orange-600">{monthFields.currentMonth.verve.toLocaleString()}</div>
+            <div className="text-xs text-gray-500">VERVE</div>
+          </div>
         </div>
-      </div>
-      
-      {/* Current Month Performance */}
-      <div className="grid grid-cols-3 gap-3 mb-3 p-3 bg-red-50 rounded-lg">
-        <div className="text-center">
-          <div className="text-sm font-bold text-gray-900">{shop.juneTotal?.toLocaleString() || shop.total.toLocaleString()}</div>
-          <div className="text-xs text-gray-500">{getShortMonthName(data.currentMonth)} Total</div>
-        </div>
-        <div className="text-center">
-          <div className="text-sm font-bold text-purple-600">{shop.juneEightPM?.toLocaleString() || shop.eightPM.toLocaleString()}</div>
-          <div className="text-xs text-gray-500">8PM</div>
-        </div>
-        <div className="text-center">
-          <div className="text-sm font-bold text-orange-600">{shop.juneVerve?.toLocaleString() || shop.verve.toLocaleString()}</div>
-          <div className="text-xs text-gray-500">VERVE</div>
-        </div>
-      </div>
 
-      {/* Historical Performance */}
-      <div className="grid grid-cols-3 gap-3 mb-3">
-        <div className="text-center p-2 bg-blue-50 rounded">
-          <div className="text-sm font-medium text-gray-900">{shop.marchTotal?.toLocaleString() || 0}</div>
-          <div className="text-xs text-gray-500">Mar</div>
+        {/* Historical Performance */}
+        <div className="grid grid-cols-3 gap-3 mb-3">
+          {prevMonths.map((monthData, idx) => (
+            <div key={idx} className="text-center p-2 bg-blue-50 rounded">
+              <div className="text-sm font-medium text-gray-900">{monthData.total.toLocaleString()}</div>
+              <div className="text-xs text-gray-500">{monthData.month.charAt(0).toUpperCase() + monthData.month.slice(1, 3)}</div>
+            </div>
+          ))}
         </div>
-        <div className="text-center p-2 bg-green-50 rounded">
-          <div className="text-sm font-medium text-gray-900">{shop.aprilTotal?.toLocaleString() || 0}</div>
-          <div className="text-xs text-gray-500">Apr</div>
-        </div>
-        <div className="text-center p-2 bg-yellow-50 rounded">
-          <div className="text-sm font-medium text-gray-900">{shop.mayTotal?.toLocaleString() || 0}</div>
-          <div className="text-xs text-gray-500">May</div>
-        </div>
-      </div>
 
-      {/* Growth Metrics */}
-      <div className="flex justify-between items-center">
-        <div className="flex space-x-2">
+        {/* Growth Metrics */}
+        <div className="flex justify-between items-center">
+          <div className="flex space-x-2">
+            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+              (shop.growthPercent || 0) > 0 ? 'bg-green-100 text-green-800' : 
+              (shop.growthPercent || 0) < 0 ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
+            }`}>
+              {shop.growthPercent?.toFixed(1) || 0}%
+            </span>
+            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+              (shop.yoyGrowthPercent || 0) > 0 ? 'bg-blue-100 text-blue-800' : 
+              (shop.yoyGrowthPercent || 0) < 0 ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
+            }`}>
+              YoY: {shop.yoyGrowthPercent?.toFixed(1) || 0}%
+            </span>
+          </div>
           <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-            (shop.growthPercent || 0) > 0 ? 'bg-green-100 text-green-800' : 
-            (shop.growthPercent || 0) < 0 ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
+            shop.monthlyTrend === 'improving' ? 'bg-green-100 text-green-800' :
+            shop.monthlyTrend === 'declining' ? 'bg-red-100 text-red-800' :
+            shop.monthlyTrend === 'new' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
           }`}>
-            {shop.growthPercent?.toFixed(1) || 0}%
-          </span>
-          <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-            (shop.yoyGrowthPercent || 0) > 0 ? 'bg-blue-100 text-blue-800' : 
-            (shop.yoyGrowthPercent || 0) < 0 ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-800'
-          }`}>
-            YoY: {shop.yoyGrowthPercent?.toFixed(1) || 0}%
+            {shop.monthlyTrend === 'improving' ? '📈' : shop.monthlyTrend === 'declining' ? '📉' : 
+             shop.monthlyTrend === 'new' ? '✨' : '➡️'}
           </span>
         </div>
-        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-          shop.monthlyTrend === 'improving' ? 'bg-green-100 text-green-800' :
-          shop.monthlyTrend === 'declining' ? 'bg-red-100 text-red-800' :
-          shop.monthlyTrend === 'new' ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
-        }`}>
-          {shop.monthlyTrend === 'improving' ? '📈' : shop.monthlyTrend === 'declining' ? '📉' : 
-           shop.monthlyTrend === 'new' ? '✨' : '➡️'}
-        </span>
       </div>
-    </div>
-  );
+    );
+  };
 
   // ==========================================
   // RENDER
@@ -298,7 +341,7 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
           <div className="text-xl sm:text-2xl font-bold text-green-600">
             {filteredShops[0]?.threeMonthAvgTotal?.toFixed(1) || 0}
           </div>
-          <div className="text-xs sm:text-sm text-gray-500">Cases (Mar-May)</div>
+          <div className="text-xs sm:text-sm text-gray-500">Cases (3-Month Avg)</div>
         </div>
         
         <div className="bg-white p-3 sm:p-6 rounded-lg shadow">
@@ -414,7 +457,7 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
               Top Shops - Mobile View
             </h3>
             <p className="text-sm text-gray-500">
-              Ranked by 3-month average (Mar-Apr-May {data.currentYear})
+              Ranked by 3-month average performance
             </p>
           </div>
           
@@ -454,15 +497,15 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-      {/* Desktop View - Enhanced Table */}
+      {/* 🔧 FIXED: Desktop View - Enhanced Table with Dynamic Months */}
       <div className="hidden lg:block bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900">
-            Detailed Shop Performance Analysis - Ranked by 3-Month Average (Mar-Apr-May {data.currentYear})
+            Detailed Shop Performance Analysis - Ranked by 3-Month Average
           </h3>
           <p className="text-sm text-gray-500">
             Complete brand breakdown for each month with 3-month averages and growth trends. 
-            Sorted by highest 3-month average performance (Mar-Apr-May only).
+            Sorted by highest 3-month average performance.
           </p>
         </div>
         
@@ -481,49 +524,49 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
                   Department
                 </th>
                 
-                {/* March columns */}
-                <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-blue-50 border-l border-r">
-                  Mar Total
-                </th>
-                <th className="px-3 py-3 text-center text-xs font-medium text-purple-500 uppercase tracking-wider bg-blue-50">
-                  Mar 8PM
-                </th>
-                <th className="px-3 py-3 text-center text-xs font-medium text-orange-500 uppercase tracking-wider bg-blue-50 border-r">
-                  Mar VERVE
-                </th>
-                
-                {/* April columns */}
-                <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-green-50 border-l border-r">
-                  Apr Total
-                </th>
-                <th className="px-3 py-3 text-center text-xs font-medium text-purple-500 uppercase tracking-wider bg-green-50">
-                  Apr 8PM
-                </th>
-                <th className="px-3 py-3 text-center text-xs font-medium text-orange-500 uppercase tracking-wider bg-green-50 border-r">
-                  Apr VERVE
-                </th>
-                
-                {/* May columns */}
-                <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-yellow-50 border-l border-r">
-                  May Total
-                </th>
-                <th className="px-3 py-3 text-center text-xs font-medium text-purple-500 uppercase tracking-wider bg-yellow-50">
-                  May 8PM
-                </th>
-                <th className="px-3 py-3 text-center text-xs font-medium text-orange-500 uppercase tracking-wider bg-yellow-50 border-r">
-                  May VERVE
-                </th>
-                
-                {/* June columns */}
-                <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-red-50 border-l border-r">
-                  {getShortMonthName(data.currentMonth)} Total
-                </th>
-                <th className="px-3 py-3 text-center text-xs font-medium text-purple-500 uppercase tracking-wider bg-red-50">
-                  {getShortMonthName(data.currentMonth)} 8PM
-                </th>
-                <th className="px-3 py-3 text-center text-xs font-medium text-orange-500 uppercase tracking-wider bg-red-50 border-r">
-                  {getShortMonthName(data.currentMonth)} VERVE
-                </th>
+                {/* 🔧 FIXED: Dynamic month columns */}
+                {(() => {
+                  const currentMonthNum = parseInt(data.currentMonth);
+                  const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                  const colors = ['bg-blue-50', 'bg-green-50', 'bg-yellow-50', 'bg-red-50'];
+                  
+                  const headers = [];
+                  
+                  // Previous 3 months
+                  for (let i = 3; i >= 1; i--) {
+                    const monthIndex = (currentMonthNum - 1 - i + 12) % 12;
+                    const monthName = monthNames[monthIndex];
+                    const colorClass = colors[3 - i];
+                    
+                    headers.push(
+                      <th key={`prev-${i}-total`} className={`px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider ${colorClass} border-l border-r`}>
+                        {monthName} Total
+                      </th>,
+                      <th key={`prev-${i}-8pm`} className={`px-3 py-3 text-center text-xs font-medium text-purple-500 uppercase tracking-wider ${colorClass}`}>
+                        {monthName} 8PM
+                      </th>,
+                      <th key={`prev-${i}-verve`} className={`px-3 py-3 text-center text-xs font-medium text-orange-500 uppercase tracking-wider ${colorClass} border-r`}>
+                        {monthName} VERVE
+                      </th>
+                    );
+                  }
+                  
+                  // Current month
+                  const currentMonthName = monthNames[currentMonthNum - 1];
+                  headers.push(
+                    <th key="current-total" className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-red-50 border-l border-r">
+                      {currentMonthName} Total
+                    </th>,
+                    <th key="current-8pm" className="px-3 py-3 text-center text-xs font-medium text-purple-500 uppercase tracking-wider bg-red-50">
+                      {currentMonthName} 8PM
+                    </th>,
+                    <th key="current-verve" className="px-3 py-3 text-center text-xs font-medium text-orange-500 uppercase tracking-wider bg-red-50 border-r">
+                      {currentMonthName} VERVE
+                    </th>
+                  );
+                  
+                  return headers;
+                })()}
                 
                 {/* 3-Month Averages */}
                 <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-purple-50 border-l border-r">
@@ -549,121 +592,111 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {currentShops.map((shop, index) => (
-                <tr key={shop.shopId} className={`hover:bg-gray-50 ${index < 3 ? 'bg-yellow-50' : ''}`}>
-                  {/* Sticky columns */}
-                  <td className="sticky left-0 z-10 bg-white px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 border-r">
-                    <div className="flex items-center">
-                      {startIndex + index + 1}
-                      {startIndex + index < 3 && (
-                        <span className="ml-2">
-                          {startIndex + index === 0 && '🥇'}
-                          {startIndex + index === 1 && '🥈'}
-                          {startIndex + index === 2 && '🥉'}
-                        </span>
-                      )}
-                    </div>
-                  </td>
-                  <td className="sticky left-12 z-10 bg-white px-3 py-4 text-sm text-gray-900 border-r min-w-48">
-                    <div className="max-w-xs truncate font-medium">{shop.shopName}</div>
-                    <div className="text-xs text-gray-500 truncate">{shop.salesman}</div>
-                  </td>
-                  <td className="sticky left-60 z-10 bg-white px-3 py-4 whitespace-nowrap text-sm text-gray-900 border-r">
-                    {shop.department}
-                  </td>
-                  
-                  {/* March data */}
-                  <td className="px-3 py-4 whitespace-nowrap text-sm text-center font-medium bg-blue-50 border-l border-r">
-                    {shop.marchTotal?.toLocaleString() || 0}
-                  </td>
-                  <td className="px-3 py-4 whitespace-nowrap text-sm text-center text-purple-600 bg-blue-50">
-                    {shop.marchEightPM?.toLocaleString() || 0}
-                  </td>
-                  <td className="px-3 py-4 whitespace-nowrap text-sm text-center text-orange-600 bg-blue-50 border-r">
-                    {shop.marchVerve?.toLocaleString() || 0}
-                  </td>
-                  
-                  {/* April data */}
-                  <td className="px-3 py-4 whitespace-nowrap text-sm text-center font-medium bg-green-50 border-l border-r">
-                    {shop.aprilTotal?.toLocaleString() || 0}
-                  </td>
-                  <td className="px-3 py-4 whitespace-nowrap text-sm text-center text-purple-600 bg-green-50">
-                    {shop.aprilEightPM?.toLocaleString() || 0}
-                  </td>
-                  <td className="px-3 py-4 whitespace-nowrap text-sm text-center text-orange-600 bg-green-50 border-r">
-                    {shop.aprilVerve?.toLocaleString() || 0}
-                  </td>
-                  
-                  {/* May data */}
-                  <td className="px-3 py-4 whitespace-nowrap text-sm text-center font-medium bg-yellow-50 border-l border-r">
-                    {shop.mayTotal?.toLocaleString() || 0}
-                  </td>
-                  <td className="px-3 py-4 whitespace-nowrap text-sm text-center text-purple-600 bg-yellow-50">
-                    {shop.mayEightPM?.toLocaleString() || 0}
-                  </td>
-                  <td className="px-3 py-4 whitespace-nowrap text-sm text-center text-orange-600 bg-yellow-50 border-r">
-                    {shop.mayVerve?.toLocaleString() || 0}
-                  </td>
-                  
-                  {/* June data */}
-                  <td className="px-3 py-4 whitespace-nowrap text-sm text-center font-bold bg-red-50 border-l border-r">
-                    {shop.juneTotal?.toLocaleString() || shop.total.toLocaleString()}
-                  </td>
-                  <td className="px-3 py-4 whitespace-nowrap text-sm text-center text-purple-600 font-bold bg-red-50">
-                    {shop.juneEightPM?.toLocaleString() || shop.eightPM.toLocaleString()}
-                  </td>
-                  <td className="px-3 py-4 whitespace-nowrap text-sm text-center text-orange-600 font-bold bg-red-50 border-r">
-                    {shop.juneVerve?.toLocaleString() || shop.verve.toLocaleString()}
-                  </td>
-                  
-                  {/* 3-Month Averages */}
-                  <td className="px-3 py-4 whitespace-nowrap text-sm text-center font-bold text-blue-600 bg-purple-50 border-l border-r">
-                    {shop.threeMonthAvgTotal?.toFixed(1) || '0.0'}
-                  </td>
-                  <td className="px-3 py-4 whitespace-nowrap text-sm text-center font-bold text-purple-600 bg-purple-50">
-                    {shop.threeMonthAvg8PM?.toFixed(1) || '0.0'}
-                  </td>
-                  <td className="px-3 py-4 whitespace-nowrap text-sm text-center font-bold text-orange-600 bg-purple-50 border-r">
-                    {shop.threeMonthAvgVERVE?.toFixed(1) || '0.0'}
-                  </td>
-                  
-                  {/* Growth metrics */}
-                  <td className="px-3 py-4 whitespace-nowrap text-sm">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      (shop.growthPercent || 0) > 0 
-                        ? 'bg-green-100 text-green-800' 
-                        : (shop.growthPercent || 0) < 0
-                        ? 'bg-red-100 text-red-800'
-                        : 'bg-gray-100 text-gray-800'
-                    }`}>
-                      {shop.growthPercent?.toFixed(1) || 0}%
-                    </span>
-                  </td>
-                  <td className="px-3 py-4 whitespace-nowrap text-sm">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      (shop.yoyGrowthPercent || 0) > 0 
-                        ? 'bg-blue-100 text-blue-800' 
-                        : (shop.yoyGrowthPercent || 0) < 0
-                        ? 'bg-red-100 text-red-800'
-                        : 'bg-gray-100 text-gray-800'
-                    }`}>
-                      {shop.yoyGrowthPercent?.toFixed(1) || 0}%
-                    </span>
-                  </td>
-                  <td className="px-3 py-4 whitespace-nowrap text-sm">
-                    <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                      shop.monthlyTrend === 'improving' ? 'bg-green-100 text-green-800' :
-                      shop.monthlyTrend === 'declining' ? 'bg-red-100 text-red-800' :
-                      shop.monthlyTrend === 'new' ? 'bg-blue-100 text-blue-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {shop.monthlyTrend === 'improving' ? '📈' :
-                       shop.monthlyTrend === 'declining' ? '📉' :
-                       shop.monthlyTrend === 'new' ? '✨' : '➡️'}
-                    </span>
-                  </td>
-                </tr>
-              ))}
+              {currentShops.map((shop, index) => {
+                const monthFields = getDynamicMonthFields(data.currentMonth, shop);
+                const prevMonths = monthFields.previousMonths.reverse(); // Reverse to get oldest to newest
+                
+                return (
+                  <tr key={shop.shopId} className={`hover:bg-gray-50 ${index < 3 ? 'bg-yellow-50' : ''}`}>
+                    {/* Sticky columns */}
+                    <td className="sticky left-0 z-10 bg-white px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 border-r">
+                      <div className="flex items-center">
+                        {startIndex + index + 1}
+                        {startIndex + index < 3 && (
+                          <span className="ml-2">
+                            {startIndex + index === 0 && '🥇'}
+                            {startIndex + index === 1 && '🥈'}
+                            {startIndex + index === 2 && '🥉'}
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="sticky left-12 z-10 bg-white px-3 py-4 text-sm text-gray-900 border-r min-w-48">
+                      <div className="max-w-xs truncate font-medium">{shop.shopName}</div>
+                      <div className="text-xs text-gray-500 truncate">{shop.salesman}</div>
+                    </td>
+                    <td className="sticky left-60 z-10 bg-white px-3 py-4 whitespace-nowrap text-sm text-gray-900 border-r">
+                      {shop.department}
+                    </td>
+                    
+                    {/* 🔧 FIXED: Dynamic month data */}
+                    {prevMonths.map((monthData, monthIndex) => {
+                      const colors = ['bg-blue-50', 'bg-green-50', 'bg-yellow-50'];
+                      const colorClass = colors[monthIndex];
+                      
+                      return [
+                        <td key={`month-${monthIndex}-total`} className={`px-3 py-4 whitespace-nowrap text-sm text-center font-medium ${colorClass} border-l border-r`}>
+                          {monthData.total.toLocaleString()}
+                        </td>,
+                        <td key={`month-${monthIndex}-8pm`} className={`px-3 py-4 whitespace-nowrap text-sm text-center text-purple-600 ${colorClass}`}>
+                          {monthData.eightPM.toLocaleString()}
+                        </td>,
+                        <td key={`month-${monthIndex}-verve`} className={`px-3 py-4 whitespace-nowrap text-sm text-center text-orange-600 ${colorClass} border-r`}>
+                          {monthData.verve.toLocaleString()}
+                        </td>
+                      ];
+                    })}
+                    
+                    {/* Current month data */}
+                    <td className="px-3 py-4 whitespace-nowrap text-sm text-center font-bold bg-red-50 border-l border-r">
+                      {monthFields.currentMonth.total.toLocaleString()}
+                    </td>
+                    <td className="px-3 py-4 whitespace-nowrap text-sm text-center text-purple-600 font-bold bg-red-50">
+                      {monthFields.currentMonth.eightPM.toLocaleString()}
+                    </td>
+                    <td className="px-3 py-4 whitespace-nowrap text-sm text-center text-orange-600 font-bold bg-red-50 border-r">
+                      {monthFields.currentMonth.verve.toLocaleString()}
+                    </td>
+                    
+                    {/* 3-Month Averages */}
+                    <td className="px-3 py-4 whitespace-nowrap text-sm text-center font-bold text-blue-600 bg-purple-50 border-l border-r">
+                      {shop.threeMonthAvgTotal?.toFixed(1) || '0.0'}
+                    </td>
+                    <td className="px-3 py-4 whitespace-nowrap text-sm text-center font-bold text-purple-600 bg-purple-50">
+                      {shop.threeMonthAvg8PM?.toFixed(1) || '0.0'}
+                    </td>
+                    <td className="px-3 py-4 whitespace-nowrap text-sm text-center font-bold text-orange-600 bg-purple-50 border-r">
+                      {shop.threeMonthAvgVERVE?.toFixed(1) || '0.0'}
+                    </td>
+                    
+                    {/* Growth metrics */}
+                    <td className="px-3 py-4 whitespace-nowrap text-sm">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        (shop.growthPercent || 0) > 0 
+                          ? 'bg-green-100 text-green-800' 
+                          : (shop.growthPercent || 0) < 0
+                          ? 'bg-red-100 text-red-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {shop.growthPercent?.toFixed(1) || 0}%
+                      </span>
+                    </td>
+                    <td className="px-3 py-4 whitespace-nowrap text-sm">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        (shop.yoyGrowthPercent || 0) > 0 
+                          ? 'bg-blue-100 text-blue-800' 
+                          : (shop.yoyGrowthPercent || 0) < 0
+                          ? 'bg-red-100 text-red-800'
+                          : 'bg-gray-100 text-gray-800'
+                      }`}>
+                        {shop.yoyGrowthPercent?.toFixed(1) || 0}%
+                      </span>
+                    </td>
+                    <td className="px-3 py-4 whitespace-nowrap text-sm">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        shop.monthlyTrend === 'improving' ? 'bg-green-100 text-green-800' :
+                        shop.monthlyTrend === 'declining' ? 'bg-red-100 text-red-800' :
+                        shop.monthlyTrend === 'new' ? 'bg-blue-100 text-blue-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {shop.monthlyTrend === 'improving' ? '📈' :
+                         shop.monthlyTrend === 'declining' ? '📉' :
+                         shop.monthlyTrend === 'new' ? '✨' : '➡️'}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -708,7 +741,7 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
               <div>• <strong>Card Layout:</strong> Easy mobile browsing</div>
               <div>• <strong>Key Metrics:</strong> 3M avg prominently displayed</div>
               <div>• <strong>Current Performance:</strong> {getMonthName(data.currentMonth)} highlighted</div>
-              <div>• <strong>Historical Trends:</strong> Mar-Apr-May progression</div>
+              <div>• <strong>Historical Trends:</strong> Previous months progression</div>
               <div>• <strong>Growth Indicators:</strong> Visual badges for trends</div>
             </div>
           </div>
@@ -717,19 +750,19 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
             <div className="space-y-1 text-sm">
               <div className="flex items-center space-x-2">
                 <div className="w-4 h-4 bg-blue-100 rounded"></div>
-                <span>March 2025 Data</span>
+                <span>Previous Month -3</span>
               </div>
               <div className="flex items-center space-x-2">
                 <div className="w-4 h-4 bg-green-100 rounded"></div>
-                <span>April 2025 Data</span>
+                <span>Previous Month -2</span>
               </div>
               <div className="flex items-center space-x-2">
                 <div className="w-4 h-4 bg-yellow-100 rounded"></div>
-                <span>May 2025 Data</span>
+                <span>Previous Month -1</span>
               </div>
               <div className="flex items-center space-x-2">
                 <div className="w-4 h-4 bg-red-100 rounded"></div>
-                <span>{getMonthName(data.currentMonth)} 2025 Data</span>
+                <span>{getMonthName(data.currentMonth)} {data.currentYear} (Current)</span>
               </div>
               <div className="flex items-center space-x-2">
                 <div className="w-4 h-4 bg-purple-100 rounded"></div>
@@ -740,8 +773,8 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
           <div className="lg:col-span-2">
             <h4 className="font-medium text-gray-900 mb-2">Key Metrics Explained:</h4>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 text-sm">
-              <div>• <strong>3M Avg Total:</strong> Mar + Apr + May average</div>
-              <div>• <strong>Growth %:</strong> May to {getMonthName(data.currentMonth)} change</div>
+              <div>• <strong>3M Avg Total:</strong> Rolling 3-month average</div>
+              <div>• <strong>Growth %:</strong> Current vs previous month</div>
               <div>• <strong>YoY %:</strong> Year-over-year comparison</div>
               <div>• <strong>Trend Icons:</strong> 📈 ➡️ 📉 ✨ patterns</div>
             </div>
