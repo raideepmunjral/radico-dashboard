@@ -130,42 +130,7 @@ const getPreviousMonthData = (currentMonth: string, currentYear: string, histori
   };
 };
 
-// NEW: Helper function to get previous month for MoM comparison
-const getPreviousMonthData = (currentMonth: string, currentYear: string, historicalData: any) => {
-  const currentMonthNum = parseInt(currentMonth);
-  const currentYearNum = parseInt(currentYear);
-  
-  let prevMonth, prevYear, prevMonthName, prevDataKey;
-  
-  if (currentMonthNum === 1) {
-    // January -> December of previous year
-    prevMonth = 12;
-    prevYear = currentYearNum - 1;
-    prevMonthName = 'December';
-    prevDataKey = 'december2024'; // Assuming we're in 2025
-  } else {
-    // Any other month -> previous month same year
-    prevMonth = currentMonthNum - 1;
-    prevYear = currentYearNum;
-    prevMonthName = getMonthName(prevMonth.toString().padStart(2, '0'));
-    
-    // Map to correct data key
-    const monthKeys = ['', 'january', 'february', 'march', 'april', 'may', 'june', 
-                      'july', 'august', 'september', 'october', 'november', 'december'];
-    prevDataKey = monthKeys[prevMonth];
-  }
-  
-  const prevMonthData = historicalData?.[prevDataKey];
-  
-  return {
-    month: prevMonth,
-    year: prevYear,
-    monthName: prevMonthName,
-    total8PM: prevMonthData?.total8PM || 0,
-    totalVERVE: prevMonthData?.totalVERVE || 0,
-    displayLabel: `${prevMonthName} ${prevYear}`
-  };
-};
+// NEW: Get descriptive period label for ongoing quarter
 const getOngoingQuarterPeriodLabel = (currentMonth: string, currentYear: string) => {
   const monthNum = parseInt(currentMonth);
   
@@ -325,6 +290,19 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
   const coverage8PM = ((shopsWith8PM.length / data.summary.totalShops) * 100).toFixed(1);
   const coverageVERVE = ((shopsWithVERVE.length / data.summary.totalShops) * 100).toFixed(1);
   const crossSellingRate = shopsWithAnyOrder.length > 0 ? ((shopsWithBothBrands.length / shopsWithAnyOrder.length) * 100).toFixed(1) : '0';
+  
+  // Calculate Month-over-Month data for brand performance cards
+  const previousMonthData = getPreviousMonthData(data.currentMonth, data.currentYear, data.historicalData);
+  const mom8PMGrowth = previousMonthData.total8PM > 0 ? 
+    (((data.summary.total8PM - previousMonthData.total8PM) / previousMonthData.total8PM) * 100).toFixed(1) : 
+    data.summary.total8PM > 0 ? '100' : '0';
+  const momVERVEGrowth = previousMonthData.totalVERVE > 0 ? 
+    (((data.summary.totalVERVE - previousMonthData.totalVERVE) / previousMonthData.totalVERVE) * 100).toFixed(1) : 
+    data.summary.totalVERVE > 0 ? '100' : '0';
+  
+  // Average Cases per Shop by Brand
+  const avg8PMPerShop = shopsWith8PM.length > 0 ? (data.summary.total8PM / shopsWith8PM.length).toFixed(1) : '0';
+  const avgVERVEPerShop = shopsWithVERVE.length > 0 ? (data.summary.totalVERVE / shopsWithVERVE.length).toFixed(1) : '0';
   
   // ==========================================
   // ENHANCED QUARTERLY LOGIC: COMPLETED + ONGOING
@@ -533,19 +511,6 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
   const ongoingQGrowth8PM = ongoingQuarter && lastYearOngoingQ_8PM > 0 ? (((ongoingQ_8PM - lastYearOngoingQ_8PM) / lastYearOngoingQ_8PM) * 100).toFixed(1) : '0';
   const ongoingQGrowthVERVE = ongoingQuarter && lastYearOngoingQ_VERVE > 0 ? (((ongoingQ_VERVE - lastYearOngoingQ_VERVE) / lastYearOngoingQ_VERVE) * 100).toFixed(1) : '0';
   const ongoingQGrowthTotal = ongoingQuarter && lastYearOngoingQ_Total > 0 ? (((ongoingQ_Total - lastYearOngoingQ_Total) / lastYearOngoingQ_Total) * 100).toFixed(1) : '0';
-  
-  // Calculate Month-over-Month data for brand performance cards
-  const previousMonthData = getPreviousMonthData(data.currentMonth, data.currentYear, data.historicalData);
-  const mom8PMGrowth = previousMonthData.total8PM > 0 ? 
-    (((data.summary.total8PM - previousMonthData.total8PM) / previousMonthData.total8PM) * 100).toFixed(1) : 
-    data.summary.total8PM > 0 ? '100' : '0';
-  const momVERVEGrowth = previousMonthData.totalVERVE > 0 ? 
-    (((data.summary.totalVERVE - previousMonthData.totalVERVE) / previousMonthData.totalVERVE) * 100).toFixed(1) : 
-    data.summary.totalVERVE > 0 ? '100' : '0';
-  
-  // Average Cases per Shop by Brand
-  const avg8PMPerShop = shopsWith8PM.length > 0 ? (data.summary.total8PM / shopsWith8PM.length).toFixed(1) : '0';
-  const avgVERVEPerShop = shopsWithVERVE.length > 0 ? (data.summary.totalVERVE / shopsWithVERVE.length).toFixed(1) : '0';
   
   // Sales Velocity (current month vs PREVIOUS completed quarter average)
   const getPreviousQuarter = (quarter: string) => {
@@ -867,7 +832,6 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
                 {completedQuarter === 'Q4' && <div className="text-xs text-purple-600 font-medium">✅ Latest Complete</div>}
               </div>
             </div>
-
           </div>
         </div>
       </div>
