@@ -23,6 +23,9 @@ const nextConfig = {
     
     // 📋 NEW: Submission Tracking Sheet ID
     NEXT_PUBLIC_SUBMISSION_SHEET_ID: '1M1efTPrPwvpY2nRbkGms5171vT5PXf1zoB2NRRM5m5E',
+    
+    // 🎯 NEW: Focus Shops Dynamic Configuration Sheet ID
+    NEXT_PUBLIC_FOCUS_SHOPS_SHEET_ID: '1_e0IIGNvQkixUyVuy-T_bPCV0EUzQ3EnoCdY81aNXWw',
   },
   // Suppress build warnings for better performance
   typescript: {
