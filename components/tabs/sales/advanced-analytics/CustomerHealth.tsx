@@ -117,7 +117,7 @@ interface AnalyzedShop extends ShopData {
 }
 
 // ==========================================
-// HELPER FUNCTIONS (UNCHANGED)
+// 🔧 NEW: FUTURE-READY HELPER FUNCTIONS
 // ==========================================
 
 const getMonthName = (monthNum: string) => {
@@ -128,6 +128,62 @@ const getMonthName = (monthNum: string) => {
 const getShortMonthName = (monthNum: string) => {
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   return months[parseInt(monthNum) - 1] || 'Unknown';
+};
+
+// 🔧 NEW: Dynamic month calculation with year handling
+const getPreviousMonth = (currentMonth: string, currentYear: string): { month: string; year: string; name: string } => {
+  const monthNum = parseInt(currentMonth);
+  const yearNum = parseInt(currentYear);
+  
+  if (monthNum === 1) {
+    // January -> Previous December
+    return {
+      month: '12',
+      year: (yearNum - 1).toString(),
+      name: 'December'
+    };
+  } else {
+    // Any other month -> Previous month same year
+    const prevMonth = (monthNum - 1).toString().padStart(2, '0');
+    return {
+      month: prevMonth,
+      year: currentYear,
+      name: getMonthName(prevMonth)
+    };
+  }
+};
+
+// 🔧 NEW: Get month key for data access
+const getMonthKey = (monthNum: string): string => {
+  const monthKeys: Record<string, string> = {
+    '01': 'january',
+    '02': 'february', 
+    '03': 'march',
+    '04': 'april',
+    '05': 'may',
+    '06': 'june',
+    '07': 'july',
+    '08': 'august',
+    '09': 'september',
+    '10': 'october',
+    '11': 'november',
+    '12': 'december'
+  };
+  return monthKeys[monthNum] || 'unknown';
+};
+
+// 🔧 NEW: Get brand-specific value for any month (DYNAMIC)
+const getBrandValue = (shop: ShopData, monthKey: string, brand: 'all' | '8PM' | 'VERVE'): number => {
+  if (brand === '8PM') {
+    const key = `${monthKey}EightPM` as keyof ShopData;
+    return (shop[key] as number) || 0;
+  } else if (brand === 'VERVE') {
+    const key = `${monthKey}Verve` as keyof ShopData;
+    return (shop[key] as number) || 0;
+  } else {
+    const key = `${monthKey}Total` as keyof ShopData;
+    return (shop[key] as number) || 0;
+  }
 };
 
 const formatDate = (monthNum: string, year: string) => {
@@ -160,21 +216,58 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
   const [salesmanFilter, setSalesmanFilter] = useState('');
 
   // ==========================================
+  // 🔧 NEW: DYNAMIC MONTH CALCULATIONS
+  // ==========================================
+  
+  const currentMonthInfo = useMemo(() => {
+    const currentMonth = data.currentMonth;
+    const currentYear = data.currentYear;
+    const previousMonth = getPreviousMonth(currentMonth, currentYear);
+    
+    return {
+      current: {
+        month: currentMonth,
+        year: currentYear,
+        name: getMonthName(currentMonth),
+        key: getMonthKey(currentMonth)
+      },
+      previous: {
+        month: previousMonth.month,
+        year: previousMonth.year, 
+        name: previousMonth.name,
+        key: getMonthKey(previousMonth.month)
+      }
+    };
+  }, [data.currentMonth, data.currentYear]);
+
+  console.log('🔧 DYNAMIC MONTH CALCULATION:', {
+    current: currentMonthInfo.current,
+    previous: currentMonthInfo.previous,
+    dynamicLabel: `Ordered in ${currentMonthInfo.previous.name}, not ${currentMonthInfo.current.name}`
+  });
+
+  // ==========================================
   // ENHANCED DATA PROCESSING WITH COMPLETE HISTORICAL SCANNING + QUARTERLY PERFORMANCE
   // ==========================================
 
   const analyzedShops = useMemo((): AnalyzedShop[] => {
-    console.log('🔍 ENHANCED CUSTOMER HEALTH: Processing shops with complete historical data...');
+    console.log('🔍 ENHANCED CUSTOMER HEALTH: Processing shops with FUTURE-READY logic...', {
+      currentMonth: currentMonthInfo.current.name,
+      previousMonth: currentMonthInfo.previous.name,
+      unbilledLabel: `Ordered in ${currentMonthInfo.previous.name}, not ${currentMonthInfo.current.name}`
+    });
     
     return data.allShopsComparison.map(shop => {
-      // ENHANCED: Define ALL available months in chronological order (most recent first)
+      // 🔧 NEW: Define ALL available months in chronological order (most recent first)
+      // This creates a dynamic timeline based on current month
       const availableMonths = [
-        { key: 'june', month: '06', year: data.currentYear, label: 'June' },
+        { key: currentMonthInfo.current.key, month: currentMonthInfo.current.month, year: currentMonthInfo.current.year, label: currentMonthInfo.current.name },
+        { key: currentMonthInfo.previous.key, month: currentMonthInfo.previous.month, year: currentMonthInfo.previous.year, label: currentMonthInfo.previous.name },
+        
+        // Extended historical months (always available)
         { key: 'may', month: '05', year: data.currentYear, label: 'May' },
         { key: 'april', month: '04', year: data.currentYear, label: 'April' },
         { key: 'march', month: '03', year: data.currentYear, label: 'March' },
-        
-        // NEW: Now available from enhanced main dashboard!
         { key: 'february', month: '02', year: data.currentYear, label: 'February' },
         { key: 'january', month: '01', year: data.currentYear, label: 'January' },
         { key: 'december', month: '12', year: '2024', label: 'December' },
@@ -185,21 +278,7 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
         { key: 'july', month: '07', year: '2024', label: 'July' }
       ];
 
-      // ENHANCED: Helper function to get brand-specific value for any month
-      const getBrandValue = (monthKey: string, brand: 'all' | '8PM' | 'VERVE') => {
-        if (brand === '8PM') {
-          const key = `${monthKey}EightPM` as keyof ShopData;
-          return (shop[key] as number) || 0;
-        } else if (brand === 'VERVE') {
-          const key = `${monthKey}Verve` as keyof ShopData;
-          return (shop[key] as number) || 0;
-        } else {
-          const key = `${monthKey}Total` as keyof ShopData;
-          return (shop[key] as number) || 0;
-        }
-      };
-
-      // ENHANCED: Find ACTUAL last order date by scanning ALL available months
+      // 🔧 NEW: Find ACTUAL last order date by scanning ALL available months dynamically
       let lastOrderDate = '';
       let lastOrderMonth = '';
       let daysSinceLastOrder = 999;
@@ -208,7 +287,7 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
 
       // Scan through all months from most recent to oldest
       for (const monthData of availableMonths) {
-        const monthValue = getBrandValue(monthData.key, activeBrand);
+        const monthValue = getBrandValue(shop, monthData.key, activeBrand);
         
         if (monthValue > 0 && !foundLastOrder) {
           lastOrderDate = formatDate(monthData.month, monthData.year);
@@ -216,15 +295,15 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
           daysSinceLastOrder = calculateDaysBetween(monthData.month, monthData.year, data.currentMonth, data.currentYear);
           foundLastOrder = true;
 
-          // Determine customer status based on how recent the last order was
-          if (monthData.key === 'june' && monthData.year === data.currentYear) {
+          // 🔧 FIXED: DYNAMIC customer status determination
+          if (monthData.key === currentMonthInfo.current.key) {
             customerStatus = 'active';
-          } else if (monthData.key === 'may' && monthData.year === data.currentYear) {
-            customerStatus = 'unbilled';
+          } else if (monthData.key === currentMonthInfo.previous.key) {
+            customerStatus = 'unbilled'; // ✅ DYNAMIC: Previous month = unbilled
           } else if (daysSinceLastOrder <= 90) {
             customerStatus = 'at-risk';
           } else {
-            customerStatus = 'lost';
+            customerStatus = 'lost'; // ✅ ALL OLDER MONTHS = LOST
           }
           
           break; // Found the most recent order, stop searching
@@ -245,17 +324,17 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
       else if (daysSinceLastOrder > 30) riskLevel = 'medium';
 
       // SIMPLIFIED QUARTERLY PERFORMANCE (using available data)
-      const currentJune = getBrandValue('june', activeBrand);
-      const currentMay = getBrandValue('may', activeBrand);
-      const currentApril = getBrandValue('april', activeBrand);
+      const currentJune = getBrandValue(shop, 'june', activeBrand);
+      const currentMay = getBrandValue(shop, 'may', activeBrand);
+      const currentApril = getBrandValue(shop, 'april', activeBrand);
       
       // Current Quarter: Q1 FY2025 (Apr-May-Jun 2025) - use current 3 months
       const q1FY2025 = currentApril + currentMay + currentJune;
       
       // Previous Quarter: Use Q4 data if available, otherwise use Q1 average as fallback
-      const currentMarch = getBrandValue('march', activeBrand);
-      const currentFebruary = getBrandValue('february', activeBrand);
-      const currentJanuary = getBrandValue('january', activeBrand);
+      const currentMarch = getBrandValue(shop, 'march', activeBrand);
+      const currentFebruary = getBrandValue(shop, 'february', activeBrand);
+      const currentJanuary = getBrandValue(shop, 'january', activeBrand);
       const q4FY2024 = currentJanuary + currentFebruary + currentMarch;
       
       // Year-over-Year Quarter: Q1 FY2024 - use last year June data
@@ -288,17 +367,17 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
       const q2Current = currentJune;
       const quarterlyDecline = q1Average > 0 ? ((q1Average - q2Current) / q1Average) * 100 : 0;
 
-      // DEBUG: Log some quarterly calculations for first few shops
+      // DEBUG: Log dynamic segmentation for first few shops
       if (data.allShopsComparison.indexOf(shop) < 3) {
-        console.log(`🔍 QUARTERLY CALC for "${shop.shopName}":`, {
-          q1FY2024: q1FY2024,
-          q1FY2025: q1FY2025,
-          q4FY2024: q4FY2024,
-          yoyGrowth: isNewCustomer ? 'NEW CUSTOMER' : yoyGrowth.toFixed(1) + '%',
-          qoqGrowth: qoqGrowth.toFixed(1) + '%',
-          isNewCustomer: isNewCustomer,
+        console.log(`🔧 DYNAMIC SEGMENTATION for "${shop.shopName}":`, {
+          currentMonth: currentMonthInfo.current.name,
+          previousMonth: currentMonthInfo.previous.name,
           customerStatus: customerStatus,
-          daysSinceLastOrder: daysSinceLastOrder
+          lastOrderDate: lastOrderDate,
+          daysSinceLastOrder: daysSinceLastOrder,
+          dynamicLogic: customerStatus === 'unbilled' ? `✅ UNBILLED: Ordered in ${currentMonthInfo.previous.name}, not ${currentMonthInfo.current.name}` : 
+                       customerStatus === 'lost' ? '🚨 LOST: 2+ months ago' : 
+                       customerStatus
         });
       }
 
@@ -319,16 +398,16 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
         isNewCustomer: isNewCustomer
       };
     });
-  }, [data, activeBrand]);
+  }, [data, activeBrand, currentMonthInfo]);
 
   // ==========================================
-  // COMPUTED METRICS (ENHANCED)
+  // 🔧 FIXED: DYNAMIC COMPUTED METRICS
   // ==========================================
 
   const healthMetrics = useMemo((): CustomerHealthMetrics => {
     const unbilled = analyzedShops.filter(s => s.customerStatus === 'unbilled').length;
     
-    // ENHANCED: More granular lost customer categorization
+    // 🔧 FIXED: Dynamic lost customer categorization based on current month
     const lost2Months = analyzedShops.filter(s => s.daysSinceLastOrder! >= 60 && s.daysSinceLastOrder! < 90).length;
     const lost3Months = analyzedShops.filter(s => s.daysSinceLastOrder! >= 90 && s.daysSinceLastOrder! < 120).length;
     const lost4Months = analyzedShops.filter(s => s.daysSinceLastOrder! >= 120 && s.daysSinceLastOrder! < 150).length;
@@ -339,7 +418,10 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
     const quarterlyDeclining = analyzedShops.filter(s => !s.isNewCustomer && (s.yoyGrowth || 0) < -10).length; // YoY decline > 10% (excluding new customers)
     const quarterlyGrowing = analyzedShops.filter(s => s.isNewCustomer || (s.yoyGrowth || 0) > 10).length; // YoY growth > 10% OR new customers
 
-    console.log('📊 ENHANCED CUSTOMER HEALTH METRICS:', {
+    console.log('📊 DYNAMIC CUSTOMER HEALTH METRICS:', {
+      currentMonth: currentMonthInfo.current.name,
+      previousMonth: currentMonthInfo.previous.name,
+      unbilledLabel: `Ordered in ${currentMonthInfo.previous.name}, not ${currentMonthInfo.current.name}`,
       unbilled,
       lost2Months,
       lost3Months,
@@ -363,10 +445,10 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
       quarterlyDeclining,
       quarterlyGrowing
     };
-  }, [analyzedShops]);
+  }, [analyzedShops, currentMonthInfo]);
 
   // ==========================================
-  // FILTERED DATA (ENHANCED)
+  // 🔧 FIXED: DYNAMIC FILTERED DATA
   // ==========================================
 
   const filteredShops = useMemo(() => {
@@ -379,10 +461,10 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
       const matchesDepartment = !departmentFilter || shop.department === departmentFilter;
       const matchesSalesman = !salesmanFilter || shop.salesman === salesmanFilter;
 
-      // Section-specific filtering
+      // Section-specific filtering with DYNAMIC logic
       if (activeSection === 'unbilled') {
         return matchesSearch && matchesDepartment && matchesSalesman && 
-               shop.customerStatus === 'unbilled';
+               shop.customerStatus === 'unbilled'; // ✅ DYNAMIC: Previous month orders
       } else if (activeSection === 'lost') {
         const monthsBack = lookbackMonths * 30;
         // ENHANCED: Include never-ordered customers and lost customers
@@ -410,11 +492,13 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
         return aGrowth - bGrowth; // Most declining first, NEW customers at the end
       });
     } else {
-      filtered.sort((a, b) => (b.mayTotal || 0) - (a.mayTotal || 0));
+      // ✅ DYNAMIC: Sort by previous month total for unbilled section
+      const previousMonthKey = `${currentMonthInfo.previous.key}Total` as keyof ShopData;
+      filtered.sort((a, b) => ((b[previousMonthKey] as number) || 0) - ((a[previousMonthKey] as number) || 0));
     }
 
     return filtered;
-  }, [analyzedShops, searchText, departmentFilter, salesmanFilter, activeSection, lookbackMonths]);
+  }, [analyzedShops, searchText, departmentFilter, salesmanFilter, activeSection, lookbackMonths, currentMonthInfo]);
 
   // Pagination
   const totalPages = Math.ceil(filteredShops.length / itemsPerPage);
@@ -427,24 +511,30 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
   const salesmen = [...new Set(data.allShopsComparison.map(shop => shop.salesman))].sort();
 
   // ==========================================
-  // EXPORT FUNCTION (ENHANCED)
+  // EXPORT FUNCTION (ENHANCED WITH DYNAMIC DATA)
   // ==========================================
 
   const exportToCSV = () => {
     let csvContent = "data:text/csv;charset=utf-8,";
     csvContent += `Radico Customer Health Analysis - ${activeSection.toUpperCase()} - ${new Date().toLocaleDateString()}\n`;
     csvContent += `Brand Filter: ${activeBrand}, Lookback: ${lookbackMonths} months\n`;
+    csvContent += `Current Month: ${currentMonthInfo.current.name} ${currentMonthInfo.current.year}\n`;
+    csvContent += `Previous Month: ${currentMonthInfo.previous.name} ${currentMonthInfo.previous.year}\n`;
     csvContent += `Generated: ${new Date().toLocaleString()}\n\n`;
 
     if (activeSection === 'unbilled') {
-      csvContent += `UNBILLED THIS MONTH (${getMonthName(data.currentMonth)} ${data.currentYear})\n`;
-      csvContent += `Shop Name,Department,Salesman,Last Order (May),Days Since Order,Risk Level\n`;
+      csvContent += `UNBILLED THIS MONTH (${currentMonthInfo.current.name} ${currentMonthInfo.current.year})\n`;
+      csvContent += `Ordered in ${currentMonthInfo.previous.name}, not ${currentMonthInfo.current.name}\n`;
+      csvContent += `Shop Name,Department,Salesman,Last Order (${currentMonthInfo.previous.name}),Days Since Order,Risk Level\n`;
       
       filteredShops.forEach(shop => {
-        csvContent += `"${shop.shopName}","${shop.department}","${shop.salesman}",${shop.mayTotal || 0},${shop.daysSinceLastOrder},"${shop.riskLevel}"\n`;
+        const previousMonthKey = `${currentMonthInfo.previous.key}Total` as keyof ShopData;
+        const previousMonthValue = (shop[previousMonthKey] as number) || 0;
+        csvContent += `"${shop.shopName}","${shop.department}","${shop.salesman}",${previousMonthValue},${shop.daysSinceLastOrder},"${shop.riskLevel}"\n`;
       });
     } else if (activeSection === 'lost') {
       csvContent += `LOST CUSTOMERS ANALYSIS (${lookbackMonths} month lookback)\n`;
+      csvContent += `All customers who ordered in: April, March, February, January, etc. (2+ months ago)\n`;
       csvContent += `Shop Name,Department,Salesman,Last Order Date,Days Since Order,Customer Status,Risk Level\n`;
       
       filteredShops.forEach(shop => {
@@ -463,7 +553,7 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `Customer_Health_${activeSection}_${activeBrand}_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute("download", `Customer_Health_DYNAMIC_${activeSection}_${activeBrand}_${new Date().toISOString().split('T')[0]}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -506,9 +596,13 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
           <div>
             <h2 className="text-xl font-semibold flex items-center mb-2">
               <Heart className="w-6 h-6 mr-2 text-red-500" />
-              Customer Health Intelligence
+              Customer Health Intelligence - FUTURE READY
             </h2>
             <p className="text-gray-600">Enhanced customer lifecycle analysis with complete historical data</p>
+            <div className="mt-2 text-sm text-blue-600">
+              ✅ Current Month: {currentMonthInfo.current.name} {currentMonthInfo.current.year} | 
+              Previous Month: {currentMonthInfo.previous.name} {currentMonthInfo.previous.year}
+            </div>
           </div>
           
           {/* Brand Toggle */}
@@ -531,7 +625,7 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
           </div>
         </div>
 
-        {/* Key Metrics - ENHANCED */}
+        {/* 🔧 FIXED: Dynamic Key Metrics */}
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
           <div className="bg-orange-50 p-4 rounded-lg">
             <div className="flex items-center mb-2">
@@ -539,7 +633,9 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
               <h4 className="font-medium text-orange-800">Unbilled This Month</h4>
             </div>
             <div className="text-2xl font-bold text-orange-600">{healthMetrics.unbilledCount}</div>
-            <p className="text-sm text-orange-600">Ordered in May, not June</p>
+            <p className="text-sm text-orange-600">
+              Ordered in {currentMonthInfo.previous.name}, not {currentMonthInfo.current.name}
+            </p>
           </div>
           
           <div className="bg-red-50 p-4 rounded-lg">
@@ -691,7 +787,7 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Salesman</th>
                 {activeSection === 'unbilled' && (
                   <>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">May Orders</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">{currentMonthInfo.previous.name} Orders</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Days Since</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Risk Level</th>
                   </>
@@ -727,7 +823,11 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
                   {activeSection === 'unbilled' && (
                     <>
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-orange-600">
-                        {shop.mayTotal?.toLocaleString() || 0} cases
+                        {(() => {
+                          const previousMonthKey = `${currentMonthInfo.previous.key}Total` as keyof ShopData;
+                          const value = (shop[previousMonthKey] as number) || 0;
+                          return `${value.toLocaleString()} cases`;
+                        })()}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {shop.daysSinceLastOrder} days
