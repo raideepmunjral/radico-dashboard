@@ -130,7 +130,7 @@ interface TopShopsFilterState {
 }
 
 // ==========================================
-// HELPER FUNCTIONS
+// 🚀 FUTURE-READY 5-MONTH ROLLING WINDOW HELPER FUNCTIONS
 // ==========================================
 
 const getMonthName = (monthNum: string) => {
@@ -143,34 +143,105 @@ const getShortMonthName = (monthNum: string) => {
   return months[parseInt(monthNum) - 1] || 'Unknown';
 };
 
-// 🔧 FIXED: Proper current month data getter - no dynamic fetching
-const getCurrentMonthTotals = (shop: ShopData, currentMonth: string) => {
-  // Return the actual month field data, not dynamic fetching
-  if (currentMonth === '07') {
-    return {
-      total: shop.julyTotal || 0,
-      eightPM: shop.julyEightPM || 0,
-      verve: shop.julyVerve || 0
-    };
-  } else if (currentMonth === '06') {
-    return {
-      total: shop.juneTotal || 0,
-      eightPM: shop.juneEightPM || 0,
-      verve: shop.juneVerve || 0
-    };
-  } else if (currentMonth === '08') {
-    return {
-      total: shop.augustTotal || 0,
-      eightPM: shop.augustEightPM || 0,
-      verve: shop.augustVerve || 0
-    };
+const getMonthKey = (monthNum: string) => {
+  const keys = ['january', 'february', 'march', 'april', 'may', 'june',
+                'july', 'august', 'september', 'october', 'november', 'december'];
+  return keys[parseInt(monthNum) - 1] || 'unknown';
+};
+
+// 🚀 NEW: 5-MONTH ROLLING WINDOW CALCULATION
+const get5MonthRollingWindow = (currentMonth: string, currentYear: string) => {
+  const monthNum = parseInt(currentMonth);
+  const yearNum = parseInt(currentYear);
+  const months = [];
+  
+  // Calculate last 5 months including current
+  for (let i = 4; i >= 0; i--) {
+    let targetMonth = monthNum - i;
+    let targetYear = yearNum;
+    
+    // Handle year rollover
+    while (targetMonth <= 0) {
+      targetMonth += 12;
+      targetYear -= 1;
+    }
+    
+    months.push({
+      month: targetMonth.toString().padStart(2, '0'),
+      shortName: getShortMonthName(targetMonth.toString()),
+      fullName: getMonthName(targetMonth.toString()),
+      year: targetYear.toString(),
+      key: getMonthKey(targetMonth.toString()), // For data access
+      color: getMonthColor(months.length) // For UI coloring
+    });
   }
-  // For other months, fall back to the generic total/eightPM/verve fields
+  
+  return months;
+};
+
+// 🚀 NEW: MONTH COLOR CODING FOR UI
+const getMonthColor = (index: number) => {
+  const colors = [
+    'blue', 'green', 'yellow', 'pink', 'red'
+  ];
+  return colors[index] || 'gray';
+};
+
+// 🚀 NEW: 5-MONTH ROLLING WINDOW LABEL
+const get5MonthRollingLabel = (currentMonth: string, currentYear: string) => {
+  const window = get5MonthRollingWindow(currentMonth, currentYear);
+  return window.map(m => m.shortName).join('-') + ` ${currentYear}`;
+};
+
+// 🚀 NEW: GET SHOP DATA FOR ANY MONTH IN 5-MONTH WINDOW
+const getShopDataForMonth = (shop: any, monthKey: string, dataType: 'total' | 'eightPM' | 'verve' = 'total') => {
+  if (monthKey === 'current') {
+    return shop[dataType] || 0;
+  }
+  
+  // Historical month data
+  let key: string;
+  switch (dataType) {
+    case 'eightPM':
+      key = `${monthKey}EightPM`;
+      break;
+    case 'verve':
+      key = `${monthKey}Verve`;
+      break;
+    default:
+      key = `${monthKey}Total`;
+  }
+  
+  const value = shop[key];
+  return typeof value === 'number' ? value : 0;
+};
+
+// 🚀 NEW: CALCULATE 5-MONTH AVERAGE (Replaces 3-month for ranking)
+const calculate5MonthAverage = (shop: any, rollingWindow: any[]) => {
+  const totals = rollingWindow.map(month => getShopDataForMonth(shop, month.key, 'total'));
+  const eightPMs = rollingWindow.map(month => getShopDataForMonth(shop, month.key, 'eightPM'));
+  const verves = rollingWindow.map(month => getShopDataForMonth(shop, month.key, 'verve'));
+  
+  const validMonths = rollingWindow.length;
+  
   return {
-    total: shop.total || 0,
-    eightPM: shop.eightPM || 0,
-    verve: shop.verve || 0
+    avgTotal: totals.reduce((sum, val) => sum + val, 0) / validMonths,
+    avg8PM: eightPMs.reduce((sum, val) => sum + val, 0) / validMonths,
+    avgVerve: verves.reduce((sum, val) => sum + val, 0) / validMonths
   };
+};
+
+// 🚀 NEW: GET MONTH COLOR CLASSES FOR UI
+const getMonthColorClasses = (color: string) => {
+  const colorMap: Record<string, { bg: string; border: string; text: string }> = {
+    blue: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-600' },
+    green: { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-600' },
+    yellow: { bg: 'bg-yellow-50', border: 'border-yellow-200', text: 'text-yellow-600' },
+    pink: { bg: 'bg-pink-50', border: 'border-pink-200', text: 'text-pink-600' },
+    red: { bg: 'bg-red-50', border: 'border-red-200', text: 'text-red-600' },
+    purple: { bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-600' }
+  };
+  return colorMap[color] || colorMap.blue;
 };
 
 // ==========================================
@@ -178,6 +249,18 @@ const getCurrentMonthTotals = (shop: ShopData, currentMonth: string) => {
 // ==========================================
 
 const TopShopsTab = ({ data }: { data: DashboardData }) => {
+  // ==========================================
+  // 🚀 NEW: 5-MONTH ROLLING WINDOW CALCULATION
+  // ==========================================
+  
+  const rollingWindow = useMemo(() => {
+    return get5MonthRollingWindow(data.currentMonth, data.currentYear);
+  }, [data.currentMonth, data.currentYear]);
+
+  const rollingWindowLabel = useMemo(() => {
+    return get5MonthRollingLabel(data.currentMonth, data.currentYear);
+  }, [data.currentMonth, data.currentYear]);
+
   // ==========================================
   // INTERNAL STATE MANAGEMENT
   // ==========================================
@@ -193,11 +276,27 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
   });
 
   // ==========================================
+  // 🚀 NEW: ENHANCED SHOP DATA WITH 5-MONTH AVERAGES
+  // ==========================================
+
+  const shopsWithEnhancedMetrics = useMemo(() => {
+    return data.allShopsComparison.map(shop => {
+      const fiveMonthAvg = calculate5MonthAverage(shop, rollingWindow);
+      return {
+        ...shop,
+        fiveMonthAvgTotal: fiveMonthAvg.avgTotal,
+        fiveMonthAvg8PM: fiveMonthAvg.avg8PM,
+        fiveMonthAvgVerve: fiveMonthAvg.avgVerve
+      };
+    }).sort((a, b) => (b.fiveMonthAvgTotal || 0) - (a.fiveMonthAvgTotal || 0)); // Sort by 5-month average
+  }, [data.allShopsComparison, rollingWindow]);
+
+  // ==========================================
   // INTERNAL UTILITY FUNCTIONS
   // ==========================================
 
   const getFilteredTopShops = useMemo(() => {
-    return (shops: ShopData[]): ShopData[] => {
+    return (shops: any[]): any[] => {
       return shops.filter(shop => {
         const matchesDepartment = !filters.department || shop.department === filters.department;
         const matchesSalesman = !filters.salesman || shop.salesman === filters.salesman;
@@ -205,7 +304,7 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
           shop.shopName.toLowerCase().includes(filters.searchText.toLowerCase()) ||
           shop.department.toLowerCase().includes(filters.searchText.toLowerCase()) ||
           shop.salesman.toLowerCase().includes(filters.searchText.toLowerCase());
-        const matchesMinCases = !filters.minCases || (shop.threeMonthAvgTotal! >= parseFloat(filters.minCases));
+        const matchesMinCases = !filters.minCases || (shop.fiveMonthAvgTotal >= parseFloat(filters.minCases));
         const matchesTrend = !filters.performanceTrend || shop.monthlyTrend === filters.performanceTrend;
         
         return matchesDepartment && matchesSalesman && matchesSearch && matchesMinCases && matchesTrend;
@@ -213,7 +312,7 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
     };
   }, [filters]);
 
-  const filteredShops = getFilteredTopShops(data.allShopsComparison);
+  const filteredShops = getFilteredTopShops(shopsWithEnhancedMetrics);
   const totalPages = Math.ceil(filteredShops.length / itemsPerPage);
   const startIndex = (currentPage - 1) * itemsPerPage;
   const endIndex = startIndex + itemsPerPage;
@@ -223,7 +322,7 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
   const salesmen = [...new Set(data.allShopsComparison.map(shop => shop.salesman))].sort();
 
   // ==========================================
-  // INTERNAL EXPORT FUNCTION
+  // 🔧 UPDATED: EXPORT FUNCTION WITH DYNAMIC 5-MONTH LABELS
   // ==========================================
 
   const exportTopShopsToCSV = async () => {
@@ -232,8 +331,9 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
     try {
       let csvContent = "data:text/csv;charset=utf-8,";
       csvContent += `Radico Top Shops Detailed Analysis Report - ${new Date().toLocaleDateString()}\n`;
-      csvContent += `Report Period: Mar-Apr-May-${getShortMonthName(data.currentMonth)} ${data.currentYear}\n`;
-      csvContent += `Sorted by: 3-Month Average Performance (Mar-Apr-May)\n`;
+      // 🔧 FIXED: Dynamic 5-month rolling window label
+      csvContent += `Report Period: ${rollingWindowLabel}\n`;
+      csvContent += `Sorted by: 5-Month Average Performance (${rollingWindow.map(m => m.shortName).join('-')})\n`;
       
       if (filters.department || filters.salesman || filters.searchText || filters.minCases || filters.performanceTrend) {
         csvContent += "APPLIED FILTERS: ";
@@ -249,19 +349,39 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
       csvContent += "EXECUTIVE SUMMARY\n";
       csvContent += "Total Shops," + data.summary.totalShops + "\n";
       csvContent += "Filtered Shops," + filteredShops.length + "\n";
-      csvContent += "Top 3-Month Avg," + (filteredShops[0]?.threeMonthAvgTotal?.toFixed(1) || 0) + " cases\n\n";
+      csvContent += "Top 5-Month Avg," + (filteredShops[0]?.fiveMonthAvgTotal?.toFixed(1) || 0) + " cases\n\n";
       
-      csvContent += `DETAILED SHOP ANALYSIS (Mar-Apr-May-${getShortMonthName(data.currentMonth)} ${data.currentYear})\n`;
-      csvContent += `Rank,Shop Name,Department,Salesman,Mar Total,Mar 8PM,Mar VERVE,Apr Total,Apr 8PM,Apr VERVE,May Total,May 8PM,May VERVE,Jun Total,Jun 8PM,Jun VERVE,Jul Total,Jul 8PM,Jul VERVE,3M Avg Total,3M Avg 8PM,3M Avg VERVE,Growth %,YoY Growth %,Monthly Trend\n`;
+      // 🔧 FIXED: Dynamic CSV headers for 5-month window
+      csvContent += `DETAILED SHOP ANALYSIS (${rollingWindowLabel})\n`;
+      let csvHeaders = `Rank,Shop Name,Department,Salesman`;
+      
+      // Add dynamic month columns
+      rollingWindow.forEach(month => {
+        csvHeaders += `,${month.shortName} Total,${month.shortName} 8PM,${month.shortName} VERVE`;
+      });
+      
+      csvHeaders += `,5M Avg Total,5M Avg 8PM,5M Avg VERVE,Growth %,YoY Growth %,Monthly Trend\n`;
+      csvContent += csvHeaders;
       
       filteredShops.forEach((shop, index) => {
-        csvContent += `${index + 1},"${shop.shopName}","${shop.department}","${shop.salesman}",${shop.marchTotal || 0},${shop.marchEightPM || 0},${shop.marchVerve || 0},${shop.aprilTotal || 0},${shop.aprilEightPM || 0},${shop.aprilVerve || 0},${shop.mayTotal || 0},${shop.mayEightPM || 0},${shop.mayVerve || 0},${shop.juneTotal || 0},${shop.juneEightPM || 0},${shop.juneVerve || 0},${shop.julyTotal || 0},${shop.julyEightPM || 0},${shop.julyVerve || 0},${shop.threeMonthAvgTotal?.toFixed(1) || 0},${shop.threeMonthAvg8PM?.toFixed(1) || 0},${shop.threeMonthAvgVERVE?.toFixed(1) || 0},${shop.growthPercent?.toFixed(1) || 0}%,${shop.yoyGrowthPercent?.toFixed(1) || 0}%,"${shop.monthlyTrend || 'stable'}"\n`;
+        let csvRow = `${index + 1},"${shop.shopName}","${shop.department}","${shop.salesman}"`;
+        
+        // Add dynamic month data
+        rollingWindow.forEach(month => {
+          const total = getShopDataForMonth(shop, month.key, 'total');
+          const eightPM = getShopDataForMonth(shop, month.key, 'eightPM');
+          const verve = getShopDataForMonth(shop, month.key, 'verve');
+          csvRow += `,${total},${eightPM},${verve}`;
+        });
+        
+        csvRow += `,${shop.fiveMonthAvgTotal?.toFixed(1) || 0},${shop.fiveMonthAvg8PM?.toFixed(1) || 0},${shop.fiveMonthAvgVerve?.toFixed(1) || 0},${shop.growthPercent?.toFixed(1) || 0}%,${shop.yoyGrowthPercent?.toFixed(1) || 0}%,"${shop.monthlyTrend || 'stable'}"\n`;
+        csvContent += csvRow;
       });
 
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement("a");
       link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `Radico_Top_Shops_Detailed_Analysis_${getShortMonthName(data.currentMonth)}_${data.currentYear}.csv`);
+      link.setAttribute("download", `Radico_Top_Shops_5Month_Analysis_${getShortMonthName(data.currentMonth)}_${data.currentYear}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -272,13 +392,10 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
   };
 
   // ==========================================
-  // MOBILE CARD COMPONENT
+  // 🔧 UPDATED: MOBILE CARD COMPONENT WITH 5-MONTH DATA
   // ==========================================
 
-  const MobileShopCard = ({ shop, index }: { shop: ShopData, index: number }) => {
-    // 🔧 FIXED: Use proper month data
-    const currentTotals = getCurrentMonthTotals(shop, data.currentMonth);
-    
+  const MobileShopCard = ({ shop, index }: { shop: any, index: number }) => {
     return (
       <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
         <div className="flex justify-between items-start mb-3">
@@ -297,45 +414,46 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
             <p className="text-xs text-gray-500">{shop.department} • {shop.salesman}</p>
           </div>
           <div className="text-right">
-            <div className="text-lg font-bold text-blue-600">{shop.threeMonthAvgTotal?.toFixed(1) || '0.0'}</div>
-            <div className="text-xs text-gray-500">3M Avg</div>
+            <div className="text-lg font-bold text-blue-600">{shop.fiveMonthAvgTotal?.toFixed(1) || '0.0'}</div>
+            <div className="text-xs text-gray-500">5M Avg</div>
           </div>
         </div>
         
         {/* Current Month Performance */}
         <div className="grid grid-cols-3 gap-3 mb-3 p-3 bg-red-50 rounded-lg">
           <div className="text-center">
-            <div className="text-sm font-bold text-gray-900">{currentTotals.total.toLocaleString()}</div>
-            <div className="text-xs text-gray-500">{getShortMonthName(data.currentMonth)} Total</div>
+            <div className="text-sm font-bold text-gray-900">
+              {getShopDataForMonth(shop, rollingWindow[4]?.key || 'current', 'total').toLocaleString()}
+            </div>
+            <div className="text-xs text-gray-500">{rollingWindow[4]?.shortName || getShortMonthName(data.currentMonth)} Total</div>
           </div>
           <div className="text-center">
-            <div className="text-sm font-bold text-purple-600">{currentTotals.eightPM.toLocaleString()}</div>
+            <div className="text-sm font-bold text-purple-600">
+              {getShopDataForMonth(shop, rollingWindow[4]?.key || 'current', 'eightPM').toLocaleString()}
+            </div>
             <div className="text-xs text-gray-500">8PM</div>
           </div>
           <div className="text-center">
-            <div className="text-sm font-bold text-orange-600">{currentTotals.verve.toLocaleString()}</div>
+            <div className="text-sm font-bold text-orange-600">
+              {getShopDataForMonth(shop, rollingWindow[4]?.key || 'current', 'verve').toLocaleString()}
+            </div>
             <div className="text-xs text-gray-500">VERVE</div>
           </div>
         </div>
 
-        {/* Historical Performance - FIXED: Show actual historical data */}
-        <div className="grid grid-cols-4 gap-2 mb-3">
-          <div className="text-center p-2 bg-blue-50 rounded">
-            <div className="text-sm font-medium text-gray-900">{shop.marchTotal?.toLocaleString() || 0}</div>
-            <div className="text-xs text-gray-500">Mar</div>
-          </div>
-          <div className="text-center p-2 bg-green-50 rounded">
-            <div className="text-sm font-medium text-gray-900">{shop.aprilTotal?.toLocaleString() || 0}</div>
-            <div className="text-xs text-gray-500">Apr</div>
-          </div>
-          <div className="text-center p-2 bg-yellow-50 rounded">
-            <div className="text-sm font-medium text-gray-900">{shop.mayTotal?.toLocaleString() || 0}</div>
-            <div className="text-xs text-gray-500">May</div>
-          </div>
-          <div className="text-center p-2 bg-pink-50 rounded">
-            <div className="text-sm font-medium text-gray-900">{shop.juneTotal?.toLocaleString() || 0}</div>
-            <div className="text-xs text-gray-500">Jun</div>
-          </div>
+        {/* 5-Month Historical Performance - DYNAMIC */}
+        <div className="grid grid-cols-5 gap-1 mb-3">
+          {rollingWindow.map((month, idx) => {
+            const colorClasses = getMonthColorClasses(month.color);
+            return (
+              <div key={month.month} className={`text-center p-2 ${colorClasses.bg} rounded`}>
+                <div className="text-sm font-medium text-gray-900">
+                  {getShopDataForMonth(shop, month.key, 'total').toLocaleString()}
+                </div>
+                <div className="text-xs text-gray-500">{month.shortName}</div>
+              </div>
+            );
+          })}
         </div>
 
         {/* Growth Metrics */}
@@ -386,27 +504,27 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
         </div>
         
         <div className="bg-white p-3 sm:p-6 rounded-lg shadow">
-          <h3 className="text-sm sm:text-lg font-medium text-gray-900 mb-1 sm:mb-2">Top 3M Avg</h3>
+          <h3 className="text-sm sm:text-lg font-medium text-gray-900 mb-1 sm:mb-2">Top 5M Avg</h3>
           <div className="text-xl sm:text-2xl font-bold text-green-600">
-            {filteredShops[0]?.threeMonthAvgTotal?.toFixed(1) || 0}
+            {filteredShops[0]?.fiveMonthAvgTotal?.toFixed(1) || 0}
           </div>
-          <div className="text-xs sm:text-sm text-gray-500">Cases (Mar-May)</div>
+          <div className="text-xs sm:text-sm text-gray-500">Cases ({rollingWindow.map(m => m.shortName).join('-')})</div>
         </div>
         
         <div className="bg-white p-3 sm:p-6 rounded-lg shadow">
           <h3 className="text-sm sm:text-lg font-medium text-gray-900 mb-1 sm:mb-2">Avg 8PM</h3>
           <div className="text-xl sm:text-2xl font-bold text-purple-600">
-            {(filteredShops.reduce((sum, shop) => sum + (shop.threeMonthAvg8PM || 0), 0) / Math.max(filteredShops.length, 1)).toFixed(1)}
+            {(filteredShops.reduce((sum, shop) => sum + (shop.fiveMonthAvg8PM || 0), 0) / Math.max(filteredShops.length, 1)).toFixed(1)}
           </div>
-          <div className="text-xs sm:text-sm text-gray-500">3M Avg Cases</div>
+          <div className="text-xs sm:text-sm text-gray-500">5M Avg Cases</div>
         </div>
         
         <div className="bg-white p-3 sm:p-6 rounded-lg shadow">
           <h3 className="text-sm sm:text-lg font-medium text-gray-900 mb-1 sm:mb-2">Avg VERVE</h3>
           <div className="text-xl sm:text-2xl font-bold text-orange-600">
-            {(filteredShops.reduce((sum, shop) => sum + (shop.threeMonthAvgVERVE || 0), 0) / Math.max(filteredShops.length, 1)).toFixed(1)}
+            {(filteredShops.reduce((sum, shop) => sum + (shop.fiveMonthAvgVerve || 0), 0) / Math.max(filteredShops.length, 1)).toFixed(1)}
           </div>
-          <div className="text-xs sm:text-sm text-gray-500">3M Avg Cases</div>
+          <div className="text-xs sm:text-sm text-gray-500">5M Avg Cases</div>
         </div>
       </div>
 
@@ -451,7 +569,7 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
 
             <input
               type="number"
-              placeholder="Min 3M Avg Cases"
+              placeholder="Min 5M Avg Cases"
               value={filters.minCases}
               onChange={(e) => setFilters({ ...filters, minCases: e.target.value })}
               className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
@@ -506,7 +624,7 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
               Top Shops - Mobile View
             </h3>
             <p className="text-sm text-gray-500">
-              Ranked by 3-month average (Mar-Apr-May {data.currentYear})
+              Ranked by 5-month average ({rollingWindowLabel})
             </p>
           </div>
           
@@ -546,15 +664,15 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-      {/* Desktop View - Enhanced Table */}
+      {/* 🚀 NEW: Desktop View - Enhanced Table with Dynamic 5-Month Columns */}
       <div className="hidden lg:block bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900">
-            Detailed Shop Performance Analysis - Ranked by 3-Month Average (Mar-Apr-May {data.currentYear})
+            Detailed Shop Performance Analysis - Ranked by 5-Month Average ({rollingWindowLabel})
           </h3>
           <p className="text-sm text-gray-500">
-            Complete brand breakdown for each month with 3-month averages and growth trends. 
-            Sorted by highest 3-month average performance (Mar-Apr-May only).
+            Complete brand breakdown for each month with 5-month averages and growth trends. 
+            Sorted by highest 5-month average performance ({rollingWindow.map(m => m.shortName).join('-')}).
           </p>
         </div>
         
@@ -573,70 +691,33 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
                   Department
                 </th>
                 
-                {/* March columns */}
-                <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-blue-50 border-l border-r">
-                  Mar Total
-                </th>
-                <th className="px-3 py-3 text-center text-xs font-medium text-purple-500 uppercase tracking-wider bg-blue-50">
-                  Mar 8PM
-                </th>
-                <th className="px-3 py-3 text-center text-xs font-medium text-orange-500 uppercase tracking-wider bg-blue-50 border-r">
-                  Mar VERVE
-                </th>
+                {/* 🚀 NEW: Dynamic Month Columns */}
+                {rollingWindow.map((month, index) => {
+                  const colorClasses = getMonthColorClasses(month.color);
+                  return (
+                    <React.Fragment key={month.month}>
+                      <th className={`px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider ${colorClasses.bg} border-l border-r`}>
+                        {month.shortName} Total
+                      </th>
+                      <th className={`px-3 py-3 text-center text-xs font-medium text-purple-500 uppercase tracking-wider ${colorClasses.bg}`}>
+                        {month.shortName} 8PM
+                      </th>
+                      <th className={`px-3 py-3 text-center text-xs font-medium text-orange-500 uppercase tracking-wider ${colorClasses.bg} border-r`}>
+                        {month.shortName} VERVE
+                      </th>
+                    </React.Fragment>
+                  );
+                })}
                 
-                {/* April columns */}
-                <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-green-50 border-l border-r">
-                  Apr Total
-                </th>
-                <th className="px-3 py-3 text-center text-xs font-medium text-purple-500 uppercase tracking-wider bg-green-50">
-                  Apr 8PM
-                </th>
-                <th className="px-3 py-3 text-center text-xs font-medium text-orange-500 uppercase tracking-wider bg-green-50 border-r">
-                  Apr VERVE
-                </th>
-                
-                {/* May columns */}
-                <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-yellow-50 border-l border-r">
-                  May Total
-                </th>
-                <th className="px-3 py-3 text-center text-xs font-medium text-purple-500 uppercase tracking-wider bg-yellow-50">
-                  May 8PM
-                </th>
-                <th className="px-3 py-3 text-center text-xs font-medium text-orange-500 uppercase tracking-wider bg-yellow-50 border-r">
-                  May VERVE
-                </th>
-                
-                {/* 🔧 FIXED: June columns - Always show June */}
-                <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-pink-50 border-l border-r">
-                  Jun Total
-                </th>
-                <th className="px-3 py-3 text-center text-xs font-medium text-purple-500 uppercase tracking-wider bg-pink-50">
-                  Jun 8PM
-                </th>
-                <th className="px-3 py-3 text-center text-xs font-medium text-orange-500 uppercase tracking-wider bg-pink-50 border-r">
-                  Jun VERVE
-                </th>
-                
-                {/* 🔧 FIXED: July columns - Always show July */}
-                <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-red-50 border-l border-r">
-                  Jul Total
-                </th>
-                <th className="px-3 py-3 text-center text-xs font-medium text-purple-500 uppercase tracking-wider bg-red-50">
-                  Jul 8PM
-                </th>
-                <th className="px-3 py-3 text-center text-xs font-medium text-orange-500 uppercase tracking-wider bg-red-50 border-r">
-                  Jul VERVE
-                </th>
-                
-                {/* 3-Month Averages */}
+                {/* 5-Month Averages */}
                 <th className="px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-purple-50 border-l border-r">
-                  3M Avg Total
+                  5M Avg Total
                 </th>
                 <th className="px-3 py-3 text-center text-xs font-medium text-purple-500 uppercase tracking-wider bg-purple-50">
-                  3M Avg 8PM
+                  5M Avg 8PM
                 </th>
                 <th className="px-3 py-3 text-center text-xs font-medium text-orange-500 uppercase tracking-wider bg-purple-50 border-r">
-                  3M Avg VERVE
+                  5M Avg VERVE
                 </th>
                 
                 {/* Growth metrics */}
@@ -676,70 +757,37 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
                       {shop.department}
                     </td>
                     
-                    {/* March data */}
-                    <td className="px-3 py-4 whitespace-nowrap text-sm text-center font-medium bg-blue-50 border-l border-r">
-                      {shop.marchTotal?.toLocaleString() || 0}
-                    </td>
-                    <td className="px-3 py-4 whitespace-nowrap text-sm text-center text-purple-600 bg-blue-50">
-                      {shop.marchEightPM?.toLocaleString() || 0}
-                    </td>
-                    <td className="px-3 py-4 whitespace-nowrap text-sm text-center text-orange-600 bg-blue-50 border-r">
-                      {shop.marchVerve?.toLocaleString() || 0}
-                    </td>
+                    {/* 🚀 NEW: Dynamic Month Data Columns */}
+                    {rollingWindow.map((month, monthIndex) => {
+                      const colorClasses = getMonthColorClasses(month.color);
+                      const total = getShopDataForMonth(shop, month.key, 'total');
+                      const eightPM = getShopDataForMonth(shop, month.key, 'eightPM');
+                      const verve = getShopDataForMonth(shop, month.key, 'verve');
+                      
+                      return (
+                        <React.Fragment key={month.month}>
+                          <td className={`px-3 py-4 whitespace-nowrap text-sm text-center font-medium ${colorClasses.bg} border-l border-r`}>
+                            {total.toLocaleString()}
+                          </td>
+                          <td className={`px-3 py-4 whitespace-nowrap text-sm text-center text-purple-600 ${colorClasses.bg}`}>
+                            {eightPM.toLocaleString()}
+                          </td>
+                          <td className={`px-3 py-4 whitespace-nowrap text-sm text-center text-orange-600 ${colorClasses.bg} border-r`}>
+                            {verve.toLocaleString()}
+                          </td>
+                        </React.Fragment>
+                      );
+                    })}
                     
-                    {/* April data */}
-                    <td className="px-3 py-4 whitespace-nowrap text-sm text-center font-medium bg-green-50 border-l border-r">
-                      {shop.aprilTotal?.toLocaleString() || 0}
-                    </td>
-                    <td className="px-3 py-4 whitespace-nowrap text-sm text-center text-purple-600 bg-green-50">
-                      {shop.aprilEightPM?.toLocaleString() || 0}
-                    </td>
-                    <td className="px-3 py-4 whitespace-nowrap text-sm text-center text-orange-600 bg-green-50 border-r">
-                      {shop.aprilVerve?.toLocaleString() || 0}
-                    </td>
-                    
-                    {/* May data */}
-                    <td className="px-3 py-4 whitespace-nowrap text-sm text-center font-medium bg-yellow-50 border-l border-r">
-                      {shop.mayTotal?.toLocaleString() || 0}
-                    </td>
-                    <td className="px-3 py-4 whitespace-nowrap text-sm text-center text-purple-600 bg-yellow-50">
-                      {shop.mayEightPM?.toLocaleString() || 0}
-                    </td>
-                    <td className="px-3 py-4 whitespace-nowrap text-sm text-center text-orange-600 bg-yellow-50 border-r">
-                      {shop.mayVerve?.toLocaleString() || 0}
-                    </td>
-                    
-                    {/* 🔧 FIXED: June data - Always show actual June data */}
-                    <td className="px-3 py-4 whitespace-nowrap text-sm text-center font-medium bg-pink-50 border-l border-r">
-                      {shop.juneTotal?.toLocaleString() || 0}
-                    </td>
-                    <td className="px-3 py-4 whitespace-nowrap text-sm text-center text-purple-600 bg-pink-50">
-                      {shop.juneEightPM?.toLocaleString() || 0}
-                    </td>
-                    <td className="px-3 py-4 whitespace-nowrap text-sm text-center text-orange-600 bg-pink-50 border-r">
-                      {shop.juneVerve?.toLocaleString() || 0}
-                    </td>
-                    
-                    {/* 🔧 FIXED: July data - Always show actual July data (0 if no data) */}
-                    <td className="px-3 py-4 whitespace-nowrap text-sm text-center font-bold bg-red-50 border-l border-r">
-                      {shop.julyTotal?.toLocaleString() || 0}
-                    </td>
-                    <td className="px-3 py-4 whitespace-nowrap text-sm text-center text-purple-600 font-bold bg-red-50">
-                      {shop.julyEightPM?.toLocaleString() || 0}
-                    </td>
-                    <td className="px-3 py-4 whitespace-nowrap text-sm text-center text-orange-600 font-bold bg-red-50 border-r">
-                      {shop.julyVerve?.toLocaleString() || 0}
-                    </td>
-                    
-                    {/* 3-Month Averages */}
+                    {/* 5-Month Averages */}
                     <td className="px-3 py-4 whitespace-nowrap text-sm text-center font-bold text-blue-600 bg-purple-50 border-l border-r">
-                      {shop.threeMonthAvgTotal?.toFixed(1) || '0.0'}
+                      {shop.fiveMonthAvgTotal?.toFixed(1) || '0.0'}
                     </td>
                     <td className="px-3 py-4 whitespace-nowrap text-sm text-center font-bold text-purple-600 bg-purple-50">
-                      {shop.threeMonthAvg8PM?.toFixed(1) || '0.0'}
+                      {shop.fiveMonthAvg8PM?.toFixed(1) || '0.0'}
                     </td>
                     <td className="px-3 py-4 whitespace-nowrap text-sm text-center font-bold text-orange-600 bg-purple-50 border-r">
-                      {shop.threeMonthAvgVERVE?.toFixed(1) || '0.0'}
+                      {shop.fiveMonthAvgVerve?.toFixed(1) || '0.0'}
                     </td>
                     
                     {/* Growth metrics */}
@@ -814,48 +862,49 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-      {/* Legend and Summary - Mobile Responsive */}
+      {/* 🚀 NEW: Legend and Summary - Future-Ready Information */}
       <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 sm:p-6 rounded-lg">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">🔧 FIXED: Proper Month Data Display</h3>
+        <h3 className="text-lg font-medium text-gray-900 mb-4">🚀 5-Month Rolling Window - Future-Ready Display</h3>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
           <div>
-            <h4 className="font-medium text-gray-900 mb-2">✅ Key Fixes Applied:</h4>
+            <h4 className="font-medium text-gray-900 mb-2">✅ Current Period ({data.currentMonth}/{data.currentYear}):</h4>
             <div className="space-y-1 text-sm">
-              <div>• <strong>June Column:</strong> Shows actual June 2025 data (preserved)</div>
-              <div>• <strong>July Column:</strong> Shows actual July 2025 data (0s if no data)</div>
-              <div>• <strong>No Dynamic Fetching:</strong> Direct field references only</div>
-              <div>• <strong>Data Integrity:</strong> Proper month-to-field mapping</div>
-              <div>• <strong>Historical Accuracy:</strong> Mar-Apr-May-Jun-Jul progression</div>
+              <div>• <strong>Display:</strong> {rollingWindowLabel}</div>
+              <div>• <strong>Ranking:</strong> By 5-month average performance</div>
+              <div>• <strong>Rolling Logic:</strong> Last 5 months including current</div>
+              <div>• <strong>Data Integrity:</strong> Direct field references only</div>
+              <div>• <strong>Next Month:</strong> March drops off, {getShortMonthName((parseInt(data.currentMonth) + 1).toString())} added</div>
             </div>
           </div>
           <div>
             <h4 className="font-medium text-gray-900 mb-2">Desktop Color Coding:</h4>
             <div className="space-y-1 text-sm">
+              {rollingWindow.map((month, index) => {
+                const colorClasses = getMonthColorClasses(month.color);
+                return (
+                  <div key={month.month} className="flex items-center space-x-2">
+                    <div className={`w-4 h-4 ${colorClasses.bg} border ${colorClasses.border} rounded`}></div>
+                    <span>{month.fullName} {month.year} Data</span>
+                  </div>
+                );
+              })}
               <div className="flex items-center space-x-2">
-                <div className="w-4 h-4 bg-blue-100 rounded"></div>
-                <span>March 2025 Data</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-4 h-4 bg-green-100 rounded"></div>
-                <span>April 2025 Data</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-4 h-4 bg-yellow-100 rounded"></div>
-                <span>May 2025 Data</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-4 h-4 bg-pink-100 rounded"></div>
-                <span>June 2025 Data</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-4 h-4 bg-red-100 rounded"></div>
-                <span>July 2025 Data</span>
-              </div>
-              <div className="flex items-center space-x-2">
-                <div className="w-4 h-4 bg-purple-100 rounded"></div>
-                <span>3-Month Averages (Mar-May)</span>
+                <div className="w-4 h-4 bg-purple-100 border border-purple-200 rounded"></div>
+                <span>5-Month Averages</span>
               </div>
             </div>
+          </div>
+        </div>
+
+        {/* Future Month Preview */}
+        <div className="mt-4 p-3 bg-white rounded-lg border border-blue-200">
+          <h5 className="font-medium text-blue-900 mb-2">🔮 Future Month Preview:</h5>
+          <div className="text-sm text-blue-700">
+            <strong>August 2025:</strong> Will show "Apr-May-Jun-Jul-Aug 2025" (March drops off)
+            <br />
+            <strong>September 2025:</strong> Will show "May-Jun-Jul-Aug-Sep 2025" (April drops off)
+            <br />
+            <strong>January 2026:</strong> Will show "Sep-Oct-Nov-Dec-Jan 2026" (automatic year transition)
           </div>
         </div>
       </div>
