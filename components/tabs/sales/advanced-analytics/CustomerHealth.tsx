@@ -335,24 +335,47 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
       const currentJune = getBrandValue(shop, 'june', activeBrand);
       const currentMay = getBrandValue(shop, 'may', activeBrand);
       const currentApril = getBrandValue(shop, 'april', activeBrand);
-      const currentJuly = getBrandValue(shop, 'july', activeBrand);
-      const currentAugust = getBrandValue(shop, 'august', activeBrand);
-      const currentSeptember = getBrandValue(shop, 'september', activeBrand);
       
       // Q1 FY2025 (Apr-May-Jun 2025) - COMPLETED
       const q1FY2025 = currentApril + currentMay + currentJune;
       const q1FY2025Status = 'COMPLETED';
       
-      // Q2 FY2025 (Jul-Aug-Sep 2025) - IN PROGRESS (depends on current month)
-      const q2FY2025 = currentJuly + currentAugust + currentSeptember;
-      const currentMonthNum = parseInt(data.currentMonth);
+      // 🔧 CRITICAL FIX: Separate current year 2025 vs historical 2024 data
+      
+      // Q2 FY2025 (Jul-Aug-Sep 2025) - Use ONLY actual current year 2025 data
+      // Since user confirmed July 2025 has NO SALES, Q2 FY2025 should be 0
+      let july2025 = 0;
+      let august2025 = 0;
+      let september2025 = 0;
+      
+      // Only assign current month data if we're actually in that month with sales
+      if (currentMonthNum === 7 && data.currentYear === '2025') {
+        // July 2025 - use actual current month data (should be 0 since no sales)
+        july2025 = shop.total || 0; // Current month total for July 2025
+      } else if (currentMonthNum === 8 && data.currentYear === '2025') {
+        // August 2025 - use actual current month data
+        august2025 = shop.total || 0; 
+      } else if (currentMonthNum === 9 && data.currentYear === '2025') {
+        // September 2025 - use actual current month data  
+        september2025 = shop.total || 0;
+      }
+      
+      // Q2 FY2025: Sum of ACTUAL 2025 data (should be 0 since no July 2025 sales)
+      const q2FY2025 = july2025 + august2025 + september2025;
+      // Q2 FY2025 Status calculation - Updated to reflect actual data availability
       let q2FY2025Status = 'NOT_STARTED';
       let q2CompletionPct = 0;
       
       if (currentMonthNum >= 7) { // July or later
         if (currentMonthNum === 7) {
-          q2FY2025Status = 'IN_PROGRESS_1_3';
-          q2CompletionPct = 33;
+          // In July 2025, check if there's actual July 2025 data
+          if (july2025 > 0) {
+            q2FY2025Status = 'IN_PROGRESS_1_3';
+            q2CompletionPct = 33;
+          } else {
+            q2FY2025Status = 'NO_JULY_SALES';
+            q2CompletionPct = 0;
+          }
         } else if (currentMonthNum === 8) {
           q2FY2025Status = 'IN_PROGRESS_2_3';
           q2CompletionPct = 67;
@@ -374,10 +397,10 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
                           (shop.juneLastYearTotal || 0);
       const q1FY2024 = juneLastYear; // Use actual last year data
       
-      // Q2 FY2024 (Jul-Aug-Sep 2024) - from historical data
-      const july2024 = getBrandValue(shop, 'july', activeBrand); // From 2024 historical
-      const august2024 = getBrandValue(shop, 'august', activeBrand); // From 2024 historical  
-      const september2024 = getBrandValue(shop, 'september', activeBrand); // From 2024 historical
+      // Q2 FY2024 (Jul-Aug-Sep 2024) - Use HISTORICAL data from shop fields
+      const july2024 = getBrandValue(shop, 'july', activeBrand); // July 2024 historical data
+      const august2024 = getBrandValue(shop, 'august', activeBrand); // August 2024 historical data  
+      const september2024 = getBrandValue(shop, 'september', activeBrand); // September 2024 historical data
       const q2FY2024 = july2024 + august2024 + september2024;
       
       // Calculate quarterly metrics with NEW customer logic
@@ -612,6 +635,7 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
       filteredShops.forEach(shop => {
         const q1YoyDisplay = shop.isNewCustomer ? 'NEW' : `${(shop.q1YoyGrowth || 0).toFixed(1)}%`;
         const q2YoyDisplay = shop.q2FY2025Status === 'NOT_STARTED' ? 'PENDING' :
+                            shop.q2FY2025Status === 'NO_JULY_SALES' ? 'NO SALES' :
                             shop.isQ2NewCustomer ? 'NEW Q2' :
                             shop.q2FY2024 === 0 ? 'FIRST Q2' :
                             `${(shop.q2YoyGrowth || 0).toFixed(1)}%`;
@@ -970,10 +994,12 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
                         {(shop.q2FY2025 || 0).toLocaleString()} cases
                         <div className={`text-xs ${
                           shop.q2FY2025Status === 'COMPLETED' ? 'text-green-600' :
+                          shop.q2FY2025Status === 'NO_JULY_SALES' ? 'text-red-600' :
                           shop.q2FY2025Status?.includes('IN_PROGRESS') ? 'text-orange-600' :
                           'text-gray-500'
                         }`}>
                           {shop.q2FY2025Status === 'COMPLETED' ? '✅ COMPLETED' :
+                           shop.q2FY2025Status === 'NO_JULY_SALES' ? '❌ No July 2025 sales' :
                            shop.q2FY2025Status === 'IN_PROGRESS_1_3' ? '🔄 1/3 (Jul only)' :
                            shop.q2FY2025Status === 'IN_PROGRESS_2_3' ? '🔄 2/3 (Jul+Aug)' :
                            '⏳ Not Started'}
@@ -984,6 +1010,10 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
                         {shop.q2FY2025Status === 'NOT_STARTED' ? (
                           <span className="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">
                             PENDING
+                          </span>
+                        ) : shop.q2FY2025Status === 'NO_JULY_SALES' ? (
+                          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                            NO SALES
                           </span>
                         ) : shop.isQ2NewCustomer ? (
                           <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
