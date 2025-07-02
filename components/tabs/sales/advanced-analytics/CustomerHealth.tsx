@@ -341,6 +341,7 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
       const q1FY2025Status = 'COMPLETED';
       
       // 🔧 CRITICAL FIX: Separate current year 2025 vs historical 2024 data
+      const currentMonthNum = parseInt(data.currentMonth); // Declare before use
       
       // Q2 FY2025 (Jul-Aug-Sep 2025) - Use ONLY actual current year 2025 data
       // Since user confirmed July 2025 has NO SALES, Q2 FY2025 should be 0
