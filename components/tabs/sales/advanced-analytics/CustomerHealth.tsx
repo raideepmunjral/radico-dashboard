@@ -631,14 +631,20 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
     } else if (activeSection === 'quarterly') {
       csvContent += `QUARTERLY FISCAL PERFORMANCE ANALYSIS - DUAL QUARTER COMPARISON\n`;
       csvContent += `Q1 Status: COMPLETED (Apr+May+Jun) | Q2 Status: Based on current month progression\n`;
+      csvContent += `Note: "No Sales in Q1/Q2" shown when current year quarter = 0 cases, but percentages calculated for comparison\n`;
       csvContent += `Shop Name,Department,Salesman,Q1 FY2024,Q1 FY2025,Q1 YoY Growth %,Q1 Status,Q2 FY2024,Q2 FY2025,Q2 YoY Growth %,Q2 Status,Q2 Completion\n`;
       
       filteredShops.forEach(shop => {
-        const q1YoyDisplay = shop.isNewCustomer ? 'NEW' : `${(shop.q1YoyGrowth || 0).toFixed(1)}%`;
+        const q1YoyDisplay = shop.isNewCustomer ? 'NEW' : 
+                            (shop.q1FY2025 || 0) === 0 && (shop.q1FY2024 || 0) > 0 ? '-100.0%' :
+                            (shop.q1FY2025 || 0) === 0 && (shop.q1FY2024 || 0) === 0 ? 'NO DATA' :
+                            `${(shop.q1YoyGrowth || 0).toFixed(1)}%`;
+        
         const q2YoyDisplay = shop.q2FY2025Status === 'NOT_STARTED' ? 'PENDING' :
-                            shop.q2FY2025Status === 'NO_JULY_SALES' ? 'NO SALES' :
+                            (shop.q2FY2025 || 0) === 0 && (shop.q2FY2024 || 0) > 0 ? '-100.0%' :
+                            (shop.q2FY2025 || 0) === 0 && (shop.q2FY2024 || 0) === 0 ? 'NO DATA' :
                             shop.isQ2NewCustomer ? 'NEW Q2' :
-                            shop.q2FY2024 === 0 ? 'FIRST Q2' :
+                            shop.q2FY2024 === 0 && (shop.q2FY2025 || 0) > 0 ? 'FIRST Q2' :
                             `${(shop.q2YoyGrowth || 0).toFixed(1)}%`;
         
         csvContent += `"${shop.shopName}","${shop.department}","${shop.salesman}",${shop.q1FY2024 || 0},${shop.q1FY2025 || 0},"${q1YoyDisplay}","${shop.q1FY2025Status}",${shop.q2FY2024 || 0},${shop.q2FY2025 || 0},"${q2YoyDisplay}","${shop.q2FY2025Status}",${shop.q2CompletionPct || 0}%\n`;
@@ -969,13 +975,20 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
                       {/* Q1 FY2025 */}
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {(shop.q1FY2025 || 0).toLocaleString()} cases
-                        <div className="text-xs text-green-600">✅ {shop.q1FY2025Status}</div>
                       </td>
                       {/* Q1 YoY Growth */}
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         {shop.isNewCustomer ? (
                           <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
                             NEW
+                          </span>
+                        ) : (shop.q1FY2025 || 0) === 0 && (shop.q1FY2024 || 0) > 0 ? (
+                          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
+                            -100.0%
+                          </span>
+                        ) : (shop.q1FY2025 || 0) === 0 && (shop.q1FY2024 || 0) === 0 ? (
+                          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">
+                            NO DATA
                           </span>
                         ) : (
                           <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
@@ -993,18 +1006,6 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
                       {/* Q2 FY2025 */}
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {(shop.q2FY2025 || 0).toLocaleString()} cases
-                        <div className={`text-xs ${
-                          shop.q2FY2025Status === 'COMPLETED' ? 'text-green-600' :
-                          shop.q2FY2025Status === 'NO_JULY_SALES' ? 'text-red-600' :
-                          shop.q2FY2025Status?.includes('IN_PROGRESS') ? 'text-orange-600' :
-                          'text-gray-500'
-                        }`}>
-                          {shop.q2FY2025Status === 'COMPLETED' ? '✅ COMPLETED' :
-                           shop.q2FY2025Status === 'NO_JULY_SALES' ? '❌ No July 2025 sales' :
-                           shop.q2FY2025Status === 'IN_PROGRESS_1_3' ? '🔄 1/3 (Jul only)' :
-                           shop.q2FY2025Status === 'IN_PROGRESS_2_3' ? '🔄 2/3 (Jul+Aug)' :
-                           '⏳ Not Started'}
-                        </div>
                       </td>
                       {/* Q2 YoY Growth */}
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -1012,15 +1013,19 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
                           <span className="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">
                             PENDING
                           </span>
-                        ) : shop.q2FY2025Status === 'NO_JULY_SALES' ? (
+                        ) : (shop.q2FY2025 || 0) === 0 && (shop.q2FY2024 || 0) > 0 ? (
                           <span className="px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
-                            NO SALES
+                            -100.0%
+                          </span>
+                        ) : (shop.q2FY2025 || 0) === 0 && (shop.q2FY2024 || 0) === 0 ? (
+                          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">
+                            NO DATA
                           </span>
                         ) : shop.isQ2NewCustomer ? (
                           <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
                             NEW Q2
                           </span>
-                        ) : shop.q2FY2024 === 0 ? (
+                        ) : shop.q2FY2024 === 0 && (shop.q2FY2025 || 0) > 0 ? (
                           <span className="px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
                             FIRST Q2
                           </span>
