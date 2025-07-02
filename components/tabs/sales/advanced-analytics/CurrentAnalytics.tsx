@@ -356,7 +356,8 @@ const CurrentAnalytics = ({ data }: { data: DashboardData }) => {
                     const selectedMonth = rollingWindow.find(m => m.shortName === activeMonth);
                     if (selectedMonth && selectedMonth.key !== 'current') {
                       const eightPMKey = `${selectedMonth.key}EightPM`;
-                      return shop[eightPMKey as keyof ShopData] || 0;
+                      const value = (shop as any)[eightPMKey];
+                      return typeof value === 'number' ? value : 0;
                     }
                     return shop.eightPM;
                   })()}
@@ -369,7 +370,8 @@ const CurrentAnalytics = ({ data }: { data: DashboardData }) => {
                     const selectedMonth = rollingWindow.find(m => m.shortName === activeMonth);
                     if (selectedMonth && selectedMonth.key !== 'current') {
                       const verveKey = `${selectedMonth.key}Verve`;
-                      return shop[verveKey as keyof ShopData] || 0;
+                      const value = (shop as any)[verveKey];
+                      return typeof value === 'number' ? value : 0;
                     }
                     return shop.verve;
                   })()}
