@@ -1,14 +1,6 @@
 // ==========================================
 // 🎯 DYNAMIC FOCUS SHOPS TAB - GOOGLE SHEET INTEGRATED
 // ==========================================
-// ✅ FEATURES:
-// - Dynamic focus shops list from Google Sheet
-// - Dynamic targets from Google Sheet (progressive building)
-// - Rolling 4-month window (3 historical + 1 current)
-// - VERVE sales-only display (no targets)
-// - Progressive target building (June → July → August → etc.)
-// - Automatic month transitions
-// ==========================================
 
 'use client';
 
@@ -74,15 +66,9 @@ interface DashboardData {
 
 interface FocusShopConfig {
   shopId: string;
-  targets: Record<string, number>; // monthKey: target value
+  targets: Record<string, number>;
 }
 
-// Google Sheets API response type
-interface GoogleSheetsResponse {
-  values?: any[][];
-}
-
-// Rolling month type
 interface RollingMonth {
   month: string;
   year: string;
@@ -113,7 +99,6 @@ const getShortMonthName = (monthNum: string): string => {
   return months[parseInt(monthNum) - 1] || 'Unknown';
 };
 
-// 🛠️ Dynamic month data field mapping
 const getMonthDataField = (monthNum: string, field: 'Total' | 'EightPM' | 'Verve'): string => {
   const monthMapping: Record<string, string> = {
     '01': 'january', '02': 'february', '03': 'march', '04': 'april',
@@ -125,13 +110,11 @@ const getMonthDataField = (monthNum: string, field: 'Total' | 'EightPM' | 'Verve
   return monthKey ? `${monthKey}${field}` : `${field.toLowerCase()}`;
 };
 
-// 🛠️ Get dynamic month data from shop
 const getMonthData = (shop: ShopData, monthNum: string, field: 'Total' | 'EightPM' | 'Verve'): number => {
   const fieldName = getMonthDataField(monthNum, field);
   return shop[fieldName] || 0;
 };
 
-// 🛠️ Get current month data for shop
 const getCurrentMonthData = (shop: ShopData, currentMonth: string) => {
   const total = getMonthData(shop, currentMonth, 'Total') || shop.total || 0;
   const eightPM = getMonthData(shop, currentMonth, 'EightPM') || shop.eightPM || 0;
@@ -140,13 +123,11 @@ const getCurrentMonthData = (shop: ShopData, currentMonth: string) => {
   return { total, eightPM, verve };
 };
 
-// 🚀 NEW: Rolling 4-month window calculation
 const getRollingMonths = (currentMonth: string, currentYear: string): RollingMonth[] => {
   const months: RollingMonth[] = [];
   let month = parseInt(currentMonth);
   let year = parseInt(currentYear);
   
-  // Get 4 months (3 historical + 1 current)
   for (let i = 3; i >= 0; i--) {
     let targetMonth = month - i;
     let targetYear = year;
@@ -180,25 +161,15 @@ const getRollingMonths = (currentMonth: string, currentYear: string): RollingMon
 const FocusShopsTab = ({ data }: { data: DashboardData }) => {
   const [searchFilter, setSearchFilter] = useState('');
   const [sortBy, setSortBy] = useState('total');
-  const [showEditMode, setShowEditMode] = useState(false);
   const [focusShopsConfig, setFocusShopsConfig] = useState<FocusShopConfig[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Dynamic current month detection
   const currentMonth = data?.currentMonth || '07';
   const currentYear = data?.currentYear || '2025';
   
-  // 🚀 NEW: Rolling months calculation
   const rollingMonths = useMemo(() => getRollingMonths(currentMonth, currentYear), [currentMonth, currentYear]);
 
-  console.log(`🎯 DYNAMIC Focus Shops: Current month is ${currentMonth} (${getMonthName(currentMonth)})`);
-  console.log('🔄 Rolling 4-month window:', rollingMonths.map((m: RollingMonth) => `${m.shortName} ${m.year}`).join(' | '));
-
-  // ==========================================
-  // 🚀 NEW: FETCH FOCUS SHOPS FROM GOOGLE SHEET (SHOP ID + TARGETS ONLY)
-  // ==========================================
-  
   const fetchFocusShopsConfig = async (): Promise<void> => {
     setLoading(true);
     setError(null);
@@ -216,20 +187,17 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
         throw new Error(`Failed to fetch focus shops data: ${response.statusText}`);
       }
       
-      const result: GoogleSheetsResponse = await response.json();
+      const result = await response.json();
       const rows = result.values || [];
       
       if (rows.length < 2) {
         throw new Error('Focus shops sheet appears to be empty or invalid');
       }
       
-      // Parse headers to find month columns
-      const headers: any[] = rows[0] || [];
-      console.log('📊 Focus Shops Sheet Headers:', headers);
-      
-      // Expected structure: Shop ID, Shop Info, Department, June Target, Jul Target, Aug Target, etc.
+      const headers: string[] = rows[0] || [];
       const focusShops: FocusShopConfig[] = [];
       
+      // ✅ FIXED: Properly typed forEach parameters
       rows.slice(1).forEach((row: any[], index: number) => {
         if (row.length >= 4) {
           const shopId = row[0]?.toString().trim();
@@ -237,13 +205,11 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
           if (shopId) {
             const targets: Record<string, number> = {};
             
-            // Parse target columns (starting from column 3 - June Target is column D)
             for (let i = 3; i < row.length && i < headers.length; i++) {
               const headerValue = headers[i]?.toString().trim();
               const targetValue = parseFloat(row[i]) || 0;
               
               if (headerValue && targetValue > 0) {
-                // Parse month from header (e.g., "June Target", "Jul Target", "Aug Target")
                 let monthKey = '';
                 
                 if (headerValue.toLowerCase().includes('june')) {
@@ -283,11 +249,6 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
       });
       
       console.log(`✅ Loaded ${focusShops.length} focus shops from Google Sheet`);
-      const availableMonths = Object.keys(focusShops.reduce((acc: Record<string, number>, shop: FocusShopConfig) => ({...acc, ...shop.targets}), {} as Record<string, number>));
-      console.log('🎯 Available targets by month:', 
-        availableMonths.map((month: string) => `${getShortMonthName(month)}: ${month}`)
-      );
-      
       setFocusShopsConfig(focusShops);
       
     } catch (error: unknown) {
@@ -299,18 +260,15 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
     }
   };
 
-  // Fetch focus shops config on component mount
   useEffect(() => {
     fetchFocusShopsConfig();
   }, []);
 
-  // 🛠️ Get target for specific month from dynamic config
   const getMonthTarget = (shopId: string, monthNum: string): number => {
     const shopConfig = focusShopsConfig.find((config: FocusShopConfig) => config.shopId === shopId);
     return shopConfig?.targets[monthNum] || 0;
   };
 
-  // 🛠️ Calculate target achievement for any month
   const calculateTargetAchievement = (shop: ShopData, monthNum: string): number => {
     const target = getMonthTarget(shop.shopId, monthNum);
     const actual = getMonthData(shop, monthNum, 'EightPM');
@@ -318,10 +276,6 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
     if (!target || target === 0) return 0;
     return (actual / target) * 100;
   };
-
-  // ==========================================
-  // 🚀 NEW: ENHANCED MOBILE CARD WITH ROLLING MONTHS
-  // ==========================================
 
   const MobileFocusShopCard = ({ shop, index }: { shop: ShopData, index: number }) => {
     const currentData = getCurrentMonthData(shop, currentMonth);
@@ -352,9 +306,8 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
           </div>
         </div>
 
-        {/* 🚀 NEW: Rolling Months Display */}
         <div className="space-y-3">
-          {rollingMonths.map((monthInfo: RollingMonth, idx: number) => {
+          {rollingMonths.map((monthInfo: RollingMonth) => {
             const monthData = {
               total: getMonthData(shop, monthInfo.month, 'Total'),
               eightPM: getMonthData(shop, monthInfo.month, 'EightPM'),
@@ -407,7 +360,6 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
                   </div>
                 </div>
 
-                {/* 🟠 VERVE Sales-Only Display */}
                 <div className="pt-2 border-t border-gray-200">
                   <div className="flex justify-between items-center">
                     <span className="text-xs text-gray-600">VERVE Sales:</span>
@@ -425,7 +377,6 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
           })}
         </div>
 
-        {/* Growth Metrics */}
         <div className="grid grid-cols-2 gap-3 mt-3 mb-3">
           <div className="text-center p-2 bg-gray-50 rounded">
             <div className="text-sm font-bold text-blue-600">
@@ -445,7 +396,6 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
           </div>
         </div>
 
-        {/* Trend Indicator */}
         <div className="flex justify-center">
           <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${
             shop.monthlyTrend === 'improving' ? 'bg-green-100 text-green-800' :
@@ -462,7 +412,6 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
     );
   };
 
-  // 🛠️ Enhanced filter and enrich data with dynamic targets (using master sheet for shop details)
   const focusShopsData = useMemo((): ShopData[] => {
     if (!data?.salesData || focusShopsConfig.length === 0) return [];
 
@@ -474,9 +423,8 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
         const currentData = getCurrentMonthData(shop, currentMonth);
         const currentTarget = getMonthTarget(shop.shopId, currentMonth);
         
-        // ✅ All shop details (name, department, salesman) come from master sheet data
         return {
-          ...shop, // This includes shopName, department, salesman from master sheet
+          ...shop,
           currentTotal: currentData.total,
           currentEightPM: currentData.eightPM,
           currentVerve: currentData.verve,
@@ -507,14 +455,12 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
     });
   }, [data, searchFilter, sortBy, currentMonth, focusShopsConfig]);
 
-  // 🛠️ Calculate enhanced focus metrics with dynamic month detection
   const focusMetrics = useMemo(() => {
     if (!focusShopsData.length) return null;
 
     const totalFocusShops = focusShopsConfig.length;
     const activeFocusShops = focusShopsData.length;
     
-    // Calculate metrics for all rolling months
     const monthlyMetrics = rollingMonths.map((monthInfo: RollingMonth) => {
       const monthTotals = focusShopsData.reduce((acc, shop: ShopData) => {
         const monthData = {
@@ -596,7 +542,6 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
 
   return (
     <div className="space-y-6">
-      {/* Header - Mobile Responsive */}
       <div className="text-center">
         <div className="flex items-center justify-center space-x-2 mb-2">
           <Target className="w-6 sm:w-8 h-6 sm:h-8 text-blue-600" />
@@ -614,7 +559,6 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-      {/* 🚀 NEW: Enhanced Focus Group Summary with Rolling Months */}
       {focusMetrics && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 sm:gap-4">
           <div className="bg-gradient-to-r from-blue-50 to-blue-100 p-4 rounded-lg border border-blue-200">
@@ -712,7 +656,6 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
         </div>
       )}
 
-      {/* Controls */}
       <div className="bg-white p-4 rounded-lg shadow">
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center gap-3">
@@ -756,22 +699,8 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-      {/* Configuration Status */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-        <h4 className="font-medium text-blue-900 mb-2">📊 Optimized Configuration Status:</h4>
-        <div className="text-sm text-blue-800 space-y-1">
-          <p>✅ <strong>Focus Shop IDs:</strong> {focusShopsConfig.length} shops from Focus Shops Sheet</p>
-          <p>📋 <strong>Shop Details:</strong> Names, departments, salesmen from Master Sheet (single source of truth)</p>
-          <p>🎯 <strong>Available Targets:</strong> {Object.keys(
-            focusShopsConfig.reduce((acc: Record<string, number>, shop: FocusShopConfig) => ({...acc, ...shop.targets}), {} as Record<string, number>)
-          ).map((month: string) => getShortMonthName(month)).join(', ') || 'None yet'}</p>
-          <p>🔄 <strong>Rolling Window:</strong> {rollingMonths.map((m: RollingMonth) => `${m.shortName} ${m.year}`).join(' → ')}</p>
-          <p>🟠 <strong>VERVE:</strong> Sales tracking only (no targets required)</p>
-          <p>🔗 <strong>Data Sync:</strong> Focus Sheet (IDs + Targets) + Master Sheet (Details) = Complete View</p>
-        </div>
-      </div>
 
-      {/* Mobile View */}
+
       <div className="block lg:hidden">
         <div className="bg-white rounded-lg shadow">
           <div className="px-4 py-4 border-b border-gray-200">
@@ -791,7 +720,6 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-      {/* 🚀 NEW: Desktop View with Rolling Months */}
       <div className="hidden lg:block bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900">Focus Shops Rolling 4-Month Performance</h3>
@@ -808,7 +736,6 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Shop Info</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
                 
-                {/* 🚀 Dynamic Rolling Month Headers */}
                 {rollingMonths.map((monthInfo: RollingMonth) => (
                   <React.Fragment key={monthInfo.key}>
                     <th className={`px-3 py-3 text-center text-xs font-medium uppercase ${
@@ -869,7 +796,6 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
                   </td>
                   <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">{shop.department}</td>
                   
-                  {/* 🚀 Dynamic Rolling Month Data */}
                   {rollingMonths.map((monthInfo: RollingMonth) => {
                     const monthData = {
                       eightPM: getMonthData(shop, monthInfo.month, 'EightPM'),
@@ -880,21 +806,18 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
                     
                     return (
                       <React.Fragment key={monthInfo.key}>
-                        {/* 8PM Sold */}
                         <td className={`px-3 py-4 whitespace-nowrap text-center text-sm font-bold ${
                           monthInfo.isCurrent ? 'text-blue-800 bg-blue-50' : 'text-green-800 bg-green-50'
                         }`}>
                           {monthData.eightPM.toLocaleString()}
                         </td>
                         
-                        {/* 8PM Target */}
                         <td className={`px-3 py-4 whitespace-nowrap text-center text-sm font-medium ${
                           monthInfo.isCurrent ? 'text-blue-700 bg-blue-50' : 'text-green-700 bg-green-50'
                         }`}>
                           {target > 0 ? target : 'No Target'}
                         </td>
                         
-                        {/* VERVE Sales (only for current month) */}
                         {monthInfo.isCurrent && (
                           <td className="px-3 py-4 whitespace-nowrap text-center text-sm bg-orange-50">
                             <div className="flex items-center justify-center space-x-1">
@@ -907,7 +830,6 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
                           </td>
                         )}
                         
-                        {/* Achievement */}
                         <td className={`px-3 py-4 whitespace-nowrap text-center text-sm ${
                           monthInfo.isCurrent ? 'bg-blue-50' : 'bg-green-50'
                         }`}>
@@ -927,7 +849,6 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
                     );
                   })}
                   
-                  {/* Growth and Trend */}
                   <td className="px-4 py-4 whitespace-nowrap text-sm">
                     <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                       (shop.growthPercent || 0) > 0 
@@ -958,7 +879,6 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-      {/* Enhanced Insights */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         <div className="bg-white rounded-lg shadow">
           <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
