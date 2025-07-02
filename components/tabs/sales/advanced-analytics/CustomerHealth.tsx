@@ -107,13 +107,21 @@ interface AnalyzedShop extends ShopData {
   lastOrderMonth?: string;
   riskLevel?: 'low' | 'medium' | 'high' | 'critical';
   quarterlyDecline?: number;
-  // NEW: Enhanced quarterly performance metrics
+  // ENHANCED: Dual quarterly performance metrics (Q1 + Q2)
   q1FY2024?: number;
   q1FY2025?: number;
+  q1FY2025Status?: string;
+  q2FY2024?: number;
+  q2FY2025?: number;
+  q2FY2025Status?: string;
+  q2CompletionPct?: number;
   q4FY2024?: number;
   qoqGrowth?: number;
-  yoyGrowth?: number;
-  isNewCustomer?: boolean; // NEW: Flag for new customers
+  q1YoyGrowth?: number;
+  q2YoyGrowth?: number;
+  yoyGrowth?: number; // Legacy compatibility
+  isNewCustomer?: boolean;
+  isQ2NewCustomer?: boolean;
 }
 
 // ==========================================
@@ -323,13 +331,36 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
       else if (daysSinceLastOrder > 60) riskLevel = 'high';
       else if (daysSinceLastOrder > 30) riskLevel = 'medium';
 
-      // SIMPLIFIED QUARTERLY PERFORMANCE (using available data)
+      // 🔧 ENHANCED: DUAL QUARTERLY PERFORMANCE (Q1 + Q2 with completion status)
       const currentJune = getBrandValue(shop, 'june', activeBrand);
       const currentMay = getBrandValue(shop, 'may', activeBrand);
       const currentApril = getBrandValue(shop, 'april', activeBrand);
+      const currentJuly = getBrandValue(shop, 'july', activeBrand);
+      const currentAugust = getBrandValue(shop, 'august', activeBrand);
+      const currentSeptember = getBrandValue(shop, 'september', activeBrand);
       
-      // Current Quarter: Q1 FY2025 (Apr-May-Jun 2025) - use current 3 months
+      // Q1 FY2025 (Apr-May-Jun 2025) - COMPLETED
       const q1FY2025 = currentApril + currentMay + currentJune;
+      const q1FY2025Status = 'COMPLETED';
+      
+      // Q2 FY2025 (Jul-Aug-Sep 2025) - IN PROGRESS (depends on current month)
+      const q2FY2025 = currentJuly + currentAugust + currentSeptember;
+      const currentMonthNum = parseInt(data.currentMonth);
+      let q2FY2025Status = 'NOT_STARTED';
+      let q2CompletionPct = 0;
+      
+      if (currentMonthNum >= 7) { // July or later
+        if (currentMonthNum === 7) {
+          q2FY2025Status = 'IN_PROGRESS_1_3';
+          q2CompletionPct = 33;
+        } else if (currentMonthNum === 8) {
+          q2FY2025Status = 'IN_PROGRESS_2_3';
+          q2CompletionPct = 67;
+        } else if (currentMonthNum >= 9) {
+          q2FY2025Status = 'COMPLETED';
+          q2CompletionPct = 100;
+        }
+      }
       
       // Previous Quarter: Use Q4 data if available, otherwise use Q1 average as fallback
       const currentMarch = getBrandValue(shop, 'march', activeBrand);
@@ -337,30 +368,55 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
       const currentJanuary = getBrandValue(shop, 'january', activeBrand);
       const q4FY2024 = currentJanuary + currentFebruary + currentMarch;
       
-      // Year-over-Year Quarter: Q1 FY2024 - use last year June data
+      // Year-over-Year Quarters: Q1 & Q2 FY2024 - use historical data
       const juneLastYear = activeBrand === '8PM' ? (shop.juneLastYearEightPM || 0) :
                           activeBrand === 'VERVE' ? (shop.juneLastYearVerve || 0) :
                           (shop.juneLastYearTotal || 0);
       const q1FY2024 = juneLastYear; // Use actual last year data
       
+      // Q2 FY2024 (Jul-Aug-Sep 2024) - from historical data
+      const july2024 = getBrandValue(shop, 'july', activeBrand); // From 2024 historical
+      const august2024 = getBrandValue(shop, 'august', activeBrand); // From 2024 historical  
+      const september2024 = getBrandValue(shop, 'september', activeBrand); // From 2024 historical
+      const q2FY2024 = july2024 + august2024 + september2024;
+      
       // Calculate quarterly metrics with NEW customer logic
       const qoqGrowth = q4FY2024 > 0 ? ((q1FY2025 - q4FY2024) / q4FY2024) * 100 : 0;
       
-      // ENHANCED: Handle NEW customers properly
-      let yoyGrowth = 0;
+      // Q1 YoY Growth: ENHANCED - Handle NEW customers properly
+      let q1YoyGrowth = 0;
       let isNewCustomer = false;
       
       if (q1FY2024 === 0 && q1FY2025 > 0) {
         // NEW customer: had no sales last year but has sales this year
         isNewCustomer = true;
-        yoyGrowth = 999; // Use 999 as marker for NEW customer
+        q1YoyGrowth = 999; // Use 999 as marker for NEW customer
       } else if (q1FY2024 > 0) {
         // Regular YoY calculation
-        yoyGrowth = ((q1FY2025 - q1FY2024) / q1FY2024) * 100;
+        q1YoyGrowth = ((q1FY2025 - q1FY2024) / q1FY2024) * 100;
       } else {
         // No sales in either year
-        yoyGrowth = 0;
+        q1YoyGrowth = 0;
       }
+      
+      // Q2 YoY Growth: Similar logic for Q2
+      let q2YoyGrowth = 0;
+      let isQ2NewCustomer = false;
+      
+      if (q2FY2024 === 0 && q2FY2025 > 0) {
+        // NEW Q2 customer: had no Q2 sales last year but has Q2 sales this year
+        isQ2NewCustomer = true;
+        q2YoyGrowth = 999; // Use 999 as marker for NEW Q2 customer
+      } else if (q2FY2024 > 0 && q2FY2025 > 0) {
+        // Regular Q2 YoY calculation (only if both quarters have data)
+        q2YoyGrowth = ((q2FY2025 - q2FY2024) / q2FY2024) * 100;
+      } else {
+        // No sales in either year or incomplete data
+        q2YoyGrowth = 0;
+      }
+      
+      // Legacy compatibility: use Q1 growth as primary
+      const yoyGrowth = q1YoyGrowth;
       
       // Simple quarterly decline for backward compatibility
       const q1Average = (currentMarch + currentApril + currentMay) / 3;
