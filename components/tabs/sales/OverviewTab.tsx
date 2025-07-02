@@ -786,18 +786,7 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
                 {completedQuarter === 'Q4' && <div className="text-xs text-purple-600 font-medium">✅ Latest Complete</div>}
               </div>
             </div>
-            
-            {/* Future-ready progression preview */}
-            <div className="bg-blue-50 p-3 rounded border border-blue-200">
-              <h6 className="font-medium text-blue-800 mb-2">🔄 Automatic Dashboard Evolution:</h6>
-              <div className="text-xs text-blue-700 space-y-1">
-                <div>• <strong>July:</strong> Shows "July 2025 vs July 2024" (1/3 months)</div>
-                <div>• <strong>August:</strong> Shows "July-August 2025 vs July-August 2024" (2/3 months)</div>
-                <div>• <strong>September:</strong> Shows "July-August-September 2025 vs July-August-September 2024" (3/3 months complete)</div>
-                <div>• <strong>October:</strong> Q2 becomes completed quarter, Q3 starts as ongoing quarter</div>
-                <div className="pt-1 font-medium">✅ Your dashboard will automatically track rolling quarters with zero configuration!</div>
-              </div>
-            </div>
+
           </div>
         </div>
       </div>
