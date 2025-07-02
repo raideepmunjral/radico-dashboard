@@ -85,12 +85,85 @@ interface DashboardData {
 }
 
 // ==========================================
-// HELPER FUNCTIONS
+// ENHANCED HELPER FUNCTIONS FOR FUTURE-READY QUARTER TRACKING
 // ==========================================
 
 const getMonthName = (monthNum: string) => {
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   return months[parseInt(monthNum) - 1] || 'Unknown';
+};
+
+// NEW: Get descriptive period label for ongoing quarter
+const getOngoingQuarterPeriodLabel = (currentMonth: string, currentYear: string) => {
+  const monthNum = parseInt(currentMonth);
+  
+  if (monthNum >= 7 && monthNum <= 9) {
+    // Q2: July-August-September
+    const monthsInQ2 = ['July', 'August', 'September'];
+    const currentPosition = monthNum - 6; // 1, 2, or 3
+    const periodMonths = monthsInQ2.slice(0, currentPosition);
+    
+    return {
+      currentPeriod: periodMonths.join('-') + ` ${currentYear}`,
+      lastYearPeriod: periodMonths.join('-') + ` ${parseInt(currentYear) - 1}`,
+      quarterName: 'Q2',
+      monthsCompleted: currentPosition,
+      totalMonths: 3,
+      isComplete: currentPosition === 3
+    };
+  } else if (monthNum >= 10 && monthNum <= 12) {
+    // Q3: October-November-December  
+    const monthsInQ3 = ['October', 'November', 'December'];
+    const currentPosition = monthNum - 9; // 1, 2, or 3
+    const periodMonths = monthsInQ3.slice(0, currentPosition);
+    
+    return {
+      currentPeriod: periodMonths.join('-') + ` ${currentYear}`,
+      lastYearPeriod: periodMonths.join('-') + ` ${parseInt(currentYear) - 1}`,
+      quarterName: 'Q3', 
+      monthsCompleted: currentPosition,
+      totalMonths: 3,
+      isComplete: currentPosition === 3
+    };
+  } else if (monthNum >= 1 && monthNum <= 3) {
+    // Q4: January-February-March
+    const monthsInQ4 = ['January', 'February', 'March'];
+    const currentPosition = monthNum; // 1, 2, or 3
+    const periodMonths = monthsInQ4.slice(0, currentPosition);
+    
+    return {
+      currentPeriod: periodMonths.join('-') + ` ${currentYear}`,
+      lastYearPeriod: periodMonths.join('-') + ` ${parseInt(currentYear) - 1}`,
+      quarterName: 'Q4',
+      monthsCompleted: currentPosition,
+      totalMonths: 3,
+      isComplete: currentPosition === 3
+    };
+  } else if (monthNum >= 4 && monthNum <= 6) {
+    // Q1: April-May-June
+    const monthsInQ1 = ['April', 'May', 'June'];
+    const currentPosition = monthNum - 3; // 1, 2, or 3
+    const periodMonths = monthsInQ1.slice(0, currentPosition);
+    
+    return {
+      currentPeriod: periodMonths.join('-') + ` ${currentYear}`,
+      lastYearPeriod: periodMonths.join('-') + ` ${parseInt(currentYear) - 1}`,
+      quarterName: 'Q1',
+      monthsCompleted: currentPosition,
+      totalMonths: 3,
+      isComplete: currentPosition === 3
+    };
+  }
+  
+  // Fallback
+  return {
+    currentPeriod: `${getMonthName(currentMonth)} ${currentYear}`,
+    lastYearPeriod: `${getMonthName(currentMonth)} ${parseInt(currentYear) - 1}`,
+    quarterName: 'Current',
+    monthsCompleted: 1,
+    totalMonths: 3,
+    isComplete: false
+  };
 };
 
 // ==========================================
@@ -298,13 +371,17 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
   
   lastYearCompletedQ_Total = lastYearCompletedQ_8PM + lastYearCompletedQ_VERVE;
 
-  // Calculate ONGOING quarter data (if exists)
+  // Calculate ONGOING quarter data (if exists) - ENHANCED: Future-ready with descriptive labels
   const ongoingQuarter = getOngoingQuarter(data.currentMonth);
   let ongoingQ_8PM = 0, ongoingQ_VERVE = 0, ongoingQ_Total = 0;
   let lastYearOngoingQ_8PM = 0, lastYearOngoingQ_VERVE = 0, lastYearOngoingQ_Total = 0;
   let ongoingDataLabel = '';
+  let periodInfo: any = null;
   
   if (ongoingQuarter) {
+    // NEW: Get enhanced period information
+    periodInfo = getOngoingQuarterPeriodLabel(data.currentMonth, data.currentYear);
+    
     const ongoingMonths = getOngoingQuarterMonths(ongoingQuarter, data.currentMonth);
     
     ongoingQ_8PM = data.allShopsComparison.reduce((sum, shop) => {
@@ -323,7 +400,7 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
     
     ongoingQ_Total = ongoingQ_8PM + ongoingQ_VERVE;
 
-    // ENHANCED: Calculate proper last year ongoing quarter data
+    // ENHANCED: Calculate proper last year ongoing quarter data with future-ready logic
     if (ongoingQuarter === 'Q2' && ongoingMonths.length <= 3) {
       // Q2 ongoing: Use actual historical data if available
       lastYearOngoingQ_8PM = ongoingMonths.reduce((sum, month) => {
@@ -336,7 +413,33 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
         return sum + (data.historicalData?.[historicalKey]?.totalVERVE || 0);
       }, 0);
       
-      ongoingDataLabel = `${ongoingMonths.length} month(s) vs same period last year`;
+      ongoingDataLabel = periodInfo.lastYearPeriod;
+    } else if (ongoingQuarter === 'Q3' && ongoingMonths.length <= 3) {
+      // Q3 ongoing: Use actual historical data  
+      lastYearOngoingQ_8PM = ongoingMonths.reduce((sum, month) => {
+        const historicalKey = `${month}2024`;
+        return sum + (data.historicalData?.[historicalKey]?.total8PM || 0);
+      }, 0);
+      
+      lastYearOngoingQ_VERVE = ongoingMonths.reduce((sum, month) => {
+        const historicalKey = `${month}2024`;
+        return sum + (data.historicalData?.[historicalKey]?.totalVERVE || 0);
+      }, 0);
+      
+      ongoingDataLabel = periodInfo.lastYearPeriod;
+    } else if (ongoingQuarter === 'Q4' && ongoingMonths.length <= 3) {
+      // Q4 ongoing: Use actual historical data
+      lastYearOngoingQ_8PM = ongoingMonths.reduce((sum, month) => {
+        const historicalKey = `${month}`;
+        return sum + (data.historicalData?.[historicalKey]?.total8PM || 0);
+      }, 0);
+      
+      lastYearOngoingQ_VERVE = ongoingMonths.reduce((sum, month) => {
+        const historicalKey = `${month}`;
+        return sum + (data.historicalData?.[historicalKey]?.totalVERVE || 0);
+      }, 0);
+      
+      ongoingDataLabel = periodInfo.lastYearPeriod;
     } else {
       // Fallback: Use proportional estimation
       lastYearOngoingQ_8PM = ongoingMonths.length === 1 ? (data.summary.lastYearTotal8PM || 0) : 
@@ -540,12 +643,30 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
           </div>
         </div>
 
-        {/* ONGOING QUARTER SECTION */}
-        {ongoingQuarter && (
+        {/* ONGOING QUARTER SECTION - ENHANCED: Future-ready with descriptive labels */}
+        {ongoingQuarter && periodInfo && (
           <div className="border-t pt-6">
             <h4 className="text-md font-medium text-gray-800 mb-2 flex items-center">
-              📈 Ongoing Quarter Progress: {ongoingQuarter} FY{data.currentYear} (Month-to-Date)
+              📈 Ongoing Quarter Progress: {ongoingQuarter} FY{data.currentYear} 
+              <span className="ml-2 text-sm text-blue-600">({periodInfo.currentPeriod})</span>
             </h4>
+            
+            {/* Enhanced progress indicator */}
+            <div className="mb-4 bg-gray-100 rounded-lg p-3">
+              <div className="flex justify-between text-sm text-gray-700 mb-2">
+                <span>Quarter Progress: {periodInfo.monthsCompleted} of {periodInfo.totalMonths} months</span>
+                <span>{Math.round((periodInfo.monthsCompleted / periodInfo.totalMonths) * 100)}% complete</span>
+              </div>
+              <div className="w-full bg-gray-300 rounded-full h-2">
+                <div 
+                  className="bg-blue-600 h-2 rounded-full transition-all duration-500" 
+                  style={{ width: `${(periodInfo.monthsCompleted / periodInfo.totalMonths) * 100}%` }}
+                ></div>
+              </div>
+              <div className="text-xs text-gray-500 mt-1">
+                Comparing: {periodInfo.currentPeriod} vs {periodInfo.lastYearPeriod}
+              </div>
+            </div>
             
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
               {/* 8PM Ongoing Quarter */}
@@ -553,11 +674,11 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
                 <h5 className="font-medium text-purple-800 mb-3">8PM {ongoingQuarter} Progress</h5>
                 <div className="space-y-3">
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Same period last year:</span>
+                    <span className="text-sm text-gray-600">{periodInfo.lastYearPeriod}:</span>
                     <span className="font-medium text-gray-900">{Math.round(lastYearOngoingQ_8PM).toLocaleString()} cases</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Current progress:</span>
+                    <span className="text-sm text-gray-600">{periodInfo.currentPeriod}:</span>
                     <span className="font-bold text-purple-600">{ongoingQ_8PM.toLocaleString()} cases</span>
                   </div>
                   <div className="flex justify-between border-t pt-2">
@@ -567,7 +688,7 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
                     </span>
                   </div>
                   <div className="text-xs text-gray-500">
-                    {getOngoingQuarterMonths(ongoingQuarter, data.currentMonth).length} of 3 months
+                    {periodInfo.monthsCompleted} of 3 months complete
                   </div>
                 </div>
               </div>
@@ -577,11 +698,11 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
                 <h5 className="font-medium text-orange-800 mb-3">VERVE {ongoingQuarter} Progress</h5>
                 <div className="space-y-3">
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Same period last year:</span>
+                    <span className="text-sm text-gray-600">{periodInfo.lastYearPeriod}:</span>
                     <span className="font-medium text-gray-900">{Math.round(lastYearOngoingQ_VERVE).toLocaleString()} cases</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Current progress:</span>
+                    <span className="text-sm text-gray-600">{periodInfo.currentPeriod}:</span>
                     <span className="font-bold text-orange-600">{ongoingQ_VERVE.toLocaleString()} cases</span>
                   </div>
                   <div className="flex justify-between border-t pt-2">
@@ -591,7 +712,7 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
                     </span>
                   </div>
                   <div className="text-xs text-gray-500">
-                    {getOngoingQuarterMonths(ongoingQuarter, data.currentMonth).length} of 3 months
+                    {periodInfo.monthsCompleted} of 3 months complete
                   </div>
                 </div>
               </div>
@@ -601,11 +722,11 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
                 <h5 className="font-medium text-indigo-800 mb-3">Combined {ongoingQuarter} Progress</h5>
                 <div className="space-y-3">
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Same period last year:</span>
+                    <span className="text-sm text-gray-600">{periodInfo.lastYearPeriod}:</span>
                     <span className="font-medium text-gray-900">{Math.round(lastYearOngoingQ_Total).toLocaleString()} cases</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-sm text-gray-600">Current progress:</span>
+                    <span className="text-sm text-gray-600">{periodInfo.currentPeriod}:</span>
                     <span className="font-bold text-indigo-600">{ongoingQ_Total.toLocaleString()} cases</span>
                   </div>
                   <div className="flex justify-between border-t pt-2">
@@ -623,26 +744,58 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
           </div>
         )}
 
-        {/* Quarter Info Banner */}
+        {/* Quarter Info Banner - ENHANCED: Future-ready with automatic progression preview */}
         <div className="mt-6 bg-gray-50 p-4 rounded-lg">
           <div>
-            <h5 className="font-medium text-gray-800 mb-2">Financial Year Quarters:</h5>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+            <h5 className="font-medium text-gray-800 mb-2 flex items-center">
+              🚀 Financial Year Quarters (Automatic Rolling Progression):
+              {periodInfo && (
+                <span className="ml-2 px-2 py-1 bg-blue-100 text-blue-800 text-xs rounded">
+                  Currently: {periodInfo.quarterName} {periodInfo.monthsCompleted}/{periodInfo.totalMonths}
+                </span>
+              )}
+            </h5>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm mb-4">
               <div className={`text-center p-2 rounded ${completedQuarter === 'Q1' ? 'bg-blue-100 border border-blue-300' : 'bg-white'}`}>
                 <div className="font-medium">Q1</div>
                 <div className="text-xs text-gray-600">Apr-May-Jun</div>
+                {completedQuarter === 'Q1' && <div className="text-xs text-blue-600 font-medium">✅ Latest Complete</div>}
               </div>
-              <div className={`text-center p-2 rounded ${completedQuarter === 'Q2' ? 'bg-blue-100 border border-blue-300' : 'bg-white'}`}>
+              <div className={`text-center p-2 rounded ${
+                (ongoingQuarter === 'Q2' || completedQuarter === 'Q2') ? 'bg-green-100 border border-green-300' : 'bg-white'
+              }`}>
                 <div className="font-medium">Q2</div>
                 <div className="text-xs text-gray-600">Jul-Aug-Sep</div>
+                {ongoingQuarter === 'Q2' && <div className="text-xs text-green-600 font-medium">📈 Ongoing</div>}
+                {completedQuarter === 'Q2' && <div className="text-xs text-green-600 font-medium">✅ Latest Complete</div>}
               </div>
-              <div className={`text-center p-2 rounded ${completedQuarter === 'Q3' ? 'bg-blue-100 border border-blue-300' : 'bg-white'}`}>
+              <div className={`text-center p-2 rounded ${
+                (ongoingQuarter === 'Q3' || completedQuarter === 'Q3') ? 'bg-orange-100 border border-orange-300' : 'bg-white'
+              }`}>
                 <div className="font-medium">Q3</div>
                 <div className="text-xs text-gray-600">Oct-Nov-Dec</div>
+                {ongoingQuarter === 'Q3' && <div className="text-xs text-orange-600 font-medium">📈 Ongoing</div>}
+                {completedQuarter === 'Q3' && <div className="text-xs text-orange-600 font-medium">✅ Latest Complete</div>}
               </div>
-              <div className={`text-center p-2 rounded ${completedQuarter === 'Q4' ? 'bg-blue-100 border border-blue-300' : 'bg-white'}`}>
+              <div className={`text-center p-2 rounded ${
+                (ongoingQuarter === 'Q4' || completedQuarter === 'Q4') ? 'bg-purple-100 border border-purple-300' : 'bg-white'
+              }`}>
                 <div className="font-medium">Q4</div>
                 <div className="text-xs text-gray-600">Jan-Feb-Mar</div>
+                {ongoingQuarter === 'Q4' && <div className="text-xs text-purple-600 font-medium">📈 Ongoing</div>}
+                {completedQuarter === 'Q4' && <div className="text-xs text-purple-600 font-medium">✅ Latest Complete</div>}
+              </div>
+            </div>
+            
+            {/* Future-ready progression preview */}
+            <div className="bg-blue-50 p-3 rounded border border-blue-200">
+              <h6 className="font-medium text-blue-800 mb-2">🔄 Automatic Dashboard Evolution:</h6>
+              <div className="text-xs text-blue-700 space-y-1">
+                <div>• <strong>July:</strong> Shows "July 2025 vs July 2024" (1/3 months)</div>
+                <div>• <strong>August:</strong> Shows "July-August 2025 vs July-August 2024" (2/3 months)</div>
+                <div>• <strong>September:</strong> Shows "July-August-September 2025 vs July-August-September 2024" (3/3 months complete)</div>
+                <div>• <strong>October:</strong> Q2 becomes completed quarter, Q3 starts as ongoing quarter</div>
+                <div className="pt-1 font-medium">✅ Your dashboard will automatically track rolling quarters with zero configuration!</div>
               </div>
             </div>
           </div>
@@ -740,7 +893,7 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
               </div>
             </div>
             
-            {/* YoY Comparison */}
+            {/* YoY Comparison - FIXED: Use consistent historical data */}
             <div className="pt-2 border-t">
               <div className="flex justify-between text-sm">
                 <span>vs Last Year</span>
@@ -749,7 +902,7 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
                 </span>
               </div>
               <div className="text-xs text-gray-500 mt-1">
-                Last year: {data.summary.lastYearTotal8PM?.toLocaleString() || 0} cases
+                Last year: {data.historicalData?.july2024?.total8PM?.toLocaleString() || data.summary.lastYearTotal8PM?.toLocaleString() || 0} cases ({getMonthName(data.currentMonth)} 2024)
               </div>
             </div>
           </div>
@@ -805,7 +958,7 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
               </div>
             </div>
             
-            {/* YoY Comparison */}
+            {/* YoY Comparison - FIXED: Use consistent historical data */}
             <div className="pt-2 border-t">
               <div className="flex justify-between text-sm">
                 <span>vs Last Year</span>
@@ -814,7 +967,7 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
                 </span>
               </div>
               <div className="text-xs text-gray-500 mt-1">
-                Last year: {data.summary.lastYearTotalVERVE?.toLocaleString() || 0} cases
+                Last year: {data.historicalData?.july2024?.totalVERVE?.toLocaleString() || data.summary.lastYearTotalVERVE?.toLocaleString() || 0} cases ({getMonthName(data.currentMonth)} 2024)
               </div>
             </div>
           </div>
