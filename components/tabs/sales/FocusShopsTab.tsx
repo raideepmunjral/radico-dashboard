@@ -212,26 +212,30 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
               if (headerValue && targetValue > 0) {
                 let monthKey = '';
                 
-                if (headerValue.toLowerCase().includes('june')) {
-                  monthKey = '06';
-                } else if (headerValue.toLowerCase().includes('jul')) {
-                  monthKey = '07';
-                } else if (headerValue.toLowerCase().includes('aug')) {
-                  monthKey = '08';
-                } else if (headerValue.toLowerCase().includes('sept')) {
-                  monthKey = '09';
-                } else if (headerValue.toLowerCase().includes('oct')) {
-                  monthKey = '10';
-                } else if (headerValue.toLowerCase().includes('nov')) {
-                  monthKey = '11';
-                } else if (headerValue.toLowerCase().includes('dec')) {
-                  monthKey = '12';
-                } else if (headerValue.toLowerCase().includes('jan')) {
+                if (headerValue.toLowerCase().includes('january') || headerValue.toLowerCase().includes('jan')) {
                   monthKey = '01';
-                } else if (headerValue.toLowerCase().includes('feb')) {
+                } else if (headerValue.toLowerCase().includes('february') || headerValue.toLowerCase().includes('feb')) {
                   monthKey = '02';
-                } else if (headerValue.toLowerCase().includes('mar')) {
+                } else if (headerValue.toLowerCase().includes('march') || headerValue.toLowerCase().includes('mar')) {
                   monthKey = '03';
+                } else if (headerValue.toLowerCase().includes('april') || headerValue.toLowerCase().includes('apr')) {
+                  monthKey = '04';
+                } else if (headerValue.toLowerCase().includes('may')) {
+                  monthKey = '05';
+                } else if (headerValue.toLowerCase().includes('june') || headerValue.toLowerCase().includes('jun')) {
+                  monthKey = '06';
+                } else if (headerValue.toLowerCase().includes('july') || headerValue.toLowerCase().includes('jul')) {
+                  monthKey = '07';
+                } else if (headerValue.toLowerCase().includes('august') || headerValue.toLowerCase().includes('aug')) {
+                  monthKey = '08';
+                } else if (headerValue.toLowerCase().includes('september') || headerValue.toLowerCase().includes('sept') || headerValue.toLowerCase().includes('sep')) {
+                  monthKey = '09';
+                } else if (headerValue.toLowerCase().includes('october') || headerValue.toLowerCase().includes('oct')) {
+                  monthKey = '10';
+                } else if (headerValue.toLowerCase().includes('november') || headerValue.toLowerCase().includes('nov')) {
+                  monthKey = '11';
+                } else if (headerValue.toLowerCase().includes('december') || headerValue.toLowerCase().includes('dec')) {
+                  monthKey = '12';
                 }
                 
                 if (monthKey) {
