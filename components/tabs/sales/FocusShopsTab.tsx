@@ -413,7 +413,9 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
                     <span className="text-xs text-gray-600">VERVE Sales:</span>
                     <div className="flex items-center space-x-2">
                       <span className="text-sm font-medium text-orange-600">{monthData.verve} cases</span>
-                      <Info className="w-3 h-3 text-gray-400" title="VERVE tracking only - no targets" />
+                      <div title="VERVE tracking only - no targets">
+                        <Info className="w-3 h-3 text-gray-400" />
+                      </div>
                     </div>
                   </div>
                   <div className="text-xs text-gray-500 text-right">Sales tracking only</div>
@@ -897,7 +899,9 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
                           <td className="px-3 py-4 whitespace-nowrap text-center text-sm bg-orange-50">
                             <div className="flex items-center justify-center space-x-1">
                               <span className="font-medium text-orange-600">{monthData.verve}</span>
-                              <Info className="w-3 h-3 text-orange-400" title="Sales tracking only" />
+                              <div title="Sales tracking only">
+                                <Info className="w-3 h-3 text-orange-400" />
+                              </div>
                             </div>
                             <div className="text-xs text-orange-500">Sales only</div>
                           </td>
