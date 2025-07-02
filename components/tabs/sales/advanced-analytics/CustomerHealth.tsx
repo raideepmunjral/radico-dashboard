@@ -445,13 +445,21 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
         customerStatus,
         riskLevel,
         quarterlyDecline,
-        // NEW: Enhanced quarterly performance metrics
+        // ENHANCED: Dual quarterly performance metrics (Q1 + Q2)
         q1FY2024: q1FY2024,
         q1FY2025: q1FY2025,
+        q1FY2025Status: q1FY2025Status,
+        q2FY2024: q2FY2024,
+        q2FY2025: q2FY2025,
+        q2FY2025Status: q2FY2025Status,
+        q2CompletionPct: q2CompletionPct,
         q4FY2024: q4FY2024,
         qoqGrowth: qoqGrowth,
-        yoyGrowth: yoyGrowth,
-        isNewCustomer: isNewCustomer
+        q1YoyGrowth: q1YoyGrowth,
+        q2YoyGrowth: q2YoyGrowth,
+        yoyGrowth: yoyGrowth, // Legacy compatibility
+        isNewCustomer: isNewCustomer,
+        isQ2NewCustomer: isQ2NewCustomer
       };
     });
   }, [data, activeBrand, currentMonthInfo]);
@@ -597,12 +605,18 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
         csvContent += `"${shop.shopName}","${shop.department}","${shop.salesman}","${shop.lastOrderDate}",${shop.daysSinceLastOrder},"${shop.customerStatus}","${shop.riskLevel}"\n`;
       });
     } else if (activeSection === 'quarterly') {
-      csvContent += `QUARTERLY FISCAL PERFORMANCE ANALYSIS\n`;
-      csvContent += `Shop Name,Department,Salesman,Q1 FY2024 (Jun),Q1 FY2025 (Total),YoY Growth %,QoQ Growth %\n`;
+      csvContent += `QUARTERLY FISCAL PERFORMANCE ANALYSIS - DUAL QUARTER COMPARISON\n`;
+      csvContent += `Q1 Status: COMPLETED (Apr+May+Jun) | Q2 Status: Based on current month progression\n`;
+      csvContent += `Shop Name,Department,Salesman,Q1 FY2024,Q1 FY2025,Q1 YoY Growth %,Q1 Status,Q2 FY2024,Q2 FY2025,Q2 YoY Growth %,Q2 Status,Q2 Completion\n`;
       
       filteredShops.forEach(shop => {
-        const yoyDisplay = shop.isNewCustomer ? 'NEW' : `${(shop.yoyGrowth || 0).toFixed(1)}%`;
-        csvContent += `"${shop.shopName}","${shop.department}","${shop.salesman}",${shop.q1FY2024 || 0},${shop.q1FY2025 || 0},"${yoyDisplay}",${(shop.qoqGrowth || 0).toFixed(1)}%\n`;
+        const q1YoyDisplay = shop.isNewCustomer ? 'NEW' : `${(shop.q1YoyGrowth || 0).toFixed(1)}%`;
+        const q2YoyDisplay = shop.q2FY2025Status === 'NOT_STARTED' ? 'PENDING' :
+                            shop.isQ2NewCustomer ? 'NEW Q2' :
+                            shop.q2FY2024 === 0 ? 'FIRST Q2' :
+                            `${(shop.q2YoyGrowth || 0).toFixed(1)}%`;
+        
+        csvContent += `"${shop.shopName}","${shop.department}","${shop.salesman}",${shop.q1FY2024 || 0},${shop.q1FY2025 || 0},"${q1YoyDisplay}","${shop.q1FY2025Status}",${shop.q2FY2024 || 0},${shop.q2FY2025 || 0},"${q2YoyDisplay}","${shop.q2FY2025Status}",${shop.q2CompletionPct || 0}%\n`;
       });
     }
 
@@ -858,9 +872,12 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
                 )}
                 {activeSection === 'quarterly' && (
                   <>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Q1 FY2024 (Jun)</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Q1 FY2025 (Total)</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">YoY Growth</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Q1 FY2024</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Q1 FY2025</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Q1 YoY Growth</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Q2 FY2024</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Q2 FY2025</th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Q2 YoY Growth</th>
                   </>
                 )}
               </tr>
@@ -919,12 +936,17 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
                   
                   {activeSection === 'quarterly' && (
                     <>
+                      {/* Q1 FY2024 */}
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                         {(shop.q1FY2024 || 0).toLocaleString()} cases
+                        <div className="text-xs text-gray-500">Apr-May-Jun 2024</div>
                       </td>
+                      {/* Q1 FY2025 */}
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {(shop.q1FY2025 || 0).toLocaleString()} cases
+                        <div className="text-xs text-green-600">✅ {shop.q1FY2025Status}</div>
                       </td>
+                      {/* Q1 YoY Growth */}
                       <td className="px-6 py-4 whitespace-nowrap text-sm">
                         {shop.isNewCustomer ? (
                           <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
@@ -932,9 +954,51 @@ const CustomerHealth = ({ data }: { data: DashboardData }) => {
                           </span>
                         ) : (
                           <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                            (shop.yoyGrowth || 0) >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                            (shop.q1YoyGrowth || 0) >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                           }`}>
-                            {(shop.yoyGrowth || 0) >= 0 ? '+' : ''}{(shop.yoyGrowth || 0).toFixed(1)}%
+                            {(shop.q1YoyGrowth || 0) >= 0 ? '+' : ''}{(shop.q1YoyGrowth || 0).toFixed(1)}%
+                          </span>
+                        )}
+                      </td>
+                      {/* Q2 FY2024 */}
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        {(shop.q2FY2024 || 0).toLocaleString()} cases
+                        <div className="text-xs text-gray-500">Jul-Aug-Sep 2024</div>
+                      </td>
+                      {/* Q2 FY2025 */}
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {(shop.q2FY2025 || 0).toLocaleString()} cases
+                        <div className={`text-xs ${
+                          shop.q2FY2025Status === 'COMPLETED' ? 'text-green-600' :
+                          shop.q2FY2025Status?.includes('IN_PROGRESS') ? 'text-orange-600' :
+                          'text-gray-500'
+                        }`}>
+                          {shop.q2FY2025Status === 'COMPLETED' ? '✅ COMPLETED' :
+                           shop.q2FY2025Status === 'IN_PROGRESS_1_3' ? '🔄 1/3 (Jul only)' :
+                           shop.q2FY2025Status === 'IN_PROGRESS_2_3' ? '🔄 2/3 (Jul+Aug)' :
+                           '⏳ Not Started'}
+                        </div>
+                      </td>
+                      {/* Q2 YoY Growth */}
+                      <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        {shop.q2FY2025Status === 'NOT_STARTED' ? (
+                          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-gray-100 text-gray-600">
+                            PENDING
+                          </span>
+                        ) : shop.isQ2NewCustomer ? (
+                          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
+                            NEW Q2
+                          </span>
+                        ) : shop.q2FY2024 === 0 ? (
+                          <span className="px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
+                            FIRST Q2
+                          </span>
+                        ) : (
+                          <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                            (shop.q2YoyGrowth || 0) >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+                          }`}>
+                            {(shop.q2YoyGrowth || 0) >= 0 ? '+' : ''}{(shop.q2YoyGrowth || 0).toFixed(1)}%
+                            {shop.q2FY2025Status?.includes('IN_PROGRESS') && <div className="text-xs opacity-60">*partial</div>}
                           </span>
                         )}
                       </td>
