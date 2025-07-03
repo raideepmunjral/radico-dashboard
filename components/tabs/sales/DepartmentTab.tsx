@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { X, AlertTriangle, TrendingUp, TrendingDown, Activity, Clock, Target, Info } from 'lucide-react';
+import { X, AlertTriangle, TrendingUp, TrendingDown, Activity, Clock, Target, Info, Download } from 'lucide-react';
 
 // ==========================================
-// TYPE DEFINITIONS (UNCHANGED)
+// TYPE DEFINITIONS
 // ==========================================
 
 interface ShopData {
@@ -16,7 +16,7 @@ interface ShopData {
   eightPM: number;
   verve: number;
   
-  // EXISTING: Rolling months (UNCHANGED)
+  // Historical data
   marchTotal?: number;
   marchEightPM?: number;
   marchVerve?: number;
@@ -30,7 +30,7 @@ interface ShopData {
   juneEightPM?: number;
   juneVerve?: number;
   
-  // NEW: Extended Historical Data
+  // Extended Historical Data
   februaryTotal?: number;
   februaryEightPM?: number;
   februaryVerve?: number;
@@ -69,7 +69,7 @@ interface DashboardData {
 }
 
 // ==========================================
-// 🚀 HELPER FUNCTIONS WITH CLEAR NAMING
+// HELPER FUNCTIONS WITH CLEAR NAMING
 // ==========================================
 
 const getMonthName = (monthNum: string) => {
@@ -88,18 +88,16 @@ const getMonthKey = (monthNum: string) => {
   return keys[parseInt(monthNum) - 1] || 'unknown';
 };
 
-// 🚀 CLEAR: 5-MONTH ROLLING WINDOW CALCULATION
+// 5-MONTH ROLLING WINDOW CALCULATION
 const getDepartmentRolling5MonthWindow = (currentMonth: string, currentYear: string) => {
   const monthNum = parseInt(currentMonth);
   const yearNum = parseInt(currentYear);
   const months = [];
   
-  // Calculate last 5 months including current
   for (let i = 4; i >= 0; i--) {
     let targetMonth = monthNum - i;
     let targetYear = yearNum;
     
-    // Handle year rollover
     while (targetMonth <= 0) {
       targetMonth += 12;
       targetYear -= 1;
@@ -117,19 +115,18 @@ const getDepartmentRolling5MonthWindow = (currentMonth: string, currentYear: str
   return months;
 };
 
-// 🚀 CLEAR: ROLLING WINDOW LABEL
+// ROLLING WINDOW LABEL
 const getDepartmentRollingLabel = (currentMonth: string, currentYear: string) => {
   const window = getDepartmentRolling5MonthWindow(currentMonth, currentYear);
   return window.map(m => m.shortName).join('-') + ` ${currentYear}`;
 };
 
-// 🚀 CLEAR: GET SHOP DATA FOR ANY SPECIFIC MONTH
+// GET SHOP DATA FOR ANY SPECIFIC MONTH
 const getShopDataForMonth = (shop: ShopData, monthKey: string, dataType: 'total' | 'eightPM' | 'verve' = 'total') => {
   if (monthKey === 'current') {
     return shop[dataType] || 0;
   }
   
-  // Historical month data with clear mapping
   let fieldKey: string;
   switch (dataType) {
     case 'eightPM':
@@ -146,50 +143,36 @@ const getShopDataForMonth = (shop: ShopData, monthKey: string, dataType: 'total'
   return typeof value === 'number' ? value : 0;
 };
 
-// 🚀 CLEAR: TREND PATTERN ANALYSIS
+// TREND PATTERN ANALYSIS
 const analyzeTrendPattern = (recentMonthSales: number, middleMonthSales: number, oldestMonthSales: number) => {
-  // Define clear trend patterns using completed months only
   if (recentMonthSales > middleMonthSales && middleMonthSales > oldestMonthSales && oldestMonthSales > 0) {
-    return 'uptrend'; // Accelerating growth: Jun > May > Apr
+    return 'uptrend';
   } else if (recentMonthSales > middleMonthSales && middleMonthSales > 0) {
-    return 'growing'; // Recent improvement: Jun > May
+    return 'growing';
   } else if (recentMonthSales < middleMonthSales && middleMonthSales > 0) {
-    return 'declining'; // Recent decline: Jun < May
+    return 'declining';
   } else if (recentMonthSales > 0 && middleMonthSales === 0 && oldestMonthSales === 0) {
-    return 'new'; // New customer
+    return 'new';
   } else if (Math.abs(recentMonthSales - middleMonthSales) <= (middleMonthSales * 0.1) && middleMonthSales > 0) {
-    return 'stable'; // Within ±10%
+    return 'stable';
   } else {
-    return 'volatile'; // Inconsistent pattern
+    return 'volatile';
   }
 };
 
-// 🚀 ENHANCED: DEPARTMENT INTELLIGENCE WITH CRYSTAL CLEAR CALCULATIONS
+// DEPARTMENT INTELLIGENCE WITH CRYSTAL CLEAR CALCULATIONS
 const calculateDepartmentIntelligenceWithClearLabels = (salesData: Record<string, ShopData>, currentMonth: string, currentYear: string) => {
   const allShops = Object.values(salesData);
   const rollingWindow = getDepartmentRolling5MonthWindow(currentMonth, currentYear);
   
-  // Get the last 3 completed months for trend analysis (CLEAR NAMING)
-  const recentCompletedMonth = rollingWindow[rollingWindow.length - 2]; // Previous month (June)
-  const middleCompletedMonth = rollingWindow[rollingWindow.length - 3]; // Month before (May)  
-  const oldestCompletedMonth = rollingWindow[rollingWindow.length - 4]; // Month before that (April)
-  
-  console.log('🔍 CLEAR Department Analysis:', {
-    totalShopsInSystem: allShops.length,
-    departmentsFound: [...new Set(allShops.map(shop => shop.department))],
-    trendAnalysisMonths: {
-      recent: `${recentCompletedMonth.fullName} ${recentCompletedMonth.year}`,
-      middle: `${middleCompletedMonth.fullName} ${middleCompletedMonth.year}`,
-      oldest: `${oldestCompletedMonth.fullName} ${oldestCompletedMonth.year}`
-    }
-  });
+  const recentCompletedMonth = rollingWindow[rollingWindow.length - 2];
+  const middleCompletedMonth = rollingWindow[rollingWindow.length - 3];  
+  const oldestCompletedMonth = rollingWindow[rollingWindow.length - 4];
 
-  // Calculate activity and trends for each shop (CLEAR PROCESSING)
   const shopsWithClearActivityData = allShops.map(shop => {
     let daysSinceLastOrder = -1;
     let lastOrderValue = 0;
     
-    // Check from most recent to oldest month to find last activity
     for (let i = rollingWindow.length - 1; i >= 0; i--) {
       const monthData = rollingWindow[i];
       const monthSales = getShopDataForMonth(shop, monthData.key, 'total');
@@ -202,10 +185,9 @@ const calculateDepartmentIntelligenceWithClearLabels = (salesData: Record<string
     }
     
     if (daysSinceLastOrder === -1) {
-      daysSinceLastOrder = 999; // Never ordered in the window
+      daysSinceLastOrder = 999;
     }
     
-    // Analyze trend pattern using completed months (CLEAR TREND LOGIC)
     const recentMonthSales = getShopDataForMonth(shop, recentCompletedMonth.key, 'total');
     const middleMonthSales = getShopDataForMonth(shop, middleCompletedMonth.key, 'total');
     const oldestMonthSales = getShopDataForMonth(shop, oldestCompletedMonth.key, 'total');
@@ -223,24 +205,20 @@ const calculateDepartmentIntelligenceWithClearLabels = (salesData: Record<string
     };
   });
   
-  // Calculate department-level metrics with CRYSTAL CLEAR naming
   const departmentIntelligenceData: Record<string, any> = {};
   
-  // Filter valid departments (no nulls, unknowns, etc.)
   const validDepartments = [...new Set(allShops.map(shop => shop.department))]
     .filter(dept => dept && dept !== 'Unknown' && dept.trim() !== '');
   
   validDepartments.forEach(departmentName => {
     const departmentShops = shopsWithClearActivityData.filter(shop => shop.department === departmentName);
     
-    // CLEAR COUNTS: Activity-based categorization
     const totalShopsInDepartment = departmentShops.length;
     const shopsActiveInLast30Days = departmentShops.filter(shop => shop.daysSinceLastOrder < 30).length;
     const shopsInactive60to90Days = departmentShops.filter(shop => shop.daysSinceLastOrder >= 60 && shop.daysSinceLastOrder < 90).length;
     const shopsInactiveOver90Days = departmentShops.filter(shop => shop.daysSinceLastOrder >= 90 && shop.daysSinceLastOrder < 999).length;
     const shopsNeverOrderedInWindow = departmentShops.filter(shop => shop.daysSinceLastOrder === 999).length;
     
-    // CLEAR COUNTS: Trend-based categorization  
     const shopsWithUptrendPattern = departmentShops.filter(shop => shop.shopTrendPattern === 'uptrend');
     const shopsWithGrowingPattern = departmentShops.filter(shop => shop.shopTrendPattern === 'growing');
     const shopsWithDecliningPattern = departmentShops.filter(shop => shop.shopTrendPattern === 'declining');
@@ -248,15 +226,12 @@ const calculateDepartmentIntelligenceWithClearLabels = (salesData: Record<string
     const shopsWithVolatilePattern = departmentShops.filter(shop => shop.shopTrendPattern === 'volatile');
     const shopsWithNewPattern = departmentShops.filter(shop => shop.shopTrendPattern === 'new');
     
-    // CLEAR COUNTS: Brand penetration (current month)
     const shopsCurrentlyBuying8PM = departmentShops.filter(shop => (shop.eightPM || 0) > 0).length;
     const shopsCurrentlyBuyingVERVE = departmentShops.filter(shop => (shop.verve || 0) > 0).length;
     
-    // CLEAR TOTALS: Sales volumes
     const total8PMCasesInDepartment = departmentShops.reduce((sum, shop) => sum + (shop.eightPM || 0), 0);
     const totalVERVECasesInDepartment = departmentShops.reduce((sum, shop) => sum + (shop.verve || 0), 0);
     
-    // CLEAR PERCENTAGES: For dashboard display
     const percentageShopsWithUptrend = totalShopsInDepartment > 0 ? ((shopsWithUptrendPattern.length / totalShopsInDepartment) * 100).toFixed(1) : '0';
     const percentageShopsWithDeclining = totalShopsInDepartment > 0 ? ((shopsWithDecliningPattern.length / totalShopsInDepartment) * 100).toFixed(1) : '0';
     const percentageShopsWithStable = totalShopsInDepartment > 0 ? ((shopsWithStablePattern.length / totalShopsInDepartment) * 100).toFixed(1) : '0';
@@ -265,19 +240,16 @@ const calculateDepartmentIntelligenceWithClearLabels = (salesData: Record<string
     const percentage8PMPenetration = totalShopsInDepartment > 0 ? ((shopsCurrentlyBuying8PM / totalShopsInDepartment) * 100).toFixed(1) : '0';
     const percentageVERVEPenetration = totalShopsInDepartment > 0 ? ((shopsCurrentlyBuyingVERVE / totalShopsInDepartment) * 100).toFixed(1) : '0';
     
-    // Health assessment
     const inactiveRate = totalShopsInDepartment > 0 ? (shopsInactiveOver90Days / totalShopsInDepartment) * 100 : 0;
     const departmentHealthScore = inactiveRate < 10 ? 'healthy' : inactiveRate < 20 ? 'moderate' : 'critical';
     
     departmentIntelligenceData[departmentName] = {
-      // CLEAR: Raw counts
       totalShopsInDepartment,
       shopsActiveInLast30Days,
       shopsInactive60to90Days,
       shopsInactiveOver90Days,
       shopsNeverOrderedInWindow,
       
-      // CLEAR: Trend analysis with shop lists
       shopsWithUptrendPattern,
       shopsWithGrowingPattern,
       shopsWithDecliningPattern,
@@ -285,13 +257,11 @@ const calculateDepartmentIntelligenceWithClearLabels = (salesData: Record<string
       shopsWithVolatilePattern,
       shopsWithNewPattern,
       
-      // CLEAR: Percentages for UI display
       percentageShopsWithUptrend,
       percentageShopsWithDeclining,
       percentageShopsWithStable,
       percentageShopsInactiveOver90Days,
       
-      // CLEAR: Brand penetration
       total8PMCasesInDepartment,
       totalVERVECasesInDepartment,
       shopsCurrentlyBuying8PM,
@@ -299,7 +269,6 @@ const calculateDepartmentIntelligenceWithClearLabels = (salesData: Record<string
       percentage8PMPenetration,
       percentageVERVEPenetration,
       
-      // CLEAR: Health indicators
       departmentHealthScore,
       trendAnalysisDescription: `${recentCompletedMonth.fullName} vs ${middleCompletedMonth.fullName} vs ${oldestCompletedMonth.fullName}`
     };
@@ -313,7 +282,6 @@ const calculateDepartmentIntelligenceWithClearLabels = (salesData: Record<string
 // ==========================================
 
 const DepartmentTab = ({ data }: { data: DashboardData }) => {
-  // Rolling window calculation
   const rollingWindow = useMemo(() => {
     return getDepartmentRolling5MonthWindow(data.currentMonth, data.currentYear);
   }, [data.currentMonth, data.currentYear]);
@@ -322,12 +290,10 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
     return getDepartmentRollingLabel(data.currentMonth, data.currentYear);
   }, [data.currentMonth, data.currentYear]);
 
-  // CLEAR: Department intelligence calculation
   const departmentIntelligence = useMemo(() => {
     return calculateDepartmentIntelligenceWithClearLabels(data.salesData, data.currentMonth, data.currentYear);
   }, [data.salesData, data.currentMonth, data.currentYear]);
 
-  // STATE for drill-down modals
   const [showDepartmentShops, setShowDepartmentShops] = useState(false);
   const [selectedDepartmentShops, setSelectedDepartmentShops] = useState<{
     department: string;
@@ -338,7 +304,6 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
     monthData?: { month: string; total: number; eightPM: number; verve: number; };
   } | null>(null);
 
-  // CLEAR: Functions to handle trend drill-down clicks
   const handleTrendDrillDown = (
     department: string,
     trendType: 'uptrend' | 'declining' | 'stable',
@@ -367,7 +332,6 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
     setShowDepartmentShops(true);
   };
 
-  // CLEAR: Functions to handle drill-down clicks
   const handleDepartmentShopsClick = (
     department: string, 
     title: string, 
@@ -387,7 +351,6 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
     setShowDepartmentShops(true);
   };
 
-  // Memoized department shop data for drill-downs
   const departmentShopsData = useMemo(() => {
     const deptData: Record<string, any> = {};
     
@@ -416,7 +379,6 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
     return deptData;
   }, [data.salesData]);
 
-  // ENHANCED: Department Shops Modal with Clear Labels
   const DepartmentShopsModal = ({ onClose }: { onClose: () => void }) => {
     if (!selectedDepartmentShops) return null;
 
@@ -460,7 +422,6 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
               </div>
             ) : (
               <>
-                {/* CLEAR: Summary Stats with Proper Calculations */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                   <div className={`${typeStyles.bg} p-4 rounded-lg text-center border ${typeStyles.border}`}>
                     <div className={`text-2xl font-bold ${typeStyles.text}`}>{shops.length}</div>
@@ -468,11 +429,7 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
                   </div>
                   <div className={`${typeStyles.bg} p-4 rounded-lg text-center border ${typeStyles.border}`}>
                     <div className={`text-2xl font-bold ${typeStyles.text}`}>
-                      {/* FIXED: Use correct data source for total cases */}
-                      {shops.reduce((sum, shop) => {
-                        // Use the same data source as the overview cards
-                        return sum + (shop.total || 0);
-                      }, 0).toLocaleString()}
+                      {shops.reduce((sum, shop) => sum + (shop.total || 0), 0).toLocaleString()}
                     </div>
                     <div className="text-sm text-gray-600">Total Cases (Current Month)</div>
                   </div>
@@ -490,7 +447,6 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
                   </div>
                 </div>
 
-                {/* Trend Analysis Summary for trend types */}
                 {(type === 'uptrend' || type === 'declining' || type === 'stable') && (
                   <div className={`mb-6 ${typeStyles.bg} p-4 rounded-lg border ${typeStyles.border}`}>
                     <h4 className={`font-medium ${typeStyles.text} mb-2 flex items-center`}>
@@ -514,7 +470,6 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
                   </div>
                 )}
 
-                {/* Shop List Table with Clear Headers */}
                 <div className="border border-gray-200 rounded-lg">
                   <div className="max-h-96 overflow-y-auto">
                     <table className="min-w-full divide-y divide-gray-200">
@@ -524,7 +479,6 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shop Name</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salesman</th>
                           
-                          {/* Dynamic columns based on view type */}
                           {(type === 'uptrend' || type === 'declining' || type === 'stable') ? (
                             <>
                               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jun Cases</th>
@@ -558,7 +512,6 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
                               {shop.salesman || 'Unknown'}
                             </td>
                             
-                            {/* Data columns based on view type */}
                             {(type === 'uptrend' || type === 'declining' || type === 'stable') ? (
                               <>
                                 <td className="px-4 py-3 text-sm font-bold text-gray-900">
@@ -650,7 +603,6 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
 
   return (
     <div className="space-y-6">
-      {/* 🚀 ENHANCED: Department Intelligence Overview with Crystal Clear Labels */}
       <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg shadow">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-gray-900 flex items-center">
@@ -677,7 +629,6 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
               </div>
               
               <div className="space-y-2">
-                {/* CLEAR: Trend Metrics with Proper Labels */}
                 <div className="flex justify-between items-center">
                   <span className="text-xs text-gray-600 flex items-center">
                     <TrendingUp className="w-3 h-3 mr-1" />
@@ -706,7 +657,6 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
                   </button>
                 </div>
                 
-                {/* CLEAR: Brand Penetration with Proper Labels */}
                 <div className="flex justify-between items-center">
                   <span className="text-xs text-gray-600">8PM Brand Buyers:</span>
                   <button
@@ -741,7 +691,6 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
                   </button>
                 </div>
                 
-                {/* CLEAR: Activity Indicator with Days Label */}
                 <div className="flex justify-between pt-2 border-t">
                   <span className="text-xs text-gray-600 flex items-center">
                     <Clock className="w-3 h-3 mr-1" />
@@ -775,22 +724,17 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
           ))}
         </div>
 
-        {/* CLEAR: Legend explaining the metrics */}
         <div className="mt-4 p-3 bg-white rounded-lg border border-blue-200">
           <h5 className="font-medium text-blue-900 mb-2">📊 Metrics Explanation:</h5>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-blue-700">
-            <div><strong>Growth Trend:</strong> % of shops with Jun > May > Apr sales</div>
-            <div><strong>Declining Trend:</strong> % of shops with Jun < May sales</div>
+            <div><strong>Growth Trend:</strong> % of shops with Jun &gt; May &gt; Apr sales</div>
+            <div><strong>Declining Trend:</strong> % of shops with Jun &lt; May sales</div>
             <div><strong>8PM/VERVE Buyers:</strong> % of shops currently buying each brand</div>
             <div><strong>Inactive 90+ Days:</strong> % of shops with no orders for 90+ days</div>
           </div>
         </div>
       </div>
 
-      {/* Rest of the component remains the same... */}
-      {/* Department Performance Overview, tables, etc. would continue here */}
-
-      {/* Modal */}
       {showDepartmentShops && (
         <DepartmentShopsModal 
           onClose={() => {
