@@ -224,69 +224,11 @@ const calculateDepartmentIntelligenceWithClearLabels = (salesData: Record<string
   validDepartments.forEach(departmentName => {
     const departmentShops = shopsWithClearActivityData.filter(shop => shop.department === departmentName);
     
-    // CLEAR COUNTS: Activity-based categorization
     const totalShopsInDepartment = departmentShops.length;
     const shopsActiveInLast30Days = departmentShops.filter(shop => shop.daysSinceLastOrder < 30).length;
     const shopsInactive60to90Days = departmentShops.filter(shop => shop.daysSinceLastOrder >= 60 && shop.daysSinceLastOrder < 90).length;
     const shopsInactiveOver90Days = departmentShops.filter(shop => shop.daysSinceLastOrder >= 90 && shop.daysSinceLastOrder < 999).length;
     const shopsNeverOrderedInWindow = departmentShops.filter(shop => shop.daysSinceLastOrder === 999).length;
-    
-    // ENHANCED: Brand-specific inactivity tracking
-    const shopsInactive60Days8PM = departmentShops.filter(shop => {
-      // Check if shop hasn't bought 8PM in 60+ days
-      let daysSinceLastEightPM = 999;
-      for (let i = rollingWindow.length - 1; i >= 0; i--) {
-        const monthData = rollingWindow[i];
-        const monthEightPM = getShopDataForMonth(shop, monthData.key, 'eightPM');
-        if (monthEightPM > 0) {
-          daysSinceLastEightPM = i === rollingWindow.length - 1 ? 0 : (rollingWindow.length - 1 - i) * 30;
-          break;
-        }
-      }
-      return daysSinceLastEightPM >= 60 && daysSinceLastEightPM < 90;
-    }).length;
-    
-    const shopsInactive90Days8PM = departmentShops.filter(shop => {
-      // Check if shop hasn't bought 8PM in 90+ days
-      let daysSinceLastEightPM = 999;
-      for (let i = rollingWindow.length - 1; i >= 0; i--) {
-        const monthData = rollingWindow[i];
-        const monthEightPM = getShopDataForMonth(shop, monthData.key, 'eightPM');
-        if (monthEightPM > 0) {
-          daysSinceLastEightPM = i === rollingWindow.length - 1 ? 0 : (rollingWindow.length - 1 - i) * 30;
-          break;
-        }
-      }
-      return daysSinceLastEightPM >= 90;
-    }).length;
-    
-    const shopsInactive60DaysVERVE = departmentShops.filter(shop => {
-      // Check if shop hasn't bought VERVE in 60+ days
-      let daysSinceLastVerve = 999;
-      for (let i = rollingWindow.length - 1; i >= 0; i--) {
-        const monthData = rollingWindow[i];
-        const monthVerve = getShopDataForMonth(shop, monthData.key, 'verve');
-        if (monthVerve > 0) {
-          daysSinceLastVerve = i === rollingWindow.length - 1 ? 0 : (rollingWindow.length - 1 - i) * 30;
-          break;
-        }
-      }
-      return daysSinceLastVerve >= 60 && daysSinceLastVerve < 90;
-    }).length;
-    
-    const shopsInactive90DaysVERVE = departmentShops.filter(shop => {
-      // Check if shop hasn't bought VERVE in 90+ days
-      let daysSinceLastVerve = 999;
-      for (let i = rollingWindow.length - 1; i >= 0; i--) {
-        const monthData = rollingWindow[i];
-        const monthVerve = getShopDataForMonth(shop, monthData.key, 'verve');
-        if (monthVerve > 0) {
-          daysSinceLastVerve = i === rollingWindow.length - 1 ? 0 : (rollingWindow.length - 1 - i) * 30;
-          break;
-        }
-      }
-      return daysSinceLastVerve >= 90;
-    }).length;
     
     const shopsWithUptrendPattern = departmentShops.filter(shop => shop.shopTrendPattern === 'uptrend');
     const shopsWithGrowingPattern = departmentShops.filter(shop => shop.shopTrendPattern === 'growing');
@@ -306,12 +248,6 @@ const calculateDepartmentIntelligenceWithClearLabels = (salesData: Record<string
     const percentageShopsWithStable = totalShopsInDepartment > 0 ? ((shopsWithStablePattern.length / totalShopsInDepartment) * 100).toFixed(1) : '0';
     const percentageShopsInactive60Days = totalShopsInDepartment > 0 ? ((shopsInactive60to90Days / totalShopsInDepartment) * 100).toFixed(1) : '0';
     const percentageShopsInactiveOver90Days = totalShopsInDepartment > 0 ? ((shopsInactiveOver90Days / totalShopsInDepartment) * 100).toFixed(1) : '0';
-    
-    // NEW: Brand-specific inactivity percentages
-    const percentage8PMInactive60Days = totalShopsInDepartment > 0 ? ((shopsInactive60Days8PM / totalShopsInDepartment) * 100).toFixed(1) : '0';
-    const percentage8PMInactive90Days = totalShopsInDepartment > 0 ? ((shopsInactive90Days8PM / totalShopsInDepartment) * 100).toFixed(1) : '0';
-    const percentageVERVEInactive60Days = totalShopsInDepartment > 0 ? ((shopsInactive60DaysVERVE / totalShopsInDepartment) * 100).toFixed(1) : '0';
-    const percentageVERVEInactive90Days = totalShopsInDepartment > 0 ? ((shopsInactive90DaysVERVE / totalShopsInDepartment) * 100).toFixed(1) : '0';
     
     const percentage8PMPenetration = totalShopsInDepartment > 0 ? ((shopsCurrentlyBuying8PM / totalShopsInDepartment) * 100).toFixed(1) : '0';
     const percentageVERVEPenetration = totalShopsInDepartment > 0 ? ((shopsCurrentlyBuyingVERVE / totalShopsInDepartment) * 100).toFixed(1) : '0';
@@ -333,71 +269,15 @@ const calculateDepartmentIntelligenceWithClearLabels = (salesData: Record<string
       shopsWithVolatilePattern,
       shopsWithNewPattern,
       
-      // Shop lists for inactive periods (for drill-downs)
+      // NEW: Shop lists for inactive periods (for drill-downs)
       shopsInactive60to90DaysList: departmentShops.filter(shop => shop.daysSinceLastOrder >= 60 && shop.daysSinceLastOrder < 90),
       shopsInactiveOver90DaysList: departmentShops.filter(shop => shop.daysSinceLastOrder >= 90 && shop.daysSinceLastOrder < 999),
-      
-      // NEW: Brand-specific inactive shop lists
-      shopsInactive60Days8PMList: departmentShops.filter(shop => {
-        let daysSinceLastEightPM = 999;
-        for (let i = rollingWindow.length - 1; i >= 0; i--) {
-          const monthData = rollingWindow[i];
-          const monthEightPM = getShopDataForMonth(shop, monthData.key, 'eightPM');
-          if (monthEightPM > 0) {
-            daysSinceLastEightPM = i === rollingWindow.length - 1 ? 0 : (rollingWindow.length - 1 - i) * 30;
-            break;
-          }
-        }
-        return daysSinceLastEightPM >= 60 && daysSinceLastEightPM < 90;
-      }),
-      shopsInactive90Days8PMList: departmentShops.filter(shop => {
-        let daysSinceLastEightPM = 999;
-        for (let i = rollingWindow.length - 1; i >= 0; i--) {
-          const monthData = rollingWindow[i];
-          const monthEightPM = getShopDataForMonth(shop, monthData.key, 'eightPM');
-          if (monthEightPM > 0) {
-            daysSinceLastEightPM = i === rollingWindow.length - 1 ? 0 : (rollingWindow.length - 1 - i) * 30;
-            break;
-          }
-        }
-        return daysSinceLastEightPM >= 90;
-      }),
-      shopsInactive60DaysVERVEList: departmentShops.filter(shop => {
-        let daysSinceLastVerve = 999;
-        for (let i = rollingWindow.length - 1; i >= 0; i--) {
-          const monthData = rollingWindow[i];
-          const monthVerve = getShopDataForMonth(shop, monthData.key, 'verve');
-          if (monthVerve > 0) {
-            daysSinceLastVerve = i === rollingWindow.length - 1 ? 0 : (rollingWindow.length - 1 - i) * 30;
-            break;
-          }
-        }
-        return daysSinceLastVerve >= 60 && daysSinceLastVerve < 90;
-      }),
-      shopsInactive90DaysVERVEList: departmentShops.filter(shop => {
-        let daysSinceLastVerve = 999;
-        for (let i = rollingWindow.length - 1; i >= 0; i--) {
-          const monthData = rollingWindow[i];
-          const monthVerve = getShopDataForMonth(shop, monthData.key, 'verve');
-          if (monthVerve > 0) {
-            daysSinceLastVerve = i === rollingWindow.length - 1 ? 0 : (rollingWindow.length - 1 - i) * 30;
-            break;
-          }
-        }
-        return daysSinceLastVerve >= 90;
-      }),
       
       percentageShopsWithUptrend,
       percentageShopsWithDeclining,
       percentageShopsWithStable,
       percentageShopsInactive60Days,
       percentageShopsInactiveOver90Days,
-      
-      // NEW: Brand-specific inactivity percentages
-      percentage8PMInactive60Days,
-      percentage8PMInactive90Days,
-      percentageVERVEInactive60Days,
-      percentageVERVEInactive90Days,
       
       total8PMCasesInDepartment,
       totalVERVECasesInDepartment,
@@ -437,7 +317,7 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
     title: string;
     subtitle: string;
     shops: any[];
-    type: 'all' | 'active' | 'inactive' | '8pm' | 'verve' | 'both' | 'monthly' | 'uptrend' | 'declining' | 'stable' | 'inactive60' | 'inactive90' | '8pm_inactive60' | '8pm_inactive90' | 'verve_inactive60' | 'verve_inactive90';
+    type: 'all' | 'active' | 'inactive' | '8pm' | 'verve' | 'both' | 'monthly' | 'uptrend' | 'declining' | 'stable' | 'inactive60' | 'inactive90';
     monthData?: { month: string; total: number; eightPM: number; verve: number; };
   } | null>(null);
 
@@ -474,7 +354,7 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
     title: string, 
     subtitle: string, 
     shops: any[], 
-    type: 'all' | 'active' | 'inactive' | '8pm' | 'verve' | 'both' | 'monthly' | 'inactive60' | 'inactive90' | '8pm_inactive60' | '8pm_inactive90' | 'verve_inactive60' | 'verve_inactive90',
+    type: 'all' | 'active' | 'inactive' | '8pm' | 'verve' | 'both' | 'monthly' | 'inactive60' | 'inactive90',
     monthData?: { month: string; total: number; eightPM: number; verve: number; }
   ) => {
     setSelectedDepartmentShops({
@@ -528,12 +408,8 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
         case 'inactive': 
         case 'inactive60':
         case 'inactive90': return { bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200' };
-        case '8pm':
-        case '8pm_inactive60':
-        case '8pm_inactive90': return { bg: 'bg-purple-50', text: 'text-purple-600', border: 'border-purple-200' };
-        case 'verve':
-        case 'verve_inactive60':
-        case 'verve_inactive90': return { bg: 'bg-orange-50', text: 'text-orange-600', border: 'border-orange-200' };
+        case '8pm': return { bg: 'bg-purple-50', text: 'text-purple-600', border: 'border-purple-200' };
+        case 'verve': return { bg: 'bg-orange-50', text: 'text-orange-600', border: 'border-orange-200' };
         case 'both': return { bg: 'bg-green-50', text: 'text-green-600', border: 'border-green-200' };
         case 'monthly': return { bg: 'bg-indigo-50', text: 'text-indigo-600', border: 'border-indigo-200' };
         case 'uptrend': return { bg: 'bg-green-50', text: 'text-green-600', border: 'border-green-200' };
@@ -572,6 +448,7 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
                   </div>
                   <div className={`${typeStyles.bg} p-4 rounded-lg text-center border ${typeStyles.border}`}>
                     <div className={`text-2xl font-bold ${typeStyles.text}`}>
+                      {/* FIXED: Use monthData for historical months, shop.total for current */}
                       {type === 'monthly' && monthData ? 
                         monthData.total.toLocaleString() :
                         shops.reduce((sum, shop) => sum + (shop.total || 0), 0).toLocaleString()}
@@ -584,6 +461,7 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
                   </div>
                   <div className={`${typeStyles.bg} p-4 rounded-lg text-center border ${typeStyles.border}`}>
                     <div className={`text-2xl font-bold ${typeStyles.text}`}>
+                      {/* FIXED: Use monthData for historical months, shop.eightPM for current */}
                       {type === 'monthly' && monthData ? 
                         monthData.eightPM.toLocaleString() :
                         shops.reduce((sum, shop) => sum + (shop.eightPM || 0), 0).toLocaleString()}
@@ -592,6 +470,7 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
                   </div>
                   <div className={`${typeStyles.bg} p-4 rounded-lg text-center border ${typeStyles.border}`}>
                     <div className={`text-2xl font-bold ${typeStyles.text}`}>
+                      {/* FIXED: Use monthData for historical months, shop.verve for current */}
                       {type === 'monthly' && monthData ? 
                         monthData.verve.toLocaleString() :
                         shops.reduce((sum, shop) => sum + (shop.verve || 0), 0).toLocaleString()}
@@ -624,17 +503,38 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
                   </div>
                 )}
 
-                {/* NEW: Brand-Specific Inactive Shop Analysis */}
-                {(type === 'inactive60' || type === 'inactive90' || type === '8pm_inactive60' || type === '8pm_inactive90' || type === 'verve_inactive60' || type === 'verve_inactive90') && (
+                {/* NEW: Inactive Shop Analysis */}
+                {(type === 'inactive60' || type === 'inactive90') && (
                   <div className={`mb-6 ${typeStyles.bg} p-4 rounded-lg border ${typeStyles.border}`}>
                     <h4 className={`font-medium ${typeStyles.text} mb-2 flex items-center`}>
                       <Clock className="w-4 h-4 mr-2" />
-                      {type.includes('8pm') ? '8PM Brand' : type.includes('verve') ? 'VERVE Brand' : 'Overall'} Inactivity Analysis: {type.includes('60') ? '60-89 Days' : '90+ Days'} Without {type.includes('8pm') ? '8PM' : type.includes('verve') ? 'VERVE' : 'Any'} Orders
+                      Inactive Shop Analysis: {type === 'inactive60' ? '60-89 Days' : '90+ Days'} Without Orders
                     </h4>
                     <div className="text-sm text-gray-600">
-                      {type.includes('60') ? 
-                        `Early warning: These shops may need immediate ${type.includes('8pm') ? '8PM' : type.includes('verve') ? 'VERVE' : 'sales'} attention to prevent brand churn.` :
-                        `Critical attention needed: These shops haven't bought ${type.includes('8pm') ? '8PM' : type.includes('verve') ? 'VERVE' : 'anything'} for an extended period and risk being lost.`}
+                      {type === 'inactive60' ? 
+                        'Early warning: These shops may need immediate sales attention to prevent churn.' :
+                        'Critical attention needed: These shops have been inactive for an extended period and risk being lost.'}
+                    </div>
+                  </div>
+                )}
+                  <div className={`mb-6 ${typeStyles.bg} p-4 rounded-lg border ${typeStyles.border}`}>
+                    <h4 className={`font-medium ${typeStyles.text} mb-2 flex items-center`}>
+                      <TrendingUp className="w-4 h-4 mr-2" />
+                      Trend Analysis Pattern: {type.charAt(0).toUpperCase() + type.slice(1)}
+                    </h4>
+                    <div className="grid grid-cols-3 gap-4 text-center text-sm">
+                      <div>
+                        <div className="font-bold text-gray-800">June 2025</div>
+                        <div className="text-gray-600">Most Recent Month</div>
+                      </div>
+                      <div>
+                        <div className="font-bold text-gray-800">May 2025</div>
+                        <div className="text-gray-600">Middle Comparison</div>
+                      </div>
+                      <div>
+                        <div className="font-bold text-gray-800">April 2025</div>
+                        <div className="text-gray-600">Baseline Comparison</div>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -662,16 +562,12 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
                               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{monthData.month} VERVE</th>
                               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Brand Status</th>
                             </>
-                          ) : (type === 'inactive60' || type === 'inactive90' || type.includes('inactive')) ? (
+                          ) : (type === 'inactive60' || type === 'inactive90') ? (
                             <>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Days Since Last {type.includes('8pm') ? '8PM' : type.includes('verve') ? 'VERVE' : 'Order'}
-                              </th>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                Last {type.includes('8pm') ? '8PM' : type.includes('verve') ? 'VERVE' : 'Order'} Value
-                              </th>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current 8PM Cases</th>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current VERVE Cases</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Days Since Last Order</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Order Value</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current Month</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action Priority</th>
                             </>
                           ) : (
                             <>
@@ -686,12 +582,14 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
                       <tbody className="bg-white divide-y divide-gray-200">
                         {shops
                           .sort((a, b) => {
+                            // FIXED: Sort by historical month data for monthly views
                             if (type === 'monthly' && monthData) {
                               const monthKey = getMonthKeyFromName(monthData.month);
                               const aValue = getShopDataForMonth(a, monthKey, 'total');
                               const bValue = getShopDataForMonth(b, monthKey, 'total');
                               return bValue - aValue;
                             }
+                            // NEW: Sort inactive shops by days since last order (highest first)
                             if (type === 'inactive60' || type === 'inactive90') {
                               return (b.daysSinceLastOrder || 0) - (a.daysSinceLastOrder || 0);
                             }
@@ -756,6 +654,7 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
                             ) : type === 'monthly' && monthData ? (
                               <>
                                 <td className="px-4 py-3 text-sm font-bold text-gray-900">
+                                  {/* FIXED: Show historical month data based on monthData.month */}
                                   {(() => {
                                     const monthKey = getMonthKeyFromName(monthData.month);
                                     return getShopDataForMonth(shop, monthKey, 'total').toLocaleString();
@@ -789,74 +688,6 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
                                       return <span className="px-2 py-1 text-xs bg-red-100 text-red-800 rounded-full">No Brand Sales</span>;
                                     }
                                   })()}
-                                </td>
-                              </>
-                            ) : (type === 'inactive60' || type === 'inactive90' || type.includes('inactive')) ? (
-                              <>
-                                <td className="px-4 py-3 text-sm font-bold text-gray-900">
-                                  {(() => {
-                                    if (type.includes('8pm')) {
-                                      // Calculate days since last 8PM purchase
-                                      let daysSinceLastEightPM = 999;
-                                      for (let i = rollingWindow.length - 1; i >= 0; i--) {
-                                        const monthData = rollingWindow[i];
-                                        const monthEightPM = getShopDataForMonth(shop, monthData.key, 'eightPM');
-                                        if (monthEightPM > 0) {
-                                          daysSinceLastEightPM = i === rollingWindow.length - 1 ? 0 : (rollingWindow.length - 1 - i) * 30;
-                                          break;
-                                        }
-                                      }
-                                      return daysSinceLastEightPM === 999 ? 'Never' : daysSinceLastEightPM;
-                                    } else if (type.includes('verve')) {
-                                      // Calculate days since last VERVE purchase
-                                      let daysSinceLastVerve = 999;
-                                      for (let i = rollingWindow.length - 1; i >= 0; i--) {
-                                        const monthData = rollingWindow[i];
-                                        const monthVerve = getShopDataForMonth(shop, monthData.key, 'verve');
-                                        if (monthVerve > 0) {
-                                          daysSinceLastVerve = i === rollingWindow.length - 1 ? 0 : (rollingWindow.length - 1 - i) * 30;
-                                          break;
-                                        }
-                                      }
-                                      return daysSinceLastVerve === 999 ? 'Never' : daysSinceLastVerve;
-                                    } else {
-                                      // Overall inactivity
-                                      return shop.daysSinceLastOrder === 999 ? 'Never' : shop.daysSinceLastOrder;
-                                    }
-                                  })()}
-                                </td>
-                                <td className="px-4 py-3 text-sm text-gray-600">
-                                  {(() => {
-                                    if (type.includes('8pm')) {
-                                      // Find last 8PM order value
-                                      for (let i = rollingWindow.length - 1; i >= 0; i--) {
-                                        const monthData = rollingWindow[i];
-                                        const monthEightPM = getShopDataForMonth(shop, monthData.key, 'eightPM');
-                                        if (monthEightPM > 0) {
-                                          return monthEightPM.toLocaleString();
-                                        }
-                                      }
-                                      return '0';
-                                    } else if (type.includes('verve')) {
-                                      // Find last VERVE order value
-                                      for (let i = rollingWindow.length - 1; i >= 0; i--) {
-                                        const monthData = rollingWindow[i];
-                                        const monthVerve = getShopDataForMonth(shop, monthData.key, 'verve');
-                                        if (monthVerve > 0) {
-                                          return monthVerve.toLocaleString();
-                                        }
-                                      }
-                                      return '0';
-                                    } else {
-                                      return (shop.lastOrderValue || 0).toLocaleString();
-                                    }
-                                  })()}
-                                </td>
-                                <td className="px-4 py-3 text-sm text-purple-600">
-                                  {(shop.eightPM || 0).toLocaleString()}
-                                </td>
-                                <td className="px-4 py-3 text-sm text-orange-600">
-                                  {(shop.verve || 0).toLocaleString()}
                                 </td>
                               </>
                             ) : (
@@ -898,51 +729,19 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
               onClick={() => {
                 const csvContent = shops.map(shop => {
                   if (type === 'monthly' && monthData) {
+                    // FIXED: Export historical month data for monthly views
                     const monthKey = getMonthKeyFromName(monthData.month);
                     const monthTotal = getShopDataForMonth(shop, monthKey, 'total');
                     const month8PM = getShopDataForMonth(shop, monthKey, 'eightPM');
                     const monthVerve = getShopDataForMonth(shop, monthKey, 'verve');
                     return `${shop.shopName},${shop.salesman},${monthTotal},${month8PM},${monthVerve}`;
-                  } else if (type === 'inactive60' || type === 'inactive90' || type.includes('inactive')) {
-                    // Export brand-specific inactive shop data
-                    if (type.includes('8pm')) {
-                      let daysSinceLastEightPM = 999;
-                      let lastEightPMValue = 0;
-                      for (let i = rollingWindow.length - 1; i >= 0; i--) {
-                        const monthData = rollingWindow[i];
-                        const monthEightPM = getShopDataForMonth(shop, monthData.key, 'eightPM');
-                        if (monthEightPM > 0) {
-                          daysSinceLastEightPM = i === rollingWindow.length - 1 ? 0 : (rollingWindow.length - 1 - i) * 30;
-                          lastEightPMValue = monthEightPM;
-                          break;
-                        }
-                      }
-                      const daysSince = daysSinceLastEightPM === 999 ? 'Never' : daysSinceLastEightPM;
-                      const priority = daysSinceLastEightPM >= 120 ? 'Urgent' : daysSinceLastEightPM >= 90 ? 'High' : 'Medium';
-                      return `${shop.shopName},${shop.salesman},${daysSince},${lastEightPMValue},${shop.eightPM || 0},${shop.verve || 0},${priority}`;
-                    } else if (type.includes('verve')) {
-                      let daysSinceLastVerve = 999;
-                      let lastVerveValue = 0;
-                      for (let i = rollingWindow.length - 1; i >= 0; i--) {
-                        const monthData = rollingWindow[i];
-                        const monthVerve = getShopDataForMonth(shop, monthData.key, 'verve');
-                        if (monthVerve > 0) {
-                          daysSinceLastVerve = i === rollingWindow.length - 1 ? 0 : (rollingWindow.length - 1 - i) * 30;
-                          lastVerveValue = monthVerve;
-                          break;
-                        }
-                      }
-                      const daysSince = daysSinceLastVerve === 999 ? 'Never' : daysSinceLastVerve;
-                      const priority = daysSinceLastVerve >= 120 ? 'Urgent' : daysSinceLastVerve >= 90 ? 'High' : 'Medium';
-                      return `${shop.shopName},${shop.salesman},${daysSince},${lastVerveValue},${shop.eightPM || 0},${shop.verve || 0},${priority}`;
-                    } else {
-                      // Overall inactivity
-                      const daysSince = shop.daysSinceLastOrder === 999 ? 'Never' : shop.daysSinceLastOrder;
-                      const lastOrder = shop.lastOrderValue || 0;
-                      const priority = shop.daysSinceLastOrder >= 120 ? 'Urgent' : 
-                                     shop.daysSinceLastOrder >= 90 ? 'High' : 'Medium';
-                      return `${shop.shopName},${shop.salesman},${daysSince},${lastOrder},${shop.eightPM || 0},${shop.verve || 0},${priority}`;
-                    }
+                  } else if (type === 'inactive60' || type === 'inactive90') {
+                    // NEW: Export inactive shop data with days and last order
+                    const daysSince = shop.daysSinceLastOrder === 999 ? 'Never' : shop.daysSinceLastOrder;
+                    const lastOrder = shop.lastOrderValue || 0;
+                    const priority = shop.daysSinceLastOrder >= 120 ? 'Urgent' : 
+                                   shop.daysSinceLastOrder >= 90 ? 'High' : 'Medium';
+                    return `${shop.shopName},${shop.salesman},${daysSince},${lastOrder},${shop.total || 0},${priority}`;
                   }
                   return `${shop.shopName},${shop.salesman},${shop.total},${shop.eightPM || 0},${shop.verve || 0}`;
                 }).join('\n');
@@ -950,14 +749,8 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
                 let header: string;
                 if (type === 'monthly' && monthData) {
                   header = `Shop Name,Salesman,${monthData.month} Total,${monthData.month} 8PM,${monthData.month} VERVE\n`;
-                } else if (type === 'inactive60' || type === 'inactive90' || type.includes('inactive')) {
-                  if (type.includes('8pm')) {
-                    header = 'Shop Name,Salesman,Days Since Last 8PM Order,Last 8PM Order Value,Current 8PM Cases,Current VERVE Cases,Priority\n';
-                  } else if (type.includes('verve')) {
-                    header = 'Shop Name,Salesman,Days Since Last VERVE Order,Last VERVE Order Value,Current 8PM Cases,Current VERVE Cases,Priority\n';
-                  } else {
-                    header = 'Shop Name,Salesman,Days Since Last Order,Last Order Value,Current 8PM Cases,Current VERVE Cases,Priority\n';
-                  }
+                } else if (type === 'inactive60' || type === 'inactive90') {
+                  header = 'Shop Name,Salesman,Days Since Last Order,Last Order Value,Current Month Total,Priority\n';
                 } else {
                   header = 'Shop Name,Salesman,Current Month Total,8PM Cases,VERVE Cases\n';
                 }
@@ -1084,81 +877,52 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
                   </div>
                 </div>
                 
-                {/* NEW: Brand-Specific Inactivity Tracking */}
+                {/* NEW: Enhanced Activity Indicators with 60+ and 90+ Days */}
                 <div className="pt-2 border-t">
-                  <div className="text-xs text-gray-600 font-medium mb-2">Brand-Specific Inactivity:</div>
-                  <div className="grid grid-cols-2 gap-2">
-                    {/* 8PM Brand Inactivity */}
-                    <div className="space-y-1">
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs text-gray-600">8PM 60+ Days:</span>
-                        <button
-                          onClick={() => handleDepartmentShopsClick(
-                            dept,
-                            `${dept} - 8PM Inactive 60+ Days`,
-                            `${intelligence.shopsInactive60Days8PMList?.length || 0} shops haven't bought 8PM for 60+ days`,
-                            intelligence.shopsInactive60Days8PMList || [],
-                            '8pm_inactive60'
-                          )}
-                          className="text-xs font-bold text-purple-600 hover:text-purple-800 hover:underline"
-                          title={`${intelligence.shopsInactive60Days8PMList?.length || 0} shops haven't bought 8PM for 60+ days`}
-                        >
-                          {intelligence.percentage8PMInactive60Days}%
-                        </button>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs text-gray-600">8PM 90+ Days:</span>
-                        <button
-                          onClick={() => handleDepartmentShopsClick(
-                            dept,
-                            `${dept} - 8PM Inactive 90+ Days`,
-                            `${intelligence.shopsInactive90Days8PMList?.length || 0} shops haven't bought 8PM for 90+ days`,
-                            intelligence.shopsInactive90Days8PMList || [],
-                            '8pm_inactive90'
-                          )}
-                          className="text-xs font-bold text-red-600 hover:text-red-800 hover:underline"
-                          title={`${intelligence.shopsInactive90Days8PMList?.length || 0} shops haven't bought 8PM for 90+ days`}
-                        >
-                          {intelligence.percentage8PMInactive90Days}%
-                        </button>
-                      </div>
-                    </div>
-                    
-                    {/* VERVE Brand Inactivity */}
-                    <div className="space-y-1">
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs text-gray-600">VERVE 60+ Days:</span>
-                        <button
-                          onClick={() => handleDepartmentShopsClick(
-                            dept,
-                            `${dept} - VERVE Inactive 60+ Days`,
-                            `${intelligence.shopsInactive60DaysVERVEList?.length || 0} shops haven't bought VERVE for 60+ days`,
-                            intelligence.shopsInactive60DaysVERVEList || [],
-                            'verve_inactive60'
-                          )}
-                          className="text-xs font-bold text-orange-600 hover:text-orange-800 hover:underline"
-                          title={`${intelligence.shopsInactive60DaysVERVEList?.length || 0} shops haven't bought VERVE for 60+ days`}
-                        >
-                          {intelligence.percentageVERVEInactive60Days}%
-                        </button>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-xs text-gray-600">VERVE 90+ Days:</span>
-                        <button
-                          onClick={() => handleDepartmentShopsClick(
-                            dept,
-                            `${dept} - VERVE Inactive 90+ Days`,
-                            `${intelligence.shopsInactive90DaysVERVEList?.length || 0} shops haven't bought VERVE for 90+ days`,
-                            intelligence.shopsInactive90DaysVERVEList || [],
-                            'verve_inactive90'
-                          )}
-                          className="text-xs font-bold text-red-600 hover:text-red-800 hover:underline"
-                          title={`${intelligence.shopsInactive90DaysVERVEList?.length || 0} shops haven't bought VERVE for 90+ days`}
-                        >
-                          {intelligence.percentageVERVEInactive90Days}%
-                        </button>
-                      </div>
-                    </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-gray-600 flex items-center">
+                      <Clock className="w-3 h-3 mr-1" />
+                      Inactive 60+ Days:
+                    </span>
+                    <button
+                      onClick={() => handleDepartmentShopsClick(
+                        dept,
+                        `${dept} - Shops Inactive 60+ Days`,
+                        `${intelligence.shopsInactive60to90Days} shops haven't ordered for 60-90 days - Early warning`,
+                        intelligence.shopsInactive60to90DaysList || [],
+                        'inactive'
+                      )}
+                      className={`text-sm font-bold hover:underline ${
+                        parseFloat(intelligence.percentageShopsInactive60Days || '0') < 5 ? 'text-yellow-600 hover:text-yellow-800' :
+                        parseFloat(intelligence.percentageShopsInactive60Days || '0') < 15 ? 'text-orange-600 hover:text-orange-800' : 'text-red-600 hover:text-red-800'
+                      }`}
+                      title={`${intelligence.shopsInactive60to90Days} shops haven't ordered for 60-90 days`}
+                    >
+                      {intelligence.percentageShopsInactive60Days || '0.0'}% shops
+                    </button>
+                  </div>
+                  
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-gray-600 flex items-center">
+                      <AlertTriangle className="w-3 h-3 mr-1" />
+                      Inactive 90+ Days:
+                    </span>
+                    <button
+                      onClick={() => handleDepartmentShopsClick(
+                        dept,
+                        `${dept} - Shops Inactive 90+ Days`,
+                        `${intelligence.shopsInactiveOver90Days} shops haven't ordered for 90+ days - Critical attention needed`,
+                        intelligence.shopsInactiveOver90DaysList || [],
+                        'inactive'
+                      )}
+                      className={`text-sm font-bold hover:underline ${
+                        parseFloat(intelligence.percentageShopsInactiveOver90Days) < 10 ? 'text-yellow-600 hover:text-yellow-800' :
+                        parseFloat(intelligence.percentageShopsInactiveOver90Days) < 20 ? 'text-orange-600 hover:text-orange-800' : 'text-red-600 hover:text-red-800'
+                      }`}
+                      title={`${intelligence.shopsInactiveOver90Days} shops haven't ordered for 90+ days`}
+                    >
+                      {intelligence.percentageShopsInactiveOver90Days}% shops
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1183,14 +947,15 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
         </div>
 
         <div className="mt-4 p-3 bg-white rounded-lg border border-blue-200">
-          <h5 className="font-medium text-blue-900 mb-2">📊 Brand-Specific Intelligence Metrics:</h5>
+          <h5 className="font-medium text-blue-900 mb-2">📊 Enhanced Metrics Explanation:</h5>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-blue-700">
             <div><strong>Growth (3M Trend):</strong> % of shops with Jun &gt; May &gt; Apr sales</div>
             <div><strong>Declining (3M Trend):</strong> % of shops with Jun &lt; May sales</div>
             <div><strong>8PM/VERVE (This Month):</strong> % of shops currently buying each brand</div>
-            <div><strong>Brand Inactivity (60+/90+ Days):</strong> % of shops not buying specific brands</div>
+            <div><strong>Inactive 60+ Days:</strong> % of shops with no orders for 60-89 days (early warning)</div>
+            <div><strong>Inactive 90+ Days:</strong> % of shops with no orders for 90+ days (critical)</div>
             <div className="col-span-1 md:col-span-2 text-xs text-blue-600 mt-1">
-              💡 <strong>All metrics are clickable</strong> - Click any percentage to view detailed shop lists by brand-specific activity
+              💡 <strong>All metrics are clickable</strong> - Click any percentage to view detailed shop lists and take action
             </div>
           </div>
         </div>
@@ -1518,7 +1283,6 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
             <p className="text-sm text-gray-500">Brand distribution across territories (click bars for shop details)</p>
           </div>
           <div className="p-4 sm:p-6">
-            <div className="space
             <div className="space-y-4">
               {Object.entries(data.deptPerformance)
                 .filter(([dept]) => dept && dept !== 'Unknown' && dept.trim() !== '')
