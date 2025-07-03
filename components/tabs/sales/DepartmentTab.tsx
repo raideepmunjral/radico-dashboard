@@ -735,6 +735,410 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
+      {/* Department Performance Overview */}
+      <div className="bg-white p-4 sm:p-6 rounded-lg shadow">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Department Performance Overview - {getMonthName(data.currentMonth)} {data.currentYear}</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {Object.entries(data.deptPerformance)
+            .filter(([dept]) => dept && dept !== 'Unknown' && dept.trim() !== '')
+            .map(([dept, performance]) => {
+            const coveragePercent = (performance.billedShops / performance.totalShops) * 100;
+            const deptShops = departmentShopsData[dept];
+            
+            return (
+              <div key={dept} className="border rounded-lg p-4 hover:shadow-md transition-shadow">
+                <h4 className="font-medium text-gray-900 mb-2 truncate">{dept}</h4>
+                <div className="space-y-2">
+                  <button
+                    onClick={() => handleDepartmentShopsClick(
+                      dept,
+                      `${dept} Department - All Shops`,
+                      `${deptShops?.allShops.length || 0} total shops in ${dept} department`,
+                      deptShops?.allShops || [],
+                      'all'
+                    )}
+                    className="text-xl sm:text-2xl font-bold text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                  >
+                    {performance.sales.toLocaleString()}
+                  </button>
+                  <div className="text-sm text-gray-500">Total Sales</div>
+                  <div className="text-sm">
+                    <button
+                      onClick={() => handleDepartmentShopsClick(
+                        dept,
+                        `${dept} Department - Coverage Breakdown`,
+                        `${performance.billedShops} active shops out of ${performance.totalShops} total`,
+                        deptShops?.activeShops || [],
+                        'active'
+                      )}
+                      className="font-medium text-green-600 hover:text-green-800 hover:underline cursor-pointer"
+                    >
+                      {performance.billedShops}
+                    </button>
+                    <span className="text-gray-500">/{performance.totalShops} shops</span>
+                  </div>
+                  <div className={`text-sm font-medium ${
+                    coveragePercent > 80 ? 'text-green-600' : 
+                    coveragePercent > 60 ? 'text-yellow-600' : 'text-red-600'
+                  }`}>
+                    {coveragePercent.toFixed(1)}% coverage
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Department Performance Table */}
+      <div className="bg-white rounded-lg shadow">
+        <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-medium text-gray-900">Department Performance Analysis - {getMonthName(data.currentMonth)} {data.currentYear}</h3>
+          <p className="text-sm text-gray-500">Coverage and sales performance by territory (click numbers for details)</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Shops</th>
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Active Shops</th>
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Coverage</th>
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Sales</th>
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Avg per Shop</th>
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">8PM Share</th>
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">VERVE Share</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {Object.entries(data.deptPerformance)
+                .filter(([dept]) => dept && dept !== 'Unknown' && dept.trim() !== '')
+                .map(([dept, performance]) => {
+                const coveragePercent = (performance.billedShops / performance.totalShops) * 100;
+                const avgPerShop = performance.billedShops > 0 ? (performance.sales / performance.billedShops).toFixed(1) : 0;
+                
+                const deptShops = Object.values(data.salesData).filter((shop: any) => shop.department === dept && shop.total > 0);
+                const dept8PM = deptShops.reduce((sum: number, shop: any) => sum + shop.eightPM, 0);
+                const deptVERVE = deptShops.reduce((sum: number, shop: any) => sum + shop.verve, 0);
+                const deptTotal = dept8PM + deptVERVE;
+                const eightPMShare = deptTotal > 0 ? ((dept8PM / deptTotal) * 100).toFixed(1) : '0';
+                const verveShare = deptTotal > 0 ? ((deptVERVE / deptTotal) * 100).toFixed(1) : '0';
+                
+                const deptData = departmentShopsData[dept];
+                
+                return (
+                  <tr key={dept} className="hover:bg-gray-50">
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{dept}</td>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">{performance.totalShops}</td>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <div className="flex space-x-1">
+                        <button
+                          onClick={() => handleDepartmentShopsClick(
+                            dept,
+                            `${dept} - Active Shops`,
+                            `${performance.billedShops} shops with sales in ${dept}`,
+                            deptData?.activeShops || [],
+                            'active'
+                          )}
+                          className="text-green-600 hover:text-green-800 hover:underline cursor-pointer font-medium"
+                        >
+                          {performance.billedShops}
+                        </button>
+                        {deptData?.inactiveShops.length > 0 && (
+                          <span className="text-gray-400">
+                            (<button
+                              onClick={() => handleDepartmentShopsClick(
+                                dept,
+                                `${dept} - Inactive Shops`,
+                                `${deptData.inactiveShops.length} shops with zero sales need attention`,
+                                deptData.inactiveShops,
+                                'inactive'
+                              )}
+                              className="text-red-600 hover:text-red-800 hover:underline cursor-pointer"
+                            >
+                              {deptData.inactiveShops.length} inactive
+                            </button>)
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      <div className="flex items-center">
+                        <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          coveragePercent > 80 
+                            ? 'bg-green-100 text-green-800' 
+                            : coveragePercent > 60
+                            ? 'bg-yellow-100 text-yellow-800'
+                            : 'bg-red-100 text-red-800'
+                        }`}>
+                          {coveragePercent.toFixed(1)}%
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
+                      <button
+                        onClick={() => handleDepartmentShopsClick(
+                          dept,
+                          `${dept} Department - All Shops`,
+                          `Complete shop list for ${dept} department (${performance.sales.toLocaleString()} total cases)`,
+                          deptData?.allShops || [],
+                          'all'
+                        )}
+                        className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                      >
+                        {performance.sales.toLocaleString()}
+                      </button>
+                    </td>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">{avgPerShop}</td>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-purple-600 font-medium">
+                      <button
+                        onClick={() => handleDepartmentShopsClick(
+                          dept,
+                          `${dept} - 8PM Buyers`,
+                          `${deptData?.shops8PM.length || 0} shops buying 8PM in ${dept}`,
+                          deptData?.shops8PM || [],
+                          '8pm'
+                        )}
+                        className="hover:text-purple-800 hover:underline cursor-pointer"
+                      >
+                        {eightPMShare}%
+                      </button>
+                    </td>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-orange-600 font-medium">
+                      <button
+                        onClick={() => handleDepartmentShopsClick(
+                          dept,
+                          `${dept} - VERVE Buyers`,
+                          `${deptData?.shopsVERVE.length || 0} shops buying VERVE in ${dept}`,
+                          deptData?.shopsVERVE || [],
+                          'verve'
+                        )}
+                        className="hover:text-orange-800 hover:underline cursor-pointer"
+                      >
+                        {verveShare}%
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* 5-Month Historical Department Performance */}
+      <div className="bg-white rounded-lg shadow">
+        <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
+          <h3 className="text-lg font-medium text-gray-900">5-Month Department Trend ({rollingLabel})</h3>
+          <p className="text-sm text-gray-500">Historical sales performance by department - automatically updates each month (click for monthly details)</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full divide-y divide-gray-200">
+            <thead className="bg-gray-50">
+              <tr>
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
+                {rollingWindow.map(month => (
+                  <th key={month.month} className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{month.shortName} Sales</th>
+                ))}
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">5M Avg</th>
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trend</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-200">
+              {Object.entries(data.deptPerformance)
+                .filter(([dept]) => dept && dept !== 'Unknown' && dept.trim() !== '')
+                .map(([dept, performance]) => {
+                const deptShops = Object.values(data.salesData).filter((shop: any) => shop.department === dept);
+                
+                const monthlyTotals = rollingWindow.map(month => 
+                  deptShops.reduce((sum: number, shop: any) => sum + getShopDataForMonth(shop, month.key, 'total'), 0)
+                );
+                
+                const avg5Month = (monthlyTotals.reduce((sum, val) => sum + val, 0) / 5).toFixed(0);
+                
+                const recent2 = monthlyTotals.slice(-2).reduce((sum, val) => sum + val, 0) / 2;
+                const earlier3 = monthlyTotals.slice(0, 3).reduce((sum, val) => sum + val, 0) / 3;
+                const trend = recent2 > earlier3 * 1.1 ? 'improving' : recent2 < earlier3 * 0.9 ? 'declining' : 'stable';
+                
+                const deptData = departmentShopsData[dept];
+                
+                return (
+                  <tr key={dept} className="hover:bg-gray-50">
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{dept}</td>
+                    {rollingWindow.map((month, index) => {
+                      const monthTotal = monthlyTotals[index];
+                      const monthEightPM = deptShops.reduce((sum: number, shop: any) => sum + getShopDataForMonth(shop, month.key, 'eightPM'), 0);
+                      const monthVERVE = deptShops.reduce((sum: number, shop: any) => sum + getShopDataForMonth(shop, month.key, 'verve'), 0);
+                      
+                      return (
+                        <td key={month.month} className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          <button
+                            onClick={() => handleDepartmentShopsClick(
+                              dept,
+                              `${dept} - ${month.fullName} ${month.year} Performance`,
+                              `${month.fullName} sales breakdown for ${dept} department`,
+                              deptData?.allShops || [],
+                              'monthly',
+                              { month: month.fullName, total: monthTotal, eightPM: monthEightPM, verve: monthVERVE }
+                            )}
+                            className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                          >
+                            {monthTotal.toLocaleString()}
+                          </button>
+                        </td>
+                      );
+                    })}
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">{avg5Month}</td>
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm">
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        trend === 'improving' ? 'bg-green-100 text-green-800' :
+                        trend === 'declining' ? 'bg-red-100 text-red-800' :
+                        'bg-gray-100 text-gray-800'
+                      }`}>
+                        {trend === 'improving' ? '📈 Growing' : trend === 'declining' ? '📉 Declining' : '➡️ Stable'}
+                      </span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      {/* Department Brand Performance Comparison */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
+        <div className="bg-white rounded-lg shadow">
+          <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-medium text-gray-900">8PM Performance by Department</h3>
+            <p className="text-sm text-gray-500">Brand distribution across territories (click bars for shop details)</p>
+          </div>
+          <div className="p-4 sm:p-6">
+            <div className="space-y-4">
+              {Object.entries(data.deptPerformance)
+                .filter(([dept]) => dept && dept !== 'Unknown' && dept.trim() !== '')
+                .map(([dept, performance]) => {
+                const deptShops = Object.values(data.salesData).filter((shop: any) => shop.department === dept && shop.total > 0);
+                const dept8PM = deptShops.reduce((sum: number, shop: any) => sum + shop.eightPM, 0);
+                const sharePercent = data.summary.total8PM > 0 ? (dept8PM / data.summary.total8PM) * 100 : 0;
+                const deptData = departmentShopsData[dept];
+                
+                return (
+                  <div key={dept}>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="truncate flex-1 mr-2">{dept}</span>
+                      <span className="whitespace-nowrap">{dept8PM.toLocaleString()} cases ({sharePercent.toFixed(1)}%)</span>
+                    </div>
+                    <button
+                      onClick={() => handleDepartmentShopsClick(
+                        dept,
+                        `${dept} - 8PM Buyers`,
+                        `${deptData?.shops8PM.length || 0} shops buying 8PM in ${dept} (${dept8PM.toLocaleString()} cases)`,
+                        deptData?.shops8PM || [],
+                        '8pm'
+                      )}
+                      className="w-full bg-gray-200 rounded-full h-2 hover:bg-gray-300 transition-colors cursor-pointer"
+                    >
+                      <div 
+                        className="bg-purple-600 h-2 rounded-full transition-all duration-500" 
+                        style={{ width: `${sharePercent}%` }}
+                      ></div>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-lg shadow">
+          <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
+            <h3 className="text-lg font-medium text-gray-900">VERVE Performance by Department</h3>
+            <p className="text-sm text-gray-500">Brand distribution across territories (click bars for shop details)</p>
+          </div>
+          <div className="p-4 sm:p-6">
+            <div className="space-y-4">
+              {Object.entries(data.deptPerformance)
+                .filter(([dept]) => dept && dept !== 'Unknown' && dept.trim() !== '')
+                .map(([dept, performance]) => {
+                const deptShops = Object.values(data.salesData).filter((shop: any) => shop.department === dept && shop.total > 0);
+                const deptVERVE = deptShops.reduce((sum: number, shop: any) => sum + shop.verve, 0);
+                const sharePercent = data.summary.totalVERVE > 0 ? (deptVERVE / data.summary.totalVERVE) * 100 : 0;
+                const deptData = departmentShopsData[dept];
+                
+                return (
+                  <div key={dept}>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span className="truncate flex-1 mr-2">{dept}</span>
+                      <span className="whitespace-nowrap">{deptVERVE.toLocaleString()} cases ({sharePercent.toFixed(1)}%)</span>
+                    </div>
+                    <button
+                      onClick={() => handleDepartmentShopsClick(
+                        dept,
+                        `${dept} - VERVE Buyers`,
+                        `${deptData?.shopsVERVE.length || 0} shops buying VERVE in ${dept} (${deptVERVE.toLocaleString()} cases)`,
+                        deptData?.shopsVERVE || [],
+                        'verve'
+                      )}
+                      className="w-full bg-gray-200 rounded-full h-2 hover:bg-gray-300 transition-colors cursor-pointer"
+                    >
+                      <div 
+                        className="bg-orange-600 h-2 rounded-full transition-all duration-500" 
+                        style={{ width: `${sharePercent}%` }}
+                      ></div>
+                    </button>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Department Performance Summary */}
+      <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 sm:p-6 rounded-lg">
+        <h3 className="text-lg font-medium text-gray-900 mb-4">Department Analysis Summary - {getMonthName(data.currentMonth)} {data.currentYear}</h3>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          {Object.entries(data.deptPerformance)
+            .filter(([dept]) => dept && dept !== 'Unknown' && dept.trim() !== '')
+            .slice(0, 4).map(([dept, performance]) => {
+            const coveragePercent = (performance.billedShops / performance.totalShops) * 100;
+            const deptData = departmentShopsData[dept];
+            const intelligence = departmentIntelligence[dept];
+            
+            const monthlyTotals = rollingWindow.map(month => {
+              const deptShops = Object.values(data.salesData).filter((shop: any) => shop.department === dept);
+              return deptShops.reduce((sum: number, shop: any) => sum + getShopDataForMonth(shop, month.key, 'total'), 0);
+            });
+            const recent2 = monthlyTotals.slice(-2).reduce((sum, val) => sum + val, 0) / 2;
+            const earlier3 = monthlyTotals.slice(0, 3).reduce((sum, val) => sum + val, 0) / 3;
+            const trend = recent2 > earlier3 * 1.1 ? '📈' : recent2 < earlier3 * 0.9 ? '📉' : '➡️';
+            
+            return (
+              <button
+                key={dept}
+                onClick={() => handleDepartmentShopsClick(
+                  dept,
+                  `${dept} Department Overview`,
+                  `Complete department analysis for ${dept}`,
+                  deptData?.allShops || [],
+                  'all'
+                )}
+                className="text-center bg-white p-4 rounded-lg shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+              >
+                <div className="text-lg font-bold text-gray-900 mb-1">{dept}</div>
+                <div className="text-sm text-blue-600 font-medium">{performance.sales.toLocaleString()} cases</div>
+                <div className="text-xs text-gray-500">{coveragePercent.toFixed(1)}% coverage</div>
+                <div className="text-xs text-gray-600 mt-1">
+                  {intelligence && `${intelligence.percentageShopsWithUptrend}% uptrend`}
+                </div>
+                <div className="text-lg mt-2">{trend}</div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {showDepartmentShops && (
         <DepartmentShopsModal 
           onClose={() => {
