@@ -88,6 +88,17 @@ const getMonthKey = (monthNum: string) => {
   return keys[parseInt(monthNum) - 1] || 'unknown';
 };
 
+// NEW: Convert month name to month key
+const getMonthKeyFromName = (monthName: string) => {
+  const monthNames = {
+    'january': 'january', 'february': 'february', 'march': 'march', 
+    'april': 'april', 'may': 'may', 'june': 'june',
+    'july': 'july', 'august': 'august', 'september': 'september', 
+    'october': 'october', 'november': 'november', 'december': 'december'
+  };
+  return monthNames[monthName.toLowerCase()] || 'unknown';
+};
+
 // 5-MONTH ROLLING WINDOW CALCULATION
 const getDepartmentRolling5MonthWindow = (currentMonth: string, currentYear: string) => {
   const monthNum = parseInt(currentMonth);
@@ -429,19 +440,32 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
                   </div>
                   <div className={`${typeStyles.bg} p-4 rounded-lg text-center border ${typeStyles.border}`}>
                     <div className={`text-2xl font-bold ${typeStyles.text}`}>
-                      {shops.reduce((sum, shop) => sum + (shop.total || 0), 0).toLocaleString()}
+                      {/* FIXED: Use monthData for historical months, shop.total for current */}
+                      {type === 'monthly' && monthData ? 
+                        monthData.total.toLocaleString() :
+                        shops.reduce((sum, shop) => sum + (shop.total || 0), 0).toLocaleString()}
                     </div>
-                    <div className="text-sm text-gray-600">Total Cases (Current Month)</div>
+                    <div className="text-sm text-gray-600">
+                      {type === 'monthly' && monthData ? 
+                        `Total Cases (${monthData.month})` : 
+                        'Total Cases (Current Month)'}
+                    </div>
                   </div>
                   <div className={`${typeStyles.bg} p-4 rounded-lg text-center border ${typeStyles.border}`}>
                     <div className={`text-2xl font-bold ${typeStyles.text}`}>
-                      {shops.reduce((sum, shop) => sum + (shop.eightPM || 0), 0).toLocaleString()}
+                      {/* FIXED: Use monthData for historical months, shop.eightPM for current */}
+                      {type === 'monthly' && monthData ? 
+                        monthData.eightPM.toLocaleString() :
+                        shops.reduce((sum, shop) => sum + (shop.eightPM || 0), 0).toLocaleString()}
                     </div>
                     <div className="text-sm text-gray-600">8PM Brand Cases</div>
                   </div>
                   <div className={`${typeStyles.bg} p-4 rounded-lg text-center border ${typeStyles.border}`}>
                     <div className={`text-2xl font-bold ${typeStyles.text}`}>
-                      {shops.reduce((sum, shop) => sum + (shop.verve || 0), 0).toLocaleString()}
+                      {/* FIXED: Use monthData for historical months, shop.verve for current */}
+                      {type === 'monthly' && monthData ? 
+                        monthData.verve.toLocaleString() :
+                        shops.reduce((sum, shop) => sum + (shop.verve || 0), 0).toLocaleString()}
                     </div>
                     <div className="text-sm text-gray-600">VERVE Brand Cases</div>
                   </div>
@@ -486,6 +510,13 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
                               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Apr Cases</th>
                               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trend Pattern</th>
                             </>
+                          ) : type === 'monthly' && monthData ? (
+                            <>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{monthData.month} Total</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{monthData.month} 8PM</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{monthData.month} VERVE</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Brand Status</th>
+                            </>
                           ) : (
                             <>
                               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current Month Total</th>
@@ -498,12 +529,41 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
                         {shops
-                          .sort((a, b) => (b.total || 0) - (a.total || 0))
+                          .sort((a, b) => {
+                            // FIXED: Sort by historical month data for monthly views
+                            if (type === 'monthly' && monthData) {
+                              const monthKey = getMonthKeyFromName(monthData.month);
+                              const aValue = getShopDataForMonth(a, monthKey, 'total');
+                              const bValue = getShopDataForMonth(b, monthKey, 'total');
+                              return bValue - aValue;
+                            }
+                            return (b.total || 0) - (a.total || 0);
+                          })
                           .map((shop, index) => (
-                          <tr key={shop.shopId} className={index === 0 && shop.total > 0 ? 'bg-yellow-50' : index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                          <tr key={shop.shopId} className={
+                            (() => {
+                              let isTopPerformer = false;
+                              if (type === 'monthly' && monthData) {
+                                const monthKey = getMonthKeyFromName(monthData.month);
+                                isTopPerformer = index === 0 && getShopDataForMonth(shop, monthKey, 'total') > 0;
+                              } else {
+                                isTopPerformer = index === 0 && shop.total > 0;
+                              }
+                              return isTopPerformer ? 'bg-yellow-50' : index % 2 === 0 ? 'bg-gray-50' : 'bg-white';
+                            })()
+                          }>
                             <td className="px-4 py-3 text-sm text-gray-900">
                               {index + 1}
-                              {index === 0 && shop.total > 0 && <span className="ml-1" title="Top Performer">🏆</span>}
+                              {(() => {
+                                let showTrophy = false;
+                                if (type === 'monthly' && monthData) {
+                                  const monthKey = getMonthKeyFromName(monthData.month);
+                                  showTrophy = index === 0 && getShopDataForMonth(shop, monthKey, 'total') > 0;
+                                } else {
+                                  showTrophy = index === 0 && shop.total > 0;
+                                }
+                                return showTrophy ? <span className="ml-1" title="Top Performer">🏆</span> : null;
+                              })()}
                             </td>
                             <td className="px-4 py-3 text-sm font-medium text-gray-900">
                               {shop.shopName || 'Unknown Shop'}
@@ -533,6 +593,45 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
                                      shop.shopTrendPattern === 'declining' ? '📉 Declining' :
                                      '➡️ Stable'}
                                   </span>
+                                </td>
+                              </>
+                            ) : type === 'monthly' && monthData ? (
+                              <>
+                                <td className="px-4 py-3 text-sm font-bold text-gray-900">
+                                  {/* FIXED: Show historical month data based on monthData.month */}
+                                  {(() => {
+                                    const monthKey = getMonthKeyFromName(monthData.month);
+                                    return getShopDataForMonth(shop, monthKey, 'total').toLocaleString();
+                                  })()}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-purple-600">
+                                  {(() => {
+                                    const monthKey = getMonthKeyFromName(monthData.month);
+                                    return getShopDataForMonth(shop, monthKey, 'eightPM').toLocaleString();
+                                  })()}
+                                </td>
+                                <td className="px-4 py-3 text-sm text-orange-600">
+                                  {(() => {
+                                    const monthKey = getMonthKeyFromName(monthData.month);
+                                    return getShopDataForMonth(shop, monthKey, 'verve').toLocaleString();
+                                  })()}
+                                </td>
+                                <td className="px-4 py-3 text-sm">
+                                  {(() => {
+                                    const monthKey = getMonthKeyFromName(monthData.month);
+                                    const monthEightPM = getShopDataForMonth(shop, monthKey, 'eightPM');
+                                    const monthVerve = getShopDataForMonth(shop, monthKey, 'verve');
+                                    
+                                    if (monthEightPM > 0 && monthVerve > 0) {
+                                      return <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">Both Brands</span>;
+                                    } else if (monthEightPM > 0) {
+                                      return <span className="px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded-full">8PM Only</span>;
+                                    } else if (monthVerve > 0) {
+                                      return <span className="px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded-full">VERVE Only</span>;
+                                    } else {
+                                      return <span className="px-2 py-1 text-xs bg-red-100 text-red-800 rounded-full">No Brand Sales</span>;
+                                    }
+                                  })()}
                                 </td>
                               </>
                             ) : (
@@ -572,15 +671,30 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
           <div className="border-t p-4 sm:p-6 flex justify-end space-x-3 flex-shrink-0">
             <button
               onClick={() => {
-                const csvContent = shops.map(shop => 
-                  `${shop.shopName},${shop.salesman},${shop.total},${shop.eightPM || 0},${shop.verve || 0}`
-                ).join('\n');
-                const header = 'Shop Name,Salesman,Current Month Total,8PM Cases,VERVE Cases\n';
+                const csvContent = shops.map(shop => {
+                  if (type === 'monthly' && monthData) {
+                    // FIXED: Export historical month data for monthly views
+                    const monthKey = getMonthKeyFromName(monthData.month);
+                    const monthTotal = getShopDataForMonth(shop, monthKey, 'total');
+                    const month8PM = getShopDataForMonth(shop, monthKey, 'eightPM');
+                    const monthVerve = getShopDataForMonth(shop, monthKey, 'verve');
+                    return `${shop.shopName},${shop.salesman},${monthTotal},${month8PM},${monthVerve}`;
+                  }
+                  return `${shop.shopName},${shop.salesman},${shop.total},${shop.eightPM || 0},${shop.verve || 0}`;
+                }).join('\n');
+                
+                const header = type === 'monthly' && monthData ? 
+                  `Shop Name,Salesman,${monthData.month} Total,${monthData.month} 8PM,${monthData.month} VERVE\n` :
+                  'Shop Name,Salesman,Current Month Total,8PM Cases,VERVE Cases\n';
+                
                 const blob = new Blob([header + csvContent], { type: 'text/csv' });
                 const url = URL.createObjectURL(blob);
                 const a = document.createElement('a');
                 a.href = url;
-                a.download = `${department}_${type}_shops_${getShortMonthName(data.currentMonth)}_${data.currentYear}.csv`;
+                const fileName = type === 'monthly' && monthData ? 
+                  `${department}_${monthData.month}_${type}_shops.csv` :
+                  `${department}_${type}_shops_${getShortMonthName(data.currentMonth)}_${data.currentYear}.csv`;
+                a.download = fileName;
                 a.click();
                 URL.revokeObjectURL(url);
               }}
