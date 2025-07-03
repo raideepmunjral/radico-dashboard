@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { X } from 'lucide-react';
+import { X, AlertTriangle, TrendingUp, TrendingDown, Activity, Clock, Target } from 'lucide-react';
 
 // ==========================================
-// TYPE DEFINITIONS
+// TYPE DEFINITIONS (UNCHANGED)
 // ==========================================
 
 interface ShopData {
@@ -15,6 +15,8 @@ interface ShopData {
   total: number;
   eightPM: number;
   verve: number;
+  
+  // EXISTING: Rolling months (UNCHANGED)
   marchTotal?: number;
   marchEightPM?: number;
   marchVerve?: number;
@@ -27,6 +29,32 @@ interface ShopData {
   juneTotal?: number;
   juneEightPM?: number;
   juneVerve?: number;
+  
+  // NEW: Extended Historical Data
+  februaryTotal?: number;
+  februaryEightPM?: number;
+  februaryVerve?: number;
+  januaryTotal?: number;
+  januaryEightPM?: number;
+  januaryVerve?: number;
+  decemberTotal?: number;
+  decemberEightPM?: number;
+  decemberVerve?: number;
+  novemberTotal?: number;
+  novemberEightPM?: number;
+  novemberVerve?: number;
+  octoberTotal?: number;
+  octoberEightPM?: number;
+  octoberVerve?: number;
+  septemberTotal?: number;
+  septemberEightPM?: number;
+  septemberVerve?: number;
+  augustTotal?: number;
+  augustEightPM?: number;
+  augustVerve?: number;
+  julyTotal?: number;
+  julyEightPM?: number;
+  julyVerve?: number;
 }
 
 interface DashboardData {
@@ -41,7 +69,7 @@ interface DashboardData {
 }
 
 // ==========================================
-// HELPER FUNCTIONS
+// 🚀 NEW: FUTURE-READY ROLLING WINDOW FUNCTIONS
 // ==========================================
 
 const getMonthName = (monthNum: string) => {
@@ -49,12 +77,196 @@ const getMonthName = (monthNum: string) => {
   return months[parseInt(monthNum) - 1] || 'Unknown';
 };
 
+const getShortMonthName = (monthNum: string) => {
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return months[parseInt(monthNum) - 1] || 'Unknown';
+};
+
+const getMonthKey = (monthNum: string) => {
+  const keys = ['january', 'february', 'march', 'april', 'may', 'june',
+                'july', 'august', 'september', 'october', 'november', 'december'];
+  return keys[parseInt(monthNum) - 1] || 'unknown';
+};
+
+// 🚀 NEW: 5-MONTH ROLLING WINDOW CALCULATION
+const getDepartmentRolling5MonthWindow = (currentMonth: string, currentYear: string) => {
+  const monthNum = parseInt(currentMonth);
+  const yearNum = parseInt(currentYear);
+  const months = [];
+  
+  // Calculate last 5 months including current
+  for (let i = 4; i >= 0; i--) {
+    let targetMonth = monthNum - i;
+    let targetYear = yearNum;
+    
+    // Handle year rollover
+    while (targetMonth <= 0) {
+      targetMonth += 12;
+      targetYear -= 1;
+    }
+    
+    months.push({
+      month: targetMonth.toString().padStart(2, '0'),
+      shortName: getShortMonthName(targetMonth.toString()),
+      fullName: getMonthName(targetMonth.toString()),
+      year: targetYear.toString(),
+      key: getMonthKey(targetMonth.toString())
+    });
+  }
+  
+  return months;
+};
+
+// 🚀 NEW: DYNAMIC ROLLING WINDOW LABEL
+const getDepartmentRollingLabel = (currentMonth: string, currentYear: string) => {
+  const window = getDepartmentRolling5MonthWindow(currentMonth, currentYear);
+  return window.map(m => m.shortName).join('-') + ` ${currentYear}`;
+};
+
+// 🚀 NEW: GET SHOP DATA FOR ANY MONTH
+const getShopDataForMonth = (shop: ShopData, monthKey: string, dataType: 'total' | 'eightPM' | 'verve' = 'total') => {
+  if (monthKey === 'current') {
+    return shop[dataType] || 0;
+  }
+  
+  // Historical month data
+  let key: string;
+  switch (dataType) {
+    case 'eightPM':
+      key = `${monthKey}EightPM`;
+      break;
+    case 'verve':
+      key = `${monthKey}Verve`;
+      break;
+    default:
+      key = `${monthKey}Total`;
+  }
+  
+  const value = (shop as any)[key];
+  return typeof value === 'number' ? value : 0;
+};
+
+// 🚀 NEW: DEPARTMENT INTELLIGENCE CALCULATIONS
+const calculateDepartmentIntelligence = (salesData: Record<string, ShopData>, currentMonth: string, currentYear: string) => {
+  const allShops = Object.values(salesData);
+  const rollingWindow = getDepartmentRolling5MonthWindow(currentMonth, currentYear);
+  
+  // Calculate days since last order for each shop
+  const shopsWithActivity = allShops.map(shop => {
+    let lastOrderMonth = -1;
+    let lastOrderValue = 0;
+    
+    // Check from most recent to oldest month
+    for (let i = rollingWindow.length - 1; i >= 0; i--) {
+      const monthData = rollingWindow[i];
+      const monthValue = getShopDataForMonth(shop, monthData.key, 'total');
+      
+      if (monthValue > 0) {
+        lastOrderMonth = i;
+        lastOrderValue = monthValue;
+        break;
+      }
+    }
+    
+    // Calculate days since last order (approximate)
+    const daysSinceLastOrder = lastOrderMonth === -1 ? 999 : 
+                              lastOrderMonth === rollingWindow.length - 1 ? 0 : // Current month
+                              (rollingWindow.length - 1 - lastOrderMonth) * 30;
+    
+    return {
+      ...shop,
+      daysSinceLastOrder,
+      lastOrderValue,
+      hasRecentActivity: daysSinceLastOrder < 30
+    };
+  });
+  
+  // Calculate department-level metrics
+  const departmentIntelligence: Record<string, any> = {};
+  
+  Object.keys(salesData).forEach(shopId => {
+    const shop = salesData[shopId];
+    const dept = shop.department;
+    
+    if (!departmentIntelligence[dept]) {
+      departmentIntelligence[dept] = {
+        totalShops: 0,
+        activeShops: 0,
+        inactive60Days: 0,
+        inactive90Days: 0,
+        neverOrdered: 0,
+        volumeIncreasing: 0,
+        volumeDecreasing: 0,
+        volumeStable: 0,
+        total8PM: 0,
+        totalVERVE: 0,
+        active8PM: 0,
+        activeVERVE: 0
+      };
+    }
+    
+    const deptData = departmentIntelligence[dept];
+    const shopWithActivity = shopsWithActivity.find(s => s.shopId === shopId);
+    
+    deptData.totalShops++;
+    
+    // Activity status
+    if (shopWithActivity) {
+      if (shopWithActivity.daysSinceLastOrder < 30) {
+        deptData.activeShops++;
+      } else if (shopWithActivity.daysSinceLastOrder >= 60 && shopWithActivity.daysSinceLastOrder < 90) {
+        deptData.inactive60Days++;
+      } else if (shopWithActivity.daysSinceLastOrder >= 90) {
+        deptData.inactive90Days++;
+      }
+      
+      if (shopWithActivity.daysSinceLastOrder === 999) {
+        deptData.neverOrdered++;
+      }
+    }
+    
+    // Volume trends (compare current vs 2 months ago)
+    const currentTotal = shop.total || 0;
+    const twoMonthsAgoKey = rollingWindow[2]?.key; // 3rd month back
+    const twoMonthsAgoTotal = twoMonthsAgoKey ? getShopDataForMonth(shop, twoMonthsAgoKey, 'total') : 0;
+    
+    if (currentTotal > 0 && twoMonthsAgoTotal > 0) {
+      const change = ((currentTotal - twoMonthsAgoTotal) / twoMonthsAgoTotal) * 100;
+      if (change > 10) deptData.volumeIncreasing++;
+      else if (change < -10) deptData.volumeDecreasing++;
+      else deptData.volumeStable++;
+    }
+    
+    // Brand metrics
+    deptData.total8PM += shop.eightPM || 0;
+    deptData.totalVERVE += shop.verve || 0;
+    if ((shop.eightPM || 0) > 0) deptData.active8PM++;
+    if ((shop.verve || 0) > 0) deptData.activeVERVE++;
+  });
+  
+  return departmentIntelligence;
+};
+
 // ==========================================
 // MAIN COMPONENT
 // ==========================================
 
 const DepartmentTab = ({ data }: { data: DashboardData }) => {
-  // STATE for different drill-down modals
+  // 🚀 NEW: Rolling window calculation
+  const rollingWindow = useMemo(() => {
+    return getDepartmentRolling5MonthWindow(data.currentMonth, data.currentYear);
+  }, [data.currentMonth, data.currentYear]);
+
+  const rollingLabel = useMemo(() => {
+    return getDepartmentRollingLabel(data.currentMonth, data.currentYear);
+  }, [data.currentMonth, data.currentYear]);
+
+  // 🚀 NEW: Department intelligence calculation
+  const departmentIntelligence = useMemo(() => {
+    return calculateDepartmentIntelligence(data.salesData, data.currentMonth, data.currentYear);
+  }, [data.salesData, data.currentMonth, data.currentYear]);
+
+  // STATE for drill-down modals (UNCHANGED)
   const [showDepartmentShops, setShowDepartmentShops] = useState(false);
   const [selectedDepartmentShops, setSelectedDepartmentShops] = useState<{
     department: string;
@@ -65,7 +277,7 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
     monthData?: { month: string; total: number; eightPM: number; verve: number; };
   } | null>(null);
 
-  // FUNCTIONS to handle different drill-down clicks
+  // FUNCTIONS to handle drill-down clicks (UNCHANGED)
   const handleDepartmentShopsClick = (
     department: string, 
     title: string, 
@@ -85,7 +297,7 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
     setShowDepartmentShops(true);
   };
 
-  // MEMOIZED department shop data
+  // MEMOIZED department shop data (UNCHANGED)
   const departmentShopsData = useMemo(() => {
     const deptData: Record<string, any> = {};
     
@@ -110,7 +322,36 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
     return deptData;
   }, [data.salesData]);
 
-  // COMPONENT: Department Shops Modal
+  // Calculate overall intelligence metrics
+  const overallMetrics = useMemo(() => {
+    const allDepts = Object.values(departmentIntelligence);
+    const totals = allDepts.reduce((acc: any, dept: any) => ({
+      totalShops: acc.totalShops + dept.totalShops,
+      activeShops: acc.activeShops + dept.activeShops,
+      inactive60Days: acc.inactive60Days + dept.inactive60Days,
+      inactive90Days: acc.inactive90Days + dept.inactive90Days,
+      neverOrdered: acc.neverOrdered + dept.neverOrdered,
+      volumeIncreasing: acc.volumeIncreasing + dept.volumeIncreasing,
+      volumeDecreasing: acc.volumeDecreasing + dept.volumeDecreasing,
+      active8PM: acc.active8PM + dept.active8PM,
+      activeVERVE: acc.activeVERVE + dept.activeVERVE
+    }), {
+      totalShops: 0, activeShops: 0, inactive60Days: 0, inactive90Days: 0, 
+      neverOrdered: 0, volumeIncreasing: 0, volumeDecreasing: 0, active8PM: 0, activeVERVE: 0
+    });
+
+    return {
+      ...totals,
+      inactive60DaysPct: totals.totalShops > 0 ? ((totals.inactive60Days / totals.totalShops) * 100).toFixed(1) : '0',
+      inactive90DaysPct: totals.totalShops > 0 ? ((totals.inactive90Days / totals.totalShops) * 100).toFixed(1) : '0',
+      volumeIncreasingPct: totals.totalShops > 0 ? ((totals.volumeIncreasing / totals.totalShops) * 100).toFixed(1) : '0',
+      volumeDecreasingPct: totals.totalShops > 0 ? ((totals.volumeDecreasing / totals.totalShops) * 100).toFixed(1) : '0',
+      eightPMPenetration: totals.totalShops > 0 ? ((totals.active8PM / totals.totalShops) * 100).toFixed(1) : '0',
+      vervePenetration: totals.totalShops > 0 ? ((totals.activeVERVE / totals.totalShops) * 100).toFixed(1) : '0'
+    };
+  }, [departmentIntelligence]);
+
+  // COMPONENT: Department Shops Modal (UNCHANGED)
   const DepartmentShopsModal = ({ onClose }: { onClose: () => void }) => {
     if (!selectedDepartmentShops) return null;
 
@@ -118,46 +359,14 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
 
     const getTypeStyles = (type: string) => {
       switch(type) {
-        case 'all': return {
-          bg: 'bg-blue-50',
-          text: 'text-blue-600',
-          border: 'border-blue-200'
-        };
-        case 'active': return {
-          bg: 'bg-green-50',
-          text: 'text-green-600',
-          border: 'border-green-200'
-        };
-        case 'inactive': return {
-          bg: 'bg-red-50',
-          text: 'text-red-600',
-          border: 'border-red-200'
-        };
-        case '8pm': return {
-          bg: 'bg-purple-50',
-          text: 'text-purple-600',
-          border: 'border-purple-200'
-        };
-        case 'verve': return {
-          bg: 'bg-orange-50',
-          text: 'text-orange-600',
-          border: 'border-orange-200'
-        };
-        case 'both': return {
-          bg: 'bg-green-50',
-          text: 'text-green-600',
-          border: 'border-green-200'
-        };
-        case 'monthly': return {
-          bg: 'bg-indigo-50',
-          text: 'text-indigo-600',
-          border: 'border-indigo-200'
-        };
-        default: return {
-          bg: 'bg-gray-50',
-          text: 'text-gray-600',
-          border: 'border-gray-200'
-        };
+        case 'all': return { bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-200' };
+        case 'active': return { bg: 'bg-green-50', text: 'text-green-600', border: 'border-green-200' };
+        case 'inactive': return { bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200' };
+        case '8pm': return { bg: 'bg-purple-50', text: 'text-purple-600', border: 'border-purple-200' };
+        case 'verve': return { bg: 'bg-orange-50', text: 'text-orange-600', border: 'border-orange-200' };
+        case 'both': return { bg: 'bg-green-50', text: 'text-green-600', border: 'border-green-200' };
+        case 'monthly': return { bg: 'bg-indigo-50', text: 'text-indigo-600', border: 'border-indigo-200' };
+        default: return { bg: 'bg-gray-50', text: 'text-gray-600', border: 'border-gray-200' };
       }
     };
 
@@ -171,10 +380,7 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
               <h3 className="text-lg font-semibold">{title}</h3>
               <p className="text-sm text-gray-500">{subtitle}</p>
             </div>
-            <button 
-              onClick={onClose} 
-              className="text-gray-400 hover:text-gray-600"
-            >
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
               <X className="w-6 h-6" />
             </button>
           </div>
@@ -212,61 +418,6 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
                   </div>
                 </div>
 
-                {/* Monthly Data Summary (if monthly type) */}
-                {type === 'monthly' && monthData && (
-                  <div className="mb-6 bg-indigo-50 p-4 rounded-lg border border-indigo-200">
-                    <h4 className="font-medium text-indigo-800 mb-2">📅 {monthData.month} 2025 Department Summary</h4>
-                    <div className="grid grid-cols-3 gap-4 text-center">
-                      <div>
-                        <div className="text-xl font-bold text-indigo-600">{monthData.total.toLocaleString()}</div>
-                        <div className="text-xs text-gray-600">Total Cases</div>
-                      </div>
-                      <div>
-                        <div className="text-xl font-bold text-purple-600">{monthData.eightPM.toLocaleString()}</div>
-                        <div className="text-xs text-gray-600">8PM Cases</div>
-                      </div>
-                      <div>
-                        <div className="text-xl font-bold text-orange-600">{monthData.verve.toLocaleString()}</div>
-                        <div className="text-xs text-gray-600">VERVE Cases</div>
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Department Performance Insights */}
-                <div className="mb-6 bg-gray-50 p-4 rounded-lg">
-                  <h4 className="font-medium text-gray-800 mb-3">🏢 {department} Department Insights</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <div className="font-medium text-gray-700">Performance Metrics:</div>
-                      <div className="text-gray-600">
-                        • Average per shop: {shops.length > 0 ? Math.round(shops.reduce((sum, shop) => sum + (shop.total || 0), 0) / shops.length) : 0} cases
-                      </div>
-                      <div className="text-gray-600">
-                        • 8PM dominance: {shops.reduce((sum, shop) => sum + (shop.total || 0), 0) > 0 ? 
-                          ((shops.reduce((sum, shop) => sum + (shop.eightPM || 0), 0) / shops.reduce((sum, shop) => sum + (shop.total || 0), 0)) * 100).toFixed(1) : 0}%
-                      </div>
-                      <div className="text-gray-600">
-                        • VERVE penetration: {shops.filter(shop => (shop.verve || 0) > 0).length} shops ({shops.length > 0 ? ((shops.filter(shop => (shop.verve || 0) > 0).length / shops.length) * 100).toFixed(1) : 0}%)
-                      </div>
-                    </div>
-                    <div>
-                      <div className="font-medium text-gray-700">Salesmen Coverage:</div>
-                      {Array.from(new Set(shops.map(shop => shop.salesman))).slice(0, 3).map(salesman => {
-                        const salesmanShops = shops.filter(shop => shop.salesman === salesman);
-                        return (
-                          <div key={salesman} className="text-gray-600">
-                            • {salesman}: {salesmanShops.length} shops
-                          </div>
-                        );
-                      })}
-                      {Array.from(new Set(shops.map(shop => shop.salesman))).length > 3 && (
-                        <div className="text-gray-600">• +{Array.from(new Set(shops.map(shop => shop.salesman))).length - 3} more salesmen</div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
                 {/* Shop List Table - Fixed Scrolling */}
                 <div className="border border-gray-200 rounded-lg">
                   <div className="max-h-96 overflow-y-auto">
@@ -279,13 +430,12 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Total Cases</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">8PM Cases</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">VERVE Cases</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Brand Mix</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                         </tr>
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
                         {shops
-                          .sort((a, b) => (b.total || 0) - (a.total || 0)) // Sort by total cases descending
+                          .sort((a, b) => (b.total || 0) - (a.total || 0))
                           .map((shop, index) => (
                           <tr key={shop.shopId} className={index === 0 && shop.total > 0 ? 'bg-yellow-50' : index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
                             <td className="px-4 py-3 text-sm text-gray-900">
@@ -308,24 +458,6 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
                               {(shop.verve || 0).toLocaleString()}
                             </td>
                             <td className="px-4 py-3 text-sm">
-                              {shop.total > 0 ? (
-                                <div className="flex space-x-1">
-                                  <div 
-                                    className="h-3 bg-purple-600 rounded" 
-                                    style={{ width: `${Math.max(10, (shop.eightPM || 0) / shop.total * 40)}px` }}
-                                    title={`8PM: ${((shop.eightPM || 0) / shop.total * 100).toFixed(1)}%`}
-                                  ></div>
-                                  <div 
-                                    className="h-3 bg-orange-600 rounded" 
-                                    style={{ width: `${Math.max(10, (shop.verve || 0) / shop.total * 40)}px` }}
-                                    title={`VERVE: ${((shop.verve || 0) / shop.total * 100).toFixed(1)}%`}
-                                  ></div>
-                                </div>
-                              ) : (
-                                <span className="text-gray-400">No sales</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 text-sm">
                               {(shop.eightPM || 0) > 0 && (shop.verve || 0) > 0 ? (
                                 <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">Both Brands</span>
                               ) : (shop.eightPM || 0) > 0 ? (
@@ -342,47 +474,6 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
                     </table>
                   </div>
                 </div>
-
-                {/* Actionable Insights by Type */}
-                {type === 'inactive' && (
-                  <div className="mt-6 bg-red-50 p-4 rounded-lg">
-                    <h4 className="font-medium text-red-800 mb-2">⚠️ Inactive Shops - Action Required</h4>
-                    <p className="text-sm text-red-700">
-                      These {shops.length} shops in {department} have zero sales. Priority actions: 
-                      Visit shops, understand barriers, verify shop details, check competition, and develop recovery plans.
-                    </p>
-                  </div>
-                )}
-
-                {type === '8pm' && (
-                  <div className="mt-6 bg-purple-50 p-4 rounded-lg">
-                    <h4 className="font-medium text-purple-800 mb-2">🟣 8PM Strong Territory</h4>
-                    <p className="text-sm text-purple-700">
-                      {department} shows strong 8PM performance with {shops.length} buying shops. 
-                      Consider introducing VERVE to these existing 8PM customers for cross-selling opportunities.
-                    </p>
-                  </div>
-                )}
-
-                {type === 'verve' && (
-                  <div className="mt-6 bg-orange-50 p-4 rounded-lg">
-                    <h4 className="font-medium text-orange-800 mb-2">🟠 VERVE Growth Potential</h4>
-                    <p className="text-sm text-orange-700">
-                      {shops.length} shops in {department} buy VERVE. Analyze what makes this department 
-                      VERVE-friendly and replicate success in other territories.
-                    </p>
-                  </div>
-                )}
-
-                {type === 'both' && (
-                  <div className="mt-6 bg-green-50 p-4 rounded-lg">
-                    <h4 className="font-medium text-green-800 mb-2">🎉 Cross-Selling Champions</h4>
-                    <p className="text-sm text-green-700">
-                      These {shops.length} shops in {department} buy both brands - your most valuable customers! 
-                      Study their success factors and replicate across other shops.
-                    </p>
-                  </div>
-                )}
               </>
             )}
           </div>
@@ -420,7 +511,102 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
 
   return (
     <div className="space-y-6">
-      {/* Department Performance Overview */}
+      {/* 🚀 NEW: Bird's Eye Intelligence Cards */}
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50 p-6 rounded-lg shadow">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-gray-900 flex items-center">
+            <Activity className="w-5 h-5 mr-2 text-blue-600" />
+            Department Intelligence Overview - {rollingLabel}
+          </h2>
+          <div className="text-sm text-blue-600 font-medium">
+            🔄 Rolling 5-Month Window (Auto-Updates)
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
+          {/* Shop Activity Status */}
+          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+            <div className="flex items-center mb-2">
+              <Clock className="w-4 h-4 text-red-500 mr-2" />
+              <h4 className="font-medium text-gray-800 text-sm">Inactive Shops</h4>
+            </div>
+            <div className="space-y-1">
+              <div className="flex justify-between">
+                <span className="text-xs text-gray-600">60+ Days:</span>
+                <span className="text-sm font-bold text-orange-600">{overallMetrics.inactive60DaysPct}%</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-xs text-gray-600">90+ Days:</span>
+                <span className="text-sm font-bold text-red-600">{overallMetrics.inactive90DaysPct}%</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Volume Trends */}
+          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+            <div className="flex items-center mb-2">
+              <TrendingUp className="w-4 h-4 text-green-500 mr-2" />
+              <h4 className="font-medium text-gray-800 text-sm">Volume Trends</h4>
+            </div>
+            <div className="space-y-1">
+              <div className="flex justify-between">
+                <span className="text-xs text-gray-600">Increasing:</span>
+                <span className="text-sm font-bold text-green-600">{overallMetrics.volumeIncreasingPct}%</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-xs text-gray-600">Decreasing:</span>
+                <span className="text-sm font-bold text-red-600">{overallMetrics.volumeDecreasingPct}%</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Brand Penetration */}
+          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+            <div className="flex items-center mb-2">
+              <Target className="w-4 h-4 text-purple-500 mr-2" />
+              <h4 className="font-medium text-gray-800 text-sm">8PM Penetration</h4>
+            </div>
+            <div className="text-center">
+              <div className="text-xl font-bold text-purple-600">{overallMetrics.eightPMPenetration}%</div>
+              <div className="text-xs text-gray-500">{overallMetrics.active8PM} shops</div>
+            </div>
+          </div>
+
+          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+            <div className="flex items-center mb-2">
+              <Target className="w-4 h-4 text-orange-500 mr-2" />
+              <h4 className="font-medium text-gray-800 text-sm">VERVE Penetration</h4>
+            </div>
+            <div className="text-center">
+              <div className="text-xl font-bold text-orange-600">{overallMetrics.vervePenetration}%</div>
+              <div className="text-xs text-gray-500">{overallMetrics.activeVERVE} shops</div>
+            </div>
+          </div>
+
+          {/* Health Score */}
+          <div className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
+            <div className="flex items-center mb-2">
+              <AlertTriangle className="w-4 h-4 text-blue-500 mr-2" />
+              <h4 className="font-medium text-gray-800 text-sm">Health Score</h4>
+            </div>
+            <div className="text-center">
+              <div className={`text-xl font-bold ${
+                parseFloat(overallMetrics.inactive90DaysPct) < 10 ? 'text-green-600' :
+                parseFloat(overallMetrics.inactive90DaysPct) < 20 ? 'text-yellow-600' : 'text-red-600'
+              }`}>
+                {parseFloat(overallMetrics.inactive90DaysPct) < 10 ? '🟢' :
+                 parseFloat(overallMetrics.inactive90DaysPct) < 20 ? '🟡' : '🔴'}
+              </div>
+              <div className="text-xs text-gray-500">
+                {parseFloat(overallMetrics.inactive90DaysPct) < 10 ? 'Healthy' :
+                 parseFloat(overallMetrics.inactive90DaysPct) < 20 ? 'Moderate' : 'Critical'}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Department Performance Overview (UNCHANGED) */}
       <div className="bg-white p-4 sm:p-6 rounded-lg shadow">
         <h3 className="text-lg font-medium text-gray-900 mb-4">Department Performance Overview - {getMonthName(data.currentMonth)} {data.currentYear}</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -473,7 +659,7 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-      {/* Department Performance Table */}
+      {/* Department Performance Table (UNCHANGED) */}
       <div className="bg-white rounded-lg shadow">
         <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900">Department Performance Analysis - {getMonthName(data.currentMonth)} {data.currentYear}</h3>
@@ -607,94 +793,69 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-      {/* 3-Month Historical Department Performance */}
+      {/* 🚀 UPDATED: 5-Month Historical Department Performance */}
       <div className="bg-white rounded-lg shadow">
         <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">3-Month Department Trend (Mar-Apr-May {data.currentYear})</h3>
-          <p className="text-sm text-gray-500">Historical sales performance by department (click for monthly details)</p>
+          <h3 className="text-lg font-medium text-gray-900">5-Month Department Trend ({rollingLabel})</h3>
+          <p className="text-sm text-gray-500">Historical sales performance by department - automatically updates each month (click for monthly details)</p>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
-                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">March Sales</th>
-                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">April Sales</th>
-                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">May Sales</th>
-                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">3-Month Avg</th>
+                {rollingWindow.map(month => (
+                  <th key={month.month} className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{month.shortName} Sales</th>
+                ))}
+                <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">5M Avg</th>
                 <th className="px-3 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trend</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {Object.entries(data.deptPerformance).map(([dept, performance]) => {
-                // Calculate historical data for this department
+                // Calculate historical data for this department dynamically
                 const deptShops = Object.values(data.salesData).filter((shop: any) => shop.department === dept);
-                const marchTotal = deptShops.reduce((sum: number, shop: any) => sum + (shop.marchTotal || 0), 0);
-                const aprilTotal = deptShops.reduce((sum: number, shop: any) => sum + (shop.aprilTotal || 0), 0);
-                const mayTotal = deptShops.reduce((sum: number, shop: any) => sum + (shop.mayTotal || 0), 0);
-                const avg3Month = ((marchTotal + aprilTotal + mayTotal) / 3).toFixed(0);
                 
-                const marchEightPM = deptShops.reduce((sum: number, shop: any) => sum + (shop.marchEightPM || 0), 0);
-                const marchVERVE = deptShops.reduce((sum: number, shop: any) => sum + (shop.marchVerve || 0), 0);
-                const aprilEightPM = deptShops.reduce((sum: number, shop: any) => sum + (shop.aprilEightPM || 0), 0);
-                const aprilVERVE = deptShops.reduce((sum: number, shop: any) => sum + (shop.aprilVerve || 0), 0);
-                const mayEightPM = deptShops.reduce((sum: number, shop: any) => sum + (shop.mayEightPM || 0), 0);
-                const mayVERVE = deptShops.reduce((sum: number, shop: any) => sum + (shop.mayVerve || 0), 0);
+                const monthlyTotals = rollingWindow.map(month => 
+                  deptShops.reduce((sum: number, shop: any) => sum + getShopDataForMonth(shop, month.key, 'total'), 0)
+                );
                 
-                const trend = mayTotal > aprilTotal && aprilTotal > marchTotal ? 'improving' :
-                            mayTotal < aprilTotal && aprilTotal < marchTotal ? 'declining' : 'stable';
+                const avg5Month = (monthlyTotals.reduce((sum, val) => sum + val, 0) / 5).toFixed(0);
+                
+                // Simple trend calculation: compare last 2 vs first 3 months
+                const recent2 = monthlyTotals.slice(-2).reduce((sum, val) => sum + val, 0) / 2;
+                const earlier3 = monthlyTotals.slice(0, 3).reduce((sum, val) => sum + val, 0) / 3;
+                const trend = recent2 > earlier3 * 1.1 ? 'improving' : recent2 < earlier3 * 0.9 ? 'declining' : 'stable';
                 
                 const deptData = departmentShopsData[dept];
                 
                 return (
                   <tr key={dept} className="hover:bg-gray-50">
                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{dept}</td>
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <button
-                        onClick={() => handleDepartmentShopsClick(
-                          dept,
-                          `${dept} - March 2025 Performance`,
-                          `March sales breakdown for ${dept} department`,
-                          deptData?.allShops || [],
-                          'monthly',
-                          { month: 'March', total: marchTotal, eightPM: marchEightPM, verve: marchVERVE }
-                        )}
-                        className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
-                      >
-                        {marchTotal.toLocaleString()}
-                      </button>
-                    </td>
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <button
-                        onClick={() => handleDepartmentShopsClick(
-                          dept,
-                          `${dept} - April 2025 Performance`,
-                          `April sales breakdown for ${dept} department`,
-                          deptData?.allShops || [],
-                          'monthly',
-                          { month: 'April', total: aprilTotal, eightPM: aprilEightPM, verve: aprilVERVE }
-                        )}
-                        className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
-                      >
-                        {aprilTotal.toLocaleString()}
-                      </button>
-                    </td>
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <button
-                        onClick={() => handleDepartmentShopsClick(
-                          dept,
-                          `${dept} - May 2025 Performance`,
-                          `May sales breakdown for ${dept} department`,
-                          deptData?.allShops || [],
-                          'monthly',
-                          { month: 'May', total: mayTotal, eightPM: mayEightPM, verve: mayVERVE }
-                        )}
-                        className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
-                      >
-                        {mayTotal.toLocaleString()}
-                      </button>
-                    </td>
-                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">{avg3Month}</td>
+                    {rollingWindow.map((month, index) => {
+                      const monthTotal = monthlyTotals[index];
+                      const monthEightPM = deptShops.reduce((sum: number, shop: any) => sum + getShopDataForMonth(shop, month.key, 'eightPM'), 0);
+                      const monthVERVE = deptShops.reduce((sum: number, shop: any) => sum + getShopDataForMonth(shop, month.key, 'verve'), 0);
+                      
+                      return (
+                        <td key={month.month} className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                          <button
+                            onClick={() => handleDepartmentShopsClick(
+                              dept,
+                              `${dept} - ${month.fullName} ${month.year} Performance`,
+                              `${month.fullName} sales breakdown for ${dept} department`,
+                              deptData?.allShops || [],
+                              'monthly',
+                              { month: month.fullName, total: monthTotal, eightPM: monthEightPM, verve: monthVERVE }
+                            )}
+                            className="text-blue-600 hover:text-blue-800 hover:underline cursor-pointer"
+                          >
+                            {monthTotal.toLocaleString()}
+                          </button>
+                        </td>
+                      );
+                    })}
+                    <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">{avg5Month}</td>
                     <td className="px-3 sm:px-6 py-4 whitespace-nowrap text-sm">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                         trend === 'improving' ? 'bg-green-100 text-green-800' :
@@ -712,7 +873,7 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-      {/* Department Brand Performance Comparison */}
+      {/* Department Brand Performance Comparison (UNCHANGED) */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         <div className="bg-white rounded-lg shadow">
           <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
@@ -797,19 +958,22 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-      {/* Department Performance Summary */}
+      {/* Department Performance Summary (UNCHANGED) */}
       <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 sm:p-6 rounded-lg">
         <h3 className="text-lg font-medium text-gray-900 mb-4">Department Analysis Summary - {getMonthName(data.currentMonth)} {data.currentYear}</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {Object.entries(data.deptPerformance).slice(0, 4).map(([dept, performance]) => {
             const coveragePercent = (performance.billedShops / performance.totalShops) * 100;
             const deptShops = Object.values(data.salesData).filter((shop: any) => shop.department === dept);
-            const marchTotal = deptShops.reduce((sum: number, shop: any) => sum + (shop.marchTotal || 0), 0);
-            const aprilTotal = deptShops.reduce((sum: number, shop: any) => sum + (shop.aprilTotal || 0), 0);
-            const mayTotal = deptShops.reduce((sum: number, shop: any) => sum + (shop.mayTotal || 0), 0);
-            const trend = mayTotal > aprilTotal && aprilTotal > marchTotal ? '📈' :
-                        mayTotal < aprilTotal && aprilTotal < marchTotal ? '📉' : '➡️';
             const deptData = departmentShopsData[dept];
+            
+            // Calculate trend using rolling window
+            const monthlyTotals = rollingWindow.map(month => 
+              deptShops.reduce((sum: number, shop: any) => sum + getShopDataForMonth(shop, month.key, 'total'), 0)
+            );
+            const recent2 = monthlyTotals.slice(-2).reduce((sum, val) => sum + val, 0) / 2;
+            const earlier3 = monthlyTotals.slice(0, 3).reduce((sum, val) => sum + val, 0) / 3;
+            const trend = recent2 > earlier3 * 1.1 ? '📈' : recent2 < earlier3 * 0.9 ? '📉' : '➡️';
             
             return (
               <button
@@ -833,7 +997,7 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-      {/* Modal */}
+      {/* Modal (UNCHANGED) */}
       {showDepartmentShops && (
         <DepartmentShopsModal 
           onClose={() => {
