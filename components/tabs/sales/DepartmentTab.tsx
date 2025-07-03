@@ -174,10 +174,15 @@ const calculateDepartmentIntelligence = (salesData: Record<string, ShopData>, cu
   const middleMonth = rollingWindow[rollingWindow.length - 3]; // Month before (May)  
   const oldestMonth = rollingWindow[rollingWindow.length - 4]; // Month before that (April)
   
-  console.log('🔍 Real-Time Trend Analysis:', {
-    recent: `${recentMonth.fullName} (${recentMonth.key})`,
-    middle: `${middleMonth.fullName} (${middleMonth.key})`,
-    oldest: `${oldestMonth.fullName} (${oldestMonth.key})`
+  console.log('🔍 Department Analysis Debug:', {
+    totalShops: allShops.length,
+    departmentsFound: [...new Set(allShops.map(shop => shop.department))],
+    unknownDeptShops: allShops.filter(s => !s.department || s.department === 'Unknown' || s.department.trim() === '').length,
+    trendMonths: {
+      recent: `${recentMonth.fullName} (${recentMonth.key})`,
+      middle: `${middleMonth.fullName} (${middleMonth.key})`,
+      oldest: `${oldestMonth.fullName} (${oldestMonth.key})`
+    }
   });
 
   // Calculate days since last order for each shop
@@ -223,8 +228,9 @@ const calculateDepartmentIntelligence = (salesData: Record<string, ShopData>, cu
   // Calculate department-level metrics
   const departmentIntelligence: Record<string, any> = {};
   
-  // Get all departments
-  const departments = [...new Set(allShops.map(shop => shop.department))];
+  // 🔧 FIXED: Filter out undefined/null/unknown departments
+  const departments = [...new Set(allShops.map(shop => shop.department))]
+    .filter(dept => dept && dept !== 'Unknown' && dept.trim() !== '');
   
   departments.forEach(dept => {
     const deptShops = shopsWithActivity.filter(shop => shop.department === dept);
@@ -337,6 +343,22 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
       stable: `Shops with consistent performance (±10% variation)`
     };
 
+    console.log('🔍 Trend Drill-down Debug:', {
+      department,
+      trendType,
+      shopsCount: shops.length,
+      percentage,
+      sampleShop: shops[0],
+      shopHistoricalData: shops[0] ? {
+        june: shops[0].juneTotal,
+        may: shops[0].mayTotal,
+        april: shops[0].aprilTotal,
+        recent: shops[0].recentValue,
+        middle: shops[0].middleValue,
+        oldest: shops[0].oldestValue
+      } : null
+    });
+
     setSelectedDepartmentShops({
       department,
       title: `${department} - ${trendLabels[trendType]} (${percentage}%)`,
@@ -347,7 +369,7 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
     setShowDepartmentShops(true);
   };
 
-  // FUNCTIONS to handle drill-down clicks (UNCHANGED)
+  // 🔧 FIXED: FUNCTIONS to handle drill-down clicks with debugging
   const handleDepartmentShopsClick = (
     department: string, 
     title: string, 
@@ -356,6 +378,21 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
     type: 'all' | 'active' | 'inactive' | '8pm' | 'verve' | 'both' | 'monthly',
     monthData?: { month: string; total: number; eightPM: number; verve: number; }
   ) => {
+    console.log('🔍 Drill-down Debug:', {
+      department,
+      type,
+      shopsCount: shops.length,
+      monthData,
+      sampleShop: shops[0],
+      shopKeys: shops[0] ? Object.keys(shops[0]) : [],
+      historicalFields: shops[0] ? {
+        june: shops[0].juneTotal,
+        may: shops[0].mayTotal,
+        april: shops[0].aprilTotal,
+        march: shops[0].marchTotal
+      } : null
+    });
+    
     setSelectedDepartmentShops({
       department,
       title,
@@ -371,7 +408,12 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
   const departmentShopsData = useMemo(() => {
     const deptData: Record<string, any> = {};
     
-    Object.keys(data.deptPerformance).forEach(dept => {
+    // 🔧 FIXED: Filter valid departments only
+    const validDepartments = Object.keys(data.deptPerformance).filter(dept => 
+      dept && dept !== 'Unknown' && dept.trim() !== ''
+    );
+    
+    validDepartments.forEach(dept => {
       const allShops = Object.values(data.salesData).filter((shop: any) => shop.department === dept);
       const activeShops = allShops.filter((shop: any) => shop.total > 0);
       const inactiveShops = allShops.filter((shop: any) => shop.total === 0);
@@ -444,19 +486,24 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
                   </div>
                   <div className={`${typeStyles.bg} p-4 rounded-lg text-center border ${typeStyles.border}`}>
                     <div className={`text-2xl font-bold ${typeStyles.text}`}>
-                      {shops.reduce((sum, shop) => sum + (shop.total || shop.recentValue || 0), 0).toLocaleString()}
+                      {type === 'monthly' && monthData ? monthData.total.toLocaleString() :
+                       shops.reduce((sum, shop) => sum + (
+                         shop.juneTotal || shop.mayTotal || shop.aprilTotal || shop.total || shop.recentValue || 0
+                       ), 0).toLocaleString()}
                     </div>
                     <div className="text-sm text-gray-600">Total Cases</div>
                   </div>
                   <div className={`${typeStyles.bg} p-4 rounded-lg text-center border ${typeStyles.border}`}>
                     <div className={`text-2xl font-bold ${typeStyles.text}`}>
-                      {shops.reduce((sum, shop) => sum + (shop.eightPM || 0), 0).toLocaleString()}
+                      {type === 'monthly' && monthData ? monthData.eightPM.toLocaleString() :
+                       shops.reduce((sum, shop) => sum + (shop.eightPM || 0), 0).toLocaleString()}
                     </div>
                     <div className="text-sm text-gray-600">8PM Cases</div>
                   </div>
                   <div className={`${typeStyles.bg} p-4 rounded-lg text-center border ${typeStyles.border}`}>
                     <div className={`text-2xl font-bold ${typeStyles.text}`}>
-                      {shops.reduce((sum, shop) => sum + (shop.verve || 0), 0).toLocaleString()}
+                      {type === 'monthly' && monthData ? monthData.verve.toLocaleString() :
+                       shops.reduce((sum, shop) => sum + (shop.verve || 0), 0).toLocaleString()}
                     </div>
                     <div className="text-sm text-gray-600">VERVE Cases</div>
                   </div>
@@ -515,12 +562,17 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
                       </thead>
                       <tbody className="bg-white divide-y divide-gray-200">
                         {shops
-                          .sort((a, b) => (b.total || b.recentValue || 0) - (a.total || a.recentValue || 0))
+                          .sort((a, b) => {
+                            if (type === 'uptrend' || type === 'declining' || type === 'stable') {
+                              return (b.juneTotal || b.recentValue || 0) - (a.juneTotal || a.recentValue || 0);
+                            }
+                            return (b.total || 0) - (a.total || 0);
+                          })
                           .map((shop, index) => (
-                          <tr key={shop.shopId} className={index === 0 && (shop.total || shop.recentValue) > 0 ? 'bg-yellow-50' : index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                          <tr key={shop.shopId} className={index === 0 && (shop.total || shop.juneTotal || shop.recentValue) > 0 ? 'bg-yellow-50' : index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
                             <td className="px-4 py-3 text-sm text-gray-900">
                               {index + 1}
-                              {index === 0 && (shop.total || shop.recentValue) > 0 && <span className="ml-1">🏆</span>}
+                              {index === 0 && (shop.total || shop.juneTotal || shop.recentValue) > 0 && <span className="ml-1">🏆</span>}
                             </td>
                             <td className="px-4 py-3 text-sm font-medium text-gray-900">
                               {shop.shopName || 'Unknown Shop'}
@@ -529,17 +581,17 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
                               {shop.salesman || 'Unknown'}
                             </td>
                             
-                            {/* 🚀 NEW: Trend-specific data */}
+                            {/* 🚀 FIXED: Trend-specific data with proper field access */}
                             {(type === 'uptrend' || type === 'declining' || type === 'stable') ? (
                               <>
                                 <td className="px-4 py-3 text-sm font-bold text-gray-900">
-                                  {(shop.recentValue || 0).toLocaleString()}
+                                  {(shop.juneTotal || shop.recentValue || 0).toLocaleString()}
                                 </td>
                                 <td className="px-4 py-3 text-sm text-gray-600">
-                                  {(shop.middleValue || 0).toLocaleString()}
+                                  {(shop.mayTotal || shop.middleValue || 0).toLocaleString()}
                                 </td>
                                 <td className="px-4 py-3 text-sm text-gray-600">
-                                  {(shop.oldestValue || 0).toLocaleString()}
+                                  {(shop.aprilTotal || shop.oldestValue || 0).toLocaleString()}
                                 </td>
                                 <td className="px-4 py-3 text-sm">
                                   <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
@@ -556,7 +608,9 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
                             ) : (
                               <>
                                 <td className="px-4 py-3 text-sm font-bold text-gray-900">
-                                  {(shop.total || 0).toLocaleString()}
+                                  {type === 'monthly' && monthData ? 
+                                    (shop.juneTotal || shop.mayTotal || shop.aprilTotal || shop.marchTotal || shop.total || 0).toLocaleString() :
+                                    (shop.total || 0).toLocaleString()}
                                 </td>
                                 <td className="px-4 py-3 text-sm text-purple-600">
                                   {(shop.eightPM || 0).toLocaleString()}
@@ -592,7 +646,7 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
               onClick={() => {
                 const csvContent = shops.map(shop => 
                   type === 'uptrend' || type === 'declining' || type === 'stable' ?
-                  `${shop.shopName},${shop.salesman},${shop.recentValue || 0},${shop.middleValue || 0},${shop.oldestValue || 0},${shop.trendPattern}` :
+                  `${shop.shopName},${shop.salesman},${shop.juneTotal || shop.recentValue || 0},${shop.mayTotal || shop.middleValue || 0},${shop.aprilTotal || shop.oldestValue || 0},${shop.trendPattern}` :
                   `${shop.shopName},${shop.salesman},${shop.total},${shop.eightPM || 0},${shop.verve || 0}`
                 ).join('\n');
                 const header = type === 'uptrend' || type === 'declining' || type === 'stable' ?
@@ -637,7 +691,9 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
         </div>
         
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4">
-          {Object.entries(departmentIntelligence).map(([dept, intelligence]) => (
+          {Object.entries(departmentIntelligence)
+            .filter(([dept]) => dept && dept !== 'Unknown' && dept.trim() !== '')
+            .map(([dept, intelligence]) => (
             <div key={dept} className="bg-white p-4 rounded-lg shadow-sm border border-gray-200">
               <div className="flex items-center justify-between mb-3">
                 <h4 className="font-semibold text-gray-800">{dept}</h4>
@@ -731,11 +787,13 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-      {/* Department Performance Overview (UNCHANGED) */}
+      {/* Department Performance Overview */}
       <div className="bg-white p-4 sm:p-6 rounded-lg shadow">
         <h3 className="text-lg font-medium text-gray-900 mb-4">Department Performance Overview - {getMonthName(data.currentMonth)} {data.currentYear}</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {Object.entries(data.deptPerformance).map(([dept, performance]) => {
+          {Object.entries(data.deptPerformance)
+            .filter(([dept]) => dept && dept !== 'Unknown' && dept.trim() !== '')
+            .map(([dept, performance]) => {
             const coveragePercent = (performance.billedShops / performance.totalShops) * 100;
             const deptShops = departmentShopsData[dept];
             
@@ -784,7 +842,7 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-      {/* Department Performance Table (UNCHANGED) */}
+      {/* Department Performance Table */}
       <div className="bg-white rounded-lg shadow">
         <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900">Department Performance Analysis - {getMonthName(data.currentMonth)} {data.currentYear}</h3>
@@ -805,7 +863,9 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {Object.entries(data.deptPerformance).map(([dept, performance]) => {
+              {Object.entries(data.deptPerformance)
+                .filter(([dept]) => dept && dept !== 'Unknown' && dept.trim() !== '')
+                .map(([dept, performance]) => {
                 const coveragePercent = (performance.billedShops / performance.totalShops) * 100;
                 const avgPerShop = performance.billedShops > 0 ? (performance.sales / performance.billedShops).toFixed(1) : 0;
                 
@@ -918,7 +978,7 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-      {/* 🚀 UPDATED: 5-Month Historical Department Performance */}
+      {/* 5-Month Historical Department Performance */}
       <div className="bg-white rounded-lg shadow">
         <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900">5-Month Department Trend ({rollingLabel})</h3>
@@ -937,7 +997,9 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {Object.entries(data.deptPerformance).map(([dept, performance]) => {
+              {Object.entries(data.deptPerformance)
+                .filter(([dept]) => dept && dept !== 'Unknown' && dept.trim() !== '')
+                .map(([dept, performance]) => {
                 // Calculate historical data for this department dynamically
                 const deptShops = Object.values(data.salesData).filter((shop: any) => shop.department === dept);
                 
@@ -998,7 +1060,7 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-      {/* Department Brand Performance Comparison (UNCHANGED) */}
+      {/* Department Brand Performance Comparison */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         <div className="bg-white rounded-lg shadow">
           <div className="px-4 sm:px-6 py-4 border-b border-gray-200">
@@ -1007,7 +1069,9 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
           </div>
           <div className="p-4 sm:p-6">
             <div className="space-y-4">
-              {Object.entries(data.deptPerformance).map(([dept, performance]) => {
+              {Object.entries(data.deptPerformance)
+                .filter(([dept]) => dept && dept !== 'Unknown' && dept.trim() !== '')
+                .map(([dept, performance]) => {
                 const deptShops = Object.values(data.salesData).filter((shop: any) => shop.department === dept && shop.total > 0);
                 const dept8PM = deptShops.reduce((sum: number, shop: any) => sum + shop.eightPM, 0);
                 const sharePercent = data.summary.total8PM > 0 ? (dept8PM / data.summary.total8PM) * 100 : 0;
@@ -1048,7 +1112,9 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
           </div>
           <div className="p-4 sm:p-6">
             <div className="space-y-4">
-              {Object.entries(data.deptPerformance).map(([dept, performance]) => {
+              {Object.entries(data.deptPerformance)
+                .filter(([dept]) => dept && dept !== 'Unknown' && dept.trim() !== '')
+                .map(([dept, performance]) => {
                 const deptShops = Object.values(data.salesData).filter((shop: any) => shop.department === dept && shop.total > 0);
                 const deptVERVE = deptShops.reduce((sum: number, shop: any) => sum + shop.verve, 0);
                 const sharePercent = data.summary.totalVERVE > 0 ? (deptVERVE / data.summary.totalVERVE) * 100 : 0;
@@ -1083,11 +1149,13 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-      {/* Department Performance Summary (ENHANCED WITH TREND INFO) */}
+      {/* Department Performance Summary */}
       <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 sm:p-6 rounded-lg">
         <h3 className="text-lg font-medium text-gray-900 mb-4">Department Analysis Summary - {getMonthName(data.currentMonth)} {data.currentYear}</h3>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          {Object.entries(data.deptPerformance).slice(0, 4).map(([dept, performance]) => {
+          {Object.entries(data.deptPerformance)
+            .filter(([dept]) => dept && dept !== 'Unknown' && dept.trim() !== '')
+            .slice(0, 4).map(([dept, performance]) => {
             const coveragePercent = (performance.billedShops / performance.totalShops) * 100;
             const deptData = departmentShopsData[dept];
             const intelligence = departmentIntelligence[dept];
@@ -1126,7 +1194,7 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-      {/* Modal (ENHANCED) */}
+      {/* Modal */}
       {showDepartmentShops && (
         <DepartmentShopsModal 
           onClose={() => {
