@@ -496,7 +496,7 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
     return deptData;
   }, [data.salesData]);
 
-  const DepartmentShopsModal = ({ onClose }: { onClose: () => void }) => {
+  const DepartmentShopsModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
     if (!selectedDepartmentShops) return null;
 
     const { department, title, subtitle, shops, type, monthData, brandType } = selectedDepartmentShops;
