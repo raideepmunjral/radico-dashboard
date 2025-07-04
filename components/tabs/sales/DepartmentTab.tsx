@@ -496,12 +496,12 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
     return deptData;
   }, [data.salesData]);
 
-  const DepartmentShopsModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+  function DepartmentShopsModal({ onClose }: { onClose: () => void }) {
     if (!selectedDepartmentShops) return null;
 
     const { department, title, subtitle, shops, type, monthData, brandType } = selectedDepartmentShops;
 
-    const getTypeStyles = (type: string) => {
+    function getTypeStyles(type: string) {
       if (type.includes('8PM')) {
         return { bg: 'bg-purple-50', text: 'text-purple-600', border: 'border-purple-200' };
       } else if (type.includes('VERVE')) {
@@ -526,7 +526,7 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
         case 'volatile': return { bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-200' };
         default: return { bg: 'bg-gray-50', text: 'text-gray-600', border: 'border-gray-200' };
       }
-    };
+    }
 
     const typeStyles = getTypeStyles(type);
 
@@ -938,7 +938,7 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
     );
-  };
+  }
 
   return (
     <div className="space-y-6">
