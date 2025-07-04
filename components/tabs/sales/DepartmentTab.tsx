@@ -638,7 +638,7 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
                           ) : (type.includes('inactive60_') || type.includes('inactive90_')) ? (
                             <>
                               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Days Since Last {brandType} Order</th>
-                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last {brandType} Order Value</th>
+                              <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last {brandType} Order Cases</th>
                               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current {brandType} Status</th>
                               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cross-sell Opportunity</th>
                             </>
@@ -864,7 +864,7 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
                 if (type === 'monthly' && monthData) {
                   header = `Shop Name,Salesman,${monthData.month} Total,${monthData.month} 8PM,${monthData.month} VERVE\n`;
                 } else if (type.includes('inactive60_') || type.includes('inactive90_')) {
-                  header = `Shop Name,Salesman,Days Since Last ${brandType} Order,Last ${brandType} Order Value,Current ${brandType} Cases,Other Brand Cases,Cross-sell Opportunity\n`;
+                  header = `Shop Name,Salesman,Days Since Last ${brandType} Order,Last ${brandType} Order Cases,Current ${brandType} Cases,Other Brand Cases,Cross-sell Opportunity\n`;
                 } else {
                   header = 'Shop Name,Salesman,Current Month Total,8PM Cases,VERVE Cases\n';
                 }
