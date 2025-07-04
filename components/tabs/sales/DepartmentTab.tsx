@@ -282,8 +282,11 @@ const calculateDepartmentIntelligenceWithBrandSpecificTracking = (salesData: Rec
     
     // Calculate percentages
     const percentageShopsWithUptrend = totalShopsInDepartment > 0 ? ((shopsWithUptrendPattern.length / totalShopsInDepartment) * 100).toFixed(1) : '0';
+    const percentageShopsWithGrowing = totalShopsInDepartment > 0 ? ((shopsWithGrowingPattern.length / totalShopsInDepartment) * 100).toFixed(1) : '0';
     const percentageShopsWithDeclining = totalShopsInDepartment > 0 ? ((shopsWithDecliningPattern.length / totalShopsInDepartment) * 100).toFixed(1) : '0';
     const percentageShopsWithStable = totalShopsInDepartment > 0 ? ((shopsWithStablePattern.length / totalShopsInDepartment) * 100).toFixed(1) : '0';
+    const percentageShopsWithNew = totalShopsInDepartment > 0 ? ((shopsWithNewPattern.length / totalShopsInDepartment) * 100).toFixed(1) : '0';
+    const percentageShopsWithVolatile = totalShopsInDepartment > 0 ? ((shopsWithVolatilePattern.length / totalShopsInDepartment) * 100).toFixed(1) : '0';
     
     // 🚀 NEW: Brand-specific percentages
     const percentageShopsInactive60Days8PM = totalShopsInDepartment > 0 ? ((shopsInactive60Days8PM / totalShopsInDepartment) * 100).toFixed(1) : '0';
@@ -328,8 +331,11 @@ const calculateDepartmentIntelligenceWithBrandSpecificTracking = (salesData: Rec
       shopsInactiveOver90DaysList: departmentShops.filter(shop => shop.daysSinceLastOrder >= 90 && shop.daysSinceLastOrder < 999),
       
       percentageShopsWithUptrend,
+      percentageShopsWithGrowing,
       percentageShopsWithDeclining,
       percentageShopsWithStable,
+      percentageShopsWithNew,
+      percentageShopsWithVolatile,
       
       // 🚀 NEW: Brand-specific percentages
       percentageShopsInactive60Days8PM,
@@ -375,27 +381,33 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
     title: string;
     subtitle: string;
     shops: any[];
-    type: 'all' | 'active' | 'inactive' | '8pm' | 'verve' | 'both' | 'monthly' | 'uptrend' | 'declining' | 'stable' | 'inactive60' | 'inactive90' | 'inactive60_8PM' | 'inactive90_8PM' | 'inactive60_VERVE' | 'inactive90_VERVE';
+    type: 'all' | 'active' | 'inactive' | '8pm' | 'verve' | 'both' | 'monthly' | 'uptrend' | 'growing' | 'declining' | 'stable' | 'new' | 'volatile' | 'inactive60' | 'inactive90' | 'inactive60_8PM' | 'inactive90_8PM' | 'inactive60_VERVE' | 'inactive90_VERVE';
     monthData?: { month: string; total: number; eightPM: number; verve: number; };
     brandType?: '8PM' | 'VERVE' | 'both';
   } | null>(null);
 
   const handleTrendDrillDown = (
     department: string,
-    trendType: 'uptrend' | 'declining' | 'stable',
+    trendType: 'uptrend' | 'growing' | 'declining' | 'stable' | 'new' | 'volatile',
     shops: any[],
     percentage: string
   ) => {
     const trendLabels = {
       uptrend: 'Shops with Accelerating Growth (Jun > May > Apr)',
+      growing: 'Shops with Simple Growth (Jun > May)',
       declining: 'Shops with Declining Sales (Jun < May)', 
-      stable: 'Shops with Consistent Performance (±10% variation)'
+      stable: 'Shops with Consistent Performance (±10% variation)',
+      new: 'New Shops (First-time Buyers)',
+      volatile: 'Shops with Irregular Patterns'
     };
     
     const trendDescriptions = {
       uptrend: `These ${shops.length} shops show accelerating growth pattern over the last 3 months`,
+      growing: `These ${shops.length} shops show recovery or simple growth (June better than May)`,
       declining: `These ${shops.length} shops show declining pattern and need immediate attention`,
-      stable: `These ${shops.length} shops maintain consistent performance levels`
+      stable: `These ${shops.length} shops maintain consistent performance levels`,
+      new: `These ${shops.length} shops are new customers who started buying recently`,
+      volatile: `These ${shops.length} shops have irregular buying patterns`
     };
 
     setSelectedDepartmentShops({
@@ -507,8 +519,11 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
         case 'both': return { bg: 'bg-green-50', text: 'text-green-600', border: 'border-green-200' };
         case 'monthly': return { bg: 'bg-indigo-50', text: 'text-indigo-600', border: 'border-indigo-200' };
         case 'uptrend': return { bg: 'bg-green-50', text: 'text-green-600', border: 'border-green-200' };
+        case 'growing': return { bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200' };
         case 'declining': return { bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200' };
         case 'stable': return { bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-200' };
+        case 'new': return { bg: 'bg-cyan-50', text: 'text-cyan-600', border: 'border-cyan-200' };
+        case 'volatile': return { bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-200' };
         default: return { bg: 'bg-gray-50', text: 'text-gray-600', border: 'border-gray-200' };
       }
     };
@@ -570,8 +585,8 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
                   </div>
                 </div>
 
-                {/* Trend Analysis Summary for trend types */}
-                {(type === 'uptrend' || type === 'declining' || type === 'stable') && (
+                {/* Trend Analysis Summary for all trend types */}
+                {(type === 'uptrend' || type === 'growing' || type === 'declining' || type === 'stable' || type === 'new' || type === 'volatile') && (
                   <div className={`mb-6 ${typeStyles.bg} p-4 rounded-lg border ${typeStyles.border}`}>
                     <h4 className={`font-medium ${typeStyles.text} mb-2 flex items-center`}>
                       <TrendingUp className="w-4 h-4 mr-2" />
@@ -591,6 +606,24 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
                         <div className="text-gray-600">Baseline Comparison</div>
                       </div>
                     </div>
+                    {type === 'uptrend' && (
+                      <div className="mt-2 text-xs text-green-700">✅ Pattern: June > May > April (Accelerating Growth)</div>
+                    )}
+                    {type === 'growing' && (
+                      <div className="mt-2 text-xs text-emerald-700">📈 Pattern: June > May (Recovery/Simple Growth)</div>
+                    )}
+                    {type === 'declining' && (
+                      <div className="mt-2 text-xs text-red-700">📉 Pattern: June < May (Needs Attention)</div>
+                    )}
+                    {type === 'stable' && (
+                      <div className="mt-2 text-xs text-blue-700">➡️ Pattern: June ≈ May (±10% Consistent)</div>
+                    )}
+                    {type === 'new' && (
+                      <div className="mt-2 text-xs text-cyan-700">🆕 Pattern: New Customer (First Purchase)</div>
+                    )}
+                    {type === 'volatile' && (
+                      <div className="mt-2 text-xs text-amber-700">🌊 Pattern: Irregular/Unpredictable</div>
+                    )}
                   </div>
                 )}
 
@@ -621,7 +654,7 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shop Name</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salesman</th>
                           
-                          {(type === 'uptrend' || type === 'declining' || type === 'stable') ? (
+                          {(type === 'uptrend' || type === 'growing' || type === 'declining' || type === 'stable' || type === 'new' || type === 'volatile') ? (
                             <>
                               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jun Cases</th>
                               <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">May Cases</th>
@@ -701,7 +734,7 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
                               {shop.salesman || 'Unknown'}
                             </td>
                             
-                            {(type === 'uptrend' || type === 'declining' || type === 'stable') ? (
+                            {(type === 'uptrend' || type === 'growing' || type === 'declining' || type === 'stable' || type === 'new' || type === 'volatile') ? (
                               <>
                                 <td className="px-4 py-3 text-sm font-bold text-gray-900">
                                   {(shop.juneTotal || 0).toLocaleString()}
@@ -715,12 +748,20 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
                                 <td className="px-4 py-3 text-sm">
                                   <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
                                     shop.shopTrendPattern === 'uptrend' ? 'bg-green-100 text-green-800' :
+                                    shop.shopTrendPattern === 'growing' ? 'bg-emerald-100 text-emerald-800' :
                                     shop.shopTrendPattern === 'declining' ? 'bg-red-100 text-red-800' :
-                                    'bg-blue-100 text-blue-800'
+                                    shop.shopTrendPattern === 'stable' ? 'bg-blue-100 text-blue-800' :
+                                    shop.shopTrendPattern === 'new' ? 'bg-cyan-100 text-cyan-800' :
+                                    shop.shopTrendPattern === 'volatile' ? 'bg-amber-100 text-amber-800' :
+                                    'bg-gray-100 text-gray-800'
                                   }`}>
-                                    {shop.shopTrendPattern === 'uptrend' ? '📈 Accelerating' :
+                                    {shop.shopTrendPattern === 'uptrend' ? '🚀 Accelerating' :
+                                     shop.shopTrendPattern === 'growing' ? '📈 Growing' :
                                      shop.shopTrendPattern === 'declining' ? '📉 Declining' :
-                                     '➡️ Stable'}
+                                     shop.shopTrendPattern === 'stable' ? '➡️ Stable' :
+                                     shop.shopTrendPattern === 'new' ? '🆕 New Customer' :
+                                     shop.shopTrendPattern === 'volatile' ? '🌊 Irregular' :
+                                     '❓ Unknown'}
                                   </span>
                                 </td>
                               </>
@@ -927,16 +968,16 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
               </div>
               
               <div className="space-y-2">
-                {/* ENHANCED: Trend Metrics with 3-Month Context */}
+                {/* ENHANCED: Complete Trend Metrics with All 6 Patterns */}
                 <div className="flex justify-between items-center">
                   <span className="text-xs text-gray-600 flex items-center">
                     <TrendingUp className="w-3 h-3 mr-1" />
-                    Growth (3M Trend):
+                    Accelerating (3M):
                   </span>
                   <button
                     onClick={() => handleTrendDrillDown(dept, 'uptrend', intelligence.shopsWithUptrendPattern, intelligence.percentageShopsWithUptrend)}
                     className="text-sm font-bold text-green-600 hover:text-green-800 hover:underline"
-                    title={`${intelligence.shopsWithUptrendPattern.length} shops showing accelerating growth over 3 months`}
+                    title={`${intelligence.shopsWithUptrendPattern.length} shops showing accelerating growth (Jun>May>Apr)`}
                   >
                     {intelligence.percentageShopsWithUptrend}% shops
                   </button>
@@ -944,15 +985,71 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
                 
                 <div className="flex justify-between items-center">
                   <span className="text-xs text-gray-600 flex items-center">
+                    <TrendingUp className="w-3 h-3 mr-1" />
+                    Simple Growth (3M):
+                  </span>
+                  <button
+                    onClick={() => handleTrendDrillDown(dept, 'growing', intelligence.shopsWithGrowingPattern, intelligence.percentageShopsWithGrowing)}
+                    className="text-sm font-bold text-emerald-600 hover:text-emerald-800 hover:underline"
+                    title={`${intelligence.shopsWithGrowingPattern.length} shops showing recovery/simple growth (Jun>May)`}
+                  >
+                    {intelligence.percentageShopsWithGrowing}% shops
+                  </button>
+                </div>
+                
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-gray-600 flex items-center">
                     <TrendingDown className="w-3 h-3 mr-1" />
-                    Declining (3M Trend):
+                    Declining (3M):
                   </span>
                   <button
                     onClick={() => handleTrendDrillDown(dept, 'declining', intelligence.shopsWithDecliningPattern, intelligence.percentageShopsWithDeclining)}
                     className="text-sm font-bold text-red-600 hover:text-red-800 hover:underline"
-                    title={`${intelligence.shopsWithDecliningPattern.length} shops showing declining sales over 3 months`}
+                    title={`${intelligence.shopsWithDecliningPattern.length} shops showing declining sales (Jun<May)`}
                   >
                     {intelligence.percentageShopsWithDeclining}% shops
+                  </button>
+                </div>
+                
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-gray-600 flex items-center">
+                    <Activity className="w-3 h-3 mr-1" />
+                    Stable (3M):
+                  </span>
+                  <button
+                    onClick={() => handleTrendDrillDown(dept, 'stable', intelligence.shopsWithStablePattern, intelligence.percentageShopsWithStable)}
+                    className="text-sm font-bold text-blue-600 hover:text-blue-800 hover:underline"
+                    title={`${intelligence.shopsWithStablePattern.length} shops with consistent performance (±10%)`}
+                  >
+                    {intelligence.percentageShopsWithStable}% shops
+                  </button>
+                </div>
+                
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-gray-600 flex items-center">
+                    <Target className="w-3 h-3 mr-1" />
+                    New Customers (3M):
+                  </span>
+                  <button
+                    onClick={() => handleTrendDrillDown(dept, 'new', intelligence.shopsWithNewPattern, intelligence.percentageShopsWithNew)}
+                    className="text-sm font-bold text-cyan-600 hover:text-cyan-800 hover:underline"
+                    title={`${intelligence.shopsWithNewPattern.length} shops are new first-time buyers`}
+                  >
+                    {intelligence.percentageShopsWithNew}% shops
+                  </button>
+                </div>
+                
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-gray-600 flex items-center">
+                    <AlertTriangle className="w-3 h-3 mr-1" />
+                    Irregular Pattern (3M):
+                  </span>
+                  <button
+                    onClick={() => handleTrendDrillDown(dept, 'volatile', intelligence.shopsWithVolatilePattern, intelligence.percentageShopsWithVolatile)}
+                    className="text-sm font-bold text-amber-600 hover:text-amber-800 hover:underline"
+                    title={`${intelligence.shopsWithVolatilePattern.length} shops with irregular buying patterns`}
+                  >
+                    {intelligence.percentageShopsWithVolatile}% shops
                   </button>
                 </div>
                 
@@ -1114,17 +1211,20 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
         </div>
 
         <div className="mt-4 p-3 bg-white rounded-lg border border-blue-200">
-          <h5 className="font-medium text-blue-900 mb-2">🚀 Enhanced Brand-Specific Metrics Explanation:</h5>
+          <h5 className="font-medium text-blue-900 mb-2">🚀 Complete Trend Analysis - All Scenarios Captured:</h5>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-sm text-blue-700">
-            <div><strong>Growth (3M Trend):</strong> % of shops with Jun &gt; May &gt; Apr sales</div>
-            <div><strong>Declining (3M Trend):</strong> % of shops with Jun &lt; May sales</div>
-            <div><strong>8PM/VERVE (This Month):</strong> % of shops currently buying each brand</div>
-            <div><strong>60+ Days 8PM:</strong> % of shops with no 8PM orders for 60-89 days (cross-sell opportunity)</div>
-            <div><strong>90+ Days 8PM:</strong> % of shops with no 8PM orders for 90+ days (critical 8PM attention)</div>
-            <div><strong>60+ Days VERVE:</strong> % of shops with no VERVE orders for 60-89 days (early VERVE warning)</div>
-            <div><strong>90+ Days VERVE:</strong> % of shops with no VERVE orders for 90+ days (critical VERVE attention)</div>
-            <div className="col-span-1 md:col-span-2 text-xs text-blue-600 mt-1">
-              💡 <strong>NEW: Brand-specific insights</strong> - Now track each brand separately for targeted sales strategies and cross-selling opportunities
+            <div><strong>🚀 Accelerating (3M):</strong> Jun &gt; May &gt; Apr (all positive) - Best performers</div>
+            <div><strong>📈 Simple Growth (3M):</strong> Jun &gt; May (recovery/improvement)</div>
+            <div><strong>📉 Declining (3M):</strong> Jun &lt; May (needs attention)</div>
+            <div><strong>➡️ Stable (3M):</strong> Jun ≈ May (±10% consistent performance)</div>
+            <div><strong>🆕 New Customers (3M):</strong> First-time buyers (May=0, Apr=0, Jun&gt;0)</div>
+            <div><strong>🌊 Irregular Pattern (3M):</strong> Volatile/unpredictable buying behavior</div>
+            <div><strong>🟣 60+ Days 8PM:</strong> No 8PM orders for 60-89 days (cross-sell opportunity)</div>
+            <div><strong>🟣 90+ Days 8PM:</strong> No 8PM orders for 90+ days (critical 8PM attention)</div>
+            <div><strong>🟠 60+ Days VERVE:</strong> No VERVE orders for 60-89 days (early VERVE warning)</div>
+            <div><strong>🟠 90+ Days VERVE:</strong> No VERVE orders for 90+ days (critical VERVE attention)</div>
+            <div className="col-span-1 md:col-span-2 text-xs text-blue-600 mt-1 font-bold">
+              ✅ <strong>100% COVERAGE:</strong> Every shop now fits into exactly one trend category - no gaps, complete business intelligence!
             </div>
           </div>
         </div>
