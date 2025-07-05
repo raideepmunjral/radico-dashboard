@@ -1223,23 +1223,93 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
                     </div>
                     <div className="bg-blue-50 p-4 rounded-lg text-center border border-blue-200">
                       <div className="text-2xl font-bold text-blue-600">
-                        {selectedDepartmentShops.shops.reduce((sum: number, shop: any) => sum + (shop.total || 0), 0).toLocaleString()}
+                        {selectedDepartmentShops.type === 'monthly' && selectedDepartmentShops.monthData ? 
+                          selectedDepartmentShops.monthData.total.toLocaleString() :
+                          selectedDepartmentShops.shops.reduce((sum: number, shop: any) => sum + (shop.total || 0), 0).toLocaleString()}
                       </div>
-                      <div className="text-sm text-gray-600">Total Cases (Current Month)</div>
+                      <div className="text-sm text-gray-600">
+                        {selectedDepartmentShops.type === 'monthly' && selectedDepartmentShops.monthData ? 
+                          `Total Cases (${selectedDepartmentShops.monthData.month})` : 
+                          'Total Cases (Current Month)'}
+                      </div>
                     </div>
                     <div className="bg-blue-50 p-4 rounded-lg text-center border border-blue-200">
                       <div className="text-2xl font-bold text-blue-600">
-                        {selectedDepartmentShops.shops.reduce((sum: number, shop: any) => sum + (shop.eightPM || 0), 0).toLocaleString()}
+                        {selectedDepartmentShops.type === 'monthly' && selectedDepartmentShops.monthData ? 
+                          selectedDepartmentShops.monthData.eightPM.toLocaleString() :
+                          selectedDepartmentShops.shops.reduce((sum: number, shop: any) => sum + (shop.eightPM || 0), 0).toLocaleString()}
                       </div>
                       <div className="text-sm text-gray-600">8PM Brand Cases</div>
                     </div>
                     <div className="bg-blue-50 p-4 rounded-lg text-center border border-blue-200">
                       <div className="text-2xl font-bold text-blue-600">
-                        {selectedDepartmentShops.shops.reduce((sum: number, shop: any) => sum + (shop.verve || 0), 0).toLocaleString()}
+                        {selectedDepartmentShops.type === 'monthly' && selectedDepartmentShops.monthData ? 
+                          selectedDepartmentShops.monthData.verve.toLocaleString() :
+                          selectedDepartmentShops.shops.reduce((sum: number, shop: any) => sum + (shop.verve || 0), 0).toLocaleString()}
                       </div>
                       <div className="text-sm text-gray-600">VERVE Brand Cases</div>
                     </div>
                   </div>
+
+                  {/* Trend Analysis Summary */}
+                  {(selectedDepartmentShops.type === 'uptrend' || selectedDepartmentShops.type === 'growing' || selectedDepartmentShops.type === 'declining' || selectedDepartmentShops.type === 'stable' || selectedDepartmentShops.type === 'new' || selectedDepartmentShops.type === 'volatile') && (
+                    <div className="mb-6 bg-blue-50 p-4 rounded-lg border border-blue-200">
+                      <h4 className="font-medium text-blue-600 mb-2 flex items-center">
+                        <TrendingUp className="w-4 h-4 mr-2" />
+                        Trend Analysis Pattern: {selectedDepartmentShops.type.charAt(0).toUpperCase() + selectedDepartmentShops.type.slice(1)}
+                      </h4>
+                      <div className="grid grid-cols-3 gap-4 text-center text-sm">
+                        <div>
+                          <div className="font-bold text-gray-800">June 2025</div>
+                          <div className="text-gray-600">Most Recent Month</div>
+                        </div>
+                        <div>
+                          <div className="font-bold text-gray-800">May 2025</div>
+                          <div className="text-gray-600">Middle Comparison</div>
+                        </div>
+                        <div>
+                          <div className="font-bold text-gray-800">April 2025</div>
+                          <div className="text-gray-600">Baseline Comparison</div>
+                        </div>
+                      </div>
+                      {selectedDepartmentShops.type === 'uptrend' && (
+                        <div className="mt-2 text-xs text-green-700">✅ Pattern: June > May > April (Accelerating Growth)</div>
+                      )}
+                      {selectedDepartmentShops.type === 'growing' && (
+                        <div className="mt-2 text-xs text-emerald-700">📈 Pattern: June > May (Recovery/Simple Growth)</div>
+                      )}
+                      {selectedDepartmentShops.type === 'declining' && (
+                        <div className="mt-2 text-xs text-red-700">📉 Pattern: June < May (Needs Attention)</div>
+                      )}
+                      {selectedDepartmentShops.type === 'stable' && (
+                        <div className="mt-2 text-xs text-blue-700">➡️ Pattern: June ≈ May (±10% Consistent)</div>
+                      )}
+                      {selectedDepartmentShops.type === 'new' && (
+                        <div className="mt-2 text-xs text-cyan-700">🆕 Pattern: New Customer (First Purchase)</div>
+                      )}
+                      {selectedDepartmentShops.type === 'volatile' && (
+                        <div className="mt-2 text-xs text-amber-700">🌊 Pattern: Irregular/Unpredictable</div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Brand-specific inactive analysis */}
+                  {(selectedDepartmentShops.type?.includes('inactive60_') || selectedDepartmentShops.type?.includes('inactive90_')) && (
+                    <div className="mb-6 bg-purple-50 p-4 rounded-lg border border-purple-200">
+                      <h4 className="font-medium text-purple-600 mb-2 flex items-center">
+                        <Clock className="w-4 h-4 mr-2" />
+                        {selectedDepartmentShops.brandType} Brand Inactive Analysis: {selectedDepartmentShops.type?.includes('60_') ? '60-89 Days' : '90+ Days'} Without {selectedDepartmentShops.brandType} Orders
+                      </h4>
+                      <div className="text-sm text-gray-600">
+                        {selectedDepartmentShops.type?.includes('60_') ? 
+                          `Early warning: These shops may need immediate ${selectedDepartmentShops.brandType} sales attention and cross-selling opportunities.` :
+                          `Critical attention needed: These shops have stopped buying ${selectedDepartmentShops.brandType} for an extended period. Check for brand switching or competitive pressure.`}
+                      </div>
+                      <div className="mt-2 text-xs text-blue-600">
+                        💡 <strong>Action Items:</strong> {selectedDepartmentShops.brandType === '8PM' ? 'Focus on 8PM promotions, tastings, and competitive pricing' : 'Highlight VERVE flavors, target younger demographics, and seasonal campaigns'}
+                      </div>
+                    </div>
+                  )}
 
                   <div className="border border-gray-200 rounded-lg">
                     <div className="max-h-96 overflow-y-auto">
@@ -1249,20 +1319,78 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rank</th>
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shop Name</th>
                             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salesman</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jun Cases</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">May Cases</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Apr Cases</th>
-                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pattern</th>
+                            
+                            {(selectedDepartmentShops.type === 'uptrend' || selectedDepartmentShops.type === 'growing' || selectedDepartmentShops.type === 'declining' || selectedDepartmentShops.type === 'stable' || selectedDepartmentShops.type === 'new' || selectedDepartmentShops.type === 'volatile') ? (
+                              <>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jun Cases</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">May Cases</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Apr Cases</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trend Pattern</th>
+                              </>
+                            ) : selectedDepartmentShops.type === 'monthly' && selectedDepartmentShops.monthData ? (
+                              <>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{selectedDepartmentShops.monthData.month} Total</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{selectedDepartmentShops.monthData.month} 8PM</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">{selectedDepartmentShops.monthData.month} VERVE</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Brand Status</th>
+                              </>
+                            ) : (selectedDepartmentShops.type?.includes('inactive60_') || selectedDepartmentShops.type?.includes('inactive90_')) ? (
+                              <>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Days Since Last {selectedDepartmentShops.brandType} Order</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last {selectedDepartmentShops.brandType} Order Cases</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current {selectedDepartmentShops.brandType} Status</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cross-sell Opportunity</th>
+                              </>
+                            ) : (
+                              <>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Current Month Total</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">8PM Cases</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">VERVE Cases</th>
+                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Brand Status</th>
+                              </>
+                            )}
                           </tr>
                         </thead>
                         <tbody className="bg-white divide-y divide-gray-200">
                           {selectedDepartmentShops.shops
-                            .sort((a: any, b: any) => (b.total || 0) - (a.total || 0))
+                            .sort((a: any, b: any) => {
+                              if (selectedDepartmentShops.type === 'monthly' && selectedDepartmentShops.monthData) {
+                                const monthKey = getMonthKeyFromName(selectedDepartmentShops.monthData.month);
+                                const aValue = getShopDataForMonth(a, monthKey, 'total');
+                                const bValue = getShopDataForMonth(b, monthKey, 'total');
+                                return bValue - aValue;
+                              }
+                              if (selectedDepartmentShops.type?.includes('inactive60_') || selectedDepartmentShops.type?.includes('inactive90_')) {
+                                const brandKey = selectedDepartmentShops.brandType === '8PM' ? 'daysSinceLastOrder8PM' : 'daysSinceLastOrderVERVE';
+                                return (b[brandKey] || 0) - (a[brandKey] || 0);
+                              }
+                              return (b.total || 0) - (a.total || 0);
+                            })
                             .map((shop: any, index: number) => (
-                            <tr key={shop.shopId} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                            <tr key={shop.shopId} className={
+                              (() => {
+                                let isTopPerformer = false;
+                                if (selectedDepartmentShops.type === 'monthly' && selectedDepartmentShops.monthData) {
+                                  const monthKey = getMonthKeyFromName(selectedDepartmentShops.monthData.month);
+                                  isTopPerformer = index === 0 && getShopDataForMonth(shop, monthKey, 'total') > 0;
+                                } else {
+                                  isTopPerformer = index === 0 && shop.total > 0;
+                                }
+                                return isTopPerformer ? 'bg-yellow-50' : index % 2 === 0 ? 'bg-gray-50' : 'bg-white';
+                              })()
+                            }>
                               <td className="px-4 py-3 text-sm text-gray-900">
                                 {index + 1}
-                                {index === 0 && shop.total > 0 && <span className="ml-1" title="Top Performer">🏆</span>}
+                                {(() => {
+                                  let showTrophy = false;
+                                  if (selectedDepartmentShops.type === 'monthly' && selectedDepartmentShops.monthData) {
+                                    const monthKey = getMonthKeyFromName(selectedDepartmentShops.monthData.month);
+                                    showTrophy = index === 0 && getShopDataForMonth(shop, monthKey, 'total') > 0;
+                                  } else {
+                                    showTrophy = index === 0 && shop.total > 0;
+                                  }
+                                  return showTrophy ? <span className="ml-1" title="Top Performer">🏆</span> : null;
+                                })()}
                               </td>
                               <td className="px-4 py-3 text-sm font-medium text-gray-900">
                                 {shop.shopName || 'Unknown Shop'}
@@ -1270,34 +1398,140 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
                               <td className="px-4 py-3 text-sm text-gray-600">
                                 {shop.salesman || 'Unknown'}
                               </td>
-                              <td className="px-4 py-3 text-sm font-bold text-gray-900">
-                                {(shop.juneTotal || 0).toLocaleString()}
-                              </td>
-                              <td className="px-4 py-3 text-sm text-gray-600">
-                                {(shop.mayTotal || 0).toLocaleString()}
-                              </td>
-                              <td className="px-4 py-3 text-sm text-gray-600">
-                                {(shop.aprilTotal || 0).toLocaleString()}
-                              </td>
-                              <td className="px-4 py-3 text-sm">
-                                <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                                  shop.shopTrendPattern === 'uptrend' ? 'bg-green-100 text-green-800' :
-                                  shop.shopTrendPattern === 'growing' ? 'bg-emerald-100 text-emerald-800' :
-                                  shop.shopTrendPattern === 'declining' ? 'bg-red-100 text-red-800' :
-                                  shop.shopTrendPattern === 'stable' ? 'bg-blue-100 text-blue-800' :
-                                  shop.shopTrendPattern === 'new' ? 'bg-cyan-100 text-cyan-800' :
-                                  shop.shopTrendPattern === 'volatile' ? 'bg-amber-100 text-amber-800' :
-                                  'bg-gray-100 text-gray-800'
-                                }`}>
-                                  {shop.shopTrendPattern === 'uptrend' ? '🚀 Accelerating' :
-                                   shop.shopTrendPattern === 'growing' ? '📈 Growing' :
-                                   shop.shopTrendPattern === 'declining' ? '📉 Declining' :
-                                   shop.shopTrendPattern === 'stable' ? '➡️ Stable' :
-                                   shop.shopTrendPattern === 'new' ? '🆕 New Customer' :
-                                   shop.shopTrendPattern === 'volatile' ? '🌊 Irregular' :
-                                   '❓ Unknown'}
-                                </span>
-                              </td>
+                              
+                              {(selectedDepartmentShops.type === 'uptrend' || selectedDepartmentShops.type === 'growing' || selectedDepartmentShops.type === 'declining' || selectedDepartmentShops.type === 'stable' || selectedDepartmentShops.type === 'new' || selectedDepartmentShops.type === 'volatile') ? (
+                                <>
+                                  <td className="px-4 py-3 text-sm font-bold text-gray-900">
+                                    {(shop.juneTotal || 0).toLocaleString()}
+                                  </td>
+                                  <td className="px-4 py-3 text-sm text-gray-600">
+                                    {(shop.mayTotal || 0).toLocaleString()}
+                                  </td>
+                                  <td className="px-4 py-3 text-sm text-gray-600">
+                                    {(shop.aprilTotal || 0).toLocaleString()}
+                                  </td>
+                                  <td className="px-4 py-3 text-sm">
+                                    <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                                      shop.shopTrendPattern === 'uptrend' ? 'bg-green-100 text-green-800' :
+                                      shop.shopTrendPattern === 'growing' ? 'bg-emerald-100 text-emerald-800' :
+                                      shop.shopTrendPattern === 'declining' ? 'bg-red-100 text-red-800' :
+                                      shop.shopTrendPattern === 'stable' ? 'bg-blue-100 text-blue-800' :
+                                      shop.shopTrendPattern === 'new' ? 'bg-cyan-100 text-cyan-800' :
+                                      shop.shopTrendPattern === 'volatile' ? 'bg-amber-100 text-amber-800' :
+                                      'bg-gray-100 text-gray-800'
+                                    }`}>
+                                      {shop.shopTrendPattern === 'uptrend' ? '🚀 Accelerating' :
+                                       shop.shopTrendPattern === 'growing' ? '📈 Growing' :
+                                       shop.shopTrendPattern === 'declining' ? '📉 Declining' :
+                                       shop.shopTrendPattern === 'stable' ? '➡️ Stable' :
+                                       shop.shopTrendPattern === 'new' ? '🆕 New Customer' :
+                                       shop.shopTrendPattern === 'volatile' ? '🌊 Irregular' :
+                                       '❓ Unknown'}
+                                    </span>
+                                  </td>
+                                </>
+                              ) : selectedDepartmentShops.type === 'monthly' && selectedDepartmentShops.monthData ? (
+                                <>
+                                  <td className="px-4 py-3 text-sm font-bold text-gray-900">
+                                    {(() => {
+                                      const monthKey = getMonthKeyFromName(selectedDepartmentShops.monthData.month);
+                                      return getShopDataForMonth(shop, monthKey, 'total').toLocaleString();
+                                    })()}
+                                  </td>
+                                  <td className="px-4 py-3 text-sm text-purple-600">
+                                    {(() => {
+                                      const monthKey = getMonthKeyFromName(selectedDepartmentShops.monthData.month);
+                                      return getShopDataForMonth(shop, monthKey, 'eightPM').toLocaleString();
+                                    })()}
+                                  </td>
+                                  <td className="px-4 py-3 text-sm text-orange-600">
+                                    {(() => {
+                                      const monthKey = getMonthKeyFromName(selectedDepartmentShops.monthData.month);
+                                      return getShopDataForMonth(shop, monthKey, 'verve').toLocaleString();
+                                    })()}
+                                  </td>
+                                  <td className="px-4 py-3 text-sm">
+                                    {(() => {
+                                      const monthKey = getMonthKeyFromName(selectedDepartmentShops.monthData.month);
+                                      const monthEightPM = getShopDataForMonth(shop, monthKey, 'eightPM');
+                                      const monthVerve = getShopDataForMonth(shop, monthKey, 'verve');
+                                      
+                                      if (monthEightPM > 0 && monthVerve > 0) {
+                                        return <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">Both Brands</span>;
+                                      } else if (monthEightPM > 0) {
+                                        return <span className="px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded-full">8PM Only</span>;
+                                      } else if (monthVerve > 0) {
+                                        return <span className="px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded-full">VERVE Only</span>;
+                                      } else {
+                                        return <span className="px-2 py-1 text-xs bg-red-100 text-red-800 rounded-full">No Brand Sales</span>;
+                                      }
+                                    })()}
+                                  </td>
+                                </>
+                              ) : (selectedDepartmentShops.type?.includes('inactive60_') || selectedDepartmentShops.type?.includes('inactive90_')) ? (
+                                <>
+                                  <td className="px-4 py-3 text-sm text-red-600 font-bold">
+                                    {(() => {
+                                      const brandKey = selectedDepartmentShops.brandType === '8PM' ? 'daysSinceLastOrder8PM' : 'daysSinceLastOrderVERVE';
+                                      const daysSince = shop[brandKey];
+                                      return daysSince === 999 ? 'Never in 5M window' : `${daysSince} days`;
+                                    })()}
+                                  </td>
+                                  <td className="px-4 py-3 text-sm text-gray-600">
+                                    {(() => {
+                                      const valueKey = selectedDepartmentShops.brandType === '8PM' ? 'lastOrderValue8PM' : 'lastOrderValueVERVE';
+                                      return (shop[valueKey] || 0).toLocaleString();
+                                    })()}
+                                  </td>
+                                  <td className="px-4 py-3 text-sm">
+                                    {(() => {
+                                      const currentValue = selectedDepartmentShops.brandType === '8PM' ? (shop.eightPM || 0) : (shop.verve || 0);
+                                      if (currentValue > 0) {
+                                        return <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">Currently Active</span>;
+                                      } else {
+                                        return <span className="px-2 py-1 text-xs bg-red-100 text-red-800 rounded-full">Currently Inactive</span>;
+                                      }
+                                    })()}
+                                  </td>
+                                  <td className="px-4 py-3 text-sm">
+                                    {(() => {
+                                      const current8PM = shop.eightPM || 0;
+                                      const currentVERVE = shop.verve || 0;
+                                      const otherBrandActive = selectedDepartmentShops.brandType === '8PM' ? currentVERVE > 0 : current8PM > 0;
+                                      
+                                      if (otherBrandActive) {
+                                        const otherBrand = selectedDepartmentShops.brandType === '8PM' ? 'VERVE' : '8PM';
+                                        return <span className="px-2 py-1 text-xs bg-blue-100 text-blue-800 rounded-full">✅ {otherBrand} Active</span>;
+                                      } else {
+                                        return <span className="px-2 py-1 text-xs bg-gray-100 text-gray-800 rounded-full">⚠️ Both Inactive</span>;
+                                      }
+                                    })()}
+                                  </td>
+                                </>
+                              ) : (
+                                <>
+                                  <td className="px-4 py-3 text-sm font-bold text-gray-900">
+                                    {(shop.total || 0).toLocaleString()}
+                                  </td>
+                                  <td className="px-4 py-3 text-sm text-purple-600">
+                                    {(shop.eightPM || 0).toLocaleString()}
+                                  </td>
+                                  <td className="px-4 py-3 text-sm text-orange-600">
+                                    {(shop.verve || 0).toLocaleString()}
+                                  </td>
+                                  <td className="px-4 py-3 text-sm">
+                                    {(shop.eightPM || 0) > 0 && (shop.verve || 0) > 0 ? (
+                                      <span className="px-2 py-1 text-xs bg-green-100 text-green-800 rounded-full">Both Brands</span>
+                                    ) : (shop.eightPM || 0) > 0 ? (
+                                      <span className="px-2 py-1 text-xs bg-purple-100 text-purple-800 rounded-full">8PM Only</span>
+                                    ) : (shop.verve || 0) > 0 ? (
+                                      <span className="px-2 py-1 text-xs bg-orange-100 text-orange-800 rounded-full">VERVE Only</span>
+                                    ) : (
+                                      <span className="px-2 py-1 text-xs bg-red-100 text-red-800 rounded-full">No Brand Sales</span>
+                                    )}
+                                  </td>
+                                </>
+                              )}
                             </tr>
                           ))}
                         </tbody>
@@ -1311,16 +1545,45 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
             <div className="border-t p-4 sm:p-6 flex justify-end space-x-3 flex-shrink-0">
               <button
                 onClick={() => {
-                  const csvContent = selectedDepartmentShops.shops.map((shop: any) => 
-                    `${shop.shopName},${shop.salesman},${shop.total},${shop.eightPM || 0},${shop.verve || 0}`
-                  ).join('\n');
+                  const csvContent = selectedDepartmentShops.shops.map((shop: any) => {
+                    if (selectedDepartmentShops.type === 'monthly' && selectedDepartmentShops.monthData) {
+                      const monthKey = getMonthKeyFromName(selectedDepartmentShops.monthData.month);
+                      const monthTotal = getShopDataForMonth(shop, monthKey, 'total');
+                      const month8PM = getShopDataForMonth(shop, monthKey, 'eightPM');
+                      const monthVerve = getShopDataForMonth(shop, monthKey, 'verve');
+                      return `${shop.shopName},${shop.salesman},${monthTotal},${month8PM},${monthVerve}`;
+                    } else if (selectedDepartmentShops.type?.includes('inactive60_') || selectedDepartmentShops.type?.includes('inactive90_')) {
+                      const brandKey = selectedDepartmentShops.brandType === '8PM' ? 'daysSinceLastOrder8PM' : 'daysSinceLastOrderVERVE';
+                      const valueKey = selectedDepartmentShops.brandType === '8PM' ? 'lastOrderValue8PM' : 'lastOrderValueVERVE';
+                      const daysSince = shop[brandKey] === 999 ? 'Never' : shop[brandKey];
+                      const lastOrder = shop[valueKey] || 0;
+                      const currentBrandValue = selectedDepartmentShops.brandType === '8PM' ? (shop.eightPM || 0) : (shop.verve || 0);
+                      const otherBrandValue = selectedDepartmentShops.brandType === '8PM' ? (shop.verve || 0) : (shop.eightPM || 0);
+                      const crossSellOpportunity = otherBrandValue > 0 ? 'Yes' : 'No';
+                      return `${shop.shopName},${shop.salesman},${daysSince},${lastOrder},${currentBrandValue},${otherBrandValue},${crossSellOpportunity}`;
+                    }
+                    return `${shop.shopName},${shop.salesman},${shop.total},${shop.eightPM || 0},${shop.verve || 0}`;
+                  }).join('\n');
                   
-                  const header = 'Shop Name,Salesman,Current Month Total,8PM Cases,VERVE Cases\n';
+                  let header: string;
+                  if (selectedDepartmentShops.type === 'monthly' && selectedDepartmentShops.monthData) {
+                    header = `Shop Name,Salesman,${selectedDepartmentShops.monthData.month} Total,${selectedDepartmentShops.monthData.month} 8PM,${selectedDepartmentShops.monthData.month} VERVE\n`;
+                  } else if (selectedDepartmentShops.type?.includes('inactive60_') || selectedDepartmentShops.type?.includes('inactive90_')) {
+                    header = `Shop Name,Salesman,Days Since Last ${selectedDepartmentShops.brandType} Order,Last ${selectedDepartmentShops.brandType} Order Cases,Current ${selectedDepartmentShops.brandType} Cases,Other Brand Cases,Cross-sell Opportunity\n`;
+                  } else {
+                    header = 'Shop Name,Salesman,Current Month Total,8PM Cases,VERVE Cases\n';
+                  }
+                  
                   const blob = new Blob([header + csvContent], { type: 'text/csv' });
                   const url = URL.createObjectURL(blob);
                   const a = document.createElement('a');
                   a.href = url;
-                  a.download = `${selectedDepartmentShops.department}_${selectedDepartmentShops.type}_shops.csv`;
+                  const fileName = selectedDepartmentShops.type === 'monthly' && selectedDepartmentShops.monthData ? 
+                    `${selectedDepartmentShops.department}_${selectedDepartmentShops.monthData.month}_${selectedDepartmentShops.type}_shops.csv` :
+                    selectedDepartmentShops.type?.includes('inactive') && selectedDepartmentShops.brandType ?
+                    `${selectedDepartmentShops.department}_${selectedDepartmentShops.brandType}_${selectedDepartmentShops.type}_shops_${getShortMonthName(data.currentMonth)}_${data.currentYear}.csv` :
+                    `${selectedDepartmentShops.department}_${selectedDepartmentShops.type}_shops_${getShortMonthName(data.currentMonth)}_${data.currentYear}.csv`;
+                  a.download = fileName;
                   a.click();
                   URL.revokeObjectURL(url);
                 }}
