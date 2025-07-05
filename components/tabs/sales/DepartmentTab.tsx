@@ -1190,16 +1190,155 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-      {showDepartmentShops && (
+      {showDepartmentShops && selectedDepartmentShops && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
-          <div className="bg-white rounded-lg max-w-md w-full p-6">
-            <h3 className="text-lg font-semibold mb-4">Modal Coming Soon</h3>
-            <button
-              onClick={() => setShowDepartmentShops(false)}
-              className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
-            >
-              Close
-            </button>
+          <div className="bg-white rounded-lg max-w-5xl w-full h-[90vh] flex flex-col">
+            <div className="flex justify-between items-center p-4 sm:p-6 border-b flex-shrink-0">
+              <div>
+                <h3 className="text-lg font-semibold">{selectedDepartmentShops.title}</h3>
+                <p className="text-sm text-gray-500">{selectedDepartmentShops.subtitle}</p>
+              </div>
+              <button 
+                onClick={() => {
+                  setShowDepartmentShops(false);
+                  setSelectedDepartmentShops(null);
+                }} 
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+              {selectedDepartmentShops.shops.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-gray-500">No shops found in this category.</p>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+                    <div className="bg-blue-50 p-4 rounded-lg text-center border border-blue-200">
+                      <div className="text-2xl font-bold text-blue-600">{selectedDepartmentShops.shops.length}</div>
+                      <div className="text-sm text-gray-600">Total Shops in Category</div>
+                    </div>
+                    <div className="bg-blue-50 p-4 rounded-lg text-center border border-blue-200">
+                      <div className="text-2xl font-bold text-blue-600">
+                        {selectedDepartmentShops.shops.reduce((sum: number, shop: any) => sum + (shop.total || 0), 0).toLocaleString()}
+                      </div>
+                      <div className="text-sm text-gray-600">Total Cases (Current Month)</div>
+                    </div>
+                    <div className="bg-blue-50 p-4 rounded-lg text-center border border-blue-200">
+                      <div className="text-2xl font-bold text-blue-600">
+                        {selectedDepartmentShops.shops.reduce((sum: number, shop: any) => sum + (shop.eightPM || 0), 0).toLocaleString()}
+                      </div>
+                      <div className="text-sm text-gray-600">8PM Brand Cases</div>
+                    </div>
+                    <div className="bg-blue-50 p-4 rounded-lg text-center border border-blue-200">
+                      <div className="text-2xl font-bold text-blue-600">
+                        {selectedDepartmentShops.shops.reduce((sum: number, shop: any) => sum + (shop.verve || 0), 0).toLocaleString()}
+                      </div>
+                      <div className="text-sm text-gray-600">VERVE Brand Cases</div>
+                    </div>
+                  </div>
+
+                  <div className="border border-gray-200 rounded-lg">
+                    <div className="max-h-96 overflow-y-auto">
+                      <table className="min-w-full divide-y divide-gray-200">
+                        <thead className="bg-gray-50 sticky top-0">
+                          <tr>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Rank</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Shop Name</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salesman</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Jun Cases</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">May Cases</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Apr Cases</th>
+                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Pattern</th>
+                          </tr>
+                        </thead>
+                        <tbody className="bg-white divide-y divide-gray-200">
+                          {selectedDepartmentShops.shops
+                            .sort((a: any, b: any) => (b.total || 0) - (a.total || 0))
+                            .map((shop: any, index: number) => (
+                            <tr key={shop.shopId} className={index % 2 === 0 ? 'bg-gray-50' : 'bg-white'}>
+                              <td className="px-4 py-3 text-sm text-gray-900">
+                                {index + 1}
+                                {index === 0 && shop.total > 0 && <span className="ml-1" title="Top Performer">🏆</span>}
+                              </td>
+                              <td className="px-4 py-3 text-sm font-medium text-gray-900">
+                                {shop.shopName || 'Unknown Shop'}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-600">
+                                {shop.salesman || 'Unknown'}
+                              </td>
+                              <td className="px-4 py-3 text-sm font-bold text-gray-900">
+                                {(shop.juneTotal || 0).toLocaleString()}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-600">
+                                {(shop.mayTotal || 0).toLocaleString()}
+                              </td>
+                              <td className="px-4 py-3 text-sm text-gray-600">
+                                {(shop.aprilTotal || 0).toLocaleString()}
+                              </td>
+                              <td className="px-4 py-3 text-sm">
+                                <span className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                                  shop.shopTrendPattern === 'uptrend' ? 'bg-green-100 text-green-800' :
+                                  shop.shopTrendPattern === 'growing' ? 'bg-emerald-100 text-emerald-800' :
+                                  shop.shopTrendPattern === 'declining' ? 'bg-red-100 text-red-800' :
+                                  shop.shopTrendPattern === 'stable' ? 'bg-blue-100 text-blue-800' :
+                                  shop.shopTrendPattern === 'new' ? 'bg-cyan-100 text-cyan-800' :
+                                  shop.shopTrendPattern === 'volatile' ? 'bg-amber-100 text-amber-800' :
+                                  'bg-gray-100 text-gray-800'
+                                }`}>
+                                  {shop.shopTrendPattern === 'uptrend' ? '🚀 Accelerating' :
+                                   shop.shopTrendPattern === 'growing' ? '📈 Growing' :
+                                   shop.shopTrendPattern === 'declining' ? '📉 Declining' :
+                                   shop.shopTrendPattern === 'stable' ? '➡️ Stable' :
+                                   shop.shopTrendPattern === 'new' ? '🆕 New Customer' :
+                                   shop.shopTrendPattern === 'volatile' ? '🌊 Irregular' :
+                                   '❓ Unknown'}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+
+            <div className="border-t p-4 sm:p-6 flex justify-end space-x-3 flex-shrink-0">
+              <button
+                onClick={() => {
+                  const csvContent = selectedDepartmentShops.shops.map((shop: any) => 
+                    `${shop.shopName},${shop.salesman},${shop.total},${shop.eightPM || 0},${shop.verve || 0}`
+                  ).join('\n');
+                  
+                  const header = 'Shop Name,Salesman,Current Month Total,8PM Cases,VERVE Cases\n';
+                  const blob = new Blob([header + csvContent], { type: 'text/csv' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `${selectedDepartmentShops.department}_${selectedDepartmentShops.type}_shops.csv`;
+                  a.click();
+                  URL.revokeObjectURL(url);
+                }}
+                className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center space-x-2"
+              >
+                <Download className="w-4 h-4" />
+                <span>Export CSV</span>
+              </button>
+              <button
+                onClick={() => {
+                  setShowDepartmentShops(false);
+                  setSelectedDepartmentShops(null);
+                }}
+                className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
