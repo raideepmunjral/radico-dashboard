@@ -496,39 +496,41 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
     return deptData;
   }, [data.salesData]);
 
-  function DepartmentShopsModal({ onClose }: { onClose: () => void }) {
+  // Modal component for showing department shops
+  const renderDepartmentShopsModal = () => {
     if (!selectedDepartmentShops) return null;
 
     const { department, title, subtitle, shops, type, monthData, brandType } = selectedDepartmentShops;
 
-    const getTypeStyles = (type: string) => {
-      if (type.includes('8PM')) {
+    const getModalTypeStyles = (modalType: string) => {
+      if (modalType.includes('8PM')) {
         return { bg: 'bg-purple-50', text: 'text-purple-600', border: 'border-purple-200' };
-      } else if (type.includes('VERVE')) {
+      } else if (modalType.includes('VERVE')) {
         return { bg: 'bg-orange-50', text: 'text-orange-600', border: 'border-orange-200' };
       }
       
-      switch(type) {
-        case 'all': return { bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-200' };
-        case 'active': return { bg: 'bg-green-50', text: 'text-green-600', border: 'border-green-200' };
-        case 'inactive': 
-        case 'inactive60':
-        case 'inactive90': return { bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200' };
-        case '8pm': return { bg: 'bg-purple-50', text: 'text-purple-600', border: 'border-purple-200' };
-        case 'verve': return { bg: 'bg-orange-50', text: 'text-orange-600', border: 'border-orange-200' };
-        case 'both': return { bg: 'bg-green-50', text: 'text-green-600', border: 'border-green-200' };
-        case 'monthly': return { bg: 'bg-indigo-50', text: 'text-indigo-600', border: 'border-indigo-200' };
-        case 'uptrend': return { bg: 'bg-green-50', text: 'text-green-600', border: 'border-green-200' };
-        case 'growing': return { bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200' };
-        case 'declining': return { bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200' };
-        case 'stable': return { bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-200' };
-        case 'new': return { bg: 'bg-cyan-50', text: 'text-cyan-600', border: 'border-cyan-200' };
-        case 'volatile': return { bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-200' };
-        default: return { bg: 'bg-gray-50', text: 'text-gray-600', border: 'border-gray-200' };
-      }
+      const styleMap: Record<string, any> = {
+        'all': { bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-200' },
+        'active': { bg: 'bg-green-50', text: 'text-green-600', border: 'border-green-200' },
+        'inactive': { bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200' },
+        'inactive60': { bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200' },
+        'inactive90': { bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200' },
+        '8pm': { bg: 'bg-purple-50', text: 'text-purple-600', border: 'border-purple-200' },
+        'verve': { bg: 'bg-orange-50', text: 'text-orange-600', border: 'border-orange-200' },
+        'both': { bg: 'bg-green-50', text: 'text-green-600', border: 'border-green-200' },
+        'monthly': { bg: 'bg-indigo-50', text: 'text-indigo-600', border: 'border-indigo-200' },
+        'uptrend': { bg: 'bg-green-50', text: 'text-green-600', border: 'border-green-200' },
+        'growing': { bg: 'bg-emerald-50', text: 'text-emerald-600', border: 'border-emerald-200' },
+        'declining': { bg: 'bg-red-50', text: 'text-red-600', border: 'border-red-200' },
+        'stable': { bg: 'bg-blue-50', text: 'text-blue-600', border: 'border-blue-200' },
+        'new': { bg: 'bg-cyan-50', text: 'text-cyan-600', border: 'border-cyan-200' },
+        'volatile': { bg: 'bg-amber-50', text: 'text-amber-600', border: 'border-amber-200' }
+      };
+      
+      return styleMap[modalType] || { bg: 'bg-gray-50', text: 'text-gray-600', border: 'border-gray-200' };
     };
 
-    const typeStyles = getTypeStyles(type);
+    const typeStyles = getModalTypeStyles(type);
 
     return (
       <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[60] p-4">
@@ -538,7 +540,13 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
               <h3 className="text-lg font-semibold">{title}</h3>
               <p className="text-sm text-gray-500">{subtitle}</p>
             </div>
-            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+            <button 
+              onClick={() => {
+                setShowDepartmentShops(false);
+                setSelectedDepartmentShops(null);
+              }} 
+              className="text-gray-400 hover:text-gray-600"
+            >
               <X className="w-6 h-6" />
             </button>
           </div>
@@ -929,7 +937,10 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
               <span>Export CSV</span>
             </button>
             <button
-              onClick={onClose}
+              onClick={() => {
+                setShowDepartmentShops(false);
+                setSelectedDepartmentShops(null);
+              }}
               className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700"
             >
               Close
@@ -938,7 +949,7 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
     );
-  }
+  };
 
   return (
     <div className="space-y-6">
@@ -1634,14 +1645,7 @@ const DepartmentTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-      {showDepartmentShops && (
-        <DepartmentShopsModal 
-          onClose={() => {
-            setShowDepartmentShops(false);
-            setSelectedDepartmentShops(null);
-          }} 
-        />
-      )}
+      {showDepartmentShops && renderDepartmentShopsModal()}
     </div>
   );
 };
