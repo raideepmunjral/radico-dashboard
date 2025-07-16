@@ -51,7 +51,7 @@ interface InventoryData {
 }
 
 // ==========================================
-// VISIT FREQUENCY TAB COMPONENT
+// VISIT FREQUENCY TAB COMPONENT - CORRECTED
 // ==========================================
 
 const VisitFrequencyTab = ({ data }: { data: InventoryData }) => {
@@ -65,17 +65,51 @@ const VisitFrequencyTab = ({ data }: { data: InventoryData }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(25);
 
-  // Process shop visit data with enhanced analytics
+  // CORRECTED: Process shop visit data to count ALL visits within rolling period
   const processShopVisitData = useMemo(() => {
     const shopVisitData: any[] = [];
     
+    // Create a map to track all visits per shop
+    const shopVisitTracker = new Map<string, {
+      shopInfo: any;
+      allVisits: Array<{
+        visitDate: Date;
+        dateString: string;
+        salesman: string;
+      }>;
+    }>();
+    
+    // First, collect all shop info and their visits
     Object.values(data.shops).forEach(shop => {
-      // Calculate visit frequency and status
-      const visitCount = shop.visitDate ? 1 : 0; // This is simplified - in real implementation, you'd count all visits
-      const daysSinceLastVisit = shop.lastVisitDays;
-      const lastVisitDate = shop.visitDate;
+      if (!shopVisitTracker.has(shop.shopId)) {
+        shopVisitTracker.set(shop.shopId, {
+          shopInfo: shop,
+          allVisits: []
+        });
+      }
       
-      // Determine visit status
+      // Add this visit if it exists
+      if (shop.visitDate) {
+        shopVisitTracker.get(shop.shopId)!.allVisits.push({
+          visitDate: shop.visitDate,
+          dateString: shop.visitDate.toISOString().split('T')[0],
+          salesman: shop.salesman || 'Unknown'
+        });
+      }
+    });
+    
+    // Process each shop to create analytics
+    shopVisitTracker.forEach((shopData, shopId) => {
+      const shop = shopData.shopInfo;
+      const visits = shopData.allVisits;
+      
+      // CORRECTED: Count all visits within the rolling period
+      const visitCount = visits.length;
+      const lastVisitDate = visits.length > 0 ? visits[visits.length - 1].visitDate : null;
+      const daysSinceLastVisit = lastVisitDate ? 
+        Math.floor((new Date().getTime() - lastVisitDate.getTime()) / (1000 * 60 * 60 * 24)) : null;
+      
+      // Determine visit status based on frequency and recency
       let status: 'never_visited' | 'overdue' | 'active' | 'frequent' | 'over_visited' | 'visit_due' = 'never_visited';
       let statusColor = 'bg-red-100 text-red-800';
       let statusIcon = XCircle;
@@ -106,23 +140,19 @@ const VisitFrequencyTab = ({ data }: { data: InventoryData }) => {
         statusIcon = CheckCircle;
       }
       
-      // Mock visit dates for demonstration (in real implementation, you'd get these from raw data)
-      const visitDates = lastVisitDate ? [
-        lastVisitDate.toISOString().split('T')[0],
-        // Add more mock dates based on visit count
-        ...Array.from({ length: Math.max(0, visitCount - 1) }, (_, i) => {
-          const date = new Date(lastVisitDate);
-          date.setDate(date.getDate() - (i + 1) * 3);
-          return date.toISOString().split('T')[0];
-        })
-      ] : [];
+      // Create visit dates array for modal
+      const visitDates = visits.map(visit => visit.dateString).sort((a, b) => b.localeCompare(a));
+      
+      // Calculate visit frequency per week
+      const visitFrequency = visitCount > 0 ? 
+        (visitCount / (data.summary.rollingPeriodDays / 7)).toFixed(1) : '0';
       
       shopVisitData.push({
         shopId: shop.shopId,
         shopName: shop.shopName,
         department: shop.department,
         salesman: shop.salesman || 'Unassigned',
-        visitCount,
+        visitCount, // CORRECTED: Now shows total visits in period
         lastVisitDate,
         daysSinceLastVisit,
         status,
@@ -130,13 +160,15 @@ const VisitFrequencyTab = ({ data }: { data: InventoryData }) => {
         statusIcon,
         statusLabel: status.replace('_', ' ').toUpperCase(),
         visitDates,
+        visitFrequency: parseFloat(visitFrequency),
         dataSource: shop.dataSource,
-        salesmanUid: shop.salesmanUid || ''
+        salesmanUid: shop.salesmanUid || '',
+        allVisits: visits
       });
     });
     
     return shopVisitData;
-  }, [data.shops]);
+  }, [data.shops, data.summary.rollingPeriodDays]);
 
   // Get unique values for filters
   const uniqueSalesmen = useMemo(() => {
@@ -195,7 +227,7 @@ const VisitFrequencyTab = ({ data }: { data: InventoryData }) => {
     return filtered;
   }, [processShopVisitData, searchTerm, selectedSalesman, selectedDepartment, selectedStatus, sortBy, sortOrder]);
 
-  // Calculate status distribution
+  // CORRECTED: Calculate status distribution based on actual visit counts
   const statusDistribution = useMemo(() => {
     const distribution = processShopVisitData.reduce((acc, shop) => {
       acc[shop.status] = (acc[shop.status] || 0) + 1;
@@ -215,16 +247,17 @@ const VisitFrequencyTab = ({ data }: { data: InventoryData }) => {
     currentPage * itemsPerPage
   );
 
-  // Export CSV function
+  // CORRECTED: Export CSV function with accurate visit counts
   const exportToCSV = () => {
     const csvData = [
-      ['Shop Name', 'Shop ID', 'Department', 'Salesman', 'Visit Count', 'Last Visit', 'Days Since Last Visit', 'Status', 'Data Source', 'Visit Dates'].join(','),
+      ['Shop Name', 'Shop ID', 'Department', 'Salesman', 'Visit Count', 'Visit Frequency (per week)', 'Last Visit', 'Days Since Last Visit', 'Status', 'Data Source', 'Visit Dates'].join(','),
       ...filteredAndSortedData.map(shop => [
         `"${shop.shopName}"`,
         `"${shop.shopId}"`,
         `"${shop.department}"`,
         `"${shop.salesman}"`,
         shop.visitCount,
+        shop.visitFrequency,
         shop.lastVisitDate ? new Date(shop.lastVisitDate).toLocaleDateString() : 'Never',
         shop.daysSinceLastVisit || 'N/A',
         `"${shop.statusLabel}"`,
@@ -237,7 +270,7 @@ const VisitFrequencyTab = ({ data }: { data: InventoryData }) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `visit_frequency_detailed_${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `visit_frequency_detailed_${data.summary.rollingPeriodDays}days_${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -252,6 +285,22 @@ const VisitFrequencyTab = ({ data }: { data: InventoryData }) => {
     }
   };
 
+  // CORRECTED: Calculate summary statistics
+  const summaryStats = useMemo(() => {
+    const totalVisits = processShopVisitData.reduce((sum, shop) => sum + shop.visitCount, 0);
+    const avgVisitsPerShop = processShopVisitData.length > 0 ? 
+      (totalVisits / processShopVisitData.length).toFixed(1) : '0';
+    const maxVisits = Math.max(...processShopVisitData.map(shop => shop.visitCount));
+    const shopsWithMultipleVisits = processShopVisitData.filter(shop => shop.visitCount > 1).length;
+    
+    return {
+      totalVisits,
+      avgVisitsPerShop,
+      maxVisits,
+      shopsWithMultipleVisits
+    };
+  }, [processShopVisitData]);
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -259,8 +308,15 @@ const VisitFrequencyTab = ({ data }: { data: InventoryData }) => {
         <h2 className="text-2xl font-bold text-gray-900 mb-2">Visit Frequency & Shop Analysis</h2>
         <p className="text-gray-600">Detailed shop-by-shop visit patterns and frequency analysis</p>
         <p className="text-sm text-gray-500">
-          Period: {data.summary.periodStartDate.toLocaleDateString()} - {data.summary.periodEndDate.toLocaleDateString()}
+          Period: {data.summary.periodStartDate.toLocaleDateString()} - {data.summary.periodEndDate.toLocaleDateString()} 
+          ({data.summary.rollingPeriodDays} days)
         </p>
+        <div className="mt-2 flex justify-center space-x-6 text-sm text-gray-600">
+          <span>Total Visits: <strong>{summaryStats.totalVisits}</strong></span>
+          <span>Avg per Shop: <strong>{summaryStats.avgVisitsPerShop}</strong></span>
+          <span>Max Visits: <strong>{summaryStats.maxVisits}</strong></span>
+          <span>Multi-Visit Shops: <strong>{summaryStats.shopsWithMultipleVisits}</strong></span>
+        </div>
       </div>
 
       {/* Status Overview Cards */}
@@ -414,10 +470,13 @@ const VisitFrequencyTab = ({ data }: { data: InventoryData }) => {
                   className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
                   onClick={() => handleSort('visits')}
                 >
-                  Visit Count
+                  Visit Count ({data.summary.rollingPeriodDays}d)
                   {sortBy === 'visits' && (
                     <span className="ml-1">{sortOrder === 'asc' ? '↑' : '↓'}</span>
                   )}
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Frequency/Week
                 </th>
                 <th 
                   className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100"
@@ -466,8 +525,11 @@ const VisitFrequencyTab = ({ data }: { data: InventoryData }) => {
                           : 'bg-gray-100 text-gray-600'
                       }`}
                     >
-                      {shop.visitCount} {shop.visitCount > 0 ? 'visits' : 'visits'}
+                      {shop.visitCount} visits
                     </button>
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    {shop.visitFrequency}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {shop.lastVisitDate 
@@ -527,7 +589,7 @@ const VisitFrequencyTab = ({ data }: { data: InventoryData }) => {
         </div>
       </div>
 
-      {/* Visit Dates Modal */}
+      {/* Visit Dates Modal - CORRECTED */}
       {showVisitDates && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
@@ -548,6 +610,7 @@ const VisitFrequencyTab = ({ data }: { data: InventoryData }) => {
                   <div className="mb-4">
                     <p className="text-sm text-gray-600">Shop: <span className="font-medium">{shop.shopName}</span></p>
                     <p className="text-sm text-gray-600">Total Visits: <span className="font-medium">{shop.visitCount}</span></p>
+                    <p className="text-sm text-gray-600">Frequency: <span className="font-medium">{shop.visitFrequency} per week</span></p>
                   </div>
                   
                   <div className="space-y-2">
