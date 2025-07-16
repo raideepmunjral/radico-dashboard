@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import { Search, Filter, Download, Calendar, Eye, MapPin, Users, Clock, TrendingUp, AlertCircle, CheckCircle, XCircle, Target, Zap, BarChart3, X } from 'lucide-react';
 
 // ==========================================
@@ -48,10 +48,17 @@ interface InventoryData {
       lastWeekVisits: number;
     }>;
   };
+  rawVisitData?: {
+    rollingPeriodRows: any[][];
+    columnIndices: any;
+    shopSalesmanMap: Map<string, any>;
+    rollingDays: number;
+    parseDate: (dateStr: string) => Date | null;
+  };
 }
 
 // ==========================================
-// VISIT FREQUENCY TAB COMPONENT - CORRECTED
+// OPTIMIZED VISIT FREQUENCY TAB COMPONENT
 // ==========================================
 
 const VisitFrequencyTab = ({ data }: { data: InventoryData }) => {
@@ -65,121 +72,173 @@ const VisitFrequencyTab = ({ data }: { data: InventoryData }) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(25);
 
-  // CORRECTED: Process shop visit data to count ALL visits within rolling period
-  const processShopVisitData = useMemo(() => {
-    const shopVisitData: any[] = [];
+  // On-demand processing state
+  const [shopVisitFrequencies, setShopVisitFrequencies] = useState<any[]>([]);
+  const [processing, setProcessing] = useState(false);
+  const [processed, setProcessed] = useState(false);
+
+  // Process visit frequencies on-demand
+  const processVisitFrequencies = useCallback(async () => {
+    if (!data.rawVisitData || processed) return;
     
-    // Create a map to track all visits per shop
-    const shopVisitTracker = new Map<string, {
-      shopInfo: any;
-      allVisits: Array<{
-        visitDate: Date;
-        dateString: string;
-        salesman: string;
-      }>;
-    }>();
+    setProcessing(true);
     
-    // First, collect all shop info and their visits
-    Object.values(data.shops).forEach(shop => {
-      if (!shopVisitTracker.has(shop.shopId)) {
-        shopVisitTracker.set(shop.shopId, {
-          shopInfo: shop,
-          allVisits: []
-        });
-      }
+    // Use setTimeout to prevent blocking UI
+    setTimeout(() => {
+      console.log('🔄 Processing visit frequencies on-demand...');
       
-      // Add this visit if it exists
-      if (shop.visitDate) {
-        shopVisitTracker.get(shop.shopId)!.allVisits.push({
-          visitDate: shop.visitDate,
-          dateString: shop.visitDate.toISOString().split('T')[0],
-          salesman: shop.salesman || 'Unknown'
-        });
-      }
-    });
-    
-    // Process each shop to create analytics
-    shopVisitTracker.forEach((shopData, shopId) => {
-      const shop = shopData.shopInfo;
-      const visits = shopData.allVisits;
+      const { rollingPeriodRows, columnIndices, shopSalesmanMap, rollingDays, parseDate } = data.rawVisitData!;
       
-      // CORRECTED: Count all visits within the rolling period
-      const visitCount = visits.length;
-      const lastVisitDate = visits.length > 0 ? visits[visits.length - 1].visitDate : null;
-      const daysSinceLastVisit = lastVisitDate ? 
-        Math.floor((new Date().getTime() - lastVisitDate.getTime()) / (1000 * 60 * 60 * 24)) : null;
+      const shopVisitTracker = new Map<string, any>();
       
-      // Determine visit status based on frequency and recency
-      let status: 'never_visited' | 'overdue' | 'active' | 'frequent' | 'over_visited' | 'visit_due' = 'never_visited';
-      let statusColor = 'bg-red-100 text-red-800';
-      let statusIcon = XCircle;
-      
-      if (visitCount === 0) {
-        status = 'never_visited';
-        statusColor = 'bg-red-100 text-red-800';
-        statusIcon = XCircle;
-      } else if (daysSinceLastVisit && daysSinceLastVisit > 14) {
-        status = 'overdue';
-        statusColor = 'bg-yellow-100 text-yellow-800';
-        statusIcon = AlertCircle;
-      } else if (daysSinceLastVisit && daysSinceLastVisit > 7) {
-        status = 'visit_due';
-        statusColor = 'bg-orange-100 text-orange-800';
-        statusIcon = Clock;
-      } else if (visitCount >= 10) {
-        status = 'over_visited';
-        statusColor = 'bg-purple-100 text-purple-800';
-        statusIcon = Zap;
-      } else if (visitCount >= 5) {
-        status = 'frequent';
-        statusColor = 'bg-blue-100 text-blue-800';
-        statusIcon = TrendingUp;
-      } else {
-        status = 'active';
-        statusColor = 'bg-green-100 text-green-800';
-        statusIcon = CheckCircle;
-      }
-      
-      // Create visit dates array for modal
-      const visitDates = visits.map(visit => visit.dateString).sort((a, b) => b.localeCompare(a));
-      
-      // Calculate visit frequency per week
-      const visitFrequency = visitCount > 0 ? 
-        (visitCount / (data.summary.rollingPeriodDays / 7)).toFixed(1) : '0';
-      
-      shopVisitData.push({
-        shopId: shop.shopId,
-        shopName: shop.shopName,
-        department: shop.department,
-        salesman: shop.salesman || 'Unassigned',
-        visitCount, // CORRECTED: Now shows total visits in period
-        lastVisitDate,
-        daysSinceLastVisit,
-        status,
-        statusColor,
-        statusIcon,
-        statusLabel: status.replace('_', ' ').toUpperCase(),
-        visitDates,
-        visitFrequency: parseFloat(visitFrequency),
-        dataSource: shop.dataSource,
-        salesmanUid: shop.salesmanUid || '',
-        allVisits: visits
+      // Process all visits efficiently
+      rollingPeriodRows.forEach(row => {
+        const shopId = row[columnIndices.shopId];
+        const checkInDateTime = row[columnIndices.checkInDateTime];
+        
+        if (!shopId || !checkInDateTime) return;
+        
+        try {
+          const visitDate = parseDate(checkInDateTime);
+          if (!visitDate) return;
+          
+          const dateString = visitDate.toISOString().split('T')[0];
+          
+          if (!shopVisitTracker.has(shopId)) {
+            const masterInfo = shopSalesmanMap.get(shopId);
+            shopVisitTracker.set(shopId, {
+              shopId,
+              shopName: masterInfo?.shopName || row[columnIndices.shopName] || 'Unknown Shop',
+              department: masterInfo?.department || row[columnIndices.department] || 'Unknown',
+              salesman: masterInfo?.salesman || row[columnIndices.salesman] || 'Unknown',
+              visitDates: new Set<string>(),
+              dataSource: masterInfo ? 'master_data' : 'visit_data',
+              salesmanUid: masterInfo?.salesmanUid || '',
+              lastVisitDate: null
+            });
+          }
+          
+          const shopData = shopVisitTracker.get(shopId)!;
+          shopData.visitDates.add(dateString);
+          
+          // Track the latest visit date
+          if (!shopData.lastVisitDate || visitDate > shopData.lastVisitDate) {
+            shopData.lastVisitDate = visitDate;
+          }
+        } catch (error) {
+          // Skip invalid dates
+        }
       });
-    });
-    
-    return shopVisitData;
-  }, [data.shops, data.summary.rollingPeriodDays]);
+      
+      // Calculate frequencies and status
+      const processedShops = Array.from(shopVisitTracker.values()).map(shop => {
+        const visitCount = shop.visitDates.size;
+        const allVisitDates = Array.from(shop.visitDates).sort().reverse();
+        const visitFrequency = visitCount > 0 ? (visitCount / (rollingDays / 7)).toFixed(1) : '0';
+        const daysSinceLastVisit = shop.lastVisitDate ? 
+          Math.floor((new Date().getTime() - shop.lastVisitDate.getTime()) / (1000 * 60 * 60 * 24)) : null;
+        
+        // Determine visit status based on frequency and recency
+        let status: 'never_visited' | 'overdue' | 'active' | 'frequent' | 'over_visited' | 'visit_due' = 'never_visited';
+        let statusColor = 'bg-red-100 text-red-800';
+        let statusIcon = XCircle;
+        
+        if (visitCount === 0) {
+          status = 'never_visited';
+          statusColor = 'bg-red-100 text-red-800';
+          statusIcon = XCircle;
+        } else if (daysSinceLastVisit && daysSinceLastVisit > 14) {
+          status = 'overdue';
+          statusColor = 'bg-yellow-100 text-yellow-800';
+          statusIcon = AlertCircle;
+        } else if (daysSinceLastVisit && daysSinceLastVisit > 7) {
+          status = 'visit_due';
+          statusColor = 'bg-orange-100 text-orange-800';
+          statusIcon = Clock;
+        } else if (visitCount >= 8) { // Over-visited: 8+ visits in rolling period
+          status = 'over_visited';
+          statusColor = 'bg-purple-100 text-purple-800';
+          statusIcon = Zap;
+        } else if (visitCount >= 5) { // Frequent: 5-7 visits
+          status = 'frequent';
+          statusColor = 'bg-blue-100 text-blue-800';
+          statusIcon = TrendingUp;
+        } else {
+          status = 'active';
+          statusColor = 'bg-green-100 text-green-800';
+          statusIcon = CheckCircle;
+        }
+        
+        return {
+          shopId: shop.shopId,
+          shopName: shop.shopName,
+          department: shop.department,
+          salesman: shop.salesman,
+          visitCount,
+          lastVisitDate: shop.lastVisitDate,
+          daysSinceLastVisit,
+          status,
+          statusColor,
+          statusIcon,
+          statusLabel: status.replace('_', ' ').toUpperCase(),
+          visitDates: allVisitDates,
+          visitFrequency: parseFloat(visitFrequency),
+          dataSource: shop.dataSource,
+          salesmanUid: shop.salesmanUid
+        };
+      });
+      
+      // Add unvisited shops from master data
+      shopSalesmanMap.forEach((masterInfo, shopId) => {
+        if (!shopVisitTracker.has(shopId)) {
+          processedShops.push({
+            shopId: masterInfo.shopId,
+            shopName: masterInfo.shopName,
+            department: masterInfo.department,
+            salesman: masterInfo.salesman,
+            visitCount: 0,
+            lastVisitDate: null,
+            daysSinceLastVisit: null,
+            status: 'never_visited',
+            statusColor: 'bg-red-100 text-red-800',
+            statusIcon: XCircle,
+            statusLabel: 'NEVER VISITED',
+            visitDates: [],
+            visitFrequency: 0,
+            dataSource: 'master_data_only',
+            salesmanUid: masterInfo.salesmanUid
+          });
+        }
+      });
+      
+      console.log('✅ Visit frequencies processed on-demand:', {
+        totalShops: processedShops.length,
+        visitedShops: processedShops.filter(s => s.visitCount > 0).length,
+        multiVisitShops: processedShops.filter(s => s.visitCount > 1).length,
+        maxVisits: Math.max(...processedShops.map(s => s.visitCount))
+      });
+      
+      setShopVisitFrequencies(processedShops);
+      setProcessed(true);
+      setProcessing(false);
+    }, 100);
+  }, [data.rawVisitData, processed]);
+
+  // Process data when tab becomes active
+  useEffect(() => {
+    processVisitFrequencies();
+  }, [processVisitFrequencies]);
 
   // Get unique values for filters
   const uniqueSalesmen = useMemo(() => {
-    const salesmen = Array.from(new Set(processShopVisitData.map(shop => shop.salesman)));
+    const salesmen = Array.from(new Set(shopVisitFrequencies.map(shop => shop.salesman)));
     return salesmen.filter(s => s && s !== 'Unassigned').sort();
-  }, [processShopVisitData]);
+  }, [shopVisitFrequencies]);
 
   const uniqueDepartments = useMemo(() => {
-    const departments = Array.from(new Set(processShopVisitData.map(shop => shop.department)));
+    const departments = Array.from(new Set(shopVisitFrequencies.map(shop => shop.department)));
     return departments.filter(d => d).sort();
-  }, [processShopVisitData]);
+  }, [shopVisitFrequencies]);
 
   const statusOptions = [
     { value: 'never_visited', label: 'Never Visited', color: 'text-red-600' },
@@ -192,7 +251,7 @@ const VisitFrequencyTab = ({ data }: { data: InventoryData }) => {
 
   // Filter and sort data
   const filteredAndSortedData = useMemo(() => {
-    let filtered = processShopVisitData.filter(shop => {
+    let filtered = shopVisitFrequencies.filter(shop => {
       const matchesSearch = shop.shopName.toLowerCase().includes(searchTerm.toLowerCase()) ||
                            shop.shopId.toLowerCase().includes(searchTerm.toLowerCase());
       const matchesSalesman = selectedSalesman === 'All' || shop.salesman === selectedSalesman;
@@ -225,11 +284,11 @@ const VisitFrequencyTab = ({ data }: { data: InventoryData }) => {
     });
 
     return filtered;
-  }, [processShopVisitData, searchTerm, selectedSalesman, selectedDepartment, selectedStatus, sortBy, sortOrder]);
+  }, [shopVisitFrequencies, searchTerm, selectedSalesman, selectedDepartment, selectedStatus, sortBy, sortOrder]);
 
-  // CORRECTED: Calculate status distribution based on actual visit counts
+  // Calculate status distribution
   const statusDistribution = useMemo(() => {
-    const distribution = processShopVisitData.reduce((acc, shop) => {
+    const distribution = shopVisitFrequencies.reduce((acc, shop) => {
       acc[shop.status] = (acc[shop.status] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
@@ -238,7 +297,7 @@ const VisitFrequencyTab = ({ data }: { data: InventoryData }) => {
       ...option,
       count: distribution[option.value] || 0
     }));
-  }, [processShopVisitData]);
+  }, [shopVisitFrequencies]);
 
   // Pagination
   const totalPages = Math.ceil(filteredAndSortedData.length / itemsPerPage);
@@ -247,7 +306,7 @@ const VisitFrequencyTab = ({ data }: { data: InventoryData }) => {
     currentPage * itemsPerPage
   );
 
-  // CORRECTED: Export CSV function with accurate visit counts
+  // Export CSV function
   const exportToCSV = () => {
     const csvData = [
       ['Shop Name', 'Shop ID', 'Department', 'Salesman', 'Visit Count', 'Visit Frequency (per week)', 'Last Visit', 'Days Since Last Visit', 'Status', 'Data Source', 'Visit Dates'].join(','),
@@ -285,13 +344,14 @@ const VisitFrequencyTab = ({ data }: { data: InventoryData }) => {
     }
   };
 
-  // CORRECTED: Calculate summary statistics
+  // Calculate summary statistics
   const summaryStats = useMemo(() => {
-    const totalVisits = processShopVisitData.reduce((sum, shop) => sum + shop.visitCount, 0);
-    const avgVisitsPerShop = processShopVisitData.length > 0 ? 
-      (totalVisits / processShopVisitData.length).toFixed(1) : '0';
-    const maxVisits = Math.max(...processShopVisitData.map(shop => shop.visitCount));
-    const shopsWithMultipleVisits = processShopVisitData.filter(shop => shop.visitCount > 1).length;
+    const totalVisits = shopVisitFrequencies.reduce((sum, shop) => sum + shop.visitCount, 0);
+    const avgVisitsPerShop = shopVisitFrequencies.length > 0 ? 
+      (totalVisits / shopVisitFrequencies.length).toFixed(1) : '0';
+    const maxVisits = shopVisitFrequencies.length > 0 ? 
+      Math.max(...shopVisitFrequencies.map(shop => shop.visitCount)) : 0;
+    const shopsWithMultipleVisits = shopVisitFrequencies.filter(shop => shop.visitCount > 1).length;
     
     return {
       totalVisits,
@@ -299,7 +359,33 @@ const VisitFrequencyTab = ({ data }: { data: InventoryData }) => {
       maxVisits,
       shopsWithMultipleVisits
     };
-  }, [processShopVisitData]);
+  }, [shopVisitFrequencies]);
+
+  // Show loading state while processing
+  if (processing) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Processing visit frequencies...</p>
+          <p className="text-sm text-gray-500">Analyzing {data.rawVisitData?.rollingPeriodRows?.length || 0} visit records</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Show message if no raw data available
+  if (!data.rawVisitData) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="text-center">
+          <AlertCircle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          <p className="text-gray-600">Visit frequency data not available</p>
+          <p className="text-sm text-gray-500">Raw visit data is required for frequency analysis</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -589,7 +675,7 @@ const VisitFrequencyTab = ({ data }: { data: InventoryData }) => {
         </div>
       </div>
 
-      {/* Visit Dates Modal - CORRECTED */}
+      {/* Visit Dates Modal */}
       {showVisitDates && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
@@ -604,7 +690,7 @@ const VisitFrequencyTab = ({ data }: { data: InventoryData }) => {
             </div>
             
             {(() => {
-              const shop = processShopVisitData.find(s => s.shopId === showVisitDates);
+              const shop = shopVisitFrequencies.find(s => s.shopId === showVisitDates);
               return shop ? (
                 <div>
                   <div className="mb-4">
