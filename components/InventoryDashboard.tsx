@@ -8,6 +8,7 @@ import { Package, AlertTriangle, TrendingUp, Clock, MapPin, Users, Filter, Searc
 // ==========================================
 import OverviewTab from '../components/tabs/inventory/OverviewTab';
 import VisitComplianceTab from '../components/tabs/inventory/VisitComplianceTab';
+import VisitFrequencyTab from '../components/tabs/inventory/VisitFrequencyTab';
 import ShopInventoryTab from '../components/tabs/inventory/ShopInventoryTab';
 import AgingAnalysisTab from '../components/tabs/inventory/AgingAnalysisTab';
 import StockIntelligenceTab from '../components/tabs/inventory/StockIntelligenceTab';
@@ -1669,7 +1670,8 @@ const InventoryDashboard = () => {
               { id: 'overview', label: 'Enhanced Overview', icon: BarChart3 },
               { id: 'shops', label: 'Master Shop Inventory', icon: ShoppingBag },
               { id: 'aging', label: 'Enhanced Aging Analysis', icon: Clock },
-              { id: 'visits', label: 'Enhanced Visit Compliance', icon: Users },
+              { id: 'visits', label: 'Visit Compliance', icon: Users },
+              { id: 'frequency', label: 'Visit Frequency', icon: Calendar },
               { id: 'alerts', label: 'Stock Intelligence', icon: AlertTriangle }
             ].map((tab) => (
               <button
@@ -1697,6 +1699,7 @@ const InventoryDashboard = () => {
             {activeTab === 'shops' && <ShopInventoryTab data={inventoryData} />}
             {activeTab === 'aging' && <AgingAnalysisTab data={inventoryData} />}
             {activeTab === 'visits' && <VisitComplianceTab data={inventoryData} />}
+            {activeTab === 'frequency' && <VisitFrequencyTab data={inventoryData} />}
             {activeTab === 'alerts' && <StockIntelligenceTab data={inventoryData} />}
           </>
         )}
