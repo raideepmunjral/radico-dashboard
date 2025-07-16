@@ -55,6 +55,15 @@ interface ShopInventory {
   salesmanUid?: string;
 }
 
+interface MasterShopInfo {
+  shopId: string;
+  shopName: string;
+  salesman: string;
+  department: string;
+  salesmanUid: string;
+  source: 'master_data';
+}
+
 interface InventoryData {
   summary: {
     totalShops: number;
@@ -104,15 +113,14 @@ interface InventoryData {
       lastWeekVisits: number;
     }>;
   };
-}
-
-interface MasterShopInfo {
-  shopId: string;
-  shopName: string;
-  salesman: string;
-  department: string;
-  salesmanUid: string;
-  source: 'master_data';
+  // NEW: Raw data for on-demand processing
+  rawVisitData?: {
+    rollingPeriodRows: any[][];
+    columnIndices: any;
+    shopSalesmanMap: Map<string, MasterShopInfo>;
+    rollingDays: number;
+    parseDate: (dateStr: string) => Date | null;
+  };
 }
 
 // ==========================================
@@ -714,7 +722,7 @@ const InventoryDashboard = () => {
       return processEnhancedInventoryDataWithMaster(visitData, historicalData, pendingChallans, shopSalesmanMap, 60);
     }
 
-    // Find latest visits for each shop
+    // Find latest visits for each shop (UNCHANGED - keeps main dashboard fast)
     const shopLatestVisits: Record<string, any> = {};
     
     rollingPeriodRows.forEach(row => {
@@ -861,7 +869,7 @@ const InventoryDashboard = () => {
       }
     });
 
-    // Process inventory for each shop
+    // Process inventory for each shop (UNCHANGED - keeps main dashboard fast)
     const shops: Record<string, ShopInventory> = {};
     const skuTracker: Record<string, any> = {};
     const allAgingLocations: Array<any> = [];
@@ -1154,6 +1162,14 @@ const InventoryDashboard = () => {
         yesterdayVisits: yesterdayVisitCount,
         lastWeekVisits: lastWeekVisitCount,
         salesmenStats
+      },
+      // NEW: Raw data for on-demand processing
+      rawVisitData: {
+        rollingPeriodRows,
+        columnIndices,
+        shopSalesmanMap,
+        rollingDays,
+        parseDate
       }
     };
   };
