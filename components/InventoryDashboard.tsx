@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Package, AlertTriangle, TrendingUp, Clock, MapPin, Users, Filter, Search, X, ChevronDown, ChevronUp, BarChart3, Calendar, Eye, AlertCircle, CheckCircle, XCircle, Truck, ShoppingBag, Download, RefreshCw, ChevronLeft, ChevronRight, FileText, Table } from 'lucide-react';
+import { Package, AlertTriangle, TrendingUp, Clock, MapPin, Users, Filter, Search, X, ChevronDown, ChevronUp, BarChart3, Calendar, Eye, AlertCircle, CheckCircle, XCircle, Truck, ShoppingBag, Download, RefreshCw, ChevronLeft, ChevronRight, FileText, Table, Phone } from 'lucide-react';
 
 // ==========================================
 // IMPORTED INDEPENDENT TABS
@@ -12,6 +12,7 @@ import VisitFrequencyTab from '../components/tabs/inventory/VisitFrequencyTab';
 import ShopInventoryTab from '../components/tabs/inventory/ShopInventoryTab';
 import AgingAnalysisTab from '../components/tabs/inventory/AgingAnalysisTab';
 import StockIntelligenceTab from '../components/tabs/inventory/StockIntelligenceTab';
+import SupplyStockMismatchTab from '../components/tabs/inventory/SupplyStockMismatchTab';
 
 // ==========================================
 // ENHANCED INVENTORY TYPES & INTERFACES
@@ -1688,7 +1689,8 @@ const InventoryDashboard = () => {
               { id: 'aging', label: 'Enhanced Aging Analysis', icon: Clock },
               { id: 'visits', label: 'Visit Compliance', icon: Users },
               { id: 'frequency', label: 'Visit Frequency', icon: Calendar },
-              { id: 'alerts', label: 'Stock Intelligence', icon: AlertTriangle }
+              { id: 'alerts', label: 'Stock Intelligence', icon: AlertTriangle },
+              { id: 'mismatch', label: 'Supply-Stock Mismatch', icon: AlertCircle }
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -1717,6 +1719,7 @@ const InventoryDashboard = () => {
             {activeTab === 'visits' && <VisitComplianceTab data={inventoryData} />}
             {activeTab === 'frequency' && <VisitFrequencyTab data={inventoryData} />}
             {activeTab === 'alerts' && <StockIntelligenceTab data={inventoryData} />}
+            {activeTab === 'mismatch' && <SupplyStockMismatchTab data={inventoryData} />}
           </>
         )}
       </main>
