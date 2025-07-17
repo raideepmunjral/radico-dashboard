@@ -215,7 +215,7 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
         const alertInfo = calculateAlertSeverity(
           daysSinceSupply, 
           bottleInfo.size, 
-          mockCasesSupplied, 
+          actualCasesSupplied, 
           theoreticalRemaining
         );
         
@@ -232,7 +232,7 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
           lastSupplyDate: item.lastSupplyDate,
           daysSinceSupply,
           bottleSize: bottleInfo.size,
-          casesSupplied: mockCasesSupplied,
+          casesSupplied: actualCasesSupplied,
           bottlesSupplied,
           conversionRate: bottleInfo.conversionRate,
           expectedDailyConsumption: bottleInfo.expectedDailyConsumption,
@@ -370,7 +370,7 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
           Supply-Stock Mismatch Detection
         </h2>
         <p className="text-gray-600">
-          Phase 1: Recent Supply + Zero Stock Detection with Bottle Size Analysis
+          Phase 1: Recent Supply + Zero Stock Detection with Bottle Size Analysis (Fixed: Now using actual supply data)
         </p>
         <p className="text-sm text-gray-500">
           Detection threshold: {detectionThreshold} days • Period: {data.summary.periodStartDate.toLocaleDateString()} - {data.summary.periodEndDate.toLocaleDateString()}
