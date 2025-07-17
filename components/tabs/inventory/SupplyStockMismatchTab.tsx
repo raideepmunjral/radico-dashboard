@@ -205,6 +205,11 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
                 (shop.visitDate.getTime() - item.lastSupplyDate.getTime()) / (1000 * 60 * 60 * 24)
               );
               
+              // CRITICAL FIX: Only flag if supply was BEFORE visit (positive days)
+              // We want: Supply delivered → Next day zero stock reported
+              // NOT: Zero stock reported → Supply delivered later
+              if (daysSinceSupply <= 0) return; // Skip if supply was after visit
+              
               // Only flag if within detection threshold
               if (daysSinceSupply > detectionThreshold) return;
               
@@ -391,10 +396,10 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
           Supply-Stock Mismatch Detection
         </h2>
         <p className="text-gray-600">
-          Phase 1: Recent Supply + Zero Stock Detection with Bottle Size Analysis (Fixed: Now using actual supply data)
+          Phase 1: Recent Supply + Zero Stock Detection - "We just delivered, why is it zero already?"
         </p>
         <p className="text-sm text-gray-500">
-          Detection threshold: {detectionThreshold} days • Period: {data.summary.periodStartDate.toLocaleDateString()} - {data.summary.periodEndDate.toLocaleDateString()}
+          Detection threshold: {detectionThreshold} days • Only shows cases where supply was delivered BEFORE visit • Period: {data.summary.periodStartDate.toLocaleDateString()} - {data.summary.periodEndDate.toLocaleDateString()}
         </p>
       </div>
 
@@ -564,19 +569,19 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
                   className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
                   onClick={() => handleSort('daysSinceSupply')}
                 >
-                  Days Since Supply {sortField === 'daysSinceSupply' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  Days Since Supply Delivered {sortField === 'daysSinceSupply' && (sortDirection === 'asc' ? '↑' : '↓')}
                 </th>
                 <th 
                   className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
                   onClick={() => handleSort('bottlesSupplied')}
                 >
-                  Supply Analysis {sortField === 'bottlesSupplied' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  Supply Delivered {sortField === 'bottlesSupplied' && (sortDirection === 'asc' ? '↑' : '↓')}
                 </th>
                 <th 
                   className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100"
                   onClick={() => handleSort('theoreticalRemaining')}
                 >
-                  Expected Remaining {sortField === 'theoreticalRemaining' && (sortDirection === 'asc' ? '↑' : '↓')}
+                  Should Still Have {sortField === 'theoreticalRemaining' && (sortDirection === 'asc' ? '↑' : '↓')}
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   Actions
@@ -614,19 +619,19 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <div className="flex items-center space-x-1">
                         <Clock className="w-4 h-4 text-gray-400" />
-                        <span className="font-medium">{report.daysSinceSupply} days</span>
+                        <span className="font-medium">{report.daysSinceSupply} days ago</span>
                       </div>
                       <div className="text-xs text-gray-500">
-                        {report.lastSupplyDate.toLocaleDateString('en-GB')}
+                        Delivered: {report.lastSupplyDate.toLocaleDateString('en-GB')}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <div className="flex items-center space-x-1">
                         <Package className="w-4 h-4 text-gray-400" />
-                        <span>{report.casesSupplied} cases</span>
+                        <span>{report.casesSupplied} cases delivered</span>
                       </div>
                       <div className="text-xs text-gray-500">
-                        {report.bottlesSupplied} bottles
+                        = {report.bottlesSupplied} bottles
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -634,8 +639,8 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
                         <TrendingUp className="w-4 h-4 text-gray-400" />
                         <span className="font-medium text-orange-600">{Math.round(report.theoreticalRemaining)} bottles</span>
                       </div>
-                      <div className="text-xs text-gray-500">
-                        vs 0 reported
+                      <div className="text-xs text-red-600">
+                        but reported 0 bottles
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -670,23 +675,25 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
                         <div className="space-y-4">
                           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                             <div>
-                              <h4 className="font-medium text-gray-900 mb-2">Supply Details</h4>
+                              <h4 className="font-medium text-gray-900 mb-2">Supply Timeline</h4>
                               <div className="space-y-1 text-sm">
-                                <div>Last Supply: {report.lastSupplyDate.toLocaleDateString('en-GB')}</div>
-                                <div>Cases Supplied: {report.casesSupplied}</div>
-                                <div>Bottles Supplied: {report.bottlesSupplied}</div>
+                                <div>Supply Delivered: {report.lastSupplyDate.toLocaleDateString('en-GB')}</div>
+                                <div>Visit Date: {report.visitDate.toLocaleDateString('en-GB')}</div>
+                                <div>Days Between: {report.daysSinceSupply} days after delivery</div>
+                                <div>Cases Delivered: {report.casesSupplied}</div>
+                                <div>Bottles Delivered: {report.bottlesSupplied}</div>
                                 <div>Conversion Rate: {report.conversionRate} bottles/case</div>
-                                <div>Supply Sources: {report.supplySources.join(', ')}</div>
                               </div>
                             </div>
                             <div>
                               <h4 className="font-medium text-gray-900 mb-2">Consumption Analysis</h4>
                               <div className="space-y-1 text-sm">
-                                <div>Expected Daily: {report.expectedDailyConsumption} bottles</div>
-                                <div>Days Since Supply: {report.daysSinceSupply}</div>
+                                <div>Expected Daily Consumption: {report.expectedDailyConsumption} bottles</div>
+                                <div>Days Since Delivery: {report.daysSinceSupply}</div>
                                 <div>Expected Consumed: {report.daysSinceSupply * report.expectedDailyConsumption} bottles</div>
-                                <div>Theoretical Remaining: {Math.round(report.theoreticalRemaining)} bottles</div>
-                                <div>Reported Stock: {report.reportedStock} bottles</div>
+                                <div>Should Still Have: {Math.round(report.theoreticalRemaining)} bottles</div>
+                                <div>Actually Reported: {report.reportedStock} bottles</div>
+                                <div className="font-medium text-red-600">Missing: {Math.round(report.theoreticalRemaining)} bottles</div>
                               </div>
                             </div>
                             <div>
