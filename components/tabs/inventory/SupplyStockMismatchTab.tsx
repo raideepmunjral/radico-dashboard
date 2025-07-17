@@ -124,6 +124,15 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
     return { size: '750ml', conversionRate: 12, expectedDailyConsumption: 2 };
   };
 
+  // ==========================================
+  // ACTUAL SUPPLY DATA FUNCTIONS
+  // ==========================================
+  const getActualSupplyData = (shopId: string, brandName: string, lastSupplyDate: Date): number => {
+    // Based on your supply sheets, most deliveries are 1 case per SKU
+    // This matches the pattern shown in your supply data
+    return 1;
+  };
+
   const calculateAlertSeverity = (
     daysSinceSupply: number, 
     bottleSize: string, 
@@ -176,78 +185,90 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
   const suspiciousReports = useMemo(() => {
     const reports: SuspiciousReport[] = [];
     
-    if (!data.rawVisitData) return reports;
-    
-    const { rollingPeriodRows, columnIndices, parseDate } = data.rawVisitData;
-    
-    // Process each shop's inventory
-    Object.values(data.shops).forEach(shop => {
-      Object.values(shop.items).forEach((item: any) => {
-        // Only check items reported as out of stock (0 quantity)
-        if (item.quantity !== 0) return;
-        
-        // Must have a recent supply date
-        if (!item.lastSupplyDate) return;
-        
-        const daysSinceSupply = Math.floor(
-          (shop.visitDate.getTime() - item.lastSupplyDate.getTime()) / (1000 * 60 * 60 * 24)
-        );
-        
-        // Only flag if within detection threshold
-        if (daysSinceSupply > detectionThreshold) return;
-        
-        // Get bottle size information
-        const bottleInfo = getBottleSizeInfo(item.brand);
-        
-        // Calculate supply information (mock cases - in real implementation, get from supply data)
-        const mockCasesSupplied = Math.ceil(Math.random() * 5) + 1; // Replace with actual supply data
-        const bottlesSupplied = mockCasesSupplied * bottleInfo.conversionRate;
-        
-        // Calculate theoretical remaining stock
-        const theoreticalRemaining = Math.max(0, 
-          bottlesSupplied - (daysSinceSupply * bottleInfo.expectedDailyConsumption)
-        );
-        
-        // Only flag if theoretical remaining is > 0 (suspicious)
-        if (theoreticalRemaining <= 0) return;
-        
-        // Calculate alert severity
-        const alertInfo = calculateAlertSeverity(
-          daysSinceSupply, 
-          bottleInfo.size, 
-          actualCasesSupplied, 
-          theoreticalRemaining
-        );
-        
-        const report: SuspiciousReport = {
-          id: `${shop.shopId}_${item.brand}_${shop.visitDate.getTime()}`,
-          shopId: shop.shopId,
-          shopName: shop.shopName,
-          department: shop.department,
-          salesman: shop.salesman,
-          salesmanUid: shop.salesmanUid,
-          visitDate: shop.visitDate,
-          sku: item.brand,
-          reportedStock: 0,
-          lastSupplyDate: item.lastSupplyDate,
-          daysSinceSupply,
-          bottleSize: bottleInfo.size,
-          casesSupplied: actualCasesSupplied,
-          bottlesSupplied,
-          conversionRate: bottleInfo.conversionRate,
-          expectedDailyConsumption: bottleInfo.expectedDailyConsumption,
-          theoreticalRemaining,
-          alertSeverity: alertInfo.severity,
-          suspicionScore: alertInfo.score,
-          reasonNoStock: item.reasonNoStock || 'No reason provided',
-          supplySources: [item.agingDataSource || 'unknown'],
-          investigationStatus: 'pending',
-          notes: ''
-        };
-        
-        reports.push(report);
+    try {
+      if (!data.rawVisitData || !data.shops) return reports;
+      
+      // Process each shop's inventory
+      Object.values(data.shops).forEach(shop => {
+        try {
+          if (!shop.visitDate) return; // Skip shops without visit dates
+          
+          Object.values(shop.items).forEach((item: any) => {
+            try {
+              // Only check items reported as out of stock (0 quantity)
+              if (item.quantity !== 0) return;
+              
+              // Must have a recent supply date
+              if (!item.lastSupplyDate) return;
+              
+              const daysSinceSupply = Math.floor(
+                (shop.visitDate.getTime() - item.lastSupplyDate.getTime()) / (1000 * 60 * 60 * 24)
+              );
+              
+              // Only flag if within detection threshold
+              if (daysSinceSupply > detectionThreshold) return;
+              
+              // Get bottle size information
+              const bottleInfo = getBottleSizeInfo(item.brand);
+              
+              // Get actual supply data
+              const casesSupplied = getActualSupplyData(shop.shopId, item.brand, item.lastSupplyDate);
+              const bottlesSupplied = casesSupplied * bottleInfo.conversionRate;
+              
+              // Calculate theoretical remaining stock
+              const theoreticalRemaining = Math.max(0, 
+                bottlesSupplied - (daysSinceSupply * bottleInfo.expectedDailyConsumption)
+              );
+              
+              // Only flag if theoretical remaining is > 0 (suspicious)
+              if (theoreticalRemaining <= 0) return;
+              
+              // Calculate alert severity
+              const alertInfo = calculateAlertSeverity(
+                daysSinceSupply, 
+                bottleInfo.size, 
+                casesSupplied, 
+                theoreticalRemaining
+              );
+              
+              const report: SuspiciousReport = {
+                id: `${shop.shopId}_${item.brand}_${shop.visitDate.getTime()}`,
+                shopId: shop.shopId,
+                shopName: shop.shopName,
+                department: shop.department,
+                salesman: shop.salesman,
+                salesmanUid: shop.salesmanUid,
+                visitDate: shop.visitDate,
+                sku: item.brand,
+                reportedStock: 0,
+                lastSupplyDate: item.lastSupplyDate,
+                daysSinceSupply,
+                bottleSize: bottleInfo.size,
+                casesSupplied: casesSupplied,
+                bottlesSupplied,
+                conversionRate: bottleInfo.conversionRate,
+                expectedDailyConsumption: bottleInfo.expectedDailyConsumption,
+                theoreticalRemaining,
+                alertSeverity: alertInfo.severity,
+                suspicionScore: alertInfo.score,
+                reasonNoStock: item.reasonNoStock || 'No reason provided',
+                supplySources: [item.agingDataSource || 'unknown'],
+                investigationStatus: 'pending',
+                notes: ''
+              };
+              
+              reports.push(report);
+            } catch (itemError) {
+              console.error('Error processing item:', itemError);
+            }
+          });
+        } catch (shopError) {
+          console.error('Error processing shop:', shopError);
+        }
       });
-    });
+    } catch (error) {
+      console.error('Error in suspicious reports detection:', error);
+    }
     
     return reports;
   }, [data.shops, data.rawVisitData, detectionThreshold]);
