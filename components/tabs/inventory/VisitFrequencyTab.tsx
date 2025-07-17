@@ -286,9 +286,9 @@ const VisitFrequencyTab = ({ data }: { data: InventoryData }) => {
     return filtered;
   }, [shopVisitFrequencies, searchTerm, selectedSalesman, selectedDepartment, selectedStatus, sortBy, sortOrder]);
 
-  // Calculate status distribution
+  // Calculate status distribution based on filtered data
   const statusDistribution = useMemo(() => {
-    const distribution = shopVisitFrequencies.reduce((acc, shop) => {
+    const distribution = filteredAndSortedData.reduce((acc, shop) => {
       acc[shop.status] = (acc[shop.status] || 0) + 1;
       return acc;
     }, {} as Record<string, number>);
@@ -297,7 +297,7 @@ const VisitFrequencyTab = ({ data }: { data: InventoryData }) => {
       ...option,
       count: distribution[option.value] || 0
     }));
-  }, [shopVisitFrequencies]);
+  }, [filteredAndSortedData]);
 
   // Pagination
   const totalPages = Math.ceil(filteredAndSortedData.length / itemsPerPage);
@@ -344,14 +344,14 @@ const VisitFrequencyTab = ({ data }: { data: InventoryData }) => {
     }
   };
 
-  // Calculate summary statistics
+  // Calculate summary statistics based on filtered data
   const summaryStats = useMemo(() => {
-    const totalVisits = shopVisitFrequencies.reduce((sum, shop) => sum + shop.visitCount, 0);
-    const avgVisitsPerShop = shopVisitFrequencies.length > 0 ? 
-      (totalVisits / shopVisitFrequencies.length).toFixed(1) : '0';
-    const maxVisits = shopVisitFrequencies.length > 0 ? 
-      Math.max(...shopVisitFrequencies.map(shop => shop.visitCount)) : 0;
-    const shopsWithMultipleVisits = shopVisitFrequencies.filter(shop => shop.visitCount > 1).length;
+    const totalVisits = filteredAndSortedData.reduce((sum, shop) => sum + shop.visitCount, 0);
+    const avgVisitsPerShop = filteredAndSortedData.length > 0 ? 
+      (totalVisits / filteredAndSortedData.length).toFixed(1) : '0';
+    const maxVisits = filteredAndSortedData.length > 0 ? 
+      Math.max(...filteredAndSortedData.map(shop => shop.visitCount)) : 0;
+    const shopsWithMultipleVisits = filteredAndSortedData.filter(shop => shop.visitCount > 1).length;
     
     return {
       totalVisits,
@@ -359,7 +359,7 @@ const VisitFrequencyTab = ({ data }: { data: InventoryData }) => {
       maxVisits,
       shopsWithMultipleVisits
     };
-  }, [shopVisitFrequencies]);
+  }, [filteredAndSortedData]);
 
   // Show loading state while processing
   if (processing) {
