@@ -135,19 +135,19 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
     
     // Extract size from SKU name
     if (sku.includes('750') || sku.includes('750ML')) {
-      return { size: '750ml', conversionRate: 12, expectedDailyConsumption: 5 }; // Increased for high-volume shops
+      return { size: '750ml', conversionRate: 12, expectedDailyConsumption: 2 };
     } else if (sku.includes('375') || sku.includes('375ML')) {
-      return { size: '375ml', conversionRate: 24, expectedDailyConsumption: 10 }; // Increased for high-volume shops
+      return { size: '375ml', conversionRate: 24, expectedDailyConsumption: 4 };
     } else if (sku.includes('180') || sku.includes('180ML') || sku.includes('180P')) {
-      return { size: '180ml', conversionRate: 48, expectedDailyConsumption: 20 }; // Increased for high-volume shops
+      return { size: '180ml', conversionRate: 48, expectedDailyConsumption: 8 };
     } else if (sku.includes('90') || sku.includes('90ML') || sku.includes('90P')) {
-      return { size: '90ml', conversionRate: 96, expectedDailyConsumption: 40 }; // Increased for high-volume shops
+      return { size: '90ml', conversionRate: 96, expectedDailyConsumption: 15 };
     } else if (sku.includes('60') || sku.includes('60ML') || sku.includes('60P')) {
-      return { size: '60ml', conversionRate: 150, expectedDailyConsumption: 80 }; // Increased for high-volume shops
+      return { size: '60ml', conversionRate: 150, expectedDailyConsumption: 25 };
     }
     
     // Default to 750ml if size cannot be determined
-    return { size: '750ml', conversionRate: 12, expectedDailyConsumption: 5 };
+    return { size: '750ml', conversionRate: 12, expectedDailyConsumption: 2 };
   };
 
   // ==========================================
@@ -244,36 +244,20 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
     
     score = score * sizeMultiplier;
     
-    // MAJOR UPDATE: Adjust for supply volume - handle massive supplies (100+ cases)
-    if (casesSupplied >= 100) {
-      score += 100; // Massive supply - extremely suspicious if zero
-    } else if (casesSupplied >= 50) {
-      score += 80; // Very large supply
-    } else if (casesSupplied >= 20) {
-      score += 60; // Large supply
-    } else if (casesSupplied >= 10) {
-      score += 40; // Medium-large supply
-    } else if (casesSupplied >= 5) {
-      score += 30; // Medium supply
-    } else if (casesSupplied >= 3) {
-      score += 20; // Small-medium supply
-    } else if (casesSupplied >= 2) {
-      score += 10; // Small supply
-    }
+    // Adjust for supply volume
+    if (casesSupplied >= 5) score += 30;
+    else if (casesSupplied >= 3) score += 20;
+    else if (casesSupplied >= 2) score += 10;
     
     // Adjust for theoretical remaining (higher remaining = more suspicious)
-    if (theoreticalRemaining >= 1000) score += 50; // 1000+ bottles missing
-    else if (theoreticalRemaining >= 500) score += 40; // 500+ bottles missing
-    else if (theoreticalRemaining >= 200) score += 30; // 200+ bottles missing
-    else if (theoreticalRemaining >= 100) score += 25; // 100+ bottles missing
-    else if (theoreticalRemaining >= 50) score += 20; // 50+ bottles missing
-    else if (theoreticalRemaining >= 20) score += 15; // 20+ bottles missing
-    else if (theoreticalRemaining >= 10) score += 10; // 10+ bottles missing
+    if (theoreticalRemaining >= 50) score += 25;
+    else if (theoreticalRemaining >= 30) score += 15;
+    else if (theoreticalRemaining >= 20) score += 10;
     
-    // Determine severity with updated thresholds for massive supplies
-    if (score >= 180) severity = 'critical'; // Raised threshold for massive supplies
-    else if (score >= 120) severity = 'high';
-    else if (score >= 80) severity = 'medium';
+    // Determine severity
+    if (score >= 120) severity = 'critical';
+    else if (score >= 80) severity = 'high';
+    else if (score >= 50) severity = 'medium';
     else severity = 'low';
     
     return { severity, score: Math.round(score) };
@@ -379,30 +363,14 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
               const casesSupplied = getActualSupplyData(shop.shopId, item.brand, item.lastSupplyDate);
               const bottlesSupplied = casesSupplied * bottleInfo.conversionRate;
               
-              // DYNAMIC CONSUMPTION ADJUSTMENT: High-volume shops (100+ cases) can consume much more
-              let adjustedDailyConsumption = bottleInfo.expectedDailyConsumption;
-              if (casesSupplied >= 100) {
-                // Massive supply = high-volume distributor/shop
-                adjustedDailyConsumption = bottleInfo.expectedDailyConsumption * 10; // 10x consumption for massive supplies
-              } else if (casesSupplied >= 50) {
-                adjustedDailyConsumption = bottleInfo.expectedDailyConsumption * 5; // 5x consumption for large supplies
-              } else if (casesSupplied >= 20) {
-                adjustedDailyConsumption = bottleInfo.expectedDailyConsumption * 3; // 3x consumption for medium-large supplies
-              } else if (casesSupplied >= 10) {
-                adjustedDailyConsumption = bottleInfo.expectedDailyConsumption * 2; // 2x consumption for medium supplies
-              }
-              
               // Log for debugging
               if (casesSupplied > 1) {
-                console.log(`📊 Found ${casesSupplied} cases for ${shop.shopName} - ${item.brand} (${bottlesSupplied} bottles)`);
-                if (casesSupplied >= 20) {
-                  console.log(`📈 High-volume shop: Adjusted daily consumption to ${adjustedDailyConsumption} bottles/day`);
-                }
+                console.log(`📊 Found ${casesSupplied} cases for ${shop.shopName} - ${item.brand}`);
               }
               
-              // Calculate theoretical remaining stock with adjusted consumption
+              // Calculate theoretical remaining stock
               const theoreticalRemaining = Math.max(0, 
-                bottlesSupplied - (daysSinceSupply * adjustedDailyConsumption)
+                bottlesSupplied - (daysSinceSupply * bottleInfo.expectedDailyConsumption)
               );
               
               // Only flag if theoretical remaining is > 0 (suspicious)
@@ -432,7 +400,7 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
                 casesSupplied: casesSupplied,
                 bottlesSupplied,
                 conversionRate: bottleInfo.conversionRate,
-                expectedDailyConsumption: adjustedDailyConsumption, // Use adjusted consumption
+                expectedDailyConsumption: bottleInfo.expectedDailyConsumption,
                 theoreticalRemaining,
                 alertSeverity: alertInfo.severity,
                 suspicionScore: alertInfo.score,
@@ -511,10 +479,6 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
   // ==========================================
   // HELPER FUNCTIONS
   // ==========================================
-  const formatNumber = (num: number): string => {
-    return num.toLocaleString();
-  };
-
   const getDepartments = () => {
     return Array.from(new Set(suspiciousReports.map(r => r.department))).sort();
   };
@@ -588,7 +552,7 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
           Detection and analysis of discrepancies between recent supply deliveries and reported zero stock levels. This report identifies cases where inventory was delivered within the detection threshold but subsequently reported as out of stock, indicating potential stock misreporting or rapid depletion requiring investigation.
         </p>
         <p className="text-sm text-gray-500">
-          Detection threshold: {detectionThreshold} days • Reads actual case quantities from supply data • Adjusts consumption rates based on supply volume • Only shows cases where supply was delivered BEFORE visit • Period: {data.summary.periodStartDate.toLocaleDateString()} - {data.summary.periodEndDate.toLocaleDateString()}
+          Detection threshold: {detectionThreshold} days • Now reads actual case quantities from supply data • Only shows cases where supply was delivered BEFORE visit • Period: {data.summary.periodStartDate.toLocaleDateString()} - {data.summary.periodEndDate.toLocaleDateString()}
         </p>
         <p className="text-xs text-blue-600">
           {stats.total > 0 && `Found ${suspiciousReports.filter(r => r.casesSupplied > 1).length} cases with multiple cases delivered`}
@@ -630,7 +594,7 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
             <div className="flex items-center space-x-2">
               <AlertTriangle className="w-4 h-4 text-yellow-600" />
               <p className="text-sm text-yellow-800">
-                <strong>Note:</strong> Currently using default 1 case per supply. To show actual case quantities, 
+                <strong>Note:</strong> Currently using default 1 case per supply. To show actual case quantities (2, 3, 5+ cases), 
                 please update the main dashboard to pass raw supply data to this component.
               </p>
             </div>
@@ -842,18 +806,16 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <div className="flex items-center space-x-1">
                         <Package className="w-4 h-4 text-gray-400" />
-                        <span>{formatNumber(report.casesSupplied)} cases delivered</span>
+                        <span>{report.casesSupplied} cases delivered</span>
                       </div>
                       <div className="text-xs text-gray-500">
-                        = {formatNumber(report.bottlesSupplied)} bottles
+                        = {report.bottlesSupplied} bottles
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <div className="flex items-center space-x-1">
                         <TrendingUp className="w-4 h-4 text-gray-400" />
-                        <span className="font-medium text-orange-600">
-                          {formatNumber(Math.round(report.theoreticalRemaining))} bottles
-                        </span>
+                        <span className="font-medium text-orange-600">{Math.round(report.theoreticalRemaining)} bottles</span>
                       </div>
                       <div className="text-xs text-red-600">
                         but reported 0 bottles
@@ -896,27 +858,20 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
                                 <div>Supply Delivered: {report.lastSupplyDate.toLocaleDateString('en-GB')}</div>
                                 <div>Visit Date: {report.visitDate.toLocaleDateString('en-GB')}</div>
                                 <div>Days Between: {report.daysSinceSupply} days after delivery</div>
-                                <div>Cases Delivered: {formatNumber(report.casesSupplied)}</div>
-                                <div>Bottles Delivered: {formatNumber(report.bottlesSupplied)}</div>
+                                <div>Cases Delivered: {report.casesSupplied}</div>
+                                <div>Bottles Delivered: {report.bottlesSupplied}</div>
                                 <div>Conversion Rate: {report.conversionRate} bottles/case</div>
                               </div>
                             </div>
                             <div>
                               <h4 className="font-medium text-gray-900 mb-2">Consumption Analysis</h4>
                               <div className="space-y-1 text-sm">
-                                <div>Expected Daily Consumption: {formatNumber(report.expectedDailyConsumption)} bottles</div>
-                                {report.casesSupplied >= 20 && (
-                                  <div className="text-blue-600">
-                                    Adjusted for high-volume shop (base rate: {formatNumber(report.casesSupplied >= 100 ? report.expectedDailyConsumption / 10 : report.casesSupplied >= 50 ? report.expectedDailyConsumption / 5 : report.casesSupplied >= 20 ? report.expectedDailyConsumption / 3 : report.expectedDailyConsumption / 2)} bottles/day)
-                                  </div>
-                                )}
+                                <div>Expected Daily Consumption: {report.expectedDailyConsumption} bottles</div>
                                 <div>Days Since Delivery: {report.daysSinceSupply}</div>
-                                <div>Expected Consumed: {formatNumber(report.daysSinceSupply * report.expectedDailyConsumption)} bottles</div>
-                                <div>Should Still Have: {formatNumber(Math.round(report.theoreticalRemaining))} bottles</div>
-                                <div>Actually Reported: {formatNumber(report.reportedStock)} bottles</div>
-                                <div className="font-medium text-red-600">
-                                  Missing: {formatNumber(Math.round(report.theoreticalRemaining))} bottles
-                                </div>
+                                <div>Expected Consumed: {report.daysSinceSupply * report.expectedDailyConsumption} bottles</div>
+                                <div>Should Still Have: {Math.round(report.theoreticalRemaining)} bottles</div>
+                                <div>Actually Reported: {report.reportedStock} bottles</div>
+                                <div className="font-medium text-red-600">Missing: {Math.round(report.theoreticalRemaining)} bottles</div>
                               </div>
                             </div>
                             <div>
