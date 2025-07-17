@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useMemo } from 'react';
-import { Search, X, ChevronLeft, ChevronRight, AlertTriangle, Phone, Eye, MapPin, Clock, Package, TrendingUp, Filter } from 'lucide-react';
+import { Search, X, ChevronLeft, ChevronRight, AlertTriangle, Phone, Eye, MapPin, Clock, Package, TrendingUp, Filter, Download } from 'lucide-react';
 
 // ==========================================
 // TYPES AND INTERFACES
@@ -180,8 +180,64 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
   };
 
   // ==========================================
-  // SUSPICIOUS REPORTS DETECTION
+  // CSV EXPORT FUNCTIONALITY
   // ==========================================
+  const exportSupplyMismatchCSV = () => {
+    try {
+      let csvContent = "data:text/csv;charset=utf-8,";
+      
+      // Header
+      csvContent += "SUPPLY-STOCK MISMATCH DETECTION REPORT\n";
+      csvContent += `Generated: ${new Date().toLocaleString()}\n`;
+      csvContent += `Period: ${data.summary.periodStartDate.toLocaleDateString()} - ${data.summary.periodEndDate.toLocaleDateString()}\n`;
+      csvContent += `Detection Threshold: ${detectionThreshold} days\n`;
+      csvContent += `Total Suspicious Reports: ${filteredReports.length}\n`;
+      csvContent += `Critical: ${stats.critical} | High: ${stats.high} | Medium: ${stats.medium} | Low: ${stats.low}\n\n`;
+      
+      // Column headers
+      csvContent += "Severity,Shop Name,Shop ID,Department,Salesman,SKU,Bottle Size,Supply Date,Visit Date,Days Since Supply,Cases Delivered,Bottles Delivered,Expected Daily Consumption,Expected Consumed,Should Still Have,Actually Reported,Missing Bottles,Suspicion Score,Reason Given,Investigation Status\n";
+      
+      // Data rows
+      filteredReports.forEach(report => {
+        const expectedConsumed = report.daysSinceSupply * report.expectedDailyConsumption;
+        const missingBottles = Math.round(report.theoreticalRemaining);
+        
+        csvContent += `"${report.alertSeverity.toUpperCase()}",`;
+        csvContent += `"${report.shopName}",`;
+        csvContent += `"${report.shopId}",`;
+        csvContent += `"${report.department}",`;
+        csvContent += `"${report.salesman}",`;
+        csvContent += `"${report.sku}",`;
+        csvContent += `"${report.bottleSize}",`;
+        csvContent += `"${report.lastSupplyDate.toLocaleDateString('en-GB')}",`;
+        csvContent += `"${report.visitDate.toLocaleDateString('en-GB')}",`;
+        csvContent += `"${report.daysSinceSupply}",`;
+        csvContent += `"${report.casesSupplied}",`;
+        csvContent += `"${report.bottlesSupplied}",`;
+        csvContent += `"${report.expectedDailyConsumption}",`;
+        csvContent += `"${expectedConsumed}",`;
+        csvContent += `"${Math.round(report.theoreticalRemaining)}",`;
+        csvContent += `"${report.reportedStock}",`;
+        csvContent += `"${missingBottles}",`;
+        csvContent += `"${report.suspicionScore}",`;
+        csvContent += `"${report.reasonNoStock}",`;
+        csvContent += `"${report.investigationStatus}"\n`;
+      });
+      
+      // Create download link
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `Supply_Stock_Mismatch_Report_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+    } catch (error) {
+      console.error('Error exporting CSV:', error);
+      alert('Error exporting CSV report. Please try again.');
+    }
+  };
   const suspiciousReports = useMemo(() => {
     const reports: SuspiciousReport[] = [];
     
@@ -393,10 +449,10 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
       {/* Header */}
       <div className="text-center">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">
-          Supply-Stock Mismatch Detection
+          Supply-Stock Mismatch Detection Report
         </h2>
         <p className="text-gray-600">
-          Phase 1: Recent Supply + Zero Stock Detection - "We just delivered, why is it zero already?"
+          Detection and analysis of discrepancies between recent supply deliveries and reported zero stock levels. This report identifies cases where inventory was delivered within the detection threshold but subsequently reported as out of stock, indicating potential stock misreporting or rapid depletion requiring investigation.
         </p>
         <p className="text-sm text-gray-500">
           Detection threshold: {detectionThreshold} days • Only shows cases where supply was delivered BEFORE visit • Period: {data.summary.periodStartDate.toLocaleDateString()} - {data.summary.periodEndDate.toLocaleDateString()}
@@ -405,7 +461,7 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
 
       {/* Controls */}
       <div className="bg-white p-4 rounded-lg shadow">
-        <div className="flex flex-wrap gap-4 items-center mb-4">
+        <div className="flex flex-wrap gap-4 items-center justify-between mb-4">
           <div className="flex items-center space-x-2">
             <Filter className="w-5 h-5 text-gray-400" />
             <label className="text-sm font-medium text-gray-700">Detection Threshold:</label>
@@ -421,6 +477,15 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
               <option value={7}>7 days</option>
             </select>
           </div>
+          
+          <button
+            onClick={exportSupplyMismatchCSV}
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors text-sm"
+            title="Export supply-stock mismatch report to CSV"
+          >
+            <Download className="w-4 h-4" />
+            <span>Export CSV Report</span>
+          </button>
         </div>
 
         {/* Filters */}
