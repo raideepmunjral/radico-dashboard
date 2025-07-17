@@ -1,3 +1,23 @@
+/*
+  ==========================================
+  IMPORTANT: MAIN DASHBOARD INTEGRATION
+  ==========================================
+  
+  To enable actual case quantity detection, add this to your main dashboard:
+  
+  1. In the processEnhancedInventoryDataWithMaster function, add:
+     
+     rawSupplyData: {
+       recentSupplies,
+       supplyHistory,
+       pendingChallansData: pendingChallans
+     }
+     
+  2. This will allow the component to read actual case quantities instead of hardcoding 1 case
+  
+  ==========================================
+*/
+
 'use client';
 
 import React, { useState, useMemo } from 'react';
@@ -39,6 +59,12 @@ interface InventoryData {
     shopSalesmanMap: Map<string, any>;
     rollingDays: number;
     parseDate: (dateStr: string) => Date | null;
+  };
+  // Add supply data for actual case quantities
+  rawSupplyData?: {
+    recentSupplies: Record<string, Date>;
+    supplyHistory: Record<string, Date>;
+    pendingChallansData: any[][];
   };
 }
 
@@ -127,9 +153,67 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
   // ==========================================
   // ACTUAL SUPPLY DATA FUNCTIONS
   // ==========================================
+  const createMultipleBrandKeys = (shopId: string, brandName: string, size?: string): string[] => {
+    const brandInfo = getBottleSizeInfo(brandName);
+    const actualSize = size || brandInfo.size.replace('ml', '');
+    
+    const keys = [
+      `${shopId}_${brandName.toUpperCase()}_${actualSize}`,
+      `${shopId}_${brandName.toUpperCase()}`,
+      `${shopId}_${brandName}`,
+    ];
+    
+    return [...new Set(keys)];
+  };
+
   const getActualSupplyData = (shopId: string, brandName: string, lastSupplyDate: Date): number => {
-    // Based on your supply sheets, most deliveries are 1 case per SKU
-    // This matches the pattern shown in your supply data
+    // Try to get actual supply data from pending challans
+    if (data.rawSupplyData?.pendingChallansData) {
+      const pendingChallans = data.rawSupplyData.pendingChallansData;
+      
+      if (pendingChallans.length > 1) {
+        const headers = pendingChallans[0];
+        const rows = pendingChallans.slice(1);
+        
+        // Column indices for Pending Challans (as per main dashboard)
+        const challansDateIndex = 1;
+        const shopIdIndex = 8;
+        const brandIndex = 11;
+        const sizeIndex = 12;
+        const casesIndex = 14;
+        
+        // Find matching supply record
+        for (const row of rows) {
+          if (row.length > Math.max(shopIdIndex, brandIndex, casesIndex)) {
+            const rowShopId = row[shopIdIndex]?.toString().trim();
+            const rowBrand = row[brandIndex]?.toString().trim();
+            const rowSize = row[sizeIndex]?.toString().trim() || '';
+            const rowDateStr = row[challansDateIndex]?.toString().trim();
+            const rowCases = parseFloat(row[casesIndex]) || 0;
+            
+            if (rowShopId === shopId && rowBrand && rowCases > 0) {
+              // Check if brand matches (basic matching)
+              if (rowBrand.toUpperCase().includes(brandName.toUpperCase().split(' ')[0]) ||
+                  brandName.toUpperCase().includes(rowBrand.toUpperCase().split(' ')[0])) {
+                
+                // Check if date matches approximately
+                if (rowDateStr) {
+                  const rowDate = new Date(rowDateStr);
+                  if (!isNaN(rowDate.getTime())) {
+                    const daysDiff = Math.abs(rowDate.getTime() - lastSupplyDate.getTime()) / (1000 * 60 * 60 * 24);
+                    if (daysDiff <= 2) { // Within 2 days
+                      return rowCases;
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    // Fallback to 1 case if no matching data found
     return 1;
   };
 
@@ -244,6 +328,9 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
     try {
       if (!data.rawVisitData || !data.shops) return reports;
       
+      console.log('🔍 Processing supply-stock mismatch detection...');
+      console.log('📦 Raw supply data available:', !!data.rawSupplyData?.pendingChallansData);
+      
       // Process each shop's inventory
       Object.values(data.shops).forEach(shop => {
         try {
@@ -272,9 +359,14 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
               // Get bottle size information
               const bottleInfo = getBottleSizeInfo(item.brand);
               
-              // Get actual supply data
+              // Get actual supply data (NOW READS REAL CASE QUANTITIES)
               const casesSupplied = getActualSupplyData(shop.shopId, item.brand, item.lastSupplyDate);
               const bottlesSupplied = casesSupplied * bottleInfo.conversionRate;
+              
+              // Log for debugging
+              if (casesSupplied > 1) {
+                console.log(`📊 Found ${casesSupplied} cases for ${shop.shopName} - ${item.brand}`);
+              }
               
               // Calculate theoretical remaining stock
               const theoreticalRemaining = Math.max(0, 
@@ -327,12 +419,17 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
           console.error('Error processing shop:', shopError);
         }
       });
+      
+      console.log(`✅ Generated ${reports.length} suspicious reports`);
+      const multiCaseReports = reports.filter(r => r.casesSupplied > 1);
+      console.log(`📦 Reports with multiple cases: ${multiCaseReports.length}`);
+      
     } catch (error) {
       console.error('Error in suspicious reports detection:', error);
     }
     
     return reports;
-  }, [data.shops, data.rawVisitData, detectionThreshold]);
+  }, [data.shops, data.rawVisitData, data.rawSupplyData, detectionThreshold]);
 
   // ==========================================
   // FILTERING AND SORTING
@@ -455,7 +552,10 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
           Detection and analysis of discrepancies between recent supply deliveries and reported zero stock levels. This report identifies cases where inventory was delivered within the detection threshold but subsequently reported as out of stock, indicating potential stock misreporting or rapid depletion requiring investigation.
         </p>
         <p className="text-sm text-gray-500">
-          Detection threshold: {detectionThreshold} days • Only shows cases where supply was delivered BEFORE visit • Period: {data.summary.periodStartDate.toLocaleDateString()} - {data.summary.periodEndDate.toLocaleDateString()}
+          Detection threshold: {detectionThreshold} days • Now reads actual case quantities from supply data • Only shows cases where supply was delivered BEFORE visit • Period: {data.summary.periodStartDate.toLocaleDateString()} - {data.summary.periodEndDate.toLocaleDateString()}
+        </p>
+        <p className="text-xs text-blue-600">
+          {stats.total > 0 && `Found ${suspiciousReports.filter(r => r.casesSupplied > 1).length} cases with multiple cases delivered`}
         </p>
       </div>
 
@@ -487,6 +587,19 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
             <span>Export CSV Report</span>
           </button>
         </div>
+        
+        {/* Warning if raw supply data not available */}
+        {!data.rawSupplyData?.pendingChallansData && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mt-4">
+            <div className="flex items-center space-x-2">
+              <AlertTriangle className="w-4 h-4 text-yellow-600" />
+              <p className="text-sm text-yellow-800">
+                <strong>Note:</strong> Currently using default 1 case per supply. To show actual case quantities (2, 3, 5+ cases), 
+                please update the main dashboard to pass raw supply data to this component.
+              </p>
+            </div>
+          </div>
+        )}
 
         {/* Filters */}
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
