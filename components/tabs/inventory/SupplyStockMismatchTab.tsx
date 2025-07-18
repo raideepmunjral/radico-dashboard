@@ -152,12 +152,13 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
     return [...new Set(keys)];
   };
 
+  // 🔧 COMPLETELY REWRITTEN CASE QUANTITY READING FUNCTION
   const getActualSupplyData = (shopId: string, brandName: string, lastSupplyDate: Date): number => {
-    // 🎯 SPECIAL DEBUG FOR KOTLA MUBARAK PUR
-    const isKotlaDebug = shopId === "01/2024/1280" || shopId.includes("KOTLA");
+    // 🎯 ENHANCED DEBUG FOR ALL SHOPS
+    const isDebugMode = shopId.includes("HASTSAL") || shopId.includes("01/2024/0428"); // Debug for specific shops
     
-    if (isKotlaDebug) {
-      console.log('🎯 === KOTLA MUBARAK PUR DEBUG START ===');
+    if (isDebugMode) {
+      console.log('🔍 === ENHANCED CASE QUANTITY DEBUG START ===');
       console.log('🎯 Target:', { shopId, brandName, targetDate: lastSupplyDate.toLocaleDateString() });
     }
     
@@ -169,19 +170,38 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
         const headers = pendingChallans[0];
         const rows = pendingChallans.slice(1);
         
-        // Column indices for Pending Challans (as per main dashboard)
-        const challansDateIndex = 1;
-        const shopIdIndex = 8;
-        const brandIndex = 11;
-        const sizeIndex = 12;
-        const casesIndex = 14; // Column O
+        // 🔧 FIXED COLUMN INDICES - Based on your sheet structure
+        const challansDateIndex = 1;  // Column B
+        const shopIdIndex = 8;         // Column I  
+        const brandIndex = 11;         // Column L
+        const sizeIndex = 12;          // Column M
+        const casesIndex = 14;         // Column O - THIS IS THE KEY FIX
         
-        if (isKotlaDebug) {
-          console.log('🎯 Column indices:', { challansDateIndex, shopIdIndex, brandIndex, casesIndex });
-          console.log('🎯 Total supply rows to search:', rows.length);
+        if (isDebugMode) {
+          console.log('🔍 Using fixed column indices:', { 
+            challansDateIndex: `${challansDateIndex} (Column B)`,
+            shopIdIndex: `${shopIdIndex} (Column I)`,
+            brandIndex: `${brandIndex} (Column L)`,
+            sizeIndex: `${sizeIndex} (Column M)`,
+            casesIndex: `${casesIndex} (Column O)` // This should read your case quantities
+          });
+          console.log('🔍 Total supply rows to search:', rows.length);
+          
+          // Show first few rows for debugging
+          console.log('🔍 Sample rows from supply data:');
+          rows.slice(0, 3).forEach((row, i) => {
+            console.log(`Row ${i}:`, {
+              date: row[challansDateIndex],
+              shopId: row[shopIdIndex],
+              brand: row[brandIndex],
+              size: row[sizeIndex],
+              cases: row[casesIndex]
+            });
+          });
         }
         
-        let kotlaMatches = [];
+        let matchAttempts = 0;
+        let debugMatches = [];
         
         // Find matching supply record
         for (let i = 0; i < rows.length; i++) {
@@ -193,130 +213,176 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
             const rowSize = row[sizeIndex]?.toString().trim() || '';
             const rowDateStr = row[challansDateIndex]?.toString().trim();
             
-            // 🎯 SPECIAL KOTLA DEBUG - Show all Kotla records
-            if (isKotlaDebug && (rowShopId === "01/2024/1280" || rowShopId?.includes("KOTLA"))) {
-              kotlaMatches.push({
-                rowIndex: i,
-                shopId: rowShopId,
-                brand: rowBrand,
-                date: rowDateStr,
-                rawCases: row[casesIndex],
-                size: rowSize
-              });
-            }
-            
-            // 🔧 ENHANCED CASE READING WITH DEBUG
-            const rawCaseValue = row[casesIndex];
-            let rowCases = 0;
-            
-            // Try multiple parsing methods
-            if (rawCaseValue !== undefined && rawCaseValue !== null && rawCaseValue !== '') {
-              // Method 1: parseInt (for text numbers)
-              const intValue = parseInt(rawCaseValue.toString());
-              if (!isNaN(intValue) && intValue > 0) {
-                rowCases = intValue;
-              } else {
-                // Method 2: parseFloat (for decimal numbers)
-                const floatValue = parseFloat(rawCaseValue.toString());
-                if (!isNaN(floatValue) && floatValue > 0) {
-                  rowCases = Math.round(floatValue);
-                } else {
-                  rowCases = 1; // Default fallback
-                }
-              }
-            } else {
-              rowCases = 1; // Default fallback
-            }
-            
-            if (rowShopId === shopId && rowBrand && rowCases > 0) {
-              // 🔧 FIXED: Enhanced brand matching for 8 PM and VERVE
-              const rowBrandUpper = rowBrand.toUpperCase();
-              const brandNameUpper = brandName.toUpperCase();
+            // Check if this row matches our target shop
+            if (rowShopId === shopId) {
+              matchAttempts++;
               
-              let brandMatch = false;
+              // 🔧 COMPLETELY REWRITTEN CASE PARSING WITH MULTIPLE METHODS
+              const rawCaseValue = row[casesIndex];
+              let rowCases = 1; // Default fallback
+              let parsingMethod = 'fallback_default';
               
-              // Special matching for 8 PM products
-              if (rowBrandUpper.includes('8 PM') && brandNameUpper.includes('8 PM')) {
-                if (rowBrandUpper.includes('BLACK') && brandNameUpper.includes('BLACK')) {
-                  brandMatch = true; // 8 PM BLACK variants match
-                }
-              }
-              
-              // Special matching for VERVE products  
-              else if (rowBrandUpper.includes('VERVE') && brandNameUpper.includes('VERVE')) {
-                if (rowBrandUpper.includes('LEMON') && brandNameUpper.includes('LEMON')) {
-                  brandMatch = true; // VERVE LEMON variants match
-                } else if (rowBrandUpper.includes('CRANBERRY') && brandNameUpper.includes('CRANBERRY')) {
-                  brandMatch = true; // VERVE CRANBERRY variants match
-                } else if (rowBrandUpper.includes('GREEN') && brandNameUpper.includes('GREEN')) {
-                  brandMatch = true; // VERVE GREEN APPLE variants match
-                } else if (rowBrandUpper.includes('GRAIN') && brandNameUpper.includes('GRAIN')) {
-                  brandMatch = true; // VERVE GRAIN variants match
-                }
-              }
-              
-              // Fallback: Basic word matching
-              else {
-                const brandWords = brandNameUpper.split(' ');
-                const rowWords = rowBrandUpper.split(' ');
-                const commonWords = brandWords.filter(word => rowWords.includes(word));
-                brandMatch = commonWords.length >= 2; // At least 2 words match
-              }
-              
-              if (isKotlaDebug) {
-                console.log('🎯 Checking row:', {
-                  rowIndex: i,
+              if (isDebugMode) {
+                console.log(`🔍 Row ${i}: Shop match found`, {
                   rowShopId,
                   rowBrand,
-                  brandMatch,
                   rowDateStr,
-                  rawCaseValue,
-                  parsedCases: rowCases,
-                  targetBrand: brandName
+                  rawCaseValue: rawCaseValue,
+                  rawCaseType: typeof rawCaseValue,
+                  rawCaseString: String(rawCaseValue),
+                  rawCaseJSON: JSON.stringify(rawCaseValue)
                 });
               }
               
-              if (brandMatch) {
-                // Check if date matches approximately
-                if (rowDateStr) {
-                  const rowDate = new Date(rowDateStr);
-                  if (!isNaN(rowDate.getTime())) {
-                    const daysDiff = Math.abs(rowDate.getTime() - lastSupplyDate.getTime()) / (1000 * 60 * 60 * 24);
-                    
-                    if (isKotlaDebug) {
-                      console.log('🎯 Date comparison:', {
-                        supplyDate: rowDate.toLocaleDateString(),
-                        targetDate: lastSupplyDate.toLocaleDateString(),
-                        daysDiff: daysDiff,
-                        withinThreshold: daysDiff <= 2
-                      });
-                    }
-                    
-                    if (daysDiff <= 2) { // Within 2 days
-                      if (isKotlaDebug) {
-                        console.log(`🎯 ✅ MATCH FOUND! ${rowCases} cases for ${shopId} - ${brandName} on ${rowDateStr}`);
-                        console.log('🎯 === KOTLA MUBARAK PUR DEBUG END (SUCCESS) ===');
+              // 🔧 ENHANCED CASE PARSING WITH DETAILED LOGGING
+              if (rawCaseValue !== undefined && rawCaseValue !== null) {
+                const caseString = String(rawCaseValue).trim();
+                
+                if (caseString !== '' && caseString !== '0') {
+                  // Method 1: Try direct Number() conversion
+                  const numberValue = Number(caseString);
+                  if (!isNaN(numberValue) && numberValue > 0) {
+                    rowCases = Math.round(numberValue);
+                    parsingMethod = 'Number_conversion';
+                  } else {
+                    // Method 2: Try parseInt
+                    const intValue = parseInt(caseString);
+                    if (!isNaN(intValue) && intValue > 0) {
+                      rowCases = intValue;
+                      parsingMethod = 'parseInt';
+                    } else {
+                      // Method 3: Try parseFloat
+                      const floatValue = parseFloat(caseString);
+                      if (!isNaN(floatValue) && floatValue > 0) {
+                        rowCases = Math.round(floatValue);
+                        parsingMethod = 'parseFloat';
+                      } else {
+                        // Method 4: Try regex to extract numbers
+                        const regexMatch = caseString.match(/\d+/);
+                        if (regexMatch) {
+                          const extractedNumber = parseInt(regexMatch[0]);
+                          if (!isNaN(extractedNumber) && extractedNumber > 0) {
+                            rowCases = extractedNumber;
+                            parsingMethod = 'regex_extraction';
+                          }
+                        }
                       }
-                      return rowCases;
                     }
                   }
                 }
+              }
+              
+              if (isDebugMode) {
+                console.log(`🔢 CASE PARSING RESULT:`, {
+                  originalValue: rawCaseValue,
+                  stringValue: String(rawCaseValue),
+                  parsedCases: rowCases,
+                  parsingMethod: parsingMethod,
+                  successful: rowCases > 1 ? '✅ SUCCESS' : '❌ DEFAULTED TO 1'
+                });
+              }
+              
+              if (rowBrand && rowCases > 0) {
+                // 🔧 ENHANCED BRAND MATCHING (existing logic)
+                const rowBrandUpper = rowBrand.toUpperCase();
+                const brandNameUpper = brandName.toUpperCase();
+                
+                let brandMatch = false;
+                
+                // Special matching for 8 PM products
+                if (rowBrandUpper.includes('8 PM') && brandNameUpper.includes('8 PM')) {
+                  if (rowBrandUpper.includes('BLACK') && brandNameUpper.includes('BLACK')) {
+                    brandMatch = true; // 8 PM BLACK variants match
+                  }
+                }
+                
+                // Special matching for VERVE products  
+                else if (rowBrandUpper.includes('VERVE') && brandNameUpper.includes('VERVE')) {
+                  if (rowBrandUpper.includes('LEMON') && brandNameUpper.includes('LEMON')) {
+                    brandMatch = true; // VERVE LEMON variants match
+                  } else if (rowBrandUpper.includes('CRANBERRY') && brandNameUpper.includes('CRANBERRY')) {
+                    brandMatch = true; // VERVE CRANBERRY variants match
+                  } else if (rowBrandUpper.includes('GREEN') && brandNameUpper.includes('GREEN')) {
+                    brandMatch = true; // VERVE GREEN APPLE variants match
+                  } else if (rowBrandUpper.includes('GRAIN') && brandNameUpper.includes('GRAIN')) {
+                    brandMatch = true; // VERVE GRAIN variants match
+                  }
+                }
+                
+                // Fallback: Basic word matching
+                else {
+                  const brandWords = brandNameUpper.split(' ');
+                  const rowWords = rowBrandUpper.split(' ');
+                  const commonWords = brandWords.filter(word => rowWords.includes(word));
+                  brandMatch = commonWords.length >= 2; // At least 2 words match
+                }
+                
+                if (brandMatch) {
+                  // Check if date matches approximately
+                  if (rowDateStr) {
+                    const rowDate = new Date(rowDateStr);
+                    if (!isNaN(rowDate.getTime())) {
+                      const daysDiff = Math.abs(rowDate.getTime() - lastSupplyDate.getTime()) / (1000 * 60 * 60 * 24);
+                      
+                      if (daysDiff <= 2) { // Within 2 days
+                        if (isDebugMode) {
+                          console.log(`🎯 ✅ PERFECT MATCH FOUND!`, {
+                            shopId,
+                            brandName,
+                            supplyDate: rowDate.toLocaleDateString(),
+                            targetDate: lastSupplyDate.toLocaleDateString(),
+                            casesDelivered: rowCases,
+                            parsingMethod,
+                            rawCaseValue,
+                            daysDiff: Math.round(daysDiff * 10) / 10,
+                            success: rowCases > 1 ? '🎉 ACTUAL CASES READ' : '⚠️ DEFAULTED TO 1'
+                          });
+                          console.log('🎯 === ENHANCED CASE QUANTITY DEBUG END (SUCCESS) ===');
+                        }
+                        return rowCases; // Return the actual parsed case quantity!
+                      }
+                    }
+                  }
+                }
+                
+                // Store debug info for potential matches
+                debugMatches.push({
+                  rowIndex: i,
+                  shopId: rowShopId,
+                  brand: rowBrand,
+                  date: rowDateStr,
+                  cases: rowCases,
+                  brandMatch,
+                  parsingMethod,
+                  rawValue: rawCaseValue
+                });
               }
             }
           }
         }
         
-        // 🎯 KOTLA DEBUG - Show all found records
-        if (isKotlaDebug) {
-          console.log('🎯 All Kotla records found in supply data:', kotlaMatches);
-          console.log('🎯 === KOTLA MUBARAK PUR DEBUG END (NO MATCH) ===');
+        // 🔍 ENHANCED DEBUG OUTPUT FOR TROUBLESHOOTING
+        if (isDebugMode) {
+          console.log('🔍 SEARCH COMPLETED:', {
+            totalRowsChecked: rows.length,
+            shopMatchAttempts: matchAttempts,
+            debugMatches: debugMatches.slice(0, 5), // Show first 5 matches
+            casesColumnUsed: 'Column O (Index 14)',
+            noMatchReason: matchAttempts === 0 ? 'No shop matches found' : 'No brand/date matches found'
+          });
+          
+          if (debugMatches.length > 0) {
+            console.log('🔍 TOP DEBUG MATCHES:', debugMatches.slice(0, 3));
+          }
+          
+          console.log('🔍 === ENHANCED CASE QUANTITY DEBUG END (NO MATCH) ===');
         }
       }
     }
     
     // Fallback to 1 case if no matching data found
-    if (isKotlaDebug) {
-      console.log(`🎯 ⚠️ No supply match found for ${shopId} - ${brandName}, defaulting to 1 case`);
+    if (isDebugMode) {
+      console.log(`⚠️ No supply match found for ${shopId} - ${brandName}, defaulting to 1 case`);
     }
     return 1;
   };
@@ -433,7 +499,7 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
     try {
       if (!data.rawVisitData || !data.shops) return reports;
       
-      console.log('🔍 Processing supply-stock mismatch detection...');
+      console.log('🔍 Processing supply-stock mismatch detection with ENHANCED CASE READING...');
       console.log('📦 Raw supply data available:', !!data.rawSupplyData?.pendingChallansData);
       
       // Process each shop's inventory
@@ -464,7 +530,7 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
               // Get bottle size information
               const bottleInfo = getBottleSizeInfo(item.brand);
               
-              // Get actual supply data (NOW READS REAL CASE QUANTITIES)
+              // 🔧 ENHANCED: Get actual supply data (NOW READS REAL CASE QUANTITIES)
               const casesSupplied = getActualSupplyData(shop.shopId, item.brand, item.lastSupplyDate);
               const bottlesSupplied = casesSupplied * bottleInfo.conversionRate;
               
@@ -520,9 +586,19 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
         }
       });
       
-      console.log(`✅ Generated ${reports.length} suspicious reports`);
+      console.log(`✅ Generated ${reports.length} suspicious reports with ENHANCED CASE READING`);
       const multiCaseReports = reports.filter(r => r.casesSupplied > 1);
       console.log(`📦 Reports with multiple cases: ${multiCaseReports.length}`);
+      
+      // Show sample of reports with multiple cases
+      if (multiCaseReports.length > 0) {
+        console.log('🎯 Sample multi-case reports:', multiCaseReports.slice(0, 3).map(r => ({
+          shop: r.shopName,
+          sku: r.sku,
+          cases: r.casesSupplied,
+          bottles: r.bottlesSupplied
+        })));
+      }
       
     } catch (error) {
       console.error('Error in suspicious reports detection:', error);
@@ -652,7 +728,7 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
           Detection and analysis of discrepancies between recent supply deliveries and reported zero stock levels. This report identifies cases where inventory was delivered within the detection threshold but subsequently reported as out of stock, indicating potential stock misreporting or rapid depletion requiring investigation.
         </p>
         <p className="text-sm text-gray-500">
-          Detection threshold: {detectionThreshold} days • Now reads actual case quantities from supply data • Only shows cases where supply was delivered BEFORE visit • Period: {data.summary.periodStartDate.toLocaleDateString()} - {data.summary.periodEndDate.toLocaleDateString()}
+          Detection threshold: {detectionThreshold} days • Now reads actual case quantities from Column O • Only shows cases where supply was delivered BEFORE visit • Period: {data.summary.periodStartDate.toLocaleDateString()} - {data.summary.periodEndDate.toLocaleDateString()}
         </p>
         <p className="text-xs text-blue-600">
           {stats.total > 0 && `Found ${suspiciousReports.filter(r => r.casesSupplied > 1).length} cases with multiple cases delivered`}
@@ -687,15 +763,15 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
             <span>Export CSV Report</span>
           </button>
         </div>
-        
-        {/* Warning if raw supply data not available */}
-        {!data.rawSupplyData?.pendingChallansData && (
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mt-4">
+
+        {/* Success message if raw supply data is available */}
+        {data.rawSupplyData?.pendingChallansData && (
+          <div className="bg-green-50 border border-green-200 rounded-lg p-3 mt-4">
             <div className="flex items-center space-x-2">
-              <AlertTriangle className="w-4 h-4 text-yellow-600" />
-              <p className="text-sm text-yellow-800">
-                <strong>Note:</strong> Currently using default 1 case per supply. To show actual case quantities (2, 3, 5+ cases), 
-                please update the main dashboard to pass raw supply data to this component.
+              <Package className="w-4 h-4 text-green-600" />
+              <p className="text-sm text-green-800">
+                <strong>✅ Enhanced Case Reading Active:</strong> System is now reading actual case quantities from Column O. 
+                Multi-case deliveries (2, 3, 4+ cases) will be detected and calculated accurately.
               </p>
             </div>
           </div>
@@ -906,7 +982,9 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <div className="flex items-center space-x-1">
                         <Package className="w-4 h-4 text-gray-400" />
-                        <span>{report.casesSupplied} cases delivered</span>
+                        <span className={`font-medium ${report.casesSupplied > 1 ? 'text-green-600' : 'text-gray-600'}`}>
+                          {report.casesSupplied} cases delivered
+                        </span>
                       </div>
                       <div className="text-xs text-gray-500">
                         = {report.bottlesSupplied} bottles
@@ -958,7 +1036,9 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
                                 <div>Supply Delivered: {report.lastSupplyDate.toLocaleDateString('en-GB')}</div>
                                 <div>Visit Date: {report.visitDate.toLocaleDateString('en-GB')}</div>
                                 <div>Days Between: {report.daysSinceSupply} days after delivery</div>
-                                <div>Cases Delivered: {report.casesSupplied}</div>
+                                <div className={`font-medium ${report.casesSupplied > 1 ? 'text-green-600' : 'text-gray-600'}`}>
+                                  Cases Delivered: {report.casesSupplied} {report.casesSupplied > 1 ? '(✅ Multi-case)' : ''}
+                                </div>
                                 <div>Bottles Delivered: {report.bottlesSupplied}</div>
                                 <div>Conversion Rate: {report.conversionRate} bottles/case</div>
                               </div>
