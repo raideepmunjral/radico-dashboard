@@ -153,6 +153,14 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
   };
 
   const getActualSupplyData = (shopId: string, brandName: string, lastSupplyDate: Date): number => {
+    // 🎯 SPECIAL DEBUG FOR KOTLA MUBARAK PUR
+    const isKotlaDebug = shopId === "01/2024/1280" || shopId.includes("KOTLA");
+    
+    if (isKotlaDebug) {
+      console.log('🎯 === KOTLA MUBARAK PUR DEBUG START ===');
+      console.log('🎯 Target:', { shopId, brandName, targetDate: lastSupplyDate.toLocaleDateString() });
+    }
+    
     // Try to get actual supply data from pending challans
     if (data.rawSupplyData?.pendingChallansData) {
       const pendingChallans = data.rawSupplyData.pendingChallansData;
@@ -168,15 +176,34 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
         const sizeIndex = 12;
         const casesIndex = 14; // Column O
         
-        console.log('🔍 Searching for supply data:', { shopId, brandName, targetDate: lastSupplyDate.toLocaleDateString() });
+        if (isKotlaDebug) {
+          console.log('🎯 Column indices:', { challansDateIndex, shopIdIndex, brandIndex, casesIndex });
+          console.log('🎯 Total supply rows to search:', rows.length);
+        }
+        
+        let kotlaMatches = [];
         
         // Find matching supply record
-        for (const row of rows) {
+        for (let i = 0; i < rows.length; i++) {
+          const row = rows[i];
+          
           if (row.length > Math.max(shopIdIndex, brandIndex, casesIndex)) {
             const rowShopId = row[shopIdIndex]?.toString().trim();
             const rowBrand = row[brandIndex]?.toString().trim();
             const rowSize = row[sizeIndex]?.toString().trim() || '';
             const rowDateStr = row[challansDateIndex]?.toString().trim();
+            
+            // 🎯 SPECIAL KOTLA DEBUG - Show all Kotla records
+            if (isKotlaDebug && (rowShopId === "01/2024/1280" || rowShopId?.includes("KOTLA"))) {
+              kotlaMatches.push({
+                rowIndex: i,
+                shopId: rowShopId,
+                brand: rowBrand,
+                date: rowDateStr,
+                rawCases: row[casesIndex],
+                size: rowSize
+              });
+            }
             
             // 🔧 ENHANCED CASE READING WITH DEBUG
             const rawCaseValue = row[casesIndex];
@@ -201,19 +228,6 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
               rowCases = 1; // Default fallback
             }
             
-            // 🔍 DEBUG LOGGING
-            console.log('🔍 Debug case reading:', {
-              shopId: rowShopId,
-              brandName: rowBrand,
-              targetShop: shopId,
-              targetBrand: brandName,
-              casesIndex: 14,
-              rawCaseValue: rawCaseValue,
-              parsedCases: rowCases,
-              rowLength: row.length,
-              dateStr: rowDateStr
-            });
-            
             if (rowShopId === shopId && rowBrand && rowCases > 0) {
               // Enhanced brand matching
               const brandMatch = rowBrand.toUpperCase().includes(brandName.toUpperCase().split(' ')[0]) ||
@@ -221,14 +235,40 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
                                 rowBrand.toUpperCase().includes('8 PM') && brandName.toUpperCase().includes('8 PM') ||
                                 rowBrand.toUpperCase().includes('VERVE') && brandName.toUpperCase().includes('VERVE');
               
+              if (isKotlaDebug) {
+                console.log('🎯 Checking row:', {
+                  rowIndex: i,
+                  rowShopId,
+                  rowBrand,
+                  brandMatch,
+                  rowDateStr,
+                  rawCaseValue,
+                  parsedCases: rowCases,
+                  targetBrand: brandName
+                });
+              }
+              
               if (brandMatch) {
                 // Check if date matches approximately
                 if (rowDateStr) {
                   const rowDate = new Date(rowDateStr);
                   if (!isNaN(rowDate.getTime())) {
                     const daysDiff = Math.abs(rowDate.getTime() - lastSupplyDate.getTime()) / (1000 * 60 * 60 * 24);
+                    
+                    if (isKotlaDebug) {
+                      console.log('🎯 Date comparison:', {
+                        supplyDate: rowDate.toLocaleDateString(),
+                        targetDate: lastSupplyDate.toLocaleDateString(),
+                        daysDiff: daysDiff,
+                        withinThreshold: daysDiff <= 2
+                      });
+                    }
+                    
                     if (daysDiff <= 2) { // Within 2 days
-                      console.log(`📊 Found ${rowCases} cases for ${shopId} - ${brandName} on ${rowDateStr}`);
+                      if (isKotlaDebug) {
+                        console.log(`🎯 ✅ MATCH FOUND! ${rowCases} cases for ${shopId} - ${brandName} on ${rowDateStr}`);
+                        console.log('🎯 === KOTLA MUBARAK PUR DEBUG END (SUCCESS) ===');
+                      }
                       return rowCases;
                     }
                   }
@@ -237,11 +277,19 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
             }
           }
         }
+        
+        // 🎯 KOTLA DEBUG - Show all found records
+        if (isKotlaDebug) {
+          console.log('🎯 All Kotla records found in supply data:', kotlaMatches);
+          console.log('🎯 === KOTLA MUBARAK PUR DEBUG END (NO MATCH) ===');
+        }
       }
     }
     
     // Fallback to 1 case if no matching data found
-    console.log(`⚠️ No supply match found for ${shopId} - ${brandName}, defaulting to 1 case`);
+    if (isKotlaDebug) {
+      console.log(`🎯 ⚠️ No supply match found for ${shopId} - ${brandName}, defaulting to 1 case`);
+    }
     return 1;
   };
 
