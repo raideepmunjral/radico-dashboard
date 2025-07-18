@@ -154,8 +154,8 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
 
   // 🔧 COMPLETELY REWRITTEN CASE QUANTITY READING FUNCTION
   const getActualSupplyData = (shopId: string, brandName: string, lastSupplyDate: Date): number => {
-    // 🎯 ENHANCED DEBUG FOR ALL SHOPS
-    const isDebugMode = shopId.includes("HASTSAL") || shopId.includes("01/2024/0428"); // Debug for specific shops
+    // 🎯 ENHANCED DEBUG FOR ALL SHOPS - ENABLE FOR ALL SHOPS TO SEE WHAT'S HAPPENING
+    const isDebugMode = true; // Enable debug for all shops to see the issue
     
     if (isDebugMode) {
       console.log('🔍 === ENHANCED CASE QUANTITY DEBUG START ===');
@@ -283,16 +283,18 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
               }
               
               if (rowBrand && rowCases > 0) {
-                // 🔧 ENHANCED BRAND MATCHING (existing logic)
+                // 🔧 ENHANCED BRAND MATCHING WITH DETAILED DEBUG
                 const rowBrandUpper = rowBrand.toUpperCase();
                 const brandNameUpper = brandName.toUpperCase();
                 
                 let brandMatch = false;
+                let brandMatchReason = '';
                 
                 // Special matching for 8 PM products
                 if (rowBrandUpper.includes('8 PM') && brandNameUpper.includes('8 PM')) {
                   if (rowBrandUpper.includes('BLACK') && brandNameUpper.includes('BLACK')) {
                     brandMatch = true; // 8 PM BLACK variants match
+                    brandMatchReason = '8PM_BLACK_FAMILY';
                   }
                 }
                 
@@ -300,12 +302,16 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
                 else if (rowBrandUpper.includes('VERVE') && brandNameUpper.includes('VERVE')) {
                   if (rowBrandUpper.includes('LEMON') && brandNameUpper.includes('LEMON')) {
                     brandMatch = true; // VERVE LEMON variants match
+                    brandMatchReason = 'VERVE_LEMON_FAMILY';
                   } else if (rowBrandUpper.includes('CRANBERRY') && brandNameUpper.includes('CRANBERRY')) {
                     brandMatch = true; // VERVE CRANBERRY variants match
+                    brandMatchReason = 'VERVE_CRANBERRY_FAMILY';
                   } else if (rowBrandUpper.includes('GREEN') && brandNameUpper.includes('GREEN')) {
                     brandMatch = true; // VERVE GREEN APPLE variants match
+                    brandMatchReason = 'VERVE_GREEN_FAMILY';
                   } else if (rowBrandUpper.includes('GRAIN') && brandNameUpper.includes('GRAIN')) {
                     brandMatch = true; // VERVE GRAIN variants match
+                    brandMatchReason = 'VERVE_GRAIN_FAMILY';
                   }
                 }
                 
@@ -314,7 +320,20 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
                   const brandWords = brandNameUpper.split(' ');
                   const rowWords = rowBrandUpper.split(' ');
                   const commonWords = brandWords.filter(word => rowWords.includes(word));
-                  brandMatch = commonWords.length >= 2; // At least 2 words match
+                  if (commonWords.length >= 2) {
+                    brandMatch = true; // At least 2 words match
+                    brandMatchReason = `WORD_MATCH_${commonWords.length}_WORDS`;
+                  }
+                }
+                
+                if (isDebugMode) {
+                  console.log(`🔍 BRAND MATCHING ATTEMPT:`, {
+                    visitBrand: brandNameUpper,
+                    supplyBrand: rowBrandUpper,
+                    brandMatch: brandMatch,
+                    matchReason: brandMatchReason || 'NO_MATCH',
+                    casesIfMatch: rowCases
+                  });
                 }
                 
                 if (brandMatch) {
@@ -323,6 +342,16 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
                     const rowDate = new Date(rowDateStr);
                     if (!isNaN(rowDate.getTime())) {
                       const daysDiff = Math.abs(rowDate.getTime() - lastSupplyDate.getTime()) / (1000 * 60 * 60 * 24);
+                      
+                      if (isDebugMode) {
+                        console.log(`🔍 DATE MATCHING ATTEMPT:`, {
+                          supplyDate: rowDate.toLocaleDateString(),
+                          targetDate: lastSupplyDate.toLocaleDateString(),
+                          daysDiff: Math.round(daysDiff * 10) / 10,
+                          withinThreshold: daysDiff <= 2,
+                          casesIfMatch: rowCases
+                        });
+                      }
                       
                       if (daysDiff <= 2) { // Within 2 days
                         if (isDebugMode) {
@@ -335,13 +364,31 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
                             parsingMethod,
                             rawCaseValue,
                             daysDiff: Math.round(daysDiff * 10) / 10,
-                            success: rowCases > 1 ? '🎉 ACTUAL CASES READ' : '⚠️ DEFAULTED TO 1'
+                            brandMatchReason,
+                            success: rowCases > 1 ? '🎉 ACTUAL CASES READ' : '⚠️ DEFAULTED TO 1',
+                            RETURNING: rowCases
                           });
                           console.log('🎯 === ENHANCED CASE QUANTITY DEBUG END (SUCCESS) ===');
                         }
                         return rowCases; // Return the actual parsed case quantity!
+                      } else {
+                        if (isDebugMode) {
+                          console.log(`❌ DATE MISMATCH: ${daysDiff} days difference > 2 day threshold`);
+                        }
+                      }
+                    } else {
+                      if (isDebugMode) {
+                        console.log(`❌ INVALID DATE: ${rowDateStr}`);
                       }
                     }
+                  } else {
+                    if (isDebugMode) {
+                      console.log(`❌ NO DATE STRING`);
+                    }
+                  }
+                } else {
+                  if (isDebugMode) {
+                    console.log(`❌ BRAND MISMATCH: No matching pattern found`);
                   }
                 }
                 
@@ -353,6 +400,7 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
                   date: rowDateStr,
                   cases: rowCases,
                   brandMatch,
+                  brandMatchReason,
                   parsingMethod,
                   rawValue: rawCaseValue
                 });
@@ -363,16 +411,42 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
         
         // 🔍 ENHANCED DEBUG OUTPUT FOR TROUBLESHOOTING
         if (isDebugMode) {
-          console.log('🔍 SEARCH COMPLETED:', {
+          console.log('🔍 SEARCH COMPLETED - DETAILED ANALYSIS:', {
             totalRowsChecked: rows.length,
             shopMatchAttempts: matchAttempts,
-            debugMatches: debugMatches.slice(0, 5), // Show first 5 matches
             casesColumnUsed: 'Column O (Index 14)',
-            noMatchReason: matchAttempts === 0 ? 'No shop matches found' : 'No brand/date matches found'
+            targetShop: shopId,
+            targetBrand: brandName,
+            targetDate: lastSupplyDate.toLocaleDateString()
           });
           
           if (debugMatches.length > 0) {
-            console.log('🔍 TOP DEBUG MATCHES:', debugMatches.slice(0, 3));
+            console.log('🔍 TOP DEBUG MATCHES (first 5):');
+            debugMatches.slice(0, 5).forEach((match, i) => {
+              console.log(`Match ${i + 1}:`, {
+                shopId: match.shopId,
+                brand: match.brand,
+                date: match.date,
+                cases: match.cases,
+                brandMatch: match.brandMatch,
+                brandMatchReason: match.brandMatchReason,
+                parsingMethod: match.parsingMethod,
+                rawValue: match.rawValue
+              });
+            });
+            
+            // Count different failure reasons
+            const brandFailures = debugMatches.filter(m => !m.brandMatch).length;
+            const brandSuccesses = debugMatches.filter(m => m.brandMatch).length;
+            
+            console.log('🔍 FAILURE ANALYSIS:', {
+              totalMatches: debugMatches.length,
+              brandFailures,
+              brandSuccesses,
+              mainIssue: brandFailures > brandSuccesses ? 'BRAND_MATCHING' : 'DATE_MATCHING'
+            });
+          } else {
+            console.log('❌ NO DEBUG MATCHES FOUND - NO SHOP MATCHES IN SUPPLY DATA');
           }
           
           console.log('🔍 === ENHANCED CASE QUANTITY DEBUG END (NO MATCH) ===');
@@ -382,7 +456,8 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
     
     // Fallback to 1 case if no matching data found
     if (isDebugMode) {
-      console.log(`⚠️ No supply match found for ${shopId} - ${brandName}, defaulting to 1 case`);
+      console.log(`⚠️ FINAL FALLBACK: No supply match found for ${shopId} - ${brandName}, defaulting to 1 case`);
+      console.log('🔍 === ENHANCED CASE QUANTITY DEBUG END (FALLBACK) ===');
     }
     return 1;
   };
@@ -530,9 +605,19 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
               // Get bottle size information
               const bottleInfo = getBottleSizeInfo(item.brand);
               
-              // 🔧 ENHANCED: Get actual supply data (NOW READS REAL CASE QUANTITIES)
+              // 🔧 Get actual supply data (NOW READS REAL CASE QUANTITIES)
               const casesSupplied = getActualSupplyData(shop.shopId, item.brand, item.lastSupplyDate);
               const bottlesSupplied = casesSupplied * bottleInfo.conversionRate;
+              
+              // 🔍 DEBUG: Show what was returned
+              if (shop.shopId.includes("HASTSAL") || shop.shopId.includes("01/2024/0428")) {
+                console.log(`📦 FINAL RESULT for ${shop.shopName} - ${item.brand}:`, {
+                  casesSupplied,
+                  bottlesSupplied,
+                  conversionRate: bottleInfo.conversionRate,
+                  willShowInUI: `${casesSupplied} cases delivered = ${bottlesSupplied} bottles`
+                });
+              }
               
               // Calculate theoretical remaining stock
               const theoreticalRemaining = Math.max(0, 
