@@ -122,6 +122,12 @@ interface InventoryData {
     rollingDays: number;
     parseDate: (dateStr: string) => Date | null;
   };
+  // ✅ ADDED: Raw supply data for actual case quantity detection
+  rawSupplyData?: {
+    recentSupplies: Record<string, Date>;
+    supplyHistory: Record<string, Date>;
+    pendingChallansData: any[][];
+  };
 }
 
 // ==========================================
@@ -1171,6 +1177,12 @@ const InventoryDashboard = () => {
         shopSalesmanMap,
         rollingDays,
         parseDate
+      },
+      // ✅ ADDED: Raw supply data for actual case quantity detection
+      rawSupplyData: {
+        recentSupplies,
+        supplyHistory,
+        pendingChallansData: pendingChallans
       }
     };
   };
