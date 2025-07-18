@@ -4,7 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { Package, AlertTriangle, TrendingUp, Clock, MapPin, Users, Filter, Search, X, ChevronDown, ChevronUp, BarChart3, Calendar, Eye, AlertCircle, CheckCircle, XCircle, Truck, ShoppingBag, Download, RefreshCw, ChevronLeft, ChevronRight, FileText, Table, Phone } from 'lucide-react';
 
 // ==========================================
-// IMPORTED INDEPENDENT TABS
+// IMPORTED EXTRACTED COMPONENTS
 // ==========================================
 import OverviewTab from '../components/tabs/inventory/OverviewTab';
 import VisitComplianceTab from '../components/tabs/inventory/VisitComplianceTab';
@@ -13,6 +13,8 @@ import ShopInventoryTab from '../components/tabs/inventory/ShopInventoryTab';
 import AgingAnalysisTab from '../components/tabs/inventory/AgingAnalysisTab';
 import StockIntelligenceTab from '../components/tabs/inventory/StockIntelligenceTab';
 import SupplyStockMismatchTab from '../components/tabs/inventory/SupplyStockMismatchTab';
+// 🆕 NEW: Location Verification Tab
+import LocationVerificationTab from '../components/tabs/inventory/LocationVerificationTab';
 
 // ==========================================
 // ENHANCED INVENTORY TYPES & INTERFACES
@@ -62,6 +64,9 @@ interface MasterShopInfo {
   salesman: string;
   department: string;
   salesmanUid: string;
+  // 🆕 NEW: Coordinate fields
+  latitude: string;
+  longitude: string;
   source: 'master_data';
 }
 
@@ -284,13 +289,19 @@ const InventoryDashboard = () => {
     const shopSalesmanIndex = headers.findIndex((h: any) => h?.toLowerCase().includes('shop_salesman'));
     const departmentIndex = headers.findIndex((h: any) => h?.toLowerCase().includes('shop_dep'));
     const salesmanUidIndex = headers.findIndex((h: any) => h?.toLowerCase().includes('salesman_uid'));
+    // 🆕 NEW: Coordinate indices
+    const latitudeIndex = headers.findIndex((h: any) => h?.toLowerCase().includes('latitude'));
+    const longitudeIndex = headers.findIndex((h: any) => h?.toLowerCase().includes('longitude'));
     
     console.log('📊 Master data column indices:', {
       shopId: shopIdIndex,
       shopName: shopNameIndex,
       shopSalesman: shopSalesmanIndex,
       department: departmentIndex,
-      salesmanUid: salesmanUidIndex
+      salesmanUid: salesmanUidIndex,
+      // 🆕 NEW: Log coordinate indices
+      latitude: latitudeIndex,
+      longitude: longitudeIndex
     });
     
     if (shopIdIndex === -1 || shopSalesmanIndex === -1) {
@@ -307,6 +318,9 @@ const InventoryDashboard = () => {
         const salesman = row[shopSalesmanIndex]?.toString().trim();
         const department = row[departmentIndex]?.toString().trim() || 'Unknown Department';
         const salesmanUid = row[salesmanUidIndex]?.toString().trim() || '';
+        // 🆕 NEW: Extract coordinates
+        const latitude = row[latitudeIndex]?.toString().trim() || '';
+        const longitude = row[longitudeIndex]?.toString().trim() || '';
         
         if (shopId && salesman) {
           shopSalesmanMap.set(shopId, {
@@ -315,6 +329,9 @@ const InventoryDashboard = () => {
             salesman,
             department,
             salesmanUid,
+            // 🆕 NEW: Store coordinates
+            latitude,
+            longitude,
             source: 'master_data'
           });
           processedCount++;
@@ -322,7 +339,7 @@ const InventoryDashboard = () => {
       }
     });
     
-    console.log(`✅ Master shop assignments processed: ${processedCount} shops mapped to salesmen`);
+    console.log(`✅ Master shop assignments processed: ${processedCount} shops mapped with coordinates`);
     return shopSalesmanMap;
   };
 
@@ -610,7 +627,10 @@ const InventoryDashboard = () => {
       invBrand: getColumnIndex(['inv brand', 'inv_brand', 'brand', 'tva brand']),
       invQuantity: getColumnIndex(['inv quantity', 'inv_quantity', 'quantity', 'tva target', 'bottles']),
       reasonNoStock: getColumnIndex(['reason', 'no stock', 'reason for no stock']),
-      lsDate: getColumnIndex(['ls date', 'ls_date'])
+      lsDate: getColumnIndex(['ls date', 'ls_date']),
+      // 🆕 NEW: Location coordinates
+      submitterLatitude: getColumnIndex(['submitter latitude', 'submitters latitude', 'latitude']),
+      submitterLongitude: getColumnIndex(['submitter longitude', 'submitters longitude', 'longitude'])
     };
 
     console.log('📊 Column indices found:', columnIndices);
@@ -1552,6 +1572,14 @@ const InventoryDashboard = () => {
         inventoryData.visitCompliance.salesmenStats.forEach(salesman => {
           csvContent += `"${salesman.name}","${salesman.rollingPeriodVisits}","${salesman.uniqueShops}","${salesman.todayVisits}","${salesman.yesterdayVisits}","${salesman.lastWeekVisits}"\n`;
         });
+      } else if (activeTab === 'location') {
+        // 🆕 NEW: Location verification export
+        csvContent += "LOCATION VERIFICATION ANALYSIS\n";
+        csvContent += "Note: This is a basic export. Use the dedicated Location Verification tab export buttons for complete reports.\n";
+        csvContent += "Tab,Feature,Description\n";
+        csvContent += "Location Verification,Distance Analysis,Compare master shop coordinates with visit submission coordinates\n";
+        csvContent += "Location Verification,Accuracy Categories,Accurate (≤50m) | Acceptable (≤200m) | Questionable (≤500m) | Suspicious (≤5km) | Impossible (>5km)\n";
+        csvContent += "Location Verification,Export Options,Detailed Report | Salesman Summary | Executive Summary\n";
       }
 
       const encodedUri = encodeURI(csvContent);
@@ -1702,7 +1730,8 @@ const InventoryDashboard = () => {
               { id: 'visits', label: 'Visit Compliance', icon: Users },
               { id: 'frequency', label: 'Visit Frequency', icon: Calendar },
               { id: 'alerts', label: 'Stock Intelligence', icon: AlertTriangle },
-              { id: 'mismatch', label: 'Supply-Stock Mismatch', icon: AlertCircle }
+              { id: 'mismatch', label: 'Supply-Stock Mismatch', icon: AlertCircle },
+              { id: 'location', label: 'Location Verification', icon: MapPin } // 🆕 NEW TAB
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -1732,6 +1761,7 @@ const InventoryDashboard = () => {
             {activeTab === 'frequency' && <VisitFrequencyTab data={inventoryData} />}
             {activeTab === 'alerts' && <StockIntelligenceTab data={inventoryData} />}
             {activeTab === 'mismatch' && <SupplyStockMismatchTab data={inventoryData} />}
+            {activeTab === 'location' && <LocationVerificationTab data={inventoryData} />} {/* 🆕 NEW TAB */}
           </>
         )}
       </main>
