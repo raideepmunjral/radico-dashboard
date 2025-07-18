@@ -152,10 +152,10 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
     return [...new Set(keys)];
   };
 
-  // 🔧 COMPLETELY REWRITTEN CASE QUANTITY READING FUNCTION
+  // 🔧 CASE QUANTITY READING FUNCTION
   const getActualSupplyData = (shopId: string, brandName: string, lastSupplyDate: Date): number => {
-    // 🎯 ENHANCED DEBUG FOR ALL SHOPS - ENABLE FOR ALL SHOPS TO SEE WHAT'S HAPPENING
-    const isDebugMode = true; // Enable debug for all shops to see the issue
+    // 🎯 DEBUG MODE - Set to true only for troubleshooting specific shops
+    const isDebugMode = false; // Change to true and add shop conditions for debugging
     
     if (isDebugMode) {
       console.log('🔍 === ENHANCED CASE QUANTITY DEBUG START ===');
@@ -616,9 +616,6 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
     try {
       if (!data.rawVisitData || !data.shops) return reports;
       
-      console.log('🔍 Processing supply-stock mismatch detection with ENHANCED CASE READING...');
-      console.log('📦 Raw supply data available:', !!data.rawSupplyData?.pendingChallansData);
-      
       // Process each shop's inventory
       Object.values(data.shops).forEach(shop => {
         try {
@@ -650,16 +647,6 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
               // 🔧 Get actual supply data (NOW READS REAL CASE QUANTITIES)
               const casesSupplied = getActualSupplyData(shop.shopId, item.brand, item.lastSupplyDate);
               const bottlesSupplied = casesSupplied * bottleInfo.conversionRate;
-              
-              // 🔍 DEBUG: Show what was returned
-              if (shop.shopId.includes("HASTSAL") || shop.shopId.includes("01/2024/0428")) {
-                console.log(`📦 FINAL RESULT for ${shop.shopName} - ${item.brand}:`, {
-                  casesSupplied,
-                  bottlesSupplied,
-                  conversionRate: bottleInfo.conversionRate,
-                  willShowInUI: `${casesSupplied} cases delivered = ${bottlesSupplied} bottles`
-                });
-              }
               
               // Calculate theoretical remaining stock
               const theoreticalRemaining = Math.max(0, 
@@ -712,20 +699,6 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
           console.error('Error processing shop:', shopError);
         }
       });
-      
-      console.log(`✅ Generated ${reports.length} suspicious reports with ENHANCED CASE READING`);
-      const multiCaseReports = reports.filter(r => r.casesSupplied > 1);
-      console.log(`📦 Reports with multiple cases: ${multiCaseReports.length}`);
-      
-      // Show sample of reports with multiple cases
-      if (multiCaseReports.length > 0) {
-        console.log('🎯 Sample multi-case reports:', multiCaseReports.slice(0, 3).map(r => ({
-          shop: r.shopName,
-          sku: r.sku,
-          cases: r.casesSupplied,
-          bottles: r.bottlesSupplied
-        })));
-      }
       
     } catch (error) {
       console.error('Error in suspicious reports detection:', error);
@@ -855,7 +828,7 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
           Detection and analysis of discrepancies between recent supply deliveries and reported zero stock levels. This report identifies cases where inventory was delivered within the detection threshold but subsequently reported as out of stock, indicating potential stock misreporting or rapid depletion requiring investigation.
         </p>
         <p className="text-sm text-gray-500">
-          Detection threshold: {detectionThreshold} days • Now reads actual case quantities from Column O • Only shows cases where supply was delivered BEFORE visit • Period: {data.summary.periodStartDate.toLocaleDateString()} - {data.summary.periodEndDate.toLocaleDateString()}
+          Detection threshold: {detectionThreshold} days • Reads actual case quantities from supply data • Only shows cases where supply was delivered BEFORE visit • Period: {data.summary.periodStartDate.toLocaleDateString()} - {data.summary.periodEndDate.toLocaleDateString()}
         </p>
         <p className="text-xs text-blue-600">
           {stats.total > 0 && `Found ${suspiciousReports.filter(r => r.casesSupplied > 1).length} cases with multiple cases delivered`}
@@ -891,18 +864,7 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
           </button>
         </div>
 
-        {/* Success message if raw supply data is available */}
-        {data.rawSupplyData?.pendingChallansData && (
-          <div className="bg-green-50 border border-green-200 rounded-lg p-3 mt-4">
-            <div className="flex items-center space-x-2">
-              <Package className="w-4 h-4 text-green-600" />
-              <p className="text-sm text-green-800">
-                <strong>✅ Enhanced Case Reading Active:</strong> System is now reading actual case quantities from Column O. 
-                Multi-case deliveries (2, 3, 4+ cases) will be detected and calculated accurately.
-              </p>
-            </div>
-          </div>
-        )}
+
 
         {/* Filters */}
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
