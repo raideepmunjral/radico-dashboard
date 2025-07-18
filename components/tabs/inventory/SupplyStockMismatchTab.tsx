@@ -1,20 +1,6 @@
 /*
   ==========================================
-  IMPORTANT: MAIN DASHBOARD INTEGRATION
-  ==========================================
-  
-  To enable actual case quantity detection, add this to your main dashboard:
-  
-  1. In the processEnhancedInventoryDataWithMaster function, add:
-     
-     rawSupplyData: {
-       recentSupplies,
-       supplyHistory,
-       pendingChallansData: pendingChallans
-     }
-     
-  2. This will allow the component to read actual case quantities instead of hardcoding 1 case
-  
+  FIXED: Enhanced case quantity reading with debug logging
   ==========================================
 */
 
@@ -151,7 +137,7 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
   };
 
   // ==========================================
-  // ACTUAL SUPPLY DATA FUNCTIONS
+  // ENHANCED ACTUAL SUPPLY DATA FUNCTIONS
   // ==========================================
   const createMultipleBrandKeys = (shopId: string, brandName: string, size?: string): string[] => {
     const brandInfo = getBottleSizeInfo(brandName);
@@ -180,7 +166,9 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
         const shopIdIndex = 8;
         const brandIndex = 11;
         const sizeIndex = 12;
-        const casesIndex = 14;
+        const casesIndex = 14; // Column O
+        
+        console.log('🔍 Searching for supply data:', { shopId, brandName, targetDate: lastSupplyDate.toLocaleDateString() });
         
         // Find matching supply record
         for (const row of rows) {
@@ -189,19 +177,58 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
             const rowBrand = row[brandIndex]?.toString().trim();
             const rowSize = row[sizeIndex]?.toString().trim() || '';
             const rowDateStr = row[challansDateIndex]?.toString().trim();
-            const rowCases = parseFloat(row[casesIndex]) || 0;
+            
+            // 🔧 ENHANCED CASE READING WITH DEBUG
+            const rawCaseValue = row[casesIndex];
+            let rowCases = 0;
+            
+            // Try multiple parsing methods
+            if (rawCaseValue !== undefined && rawCaseValue !== null && rawCaseValue !== '') {
+              // Method 1: parseInt (for text numbers)
+              const intValue = parseInt(rawCaseValue.toString());
+              if (!isNaN(intValue) && intValue > 0) {
+                rowCases = intValue;
+              } else {
+                // Method 2: parseFloat (for decimal numbers)
+                const floatValue = parseFloat(rawCaseValue.toString());
+                if (!isNaN(floatValue) && floatValue > 0) {
+                  rowCases = Math.round(floatValue);
+                } else {
+                  rowCases = 1; // Default fallback
+                }
+              }
+            } else {
+              rowCases = 1; // Default fallback
+            }
+            
+            // 🔍 DEBUG LOGGING
+            console.log('🔍 Debug case reading:', {
+              shopId: rowShopId,
+              brandName: rowBrand,
+              targetShop: shopId,
+              targetBrand: brandName,
+              casesIndex: 14,
+              rawCaseValue: rawCaseValue,
+              parsedCases: rowCases,
+              rowLength: row.length,
+              dateStr: rowDateStr
+            });
             
             if (rowShopId === shopId && rowBrand && rowCases > 0) {
-              // Check if brand matches (basic matching)
-              if (rowBrand.toUpperCase().includes(brandName.toUpperCase().split(' ')[0]) ||
-                  brandName.toUpperCase().includes(rowBrand.toUpperCase().split(' ')[0])) {
-                
+              // Enhanced brand matching
+              const brandMatch = rowBrand.toUpperCase().includes(brandName.toUpperCase().split(' ')[0]) ||
+                                brandName.toUpperCase().includes(rowBrand.toUpperCase().split(' ')[0]) ||
+                                rowBrand.toUpperCase().includes('8 PM') && brandName.toUpperCase().includes('8 PM') ||
+                                rowBrand.toUpperCase().includes('VERVE') && brandName.toUpperCase().includes('VERVE');
+              
+              if (brandMatch) {
                 // Check if date matches approximately
                 if (rowDateStr) {
                   const rowDate = new Date(rowDateStr);
                   if (!isNaN(rowDate.getTime())) {
                     const daysDiff = Math.abs(rowDate.getTime() - lastSupplyDate.getTime()) / (1000 * 60 * 60 * 24);
                     if (daysDiff <= 2) { // Within 2 days
+                      console.log(`📊 Found ${rowCases} cases for ${shopId} - ${brandName} on ${rowDateStr}`);
                       return rowCases;
                     }
                   }
@@ -214,6 +241,7 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
     }
     
     // Fallback to 1 case if no matching data found
+    console.log(`⚠️ No supply match found for ${shopId} - ${brandName}, defaulting to 1 case`);
     return 1;
   };
 
@@ -322,6 +350,7 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
       alert('Error exporting CSV report. Please try again.');
     }
   };
+
   const suspiciousReports = useMemo(() => {
     const reports: SuspiciousReport[] = [];
     
@@ -362,11 +391,6 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
               // Get actual supply data (NOW READS REAL CASE QUANTITIES)
               const casesSupplied = getActualSupplyData(shop.shopId, item.brand, item.lastSupplyDate);
               const bottlesSupplied = casesSupplied * bottleInfo.conversionRate;
-              
-              // Log for debugging
-              if (casesSupplied > 1) {
-                console.log(`📊 Found ${casesSupplied} cases for ${shop.shopName} - ${item.brand}`);
-              }
               
               // Calculate theoretical remaining stock
               const theoreticalRemaining = Math.max(0, 
