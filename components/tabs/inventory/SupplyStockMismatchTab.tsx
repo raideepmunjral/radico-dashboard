@@ -229,11 +229,39 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
             }
             
             if (rowShopId === shopId && rowBrand && rowCases > 0) {
-              // Enhanced brand matching
-              const brandMatch = rowBrand.toUpperCase().includes(brandName.toUpperCase().split(' ')[0]) ||
-                                brandName.toUpperCase().includes(rowBrand.toUpperCase().split(' ')[0]) ||
-                                rowBrand.toUpperCase().includes('8 PM') && brandName.toUpperCase().includes('8 PM') ||
-                                rowBrand.toUpperCase().includes('VERVE') && brandName.toUpperCase().includes('VERVE');
+              // 🔧 FIXED: Enhanced brand matching for 8 PM and VERVE
+              const rowBrandUpper = rowBrand.toUpperCase();
+              const brandNameUpper = brandName.toUpperCase();
+              
+              let brandMatch = false;
+              
+              // Special matching for 8 PM products
+              if (rowBrandUpper.includes('8 PM') && brandNameUpper.includes('8 PM')) {
+                if (rowBrandUpper.includes('BLACK') && brandNameUpper.includes('BLACK')) {
+                  brandMatch = true; // 8 PM BLACK variants match
+                }
+              }
+              
+              // Special matching for VERVE products  
+              else if (rowBrandUpper.includes('VERVE') && brandNameUpper.includes('VERVE')) {
+                if (rowBrandUpper.includes('LEMON') && brandNameUpper.includes('LEMON')) {
+                  brandMatch = true; // VERVE LEMON variants match
+                } else if (rowBrandUpper.includes('CRANBERRY') && brandNameUpper.includes('CRANBERRY')) {
+                  brandMatch = true; // VERVE CRANBERRY variants match
+                } else if (rowBrandUpper.includes('GREEN') && brandNameUpper.includes('GREEN')) {
+                  brandMatch = true; // VERVE GREEN APPLE variants match
+                } else if (rowBrandUpper.includes('GRAIN') && brandNameUpper.includes('GRAIN')) {
+                  brandMatch = true; // VERVE GRAIN variants match
+                }
+              }
+              
+              // Fallback: Basic word matching
+              else {
+                const brandWords = brandNameUpper.split(' ');
+                const rowWords = rowBrandUpper.split(' ');
+                const commonWords = brandWords.filter(word => rowWords.includes(word));
+                brandMatch = commonWords.length >= 2; // At least 2 words match
+              }
               
               if (isKotlaDebug) {
                 console.log('🎯 Checking row:', {
