@@ -337,15 +337,57 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
                 }
                 
                 if (brandMatch) {
-                  // Check if date matches approximately
+                  // 🔧 ENHANCED DATE PARSING AND MATCHING
                   if (rowDateStr) {
-                    const rowDate = new Date(rowDateStr);
-                    if (!isNaN(rowDate.getTime())) {
+                    let rowDate = null;
+                    
+                    // Try multiple date parsing methods
+                    const dateFormats = [
+                      () => new Date(rowDateStr), // Default parsing
+                      () => {
+                        // Handle DD-MM-YYYY format: "12-07-2025"
+                        const parts = rowDateStr.split('-');
+                        if (parts.length === 3) {
+                          const day = parseInt(parts[0]);
+                          const month = parseInt(parts[1]) - 1; // JS months are 0-based
+                          const year = parseInt(parts[2]);
+                          return new Date(year, month, day);
+                        }
+                        return null;
+                      },
+                      () => {
+                        // Handle MM-DD-YYYY format: "07-12-2025"
+                        const parts = rowDateStr.split('-');
+                        if (parts.length === 3) {
+                          const month = parseInt(parts[0]) - 1; // JS months are 0-based
+                          const day = parseInt(parts[1]);
+                          const year = parseInt(parts[2]);
+                          return new Date(year, month, day);
+                        }
+                        return null;
+                      }
+                    ];
+                    
+                    // Try each date format until one works
+                    for (const parseMethod of dateFormats) {
+                      try {
+                        const testDate = parseMethod();
+                        if (testDate && !isNaN(testDate.getTime())) {
+                          rowDate = testDate;
+                          break;
+                        }
+                      } catch (e) {
+                        continue;
+                      }
+                    }
+                    
+                    if (rowDate && !isNaN(rowDate.getTime())) {
                       const daysDiff = Math.abs(rowDate.getTime() - lastSupplyDate.getTime()) / (1000 * 60 * 60 * 24);
                       
                       if (isDebugMode) {
                         console.log(`🔍 DATE MATCHING ATTEMPT:`, {
-                          supplyDate: rowDate.toLocaleDateString(),
+                          rawDateString: rowDateStr,
+                          parsedSupplyDate: rowDate.toLocaleDateString(),
                           targetDate: lastSupplyDate.toLocaleDateString(),
                           daysDiff: Math.round(daysDiff * 10) / 10,
                           withinThreshold: daysDiff <= 2,
@@ -378,7 +420,7 @@ const SupplyStockMismatchTab = ({ data }: { data: InventoryData }) => {
                       }
                     } else {
                       if (isDebugMode) {
-                        console.log(`❌ INVALID DATE: ${rowDateStr}`);
+                        console.log(`❌ DATE PARSING FAILED: Could not parse "${rowDateStr}"`);
                       }
                     }
                   } else {
