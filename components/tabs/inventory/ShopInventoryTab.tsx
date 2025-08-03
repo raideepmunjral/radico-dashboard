@@ -71,6 +71,12 @@ interface InventoryData {
   allAgingLocations: Array<any>;
   outOfStockItems: Array<any>;
   visitCompliance: any;
+  // Add supply data for actual case quantities
+  rawSupplyData?: {
+    recentSupplies: Record<string, Date>;
+    supplyHistory: Record<string, Date>;
+    pendingChallansData: any[][];
+  };
 }
 
 interface ShopInventoryFilters {
@@ -102,6 +108,213 @@ const ShopInventoryTab = ({ data }: { data: InventoryData }) => {
   });
   
   const [expandedShop, setExpandedShop] = useState<string | null>(null);
+
+  // ==========================================
+  // BOTTLE SIZE CONVERSION LOGIC (copied from SupplyStockMismatchTab.tsx)
+  // ==========================================
+  const getBottleSizeInfo = (skuName: string): { size: string; conversionRate: number; expectedDailyConsumption: number } => {
+    const sku = skuName.toUpperCase();
+    
+    // Extract size from SKU name
+    if (sku.includes('750') || sku.includes('750ML')) {
+      return { size: '750ml', conversionRate: 12, expectedDailyConsumption: 2 };
+    } else if (sku.includes('375') || sku.includes('375ML')) {
+      return { size: '375ml', conversionRate: 24, expectedDailyConsumption: 4 };
+    } else if (sku.includes('180') || sku.includes('180ML') || sku.includes('180P')) {
+      return { size: '180ml', conversionRate: 48, expectedDailyConsumption: 8 };
+    } else if (sku.includes('90') || sku.includes('90ML') || sku.includes('90P')) {
+      return { size: '90ml', conversionRate: 96, expectedDailyConsumption: 15 };
+    } else if (sku.includes('60') || sku.includes('60ML') || sku.includes('60P')) {
+      return { size: '60ml', conversionRate: 150, expectedDailyConsumption: 25 };
+    }
+    
+    // Default to 750ml if size cannot be determined
+    return { size: '750ml', conversionRate: 12, expectedDailyConsumption: 2 };
+  };
+
+  // ==========================================
+  // ENHANCED ACTUAL SUPPLY DATA FUNCTIONS (copied from SupplyStockMismatchTab.tsx)
+  // ==========================================
+  const createMultipleBrandKeys = (shopId: string, brandName: string, size?: string): string[] => {
+    const brandInfo = getBottleSizeInfo(brandName);
+    const actualSize = size || brandInfo.size.replace('ml', '');
+    
+    const keys = [
+      `${shopId}_${brandName.toUpperCase()}_${actualSize}`,
+      `${shopId}_${brandName.toUpperCase()}`,
+      `${shopId}_${brandName}`,
+    ];
+    
+    return [...new Set(keys)];
+  };
+
+  // 🔧 CASE QUANTITY READING FUNCTION (copied from SupplyStockMismatchTab.tsx)
+  const getActualSupplyData = (shopId: string, brandName: string, lastSupplyDate: Date): number => {
+    // Try to get actual supply data from pending challans
+    if (data.rawSupplyData?.pendingChallansData) {
+      const pendingChallans = data.rawSupplyData.pendingChallansData;
+      
+      if (pendingChallans.length > 1) {
+        const headers = pendingChallans[0];
+        const rows = pendingChallans.slice(1);
+        
+        // 🔧 FIXED COLUMN INDICES - Based on your sheet structure
+        const challansDateIndex = 1;  // Column B
+        const shopIdIndex = 8;         // Column I  
+        const brandIndex = 11;         // Column L
+        const sizeIndex = 12;          // Column M
+        const casesIndex = 14;         // Column O
+        
+        // Find matching supply record
+        for (let i = 0; i < rows.length; i++) {
+          const row = rows[i];
+          
+          if (row.length > Math.max(shopIdIndex, brandIndex, casesIndex)) {
+            const rowShopId = row[shopIdIndex]?.toString().trim();
+            const rowBrand = row[brandIndex]?.toString().trim();
+            const rowSize = row[sizeIndex]?.toString().trim() || '';
+            const rowDateStr = row[challansDateIndex]?.toString().trim();
+            
+            // Check if this row matches our target shop
+            if (rowShopId === shopId) {
+              // 🔧 ENHANCED CASE PARSING
+              const rawCaseValue = row[casesIndex];
+              let rowCases = 1; // Default fallback
+              
+              if (rawCaseValue !== undefined && rawCaseValue !== null) {
+                const caseString = String(rawCaseValue).trim();
+                
+                if (caseString !== '' && caseString !== '0') {
+                  // Method 1: Try direct Number() conversion
+                  const numberValue = Number(caseString);
+                  if (!isNaN(numberValue) && numberValue > 0) {
+                    rowCases = Math.round(numberValue);
+                  } else {
+                    // Method 2: Try parseInt
+                    const intValue = parseInt(caseString);
+                    if (!isNaN(intValue) && intValue > 0) {
+                      rowCases = intValue;
+                    } else {
+                      // Method 3: Try parseFloat
+                      const floatValue = parseFloat(caseString);
+                      if (!isNaN(floatValue) && floatValue > 0) {
+                        rowCases = Math.round(floatValue);
+                      } else {
+                        // Method 4: Try regex to extract numbers
+                        const regexMatch = caseString.match(/\d+/);
+                        if (regexMatch) {
+                          const extractedNumber = parseInt(regexMatch[0]);
+                          if (!isNaN(extractedNumber) && extractedNumber > 0) {
+                            rowCases = extractedNumber;
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+              
+              if (rowBrand && rowCases > 0) {
+                // 🔧 ENHANCED BRAND MATCHING
+                const rowBrandUpper = rowBrand.toUpperCase();
+                const brandNameUpper = brandName.toUpperCase();
+                
+                let brandMatch = false;
+                
+                // Special matching for 8 PM products
+                if (rowBrandUpper.includes('8 PM') && brandNameUpper.includes('8 PM')) {
+                  if (rowBrandUpper.includes('BLACK') && brandNameUpper.includes('BLACK')) {
+                    brandMatch = true; // 8 PM BLACK variants match
+                  }
+                }
+                
+                // Special matching for VERVE products  
+                else if (rowBrandUpper.includes('VERVE') && brandNameUpper.includes('VERVE')) {
+                  if (rowBrandUpper.includes('LEMON') && brandNameUpper.includes('LEMON')) {
+                    brandMatch = true; // VERVE LEMON variants match
+                  } else if (rowBrandUpper.includes('CRANBERRY') && brandNameUpper.includes('CRANBERRY')) {
+                    brandMatch = true; // VERVE CRANBERRY variants match
+                  } else if (rowBrandUpper.includes('GREEN') && brandNameUpper.includes('GREEN')) {
+                    brandMatch = true; // VERVE GREEN APPLE variants match
+                  } else if (rowBrandUpper.includes('GRAIN') && brandNameUpper.includes('GRAIN')) {
+                    brandMatch = true; // VERVE GRAIN variants match
+                  }
+                }
+                
+                // Fallback: Basic word matching
+                else {
+                  const brandWords = brandNameUpper.split(' ');
+                  const rowWords = rowBrandUpper.split(' ');
+                  const commonWords = brandWords.filter(word => rowWords.includes(word));
+                  if (commonWords.length >= 2) {
+                    brandMatch = true; // At least 2 words match
+                  }
+                }
+                
+                if (brandMatch) {
+                  // 🔧 ENHANCED DATE PARSING AND MATCHING
+                  if (rowDateStr) {
+                    let rowDate = null;
+                    
+                    // Try multiple date parsing methods
+                    const dateFormats = [
+                      () => new Date(rowDateStr), // Default parsing
+                      () => {
+                        // Handle DD-MM-YYYY format: "12-07-2025"
+                        const parts = rowDateStr.split('-');
+                        if (parts.length === 3) {
+                          const day = parseInt(parts[0]);
+                          const month = parseInt(parts[1]) - 1; // JS months are 0-based
+                          const year = parseInt(parts[2]);
+                          return new Date(year, month, day);
+                        }
+                        return null;
+                      },
+                      () => {
+                        // Handle MM-DD-YYYY format: "07-12-2025"
+                        const parts = rowDateStr.split('-');
+                        if (parts.length === 3) {
+                          const month = parseInt(parts[0]) - 1; // JS months are 0-based
+                          const day = parseInt(parts[1]);
+                          const year = parseInt(parts[2]);
+                          return new Date(year, month, day);
+                        }
+                        return null;
+                      }
+                    ];
+                    
+                    // Try each date format until one works
+                    for (const parseMethod of dateFormats) {
+                      try {
+                        const testDate = parseMethod();
+                        if (testDate && !isNaN(testDate.getTime())) {
+                          rowDate = testDate;
+                          break;
+                        }
+                      } catch (e) {
+                        continue;
+                      }
+                    }
+                    
+                    if (rowDate && !isNaN(rowDate.getTime())) {
+                      const daysDiff = Math.abs(rowDate.getTime() - lastSupplyDate.getTime()) / (1000 * 60 * 60 * 24);
+                      
+                      if (daysDiff <= 2) { // Within 2 days
+                        return rowCases; // Return the actual parsed case quantity!
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    // Fallback to 1 case if no matching data found
+    return 1;
+  };
 
   // ==========================================
   // OWN HELPER FUNCTIONS
@@ -151,6 +364,67 @@ const ShopInventoryTab = ({ data }: { data: InventoryData }) => {
   };
 
   // ==========================================
+  // ENHANCED CSV EXPORT WITH CASES/BOTTLES
+  // ==========================================
+  const exportToCSV = async () => {
+    if (!data) return;
+
+    try {
+      let csvContent = "data:text/csv;charset=utf-8,";
+      csvContent += `Enhanced ${data.summary.rollingPeriodDays}-Day Rolling Shop Inventory Report with Master Data Integration and Supply Analytics - ` + new Date().toLocaleDateString() + "\n";
+      csvContent += `Period: ${data.summary.periodStartDate.toLocaleDateString()} - ${data.summary.periodEndDate.toLocaleDateString()}\n`;
+      csvContent += `Master Data Coverage: ${data.summary.masterDataIntegration.assignmentCoverage}% (${data.summary.masterDataIntegration.masterDataAssignments} master assignments, ${data.summary.masterDataIntegration.visitDataFallbacks} visit fallbacks)\n\n`;
+      
+      csvContent += "ENHANCED SHOP INVENTORY ANALYSIS WITH MASTER DATA INTEGRATION AND SUPPLY ANALYTICS\n";
+      csvContent += "Shop Name,Shop ID,Department,Salesman,Visit Date,Last Visit Days,Data Source,Brand,Bottle Size,Quantity,Stock Status,Age Days,Age Estimated,Last Supply Date,Supply Source,Supply Status,Cases Delivered,Bottles Delivered,Expected Daily Consumption,Reason No Stock,Advanced Supply Status,Days Since Supply,Days Out of Stock,Recently Restocked\n";
+      
+      Object.values(data.shops).forEach(shop => {
+        Object.values(shop.items).forEach((item: any) => {
+          const stockStatus = item.isInStock ? 'In Stock' : 
+                             item.isOutOfStock ? 'Out of Stock' : 
+                             item.isLowStock ? 'Low Stock' : 'Unknown';
+          
+          const lastSupplyStr = item.lastSupplyDate ? 
+            item.lastSupplyDate.toLocaleDateString('en-GB') : 'No Supply Data';
+          
+          const supplySource = item.agingDataSource === 'recent_supply' ? 'Recent Supply' :
+                             item.agingDataSource === 'historical_supply' ? 'Historical Supply' :
+                             'No Supply Data';
+          
+          const advancedStatus = item.advancedSupplyStatus || 
+                               item.supplyStatus?.replace(/_/g, ' ') || 'Unknown';
+          
+          const visitDateStr = shop.visitDate ? shop.visitDate.toLocaleDateString('en-GB') : 'No Recent Visit';
+          
+          // 🆕 NEW: Calculate bottle size info and supply data
+          const bottleInfo = getBottleSizeInfo(item.brand);
+          let casesDelivered = 'N/A';
+          let bottlesDelivered = 'N/A';
+          
+          if (item.lastSupplyDate) {
+            const cases = getActualSupplyData(shop.shopId, item.brand, item.lastSupplyDate);
+            casesDelivered = cases.toString();
+            bottlesDelivered = (cases * bottleInfo.conversionRate).toString();
+          }
+          
+          csvContent += `"${shop.shopName}","${shop.shopId}","${shop.department}","${shop.salesman}","${visitDateStr}","${shop.lastVisitDays || 'N/A'}","${shop.dataSource}","${item.brand}","${bottleInfo.size}","${item.quantity}","${stockStatus}","${item.ageInDays}","${item.isEstimatedAge ? 'Yes' : 'No'}","${lastSupplyStr}","${supplySource}","${item.supplyStatus.replace(/_/g, ' ')}","${casesDelivered}","${bottlesDelivered}","${bottleInfo.expectedDailyConsumption}","${item.reasonNoStock || 'N/A'}","${advancedStatus}","${item.daysSinceSupply || 'N/A'}","${item.daysOutOfStock || 'N/A'}","${item.suppliedAfterOutOfStock ? 'Yes' : 'No'}"\n`;
+        });
+      });
+
+      const encodedUri = encodeURI(csvContent);
+      const link = document.createElement("a");
+      link.setAttribute("href", encodedUri);
+      link.setAttribute("download", `Enhanced_Master_Integrated_Shop_Inventory_with_Supply_Analytics_${data.summary.rollingPeriodDays}Day_${new Date().toISOString().split('T')[0]}.csv`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (error) {
+      console.error('Error exporting CSV:', error);
+      alert('Error exporting enhanced data. Please try again.');
+    }
+  };
+
+  // ==========================================
   // GET FILTERED DATA
   // ==========================================
   
@@ -166,7 +440,7 @@ const ShopInventoryTab = ({ data }: { data: InventoryData }) => {
     <div className="space-y-6">
       {/* Filter Controls */}
       <div className="bg-white p-4 rounded-lg shadow">
-        <div className="flex flex-wrap gap-4 items-center">
+        <div className="flex flex-wrap gap-4 items-center justify-between mb-4">
           <div className="flex items-center space-x-2">
             <Search className="w-5 h-5 text-gray-400" />
             <input
@@ -178,6 +452,17 @@ const ShopInventoryTab = ({ data }: { data: InventoryData }) => {
             />
           </div>
           
+          {/* 🆕 NEW: Enhanced CSV Export Button */}
+          <button
+            onClick={exportToCSV}
+            className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors text-sm"
+            title="Export enhanced shop inventory with cases/bottles data"
+          >
+            <span>📊 Export Enhanced CSV</span>
+          </button>
+        </div>
+        
+        <div className="flex flex-wrap gap-4 items-center">
           <select
             value={filters.department}
             onChange={(e) => setFilters({ ...filters, department: e.target.value })}
@@ -234,6 +519,7 @@ const ShopInventoryTab = ({ data }: { data: InventoryData }) => {
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900">Master-Integrated Shop Inventory Status</h3>
           <p className="text-sm text-gray-500">Showing {filteredShops.length} shops with master data integration ({data.summary.rollingPeriodDays}-day rolling period)</p>
+          <p className="text-xs text-blue-600 mt-1">✨ Enhanced CSV export now includes Cases Delivered, Bottles Delivered, and Expected Daily Consumption for supply analytics</p>
         </div>
         <div className="divide-y divide-gray-200">
           {filteredShops.map((shop: ShopInventory) => (
@@ -290,60 +576,83 @@ const ShopInventoryTab = ({ data }: { data: InventoryData }) => {
               {expandedShop === shop.shopId && (
                 <div className="mt-4 border-t pt-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {Object.values(shop.items).map((item: InventoryItem) => (
-                      <div key={item.brand} className="border rounded-lg p-3">
-                        <div className="flex items-center justify-between mb-2">
-                          <h5 className="text-sm font-medium text-gray-900 truncate">{item.brand}</h5>
-                          <div className="flex items-center space-x-1">
-                            {item.isInStock ? (
-                              <CheckCircle className="w-4 h-4 text-green-500" />
-                            ) : item.isOutOfStock ? (
-                              <XCircle className="w-4 h-4 text-red-500" />
-                            ) : (
-                              <AlertCircle className="w-4 h-4 text-yellow-500" />
-                            )}
-                            {item.suppliedAfterOutOfStock && (
-                              <div className="relative group">
-                                <Truck className="w-4 h-4 text-blue-500" />
-                                <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 px-2 py-1 text-xs text-white bg-gray-800 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
-                                  Recently Restocked
+                    {Object.values(shop.items).map((item: InventoryItem) => {
+                      // 🆕 NEW: Calculate supply analytics for each item
+                      const bottleInfo = getBottleSizeInfo(item.brand);
+                      let casesDelivered = 'N/A';
+                      let bottlesDelivered = 'N/A';
+                      
+                      if (item.lastSupplyDate) {
+                        const cases = getActualSupplyData(shop.shopId, item.brand, item.lastSupplyDate);
+                        casesDelivered = cases.toString();
+                        bottlesDelivered = (cases * bottleInfo.conversionRate).toString();
+                      }
+                      
+                      return (
+                        <div key={item.brand} className="border rounded-lg p-3">
+                          <div className="flex items-center justify-between mb-2">
+                            <h5 className="text-sm font-medium text-gray-900 truncate">{item.brand}</h5>
+                            <div className="flex items-center space-x-1">
+                              {item.isInStock ? (
+                                <CheckCircle className="w-4 h-4 text-green-500" />
+                              ) : item.isOutOfStock ? (
+                                <XCircle className="w-4 h-4 text-red-500" />
+                              ) : (
+                                <AlertCircle className="w-4 h-4 text-yellow-500" />
+                              )}
+                              {item.suppliedAfterOutOfStock && (
+                                <div className="relative group">
+                                  <Truck className="w-4 h-4 text-blue-500" />
+                                  <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 px-2 py-1 text-xs text-white bg-gray-800 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                                    Recently Restocked
+                                  </div>
                                 </div>
+                              )}
+                            </div>
+                          </div>
+                          <div className="space-y-1">
+                            <div className="text-sm text-gray-600">Quantity: {item.quantity}</div>
+                            <div className="text-sm text-gray-600">Size: {bottleInfo.size}</div>
+                            <div className="text-sm text-gray-600">
+                              Age: {item.ageInDays} days {item.isEstimatedAge && '(est.)'}
+                            </div>
+                            {item.lastSupplyDate && (
+                              <div className="text-xs text-blue-600">
+                                Last Supply: {item.lastSupplyDate.toLocaleDateString('en-GB')}
                               </div>
                             )}
-                          </div>
-                        </div>
-                        <div className="space-y-1">
-                          <div className="text-sm text-gray-600">Quantity: {item.quantity}</div>
-                          <div className="text-sm text-gray-600">
-                            Age: {item.ageInDays} days {item.isEstimatedAge && '(est.)'}
-                          </div>
-                          {item.lastSupplyDate && (
-                            <div className="text-xs text-blue-600">
-                              Last Supply: {item.lastSupplyDate.toLocaleDateString('en-GB')}
-                            </div>
-                          )}
-                          {(item as any).agingDataSource && (
+                            {/* 🆕 NEW: Show supply analytics */}
+                            {casesDelivered !== 'N/A' && (
+                              <div className="text-xs text-green-600">
+                                📦 {casesDelivered} cases = {bottlesDelivered} bottles delivered
+                              </div>
+                            )}
                             <div className="text-xs text-purple-600">
-                              Source: {(item as any).agingDataSource}
+                              Expected consumption: {bottleInfo.expectedDailyConsumption} bottles/day
                             </div>
-                          )}
-                          {item.reasonNoStock && (
-                            <div className="text-xs text-red-600">{item.reasonNoStock}</div>
-                          )}
-                          <div className="text-xs">
-                            <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                              item.supplyStatus === 'current' ? 'bg-green-100 text-green-800' :
-                              item.suppliedAfterOutOfStock ? 'bg-blue-100 text-blue-800' :
-                              item.supplyStatus === 'awaiting_supply' ? 'bg-red-100 text-red-800' :
-                              item.supplyStatus?.startsWith('aging') ? 'bg-yellow-100 text-yellow-800' :
-                              'bg-gray-100 text-gray-800'
-                            }`}>
-                              {getEnhancedSupplyStatusDisplay(item)}
-                            </span>
+                            {(item as any).agingDataSource && (
+                              <div className="text-xs text-purple-600">
+                                Source: {(item as any).agingDataSource}
+                              </div>
+                            )}
+                            {item.reasonNoStock && (
+                              <div className="text-xs text-red-600">{item.reasonNoStock}</div>
+                            )}
+                            <div className="text-xs">
+                              <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                                item.supplyStatus === 'current' ? 'bg-green-100 text-green-800' :
+                                item.suppliedAfterOutOfStock ? 'bg-blue-100 text-blue-800' :
+                                item.supplyStatus === 'awaiting_supply' ? 'bg-red-100 text-red-800' :
+                                item.supplyStatus?.startsWith('aging') ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {getEnhancedSupplyStatusDisplay(item)}
+                              </span>
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               )}
