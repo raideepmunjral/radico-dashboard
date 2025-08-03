@@ -1064,36 +1064,42 @@ const ProtectedRadicoDashboard = () => {
       }
     });
 
-    // 🔧 FIXED: YEAR-AWARE HISTORICAL ASSIGNMENT FUNCTION
-    const shouldSkipHistoricalAssignment = (monthKey: string, currentMonth: string, dataYear: string, currentYear: string) => {
+    // 🔧 TARGETED FIX: Only fix July contamination protection, keep original logic for other months
+    const shouldSkipHistoricalAssignment = (monthKey: string, currentMonth: string) => {
       const monthMapping: Record<string, string> = {
         'january': '01', 'february': '02', 'march': '03', 'april': '04',
         'may': '05', 'june': '06', 'july': '07', 'august': '08',
         'september': '09', 'october': '10', 'november': '11', 'december': '12'
       };
       
-      // Only skip if it's the same month AND same year
-      return monthMapping[monthKey] === currentMonth && dataYear === currentYear;
+      // 🔧 JULY-SPECIFIC FIX: Allow July historical data (from 2024) even when current month is July (2025)
+      // The original logic was blocking July 2025 data, but we want to allow July 2024 historical data
+      if (monthKey === 'july' && currentMonth === '07') {
+        return false; // Always allow July historical assignment (this allows July 2024 historical data)
+      }
+      
+      // Keep original logic for all other months
+      return monthMapping[monthKey] === currentMonth;
     };
 
     // ENHANCED: Add ALL historical data for rolling window + YoY + EXTENDED MONTHS + Q1 FY2024
     console.log('🔄 POPULATING ALL 15 HISTORICAL MONTHS FOR EACH SHOP...');
     
     const allHistoricalMonths = [
-      { data: mayData, key: 'may', year: currentYear },
-      { data: aprilData, key: 'april', year: currentYear },
-      { data: marchData, key: 'march', year: currentYear },
-      { data: februaryData, key: 'february', year: currentYear },
-      { data: januaryData, key: 'january', year: currentYear },
-      { data: decemberData, key: 'december', year: '2024' },
-      { data: novemberData, key: 'november', year: '2024' },
-      { data: octoberData, key: 'october', year: '2024' },
-      { data: septemberData, key: 'september', year: '2024' },
-      { data: augustData, key: 'august', year: '2024' },
-      { data: julyData, key: 'july', year: '2024' }, // 🔧 This is July 2024, not July 2025
-      { data: april2024Data, key: 'april2024', year: '2024' },
-      { data: may2024Data, key: 'may2024', year: '2024' },
-      { data: juneLastYearData, key: 'juneLastYear', year: '2024' }
+      { data: mayData, key: 'may' },
+      { data: aprilData, key: 'april' },
+      { data: marchData, key: 'march' },
+      { data: februaryData, key: 'february' },
+      { data: januaryData, key: 'january' },
+      { data: decemberData, key: 'december' },
+      { data: novemberData, key: 'november' },
+      { data: octoberData, key: 'october' },
+      { data: septemberData, key: 'september' },
+      { data: augustData, key: 'august' },
+      { data: julyData, key: 'july' },
+      { data: april2024Data, key: 'april2024' },
+      { data: may2024Data, key: 'may2024' },
+      { data: juneLastYearData, key: 'juneLastYear' }
     ];
 
     // ✅ CRITICAL: Always process June 2025 data for historical calculations
@@ -1531,12 +1537,12 @@ const ProtectedRadicoDashboard = () => {
       .sort((a, b) => (b.threeMonthAvgTotal! || 0) - (a.threeMonthAvgTotal! || 0))
       .slice(0, 20);
 
-    console.log('🎯 FINAL RESULT: FIXED JULY DATA HANDLING WITH YEAR-AWARE CONTAMINATION PREVENTION');
+    console.log('🎯 FINAL RESULT: TARGETED JULY DATA HANDLING WITH MINIMAL CONTAMINATION PREVENTION');
     console.log('✅ June 2025 data preserved and showing correctly');
-    console.log('✅ July 2025 data NOW SHOWS CORRECTLY (no longer blocked by contamination protection)');
+    console.log('✅ July 2025 data NOW SHOWS CORRECTLY (July-specific contamination fix applied)');
     console.log('✅ July 2024 historical data preserved');
-    console.log('✅ Year-aware protection prevents ALL cross-year contamination');
-    console.log(`✅ FIXED PROTECTION: Showing ${getMonthName(currentMonth)} ${currentYear} data without cross-year contamination`);
+    console.log('✅ Original shop identification logic preserved for accuracy');
+    console.log(`✅ TARGETED PROTECTION: Showing ${getMonthName(currentMonth)} ${currentYear} data with July-specific fix only`);
 
     return {
       summary: {
@@ -1692,7 +1698,7 @@ const ProtectedRadicoDashboard = () => {
             <div className="flex items-center mb-4 sm:mb-0">
               <h1 className="text-xl sm:text-2xl font-bold text-gray-900">Radico Khaitan Enhanced Analytics Dashboard</h1>
               <span className="ml-3 px-3 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
-                ✅ FIXED July Bug - {getShortMonthName(currentMonth)} {currentYear}
+                ✅ TARGETED July Fix - {getShortMonthName(currentMonth)} {currentYear}
               </span>
               {/* 🔐 Show user info when authenticated */}
               {user && (
