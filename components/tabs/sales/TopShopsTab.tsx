@@ -4,7 +4,7 @@ import React, { useState, useMemo } from 'react';
 import { Download, Search, Filter, X, ChevronLeft, ChevronRight } from 'lucide-react';
 
 // ==========================================
-// TYPE DEFINITIONS (UNCHANGED)
+// TYPE DEFINITIONS
 // ==========================================
 
 interface ShopData {
@@ -16,7 +16,7 @@ interface ShopData {
   eightPM: number;
   verve: number;
   
-  // EXISTING: Rolling 4 months (UNCHANGED)
+  // Rolling 4 months
   marchTotal?: number;
   marchEightPM?: number;
   marchVerve?: number;
@@ -30,7 +30,7 @@ interface ShopData {
   juneEightPM?: number;
   juneVerve?: number;
   
-  // NEW: Extended Historical Data (12+ months)
+  // Extended Historical Data
   februaryTotal?: number;
   februaryEightPM?: number;
   februaryVerve?: number;
@@ -56,7 +56,7 @@ interface ShopData {
   julyEightPM?: number;
   julyVerve?: number;
   
-  // EXISTING: YoY comparison (UNCHANGED)
+  // YoY comparison
   juneLastYearTotal?: number;
   juneLastYearEightPM?: number;
   juneLastYearVerve?: number;
@@ -67,7 +67,7 @@ interface ShopData {
   detailedSKUBreakdown?: DetailedSKUData[];
   historicalData?: MonthlyData[];
   
-  // EXISTING: 3-month averages (UNCHANGED)
+  // 3-month averages
   threeMonthAvgTotal?: number;
   threeMonthAvg8PM?: number;
   threeMonthAvgVERVE?: number;
@@ -129,31 +129,44 @@ interface TopShopsFilterState {
   performanceTrend: string;
 }
 
+interface MonthInfo {
+  month: string;
+  shortName: string;
+  fullName: string;
+  year: string;
+  key: string;
+  color: string;
+  isCurrent: boolean;
+}
+
 // ==========================================
-// 🚀 FIXED: 5-MONTH ROLLING WINDOW HELPER FUNCTIONS
+// HELPER FUNCTIONS
 // ==========================================
 
-const getMonthName = (monthNum: string) => {
+const getMonthName = (monthNum: string | number): string => {
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-  return months[parseInt(monthNum) - 1] || 'Unknown';
+  const index = typeof monthNum === 'string' ? parseInt(monthNum) - 1 : monthNum - 1;
+  return months[index] || 'Unknown';
 };
 
-const getShortMonthName = (monthNum: string) => {
+const getShortMonthName = (monthNum: string | number): string => {
   const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  return months[parseInt(monthNum) - 1] || 'Unknown';
+  const index = typeof monthNum === 'string' ? parseInt(monthNum) - 1 : monthNum - 1;
+  return months[index] || 'Unknown';
 };
 
-const getMonthKey = (monthNum: string) => {
+const getMonthKey = (monthNum: string | number): string => {
   const keys = ['january', 'february', 'march', 'april', 'may', 'june',
                 'july', 'august', 'september', 'october', 'november', 'december'];
-  return keys[parseInt(monthNum) - 1] || 'unknown';
+  const index = typeof monthNum === 'string' ? parseInt(monthNum) - 1 : monthNum - 1;
+  return keys[index] || 'unknown';
 };
 
-// 🚀 FIXED: 5-MONTH ROLLING WINDOW CALCULATION
-const get5MonthRollingWindow = (currentMonth: string, currentYear: string) => {
+// 5-MONTH ROLLING WINDOW CALCULATION
+const get5MonthRollingWindow = (currentMonth: string, currentYear: string): MonthInfo[] => {
   const monthNum = parseInt(currentMonth);
   const yearNum = parseInt(currentYear);
-  const months = [];
+  const months: MonthInfo[] = [];
   
   // Calculate last 5 months including current
   for (let i = 4; i >= 0; i--) {
@@ -170,81 +183,81 @@ const get5MonthRollingWindow = (currentMonth: string, currentYear: string) => {
     
     months.push({
       month: targetMonth.toString().padStart(2, '0'),
-      shortName: getShortMonthName(targetMonth.toString()),
-      fullName: getMonthName(targetMonth.toString()),
+      shortName: getShortMonthName(targetMonth),
+      fullName: getMonthName(targetMonth),
       year: targetYear.toString(),
-      key: getMonthKey(targetMonth.toString()), // For data access
-      color: getMonthColor(months.length), // For UI coloring
-      isCurrent: isCurrentMonth // CRITICAL: Flag to identify current month
+      key: getMonthKey(targetMonth),
+      color: getMonthColor(months.length),
+      isCurrent: isCurrentMonth
     });
   }
   
   return months;
 };
 
-// 🚀 NEW: MONTH COLOR CODING FOR UI
-const getMonthColor = (index: number) => {
-  const colors = [
-    'blue', 'green', 'yellow', 'pink', 'red'
-  ];
+// MONTH COLOR CODING FOR UI
+const getMonthColor = (index: number): string => {
+  const colors = ['blue', 'green', 'yellow', 'pink', 'red'];
   return colors[index] || 'gray';
 };
 
-// 🚀 NEW: 5-MONTH ROLLING WINDOW LABEL
-const get5MonthRollingLabel = (currentMonth: string, currentYear: string) => {
+// 5-MONTH ROLLING WINDOW LABEL
+const get5MonthRollingLabel = (currentMonth: string, currentYear: string): string => {
   const window = get5MonthRollingWindow(currentMonth, currentYear);
   return window.map(m => m.shortName).join('-') + ` ${currentYear}`;
 };
 
-// 🚀 CRITICAL FIX: GET SHOP DATA FOR ANY MONTH IN 5-MONTH WINDOW
-const getShopDataForMonth = (shop: any, monthInfo: any, dataType: 'total' | 'eightPM' | 'verve' = 'total') => {
-  // CRITICAL FIX: If this is the current month, use current data fields
-  if (monthInfo.isCurrent) {
-    console.log(`🔧 Getting CURRENT month data for ${shop.shopName}: ${dataType} = ${shop[dataType]}`);
-    return shop[dataType] || 0;
+// FIXED: GET SHOP DATA FOR ANY MONTH IN 5-MONTH WINDOW
+const getShopDataForMonth = (shop: ShopData, monthInfo: MonthInfo, dataType: 'total' | 'eightPM' | 'verve' = 'total'): number => {
+  try {
+    // If this is the current month, use current data fields
+    if (monthInfo.isCurrent) {
+      const value = shop[dataType];
+      return typeof value === 'number' ? value : 0;
+    }
+    
+    // Historical month data - only for previous months
+    let key: string;
+    switch (dataType) {
+      case 'eightPM':
+        key = `${monthInfo.key}EightPM` as keyof ShopData;
+        break;
+      case 'verve':
+        key = `${monthInfo.key}Verve` as keyof ShopData;
+        break;
+      default:
+        key = `${monthInfo.key}Total` as keyof ShopData;
+    }
+    
+    const value = shop[key as keyof ShopData];
+    return typeof value === 'number' ? value : 0;
+  } catch (error) {
+    console.error('Error in getShopDataForMonth:', error);
+    return 0;
   }
-  
-  // Historical month data - only for previous months
-  let key: string;
-  switch (dataType) {
-    case 'eightPM':
-      key = `${monthInfo.key}EightPM`;
-      break;
-    case 'verve':
-      key = `${monthInfo.key}Verve`;
-      break;
-    default:
-      key = `${monthInfo.key}Total`;
-  }
-  
-  const value = shop[key];
-  console.log(`🔧 Getting HISTORICAL data for ${shop.shopName}: ${key} = ${value}`);
-  return typeof value === 'number' ? value : 0;
 };
 
-// 🚀 FIXED: CALCULATE 5-MONTH AVERAGE
-const calculate5MonthAverage = (shop: any, rollingWindow: any[]) => {
-  const totals = rollingWindow.map(month => getShopDataForMonth(shop, month, 'total'));
-  const eightPMs = rollingWindow.map(month => getShopDataForMonth(shop, month, 'eightPM'));
-  const verves = rollingWindow.map(month => getShopDataForMonth(shop, month, 'verve'));
-  
-  const validMonths = rollingWindow.length;
-  
-  console.log(`🔧 5-month calculation for ${shop.shopName}:`, {
-    totals,
-    eightPMs,
-    verves,
-    avgTotal: totals.reduce((sum, val) => sum + val, 0) / validMonths
-  });
-  
-  return {
-    avgTotal: totals.reduce((sum, val) => sum + val, 0) / validMonths,
-    avg8PM: eightPMs.reduce((sum, val) => sum + val, 0) / validMonths,
-    avgVerve: verves.reduce((sum, val) => sum + val, 0) / validMonths
-  };
+// CALCULATE 5-MONTH AVERAGE
+const calculate5MonthAverage = (shop: ShopData, rollingWindow: MonthInfo[]) => {
+  try {
+    const totals = rollingWindow.map(month => getShopDataForMonth(shop, month, 'total'));
+    const eightPMs = rollingWindow.map(month => getShopDataForMonth(shop, month, 'eightPM'));
+    const verves = rollingWindow.map(month => getShopDataForMonth(shop, month, 'verve'));
+    
+    const validMonths = rollingWindow.length;
+    
+    return {
+      avgTotal: totals.reduce((sum, val) => sum + val, 0) / validMonths,
+      avg8PM: eightPMs.reduce((sum, val) => sum + val, 0) / validMonths,
+      avgVerve: verves.reduce((sum, val) => sum + val, 0) / validMonths
+    };
+  } catch (error) {
+    console.error('Error in calculate5MonthAverage:', error);
+    return { avgTotal: 0, avg8PM: 0, avgVerve: 0 };
+  }
 };
 
-// 🚀 NEW: GET MONTH COLOR CLASSES FOR UI
+// GET MONTH COLOR CLASSES FOR UI
 const getMonthColorClasses = (color: string) => {
   const colorMap: Record<string, { bg: string; border: string; text: string }> = {
     blue: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-600' },
@@ -262,24 +275,26 @@ const getMonthColorClasses = (color: string) => {
 // ==========================================
 
 const TopShopsTab = ({ data }: { data: DashboardData }) => {
-  // ==========================================
-  // 🚀 FIXED: 5-MONTH ROLLING WINDOW CALCULATION
-  // ==========================================
-  
+  // 5-MONTH ROLLING WINDOW CALCULATION
   const rollingWindow = useMemo(() => {
-    const window = get5MonthRollingWindow(data.currentMonth, data.currentYear);
-    console.log('🔧 Rolling window calculated:', window);
-    return window;
+    try {
+      return get5MonthRollingWindow(data.currentMonth, data.currentYear);
+    } catch (error) {
+      console.error('Error calculating rolling window:', error);
+      return [];
+    }
   }, [data.currentMonth, data.currentYear]);
 
   const rollingWindowLabel = useMemo(() => {
-    return get5MonthRollingLabel(data.currentMonth, data.currentYear);
+    try {
+      return get5MonthRollingLabel(data.currentMonth, data.currentYear);
+    } catch (error) {
+      console.error('Error calculating rolling window label:', error);
+      return 'Unknown Period';
+    }
   }, [data.currentMonth, data.currentYear]);
 
-  // ==========================================
-  // INTERNAL STATE MANAGEMENT
-  // ==========================================
-  
+  // STATE MANAGEMENT
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(25);
   const [filters, setFilters] = useState<TopShopsFilterState>({
@@ -290,40 +305,48 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
     performanceTrend: ''
   });
 
-  // ==========================================
-  // 🚀 FIXED: ENHANCED SHOP DATA WITH 5-MONTH AVERAGES
-  // ==========================================
-
+  // ENHANCED SHOP DATA WITH 5-MONTH AVERAGES
   const shopsWithEnhancedMetrics = useMemo(() => {
-    return data.allShopsComparison.map(shop => {
-      const fiveMonthAvg = calculate5MonthAverage(shop, rollingWindow);
-      return {
-        ...shop,
-        fiveMonthAvgTotal: fiveMonthAvg.avgTotal,
-        fiveMonthAvg8PM: fiveMonthAvg.avg8PM,
-        fiveMonthAvgVerve: fiveMonthAvg.avgVerve
-      };
-    }).sort((a, b) => (b.fiveMonthAvgTotal || 0) - (a.fiveMonthAvgTotal || 0)); // Sort by 5-month average
+    try {
+      if (!data.allShopsComparison || !Array.isArray(data.allShopsComparison)) {
+        return [];
+      }
+
+      return data.allShopsComparison.map(shop => {
+        const fiveMonthAvg = calculate5MonthAverage(shop, rollingWindow);
+        return {
+          ...shop,
+          fiveMonthAvgTotal: fiveMonthAvg.avgTotal,
+          fiveMonthAvg8PM: fiveMonthAvg.avg8PM,
+          fiveMonthAvgVerve: fiveMonthAvg.avgVerve
+        };
+      }).sort((a, b) => (b.fiveMonthAvgTotal || 0) - (a.fiveMonthAvgTotal || 0));
+    } catch (error) {
+      console.error('Error processing shops with enhanced metrics:', error);
+      return [];
+    }
   }, [data.allShopsComparison, rollingWindow]);
 
-  // ==========================================
-  // INTERNAL UTILITY FUNCTIONS
-  // ==========================================
-
+  // FILTERING LOGIC
   const getFilteredTopShops = useMemo(() => {
     return (shops: any[]): any[] => {
-      return shops.filter(shop => {
-        const matchesDepartment = !filters.department || shop.department === filters.department;
-        const matchesSalesman = !filters.salesman || shop.salesman === filters.salesman;
-        const matchesSearch = !filters.searchText || 
-          shop.shopName.toLowerCase().includes(filters.searchText.toLowerCase()) ||
-          shop.department.toLowerCase().includes(filters.searchText.toLowerCase()) ||
-          shop.salesman.toLowerCase().includes(filters.searchText.toLowerCase());
-        const matchesMinCases = !filters.minCases || (shop.fiveMonthAvgTotal >= parseFloat(filters.minCases));
-        const matchesTrend = !filters.performanceTrend || shop.monthlyTrend === filters.performanceTrend;
-        
-        return matchesDepartment && matchesSalesman && matchesSearch && matchesMinCases && matchesTrend;
-      });
+      try {
+        return shops.filter(shop => {
+          const matchesDepartment = !filters.department || shop.department === filters.department;
+          const matchesSalesman = !filters.salesman || shop.salesman === filters.salesman;
+          const matchesSearch = !filters.searchText || 
+            shop.shopName?.toLowerCase().includes(filters.searchText.toLowerCase()) ||
+            shop.department?.toLowerCase().includes(filters.searchText.toLowerCase()) ||
+            shop.salesman?.toLowerCase().includes(filters.searchText.toLowerCase());
+          const matchesMinCases = !filters.minCases || (shop.fiveMonthAvgTotal >= parseFloat(filters.minCases));
+          const matchesTrend = !filters.performanceTrend || shop.monthlyTrend === filters.performanceTrend;
+          
+          return matchesDepartment && matchesSalesman && matchesSearch && matchesMinCases && matchesTrend;
+        });
+      } catch (error) {
+        console.error('Error filtering shops:', error);
+        return shops;
+      }
     };
   }, [filters]);
 
@@ -333,17 +356,29 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
   const endIndex = startIndex + itemsPerPage;
   const currentShops = filteredShops.slice(startIndex, endIndex);
 
-  const departments = [...new Set(data.allShopsComparison.map(shop => shop.department))].sort();
-  const salesmen = [...new Set(data.allShopsComparison.map(shop => shop.salesman))].sort();
-
-  // ==========================================
-  // 🔧 UPDATED: EXPORT FUNCTION WITH DYNAMIC 5-MONTH LABELS
-  // ==========================================
-
-  const exportTopShopsToCSV = async () => {
-    if (!data) return;
-
+  const departments = useMemo(() => {
     try {
+      return [...new Set(data.allShopsComparison?.map(shop => shop.department).filter(Boolean))].sort();
+    } catch (error) {
+      console.error('Error extracting departments:', error);
+      return [];
+    }
+  }, [data.allShopsComparison]);
+
+  const salesmen = useMemo(() => {
+    try {
+      return [...new Set(data.allShopsComparison?.map(shop => shop.salesman).filter(Boolean))].sort();
+    } catch (error) {
+      console.error('Error extracting salesmen:', error);
+      return [];
+    }
+  }, [data.allShopsComparison]);
+
+  // EXPORT FUNCTION
+  const exportTopShopsToCSV = async () => {
+    try {
+      if (!data) return;
+
       let csvContent = "data:text/csv;charset=utf-8,";
       csvContent += `Radico Top Shops Detailed Analysis Report - ${new Date().toLocaleDateString()}\n`;
       csvContent += `Report Period: ${rollingWindowLabel}\n`;
@@ -361,7 +396,7 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
       csvContent += "\n";
       
       csvContent += "EXECUTIVE SUMMARY\n";
-      csvContent += "Total Shops," + data.summary.totalShops + "\n";
+      csvContent += "Total Shops," + (data.summary?.totalShops || 0) + "\n";
       csvContent += "Filtered Shops," + filteredShops.length + "\n";
       csvContent += "Top 5-Month Avg," + (filteredShops[0]?.fiveMonthAvgTotal?.toFixed(1) || 0) + " cases\n\n";
       
@@ -377,7 +412,7 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
       csvContent += csvHeaders;
       
       filteredShops.forEach((shop, index) => {
-        let csvRow = `${index + 1},"${shop.shopName}","${shop.department}","${shop.salesman}"`;
+        let csvRow = `${index + 1},"${shop.shopName || ''}","${shop.department || ''}","${shop.salesman || ''}"`;
         
         // Add dynamic month data
         rollingWindow.forEach(month => {
@@ -404,12 +439,13 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
     }
   };
 
-  // ==========================================
-  // 🔧 FIXED: MOBILE CARD COMPONENT WITH CORRECT CURRENT MONTH DATA
-  // ==========================================
-
+  // MOBILE CARD COMPONENT
   const MobileShopCard = ({ shop, index }: { shop: any, index: number }) => {
     const currentMonthInfo = rollingWindow.find(m => m.isCurrent) || rollingWindow[4];
+    
+    if (!currentMonthInfo) {
+      return <div>Error loading shop data</div>;
+    }
     
     return (
       <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
@@ -425,8 +461,8 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
                 </span>
               )}
             </div>
-            <h3 className="font-medium text-gray-900 text-sm">{shop.shopName}</h3>
-            <p className="text-xs text-gray-500">{shop.department} • {shop.salesman}</p>
+            <h3 className="font-medium text-gray-900 text-sm">{shop.shopName || 'Unknown Shop'}</h3>
+            <p className="text-xs text-gray-500">{shop.department || 'Unknown'} • {shop.salesman || 'Unknown'}</p>
           </div>
           <div className="text-right">
             <div className="text-lg font-bold text-blue-600">{shop.fiveMonthAvgTotal?.toFixed(1) || '0.0'}</div>
@@ -434,7 +470,7 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
           </div>
         </div>
         
-        {/* Current Month Performance - FIXED */}
+        {/* Current Month Performance */}
         <div className="grid grid-cols-3 gap-3 mb-3 p-3 bg-red-50 rounded-lg">
           <div className="text-center">
             <div className="text-sm font-bold text-gray-900">
@@ -456,12 +492,12 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
           </div>
         </div>
 
-        {/* 5-Month Historical Performance - FIXED */}
+        {/* 5-Month Historical Performance */}
         <div className="grid grid-cols-5 gap-1 mb-3">
           {rollingWindow.map((month, idx) => {
             const colorClasses = getMonthColorClasses(month.color);
             return (
-              <div key={month.month} className={`text-center p-2 ${colorClasses.bg} rounded`}>
+              <div key={`${month.month}-${idx}`} className={`text-center p-2 ${colorClasses.bg} rounded`}>
                 <div className="text-sm font-medium text-gray-900">
                   {getShopDataForMonth(shop, month, 'total').toLocaleString()}
                 </div>
@@ -500,20 +536,17 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
     );
   };
 
-  // ==========================================
   // RENDER
-  // ==========================================
-
   return (
     <div className="space-y-6">
-      {/* Summary Cards - Mobile Responsive */}
+      {/* Summary Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
         <div className="bg-white p-3 sm:p-6 rounded-lg shadow">
           <h3 className="text-sm sm:text-lg font-medium text-gray-900 mb-1 sm:mb-2">Total Shops</h3>
           <div className="text-xl sm:text-2xl font-bold text-blue-600">{filteredShops.length}</div>
           <div className="text-xs sm:text-sm text-gray-500">
             {filters.department || filters.salesman || filters.searchText || filters.minCases || filters.performanceTrend ? 
-              `Filtered from ${data.allShopsComparison.length}` : 
+              `Filtered from ${data.allShopsComparison?.length || 0}` : 
               'All shops'}
           </div>
         </div>
@@ -543,7 +576,7 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-      {/* Enhanced Filters - Mobile Responsive */}
+      {/* Enhanced Filters */}
       <div className="bg-white p-4 rounded-lg shadow">
         <div className="space-y-4">
           {/* Search Row */}
@@ -558,7 +591,7 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
             />
           </div>
           
-          {/* Filters Row - Responsive Grid */}
+          {/* Filters Row */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             <select
               value={filters.department}
@@ -624,8 +657,8 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
           {/* Results Count */}
           <div className="text-sm text-gray-500 text-center sm:text-left">
             Showing {filteredShops.length} shops
-            {filteredShops.length !== data.allShopsComparison.length && (
-              <span> (filtered from {data.allShopsComparison.length} total)</span>
+            {filteredShops.length !== (data.allShopsComparison?.length || 0) && (
+              <span> (filtered from {data.allShopsComparison?.length || 0} total)</span>
             )}
           </div>
         </div>
@@ -645,7 +678,7 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
           
           <div className="p-4">
             {currentShops.map((shop, index) => (
-              <MobileShopCard key={shop.shopId} shop={shop} index={index} />
+              <MobileShopCard key={shop.shopId || index} shop={shop} index={index} />
             ))}
           </div>
 
@@ -679,7 +712,7 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-      {/* 🚀 FIXED: Desktop View - Enhanced Table with Correct Current Month Data */}
+      {/* Desktop View - Enhanced Table */}
       <div className="hidden lg:block bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900">
@@ -706,12 +739,12 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
                   Department
                 </th>
                 
-                {/* Dynamic Month Columns - FIXED */}
+                {/* Dynamic Month Columns */}
                 {rollingWindow.map((month, index) => {
                   const colorClasses = getMonthColorClasses(month.color);
                   const isCurrentMonth = month.isCurrent;
                   return (
-                    <React.Fragment key={month.month}>
+                    <React.Fragment key={`${month.month}-${index}`}>
                       <th className={`px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider ${colorClasses.bg} border-l border-r ${isCurrentMonth ? 'ring-2 ring-red-300' : ''}`}>
                         {month.shortName} Total {isCurrentMonth ? '(Current)' : ''}
                       </th>
@@ -751,7 +784,7 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
             <tbody className="bg-white divide-y divide-gray-200">
               {currentShops.map((shop, index) => {
                 return (
-                  <tr key={shop.shopId} className={`hover:bg-gray-50 ${index < 3 ? 'bg-yellow-50' : ''}`}>
+                  <tr key={shop.shopId || index} className={`hover:bg-gray-50 ${index < 3 ? 'bg-yellow-50' : ''}`}>
                     {/* Sticky columns */}
                     <td className="sticky left-0 z-10 bg-white px-3 py-4 whitespace-nowrap text-sm font-medium text-gray-900 border-r">
                       <div className="flex items-center">
@@ -766,14 +799,14 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
                       </div>
                     </td>
                     <td className="sticky left-12 z-10 bg-white px-3 py-4 text-sm text-gray-900 border-r min-w-48">
-                      <div className="max-w-xs truncate font-medium">{shop.shopName}</div>
-                      <div className="text-xs text-gray-500 truncate">{shop.salesman}</div>
+                      <div className="max-w-xs truncate font-medium">{shop.shopName || 'Unknown Shop'}</div>
+                      <div className="text-xs text-gray-500 truncate">{shop.salesman || 'Unknown'}</div>
                     </td>
                     <td className="sticky left-60 z-10 bg-white px-3 py-4 whitespace-nowrap text-sm text-gray-900 border-r">
-                      {shop.department}
+                      {shop.department || 'Unknown'}
                     </td>
                     
-                    {/* FIXED: Dynamic Month Data Columns */}
+                    {/* Dynamic Month Data Columns */}
                     {rollingWindow.map((month, monthIndex) => {
                       const colorClasses = getMonthColorClasses(month.color);
                       const total = getShopDataForMonth(shop, month, 'total');
@@ -782,7 +815,7 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
                       const isCurrentMonth = month.isCurrent;
                       
                       return (
-                        <React.Fragment key={month.month}>
+                        <React.Fragment key={`${month.month}-${monthIndex}`}>
                           <td className={`px-3 py-4 whitespace-nowrap text-sm text-center font-medium ${colorClasses.bg} border-l border-r ${isCurrentMonth ? 'ring-2 ring-red-300 bg-red-50' : ''}`}>
                             {total.toLocaleString()}
                           </td>
@@ -849,12 +882,12 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
           </table>
         </div>
 
-        {/* Enhanced Pagination - Desktop Only */}
+        {/* Enhanced Pagination */}
         <div className="px-6 py-3 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center">
           <div className="text-sm text-gray-700 mb-2 sm:mb-0">
             Showing {startIndex + 1} to {Math.min(endIndex, filteredShops.length)} of {filteredShops.length} shops
-            {filteredShops.length !== data.allShopsComparison.length && (
-              <span className="text-gray-500"> (filtered from {data.allShopsComparison.length} total)</span>
+            {filteredShops.length !== (data.allShopsComparison?.length || 0) && (
+              <span className="text-gray-500"> (filtered from {data.allShopsComparison?.length || 0} total)</span>
             )}
           </div>
           <div className="flex space-x-2">
@@ -879,7 +912,7 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-      {/* FIXED: Data Integration Status */}
+      {/* Data Integration Status */}
       <div className="bg-green-50 p-4 sm:p-6 rounded-lg">
         <h3 className="text-lg font-medium text-green-900 mb-4">✅ FIXED: Current Month Data Accuracy</h3>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
@@ -887,18 +920,18 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
             <h4 className="font-medium text-green-900 mb-2">🔧 Data Source Logic Fixed:</h4>
             <div className="space-y-1 text-sm text-green-700">
               <div>• <strong>Current Month ({getMonthName(data.currentMonth)} {data.currentYear}):</strong> Uses `total`, `eightPM`, `verve` fields</div>
-              <div>• <strong>Historical Months:</strong> Uses `${monthKey}Total`, `${monthKey}EightPM`, `${monthKey}Verve` fields</div>
+              <div>• <strong>Historical Months:</strong> Uses `monthKeyTotal`, `monthKeyEightPM`, `monthKeyVerve` fields</div>
               <div>• <strong>Problem Fixed:</strong> No more confusion between August 2025 (current) vs August 2024 (historical)</div>
-              <div>• <strong>Console Logging:</strong> Active for verification</div>
+              <div>• <strong>Error Handling:</strong> Added try-catch blocks for stability</div>
             </div>
           </div>
           <div>
             <h4 className="font-medium text-green-900 mb-2">Current Month Verification:</h4>
             <div className="space-y-1 text-sm text-green-700">
               <div>• <strong>Current Month:</strong> {getMonthName(data.currentMonth)} {data.currentYear}</div>
-              <div>• <strong>Total Sales:</strong> {data.summary.totalSales.toLocaleString()} cases</div>
-              <div>• <strong>8PM:</strong> {data.summary.total8PM.toLocaleString()} cases</div>
-              <div>• <strong>VERVE:</strong> {data.summary.totalVERVE.toLocaleString()} cases</div>
+              <div>• <strong>Total Sales:</strong> {data.summary?.totalSales?.toLocaleString() || 0} cases</div>
+              <div>• <strong>8PM:</strong> {data.summary?.total8PM?.toLocaleString() || 0} cases</div>
+              <div>• <strong>VERVE:</strong> {data.summary?.totalVERVE?.toLocaleString() || 0} cases</div>
               <div>• <strong>Status:</strong> ✅ Matches overview totals</div>
             </div>
           </div>
@@ -912,6 +945,8 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
             <strong>After:</strong> August column correctly shows current `total` field (August 2025 data)
             <br />
             <strong>Result:</strong> Shop-level data now matches overview totals exactly
+            <br />
+            <strong>Stability:</strong> Added comprehensive error handling to prevent client-side exceptions
           </div>
         </div>
       </div>
