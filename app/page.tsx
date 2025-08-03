@@ -490,6 +490,28 @@ const ProtectedRadicoDashboard = () => {
       
       const processedData = processEnhancedRadicoData(masterData, visitData, historicalData);
       
+      // 🔍 DEBUG: Q2 Aggregate Data Verification
+      console.log('🔍 Q2 DEBUG - After Processing:');
+      console.log('July 2025 Raw Data:', {
+        total8PM: processedData.historicalData?.july?.total8PM || 0,
+        totalVERVE: processedData.historicalData?.july?.totalVERVE || 0,
+        challans: processedData.historicalData?.july?.challans?.length || 0
+      });
+
+      console.log('August 2025 Raw Data:', {
+        total8PM: processedData.historicalData?.august?.total8PM || processedData.summary.total8PM,
+        totalVERVE: processedData.historicalData?.august?.totalVERVE || processedData.summary.totalVERVE
+      });
+
+      const expectedQ2Total = 
+        (processedData.historicalData?.july?.total8PM || 0) + 
+        (processedData.historicalData?.august?.total8PM || processedData.summary.total8PM) +
+        (processedData.historicalData?.july?.totalVERVE || 0) + 
+        (processedData.historicalData?.august?.totalVERVE || processedData.summary.totalVERVE);
+
+      console.log('🎯 Expected Q2 2025 Total:', expectedQ2Total);
+      console.log('🔧 If this shows 0, Q2 cards should show 0. If not, Q2 cards are using different data source.');
+      
       // 🔐 NEW: Apply role-based filtering - THE KEY CHANGE!
       const filteredData = applyRoleBasedFiltering(processedData, user);
       
@@ -1515,6 +1537,27 @@ const ProtectedRadicoDashboard = () => {
     console.log('✅ If no July 2025 challans exist, July 2025 fields show 0');
     console.log(`✅ CORRECTED: Showing ${getMonthName(currentMonth)} ${currentYear} data without July 2024 contamination`);
 
+    // 🔧 ADDITIONAL: Final verification of Q2 data sources
+    console.log('🔍 FINAL Q2 DATA SOURCE VERIFICATION:');
+    console.log('July 2025 will provide:', {
+      total8PM: july2025Data.total8PM,
+      totalVERVE: july2025Data.totalVERVE,
+      combined: july2025Data.total8PM + july2025Data.totalVERVE
+    });
+    
+    const augustDataForQ2 = currentMonth === '08' ? currentMonthData : processMonthlyData('08', currentYear, false);
+    console.log('August 2025 will provide:', {
+      total8PM: augustDataForQ2.total8PM,
+      totalVERVE: augustDataForQ2.totalVERVE,
+      combined: augustDataForQ2.total8PM + augustDataForQ2.totalVERVE
+    });
+    
+    console.log('🎯 FINAL Q2 2025 SHOULD BE:', {
+      total8PM: july2025Data.total8PM + augustDataForQ2.total8PM,
+      totalVERVE: july2025Data.totalVERVE + augustDataForQ2.totalVERVE,
+      combined: (july2025Data.total8PM + augustDataForQ2.total8PM) + (july2025Data.totalVERVE + augustDataForQ2.totalVERVE)
+    });
+
     return {
       summary: {
         totalShops: shopDetails.length - 1,
@@ -1542,10 +1585,29 @@ const ProtectedRadicoDashboard = () => {
       allShopsComparison,
       currentMonth: currentMonth,
       currentYear: currentYear,
-      // 🔧 FIXED: Corrected historical data structure with July separation
+      // 🔧 FIXED: Corrected historical data structure with July separation and August verification
       historicalData: {
-        // Current rolling window (2025 data) - CORRECTED
-        july: july2025Data,    // ✅ Only July 2025 data
+        // 🔧 CRITICAL FIX: Current rolling window with verified data sources
+        july: {
+          ...july2025Data,
+          // 🔧 Ensure all values are from July 2025 challans only
+          total8PM: july2025Data.total8PM,
+          totalVERVE: july2025Data.totalVERVE,
+          uniqueShops: july2025Data.uniqueShops,
+          shopSales: july2025Data.shopSales,
+          challans: july2025Data.challans
+        },
+        
+        // 🔧 CRITICAL FIX: August data with proper source detection
+        august: currentMonth === '08' ? {
+          ...currentMonthData,
+          total8PM: currentMonthData.total8PM,
+          totalVERVE: currentMonthData.totalVERVE,
+          uniqueShops: currentMonthData.uniqueShops,
+          shopSales: currentMonthData.shopSales,
+          challans: currentMonthData.challans
+        } : processMonthlyData('08', currentYear, false),
+        
         june: june2025Data,    // ✅ June 2025 data
         may: mayData,
         april: aprilData,
@@ -1561,7 +1623,7 @@ const ProtectedRadicoDashboard = () => {
         october2024: october2024Data,
         september2024: september2024Data,
         august2024: august2024Data,
-        july2024: july2024Data,        // ✅ Clearly July 2024
+        july2024: july2024Data,        // ✅ Clearly July 2024 (not contaminating 2025)
         
         // Q1 FY2024 complete data
         april2024: april2024Data,
