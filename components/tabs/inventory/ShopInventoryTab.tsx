@@ -490,53 +490,187 @@ const ShopInventoryTab = ({ data }: { data: InventoryData }) => {
               
               const visitDateStr = shop.visitDate ? shop.visitDate.toLocaleDateString('en-GB') : 'No Recent Visit';
               
-              // 🔧 SIMPLIFIED SUPPLY DATA CALCULATION WITH FALLBACKS
-              let bottleSize = '750ml';
-              let casesDelivered = '1';
-              let bottlesDelivered = '12';
-              let expectedDailyConsumption = '2';
-              
+              // 🔧 REAL SUPPLY DATA READING - FIXED TO MATCH YOUR ACTUAL SHEET STRUCTURE
               try {
-                // Simple bottle size detection without complex processing
+                // Simple bottle size detection for conversion rates
                 const brandUpper = (item.brand || '').toUpperCase();
+                let conversionRate = 12; // Default for 750ml
+                
                 if (brandUpper.includes('180')) {
                   bottleSize = '180ml';
-                  casesDelivered = '6'; // Default for 180ml based on your data
-                  bottlesDelivered = '288'; // 6 cases × 48 bottles
+                  conversionRate = 48; // 48 bottles per case for 180ml
                   expectedDailyConsumption = '8';
                 } else if (brandUpper.includes('375')) {
                   bottleSize = '375ml';
-                  casesDelivered = '2';
-                  bottlesDelivered = '48'; // 2 cases × 24 bottles
+                  conversionRate = 24; // 24 bottles per case for 375ml
                   expectedDailyConsumption = '4';
                 } else if (brandUpper.includes('750')) {
                   bottleSize = '750ml';
-                  casesDelivered = '2';
-                  bottlesDelivered = '24'; // 2 cases × 12 bottles
+                  conversionRate = 12; // 12 bottles per case for 750ml
                   expectedDailyConsumption = '2';
                 } else if (brandUpper.includes('90')) {
                   bottleSize = '90ml';
-                  casesDelivered = '1';
-                  bottlesDelivered = '96'; // 1 case × 96 bottles
+                  conversionRate = 96; // 96 bottles per case for 90ml
                   expectedDailyConsumption = '15';
                 } else if (brandUpper.includes('60')) {
                   bottleSize = '60ml';
-                  casesDelivered = '1';
-                  bottlesDelivered = '150'; // 1 case × 150 bottles
+                  conversionRate = 150; // 150 bottles per case for 60ml
                   expectedDailyConsumption = '25';
                 }
 
-                // Only try complex supply data lookup for specific shops if needed
-                if (item.lastSupplyDate && shop.shopId === '01/2024/0193') {
-                  // Special handling for GOPAL HEIGHTS to get the correct 6 cases for 180ml
-                  if (brandUpper.includes('180') && brandUpper.includes('CRANBERRY')) {
-                    casesDelivered = '6'; // Correct value from your sheet
-                    bottlesDelivered = '288';
+                // 🆕 NOW TRY TO READ ACTUAL SUPPLY DATA FROM YOUR SHEET
+                if (item.lastSupplyDate && data.rawSupplyData?.pendingChallansData) {
+                  const pendingChallans = data.rawSupplyData.pendingChallansData;
+                  
+                  if (pendingChallans.length > 1) {
+                    const rows = pendingChallans.slice(1); // Skip header
+                    
+                    // 🔧 CORRECT COLUMN INDICES BASED ON YOUR SHEET STRUCTURE
+                    const challansDateIndex = 0;  // Column A: challansdate
+                    const shopIdIndex = 8;         // Column I: Shop_Id  
+                    const brandIndex = 11;         // Column L: brand
+                    const sizeIndex = 12;          // Column M: size
+                    const packIndex = 13;          // Column N: pack
+                    const casesIndex = 14;         // Column O: cases ← THE REAL CASES VALUE!
+                    
+                    let bestMatch = null;
+                    let bestMatchStrength = 0;
+                    
+                    for (let i = 0; i < rows.length; i++) {
+                      try {
+                        const row = rows[i];
+                        
+                        if (row && row.length > casesIndex) {
+                          const rowShopId = row[shopIdIndex]?.toString().trim();
+                          const rowBrand = row[brandIndex]?.toString().trim();
+                          const rowSize = row[sizeIndex]?.toString().trim();
+                          const rowDateStr = row[challansDateIndex]?.toString().trim();
+                          const rowCases = row[casesIndex];
+                          
+                          // 🎯 EXACT SHOP ID MATCH
+                          if (rowShopId === shop.shopId) {
+                            
+                            // 🎯 BRAND MATCHING FOR VERVE/8PM PRODUCTS
+                            let brandMatch = false;
+                            let matchStrength = 0;
+                            
+                            const rowBrandUpper = rowBrand?.toUpperCase() || '';
+                            
+                            // VERVE product matching
+                            if (rowBrandUpper.includes('VERVE') && brandUpper.includes('VERVE')) {
+                              if (rowBrandUpper.includes('CRANBERRY') && brandUpper.includes('CRANBERRY')) {
+                                brandMatch = true;
+                                matchStrength += 10; // High score for exact variant match
+                              } else if (rowBrandUpper.includes('LEMON') && brandUpper.includes('LEMON')) {
+                                brandMatch = true;
+                                matchStrength += 10;
+                              } else if (rowBrandUpper.includes('GREEN') && brandUpper.includes('GREEN')) {
+                                brandMatch = true;
+                                matchStrength += 10;
+                              } else if (rowBrandUpper.includes('GRAIN') && brandUpper.includes('GRAIN')) {
+                                brandMatch = true;
+                                matchStrength += 10;
+                              }
+                            }
+                            
+                            // 8 PM product matching  
+                            else if (rowBrandUpper.includes('8 PM') && brandUpper.includes('8 PM')) {
+                              if (rowBrandUpper.includes('BLACK') && brandUpper.includes('BLACK')) {
+                                brandMatch = true;
+                                matchStrength += 10;
+                              }
+                            }
+                            
+                            // 🎯 SIZE MATCHING BOOST (CRITICAL!)
+                            if (brandMatch && rowSize) {
+                              const supplySizeNumber = rowSize.replace(/[^0-9]/g, '');
+                              const visitSizeNumber = bottleSize.replace(/[^0-9]/g, '');
+                              
+                              if (supplySizeNumber === visitSizeNumber) {
+                                matchStrength += 20; // MAJOR boost for exact size match
+                              }
+                            }
+                            
+                            // 🎯 DATE MATCHING
+                            if (brandMatch && rowDateStr) {
+                              let rowDate = null;
+                              
+                              // Try parsing DD-MM-YYYY format first
+                              try {
+                                const parts = rowDateStr.split('-');
+                                if (parts.length === 3) {
+                                  const day = parseInt(parts[0]);
+                                  const month = parseInt(parts[1]) - 1;
+                                  const year = parseInt(parts[2]);
+                                  rowDate = new Date(year, month, day);
+                                }
+                              } catch (e) {
+                                // Try default parsing
+                                rowDate = new Date(rowDateStr);
+                              }
+                              
+                              if (rowDate && !isNaN(rowDate.getTime())) {
+                                const daysDiff = Math.abs(rowDate.getTime() - item.lastSupplyDate.getTime()) / (1000 * 60 * 60 * 24);
+                                
+                                if (daysDiff <= 3) { // Within 3 days
+                                  matchStrength += 5;
+                                  
+                                  // 🎯 PARSE THE ACTUAL CASES VALUE
+                                  let actualCases = 1;
+                                  if (rowCases !== undefined && rowCases !== null) {
+                                    const caseNum = parseFloat(String(rowCases).trim());
+                                    if (!isNaN(caseNum) && caseNum > 0) {
+                                      actualCases = Math.round(caseNum);
+                                    }
+                                  }
+                                  
+                                  // Store if this is the best match so far
+                                  if (matchStrength > bestMatchStrength) {
+                                    bestMatch = {
+                                      cases: actualCases,
+                                      strength: matchStrength,
+                                      date: rowDate,
+                                      brand: rowBrand,
+                                      size: rowSize
+                                    };
+                                    bestMatchStrength = matchStrength;
+                                  }
+                                }
+                              }
+                            }
+                          }
+                        }
+                      } catch (rowError) {
+                        // Skip problematic rows
+                        continue;
+                      }
+                    }
+                    
+                    // 🎯 USE THE BEST MATCH IF FOUND
+                    if (bestMatch) {
+                      casesDelivered = bestMatch.cases.toString();
+                      bottlesDelivered = (bestMatch.cases * conversionRate).toString();
+                      
+                      // Debug log for GOPAL HEIGHTS to verify
+                      if (shop.shopId === '01/2024/0193' && processedItems % 50 === 0) {
+                        console.log(`✅ REAL SUPPLY DATA FOUND: ${shop.shopName} - ${item.brand} - ${bottleSize} - ${casesDelivered} cases from supply sheet`);
+                      }
+                    } else {
+                      // Use conversion rate based fallbacks
+                      casesDelivered = '2'; // Standard fallback
+                      bottlesDelivered = (2 * conversionRate).toString();
+                    }
                   }
+                } else {
+                  // Use conversion rate based fallbacks when no supply date
+                  casesDelivered = '2';
+                  bottlesDelivered = (2 * conversionRate).toString();
                 }
               } catch (supplyError) {
                 // Use fallback values if supply calculation fails
                 console.warn('Supply calculation error for:', shop.shopName, item.brand);
+                casesDelivered = '1';
+                bottlesDelivered = (1 * conversionRate).toString();
               }
               
               // Escape CSV values safely
