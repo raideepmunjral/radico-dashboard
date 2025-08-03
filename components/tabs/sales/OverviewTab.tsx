@@ -79,6 +79,8 @@ interface DashboardData {
     april?: any;
     may?: any;
     june?: any;
+    july?: any;     // ✅ CRITICAL: July 2025 data
+    august?: any;   // ✅ CRITICAL: August 2025 data  
     juneLastYear?: any;
     [key: string]: any;
   };
@@ -305,7 +307,7 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
   const avgVERVEPerShop = shopsWithVERVE.length > 0 ? (data.summary.totalVERVE / shopsWithVERVE.length).toFixed(1) : '0';
   
   // ==========================================
-  // ENHANCED QUARTERLY LOGIC: COMPLETED + ONGOING
+  // 🔧 FIXED: QUARTERLY LOGIC USING CORRECTED HISTORICAL DATA
   // ==========================================
   
   // Helper functions for Indian FY quarters
@@ -352,18 +354,15 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
   const completedQuarter = getCompletedQuarter(data.currentMonth);
   const completedQuarterMonths = getQuarterMonths(completedQuarter, data.currentYear);
   
-  const completedQ_8PM = data.allShopsComparison.reduce((sum, shop) => {
-    return sum + completedQuarterMonths.reduce((monthSum, month) => {
-      const key = `${month}EightPM` as keyof ShopData;
-      return monthSum + ((shop[key] as number) || 0);
-    }, 0);
+  // 🔧 FIXED: Use historicalData instead of shop fields for completed quarter
+  const completedQ_8PM = completedQuarterMonths.reduce((sum, month) => {
+    const monthData = data.historicalData?.[month];
+    return sum + (monthData?.total8PM || 0);
   }, 0);
   
-  const completedQ_VERVE = data.allShopsComparison.reduce((sum, shop) => {
-    return sum + completedQuarterMonths.reduce((monthSum, month) => {
-      const key = `${month}Verve` as keyof ShopData;
-      return monthSum + ((shop[key] as number) || 0);
-    }, 0);
+  const completedQ_VERVE = completedQuarterMonths.reduce((sum, month) => {
+    const monthData = data.historicalData?.[month];
+    return sum + (monthData?.totalVERVE || 0);
   }, 0);
   
   const completedQ_Total = completedQ_8PM + completedQ_VERVE;
@@ -421,7 +420,7 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
   
   lastYearCompletedQ_Total = lastYearCompletedQ_8PM + lastYearCompletedQ_VERVE;
 
-  // Calculate ONGOING quarter data (if exists) - ENHANCED: Future-ready with descriptive labels
+  // 🔧 CRITICAL FIX: Calculate ONGOING quarter data using historicalData
   const ongoingQuarter = getOngoingQuarter(data.currentMonth);
   let ongoingQ_8PM = 0, ongoingQ_VERVE = 0, ongoingQ_Total = 0;
   let lastYearOngoingQ_8PM = 0, lastYearOngoingQ_VERVE = 0, lastYearOngoingQ_Total = 0;
@@ -434,21 +433,31 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
     
     const ongoingMonths = getOngoingQuarterMonths(ongoingQuarter, data.currentMonth);
     
-    ongoingQ_8PM = data.allShopsComparison.reduce((sum, shop) => {
-      return sum + ongoingMonths.reduce((monthSum, month) => {
-        const key = `${month}EightPM` as keyof ShopData;
-        return monthSum + ((shop[key] as number) || 0);
-      }, 0);
+    // 🔧 CRITICAL FIX: Use data.historicalData instead of shop fields
+    console.log('🔧 Q2 CARD CALCULATION DEBUG:');
+    console.log('Ongoing Quarter:', ongoingQuarter);
+    console.log('Ongoing Months:', ongoingMonths);
+    
+    ongoingQ_8PM = ongoingMonths.reduce((sum, month) => {
+      const monthData = data.historicalData?.[month];
+      const monthValue = monthData?.total8PM || 0;
+      console.log(`${month} 8PM:`, monthValue);
+      return sum + monthValue;
     }, 0);
     
-    ongoingQ_VERVE = data.allShopsComparison.reduce((sum, shop) => {
-      return sum + ongoingMonths.reduce((monthSum, month) => {
-        const key = `${month}Verve` as keyof ShopData;
-        return monthSum + ((shop[key] as number) || 0);
-      }, 0);
+    ongoingQ_VERVE = ongoingMonths.reduce((sum, month) => {
+      const monthData = data.historicalData?.[month];
+      const monthValue = monthData?.totalVERVE || 0;
+      console.log(`${month} VERVE:`, monthValue);
+      return sum + monthValue;
     }, 0);
     
     ongoingQ_Total = ongoingQ_8PM + ongoingQ_VERVE;
+    
+    console.log('🎯 Q2 FIXED CALCULATION RESULT:');
+    console.log('8PM Total:', ongoingQ_8PM);
+    console.log('VERVE Total:', ongoingQ_VERVE); 
+    console.log('Combined Total:', ongoingQ_Total);
 
     // ENHANCED: Calculate proper last year ongoing quarter data with future-ready logic
     if (ongoingQuarter === 'Q2' && ongoingMonths.length <= 3) {
@@ -535,19 +544,15 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
   const previousQuarter = getPreviousQuarter(currentQuarter);
   const previousQuarterMonths = getQuarterMonths(previousQuarter, data.currentYear);
   
-  // Calculate previous quarter totals for velocity comparison
-  const prevQ_8PM = data.allShopsComparison.reduce((sum, shop) => {
-    return sum + previousQuarterMonths.reduce((monthSum, month) => {
-      const key = `${month}EightPM` as keyof ShopData;
-      return monthSum + ((shop[key] as number) || 0);
-    }, 0);
+  // 🔧 FIXED: Calculate previous quarter totals using historicalData
+  const prevQ_8PM = previousQuarterMonths.reduce((sum, month) => {
+    const monthData = data.historicalData?.[month];
+    return sum + (monthData?.total8PM || 0);
   }, 0);
   
-  const prevQ_VERVE = data.allShopsComparison.reduce((sum, shop) => {
-    return sum + previousQuarterMonths.reduce((monthSum, month) => {
-      const key = `${month}Verve` as keyof ShopData;
-      return monthSum + ((shop[key] as number) || 0);
-    }, 0);
+  const prevQ_VERVE = previousQuarterMonths.reduce((sum, month) => {
+    const monthData = data.historicalData?.[month];
+    return sum + (monthData?.totalVERVE || 0);
   }, 0);
   
   // Calculate velocity against previous quarter's monthly average
@@ -605,7 +610,7 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
       <div className="bg-white p-4 sm:p-6 rounded-lg shadow">
         <h3 className="text-lg font-medium text-gray-900 mb-6 flex items-center">
           <BarChart3 className="w-5 h-5 mr-2" />
-          Quarterly Performance Analysis
+          🔧 FIXED Quarterly Performance Analysis (Using Corrected Data)
         </h3>
         
         {/* COMPLETED QUARTER SECTION */}
@@ -693,7 +698,7 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
         {ongoingQuarter && periodInfo && (
           <div className="border-t pt-6">
             <h4 className="text-md font-medium text-gray-800 mb-2 flex items-center">
-              📈 Ongoing Quarter Progress: {ongoingQuarter} FY{data.currentYear} 
+              📈 🔧 FIXED Ongoing Quarter Progress: {ongoingQuarter} FY{data.currentYear} 
               <span className="ml-2 text-sm text-blue-600">({periodInfo.currentPeriod})</span>
             </h4>
             
@@ -765,7 +770,7 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
 
               {/* Combined Ongoing Quarter */}
               <div className="bg-indigo-100 p-4 rounded-lg border border-indigo-300">
-                <h5 className="font-medium text-indigo-800 mb-3">Combined {ongoingQuarter} Progress</h5>
+                <h5 className="font-medium text-indigo-800 mb-3">🔧 FIXED Combined {ongoingQuarter} Progress</h5>
                 <div className="space-y-3">
                   <div className="flex justify-between">
                     <span className="text-sm text-gray-600">{periodInfo.lastYearPeriod}:</span>
@@ -782,7 +787,7 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
                     </span>
                   </div>
                   <div className="text-xs text-gray-500">
-                    Quarter progress tracking
+                    ✅ Now using corrected data
                   </div>
                 </div>
               </div>
@@ -812,7 +817,7 @@ const OverviewTab = ({ data }: { data: DashboardData }) => {
               }`}>
                 <div className="font-medium">Q2</div>
                 <div className="text-xs text-gray-600">Jul-Aug-Sep</div>
-                {ongoingQuarter === 'Q2' && <div className="text-xs text-green-600 font-medium">📈 Ongoing</div>}
+                {ongoingQuarter === 'Q2' && <div className="text-xs text-green-600 font-medium">📈 Ongoing ✅ FIXED</div>}
                 {completedQuarter === 'Q2' && <div className="text-xs text-green-600 font-medium">✅ Latest Complete</div>}
               </div>
               <div className={`text-center p-2 rounded ${
