@@ -1,4 +1,5 @@
-'use client';
+console.log('🔧 COMPREHENSIVE Shop ID aliases configured:', Object.keys(shopIdAliases).length, 'aliases');
+    console.log('🔧 All aliases:', shopIdAliases);'use client';
 
 import React, { useState, useEffect } from 'react';
 import { Download, RefreshCw, MapPin, TrendingUp, Users, ShoppingBag, BarChart3, Calendar, Trophy, Building, Target, Activity, FileText, Table, X, ChevronLeft, ChevronRight, Star, AlertTriangle, TrendingDown, UserPlus, Search, Filter, History, Package } from 'lucide-react';
@@ -912,9 +913,11 @@ const ProtectedRadicoDashboard = () => {
       }
     });
 
-    // 🔧 COMPREHENSIVE FIX: Auto-detect shop ID aliases for July data consistency
+    // 🔧 ENHANCED: Auto-detect shop ID aliases with better matching logic
     const autoDetectShopAliases = () => {
       const aliases: Record<string, string> = {};
+      
+      console.log('🔍 AUTO-DETECTING shop ID aliases...');
       
       // Check July 2024 historical data shop IDs vs current shop details
       if (julyData && julyData.shopSales) {
@@ -923,22 +926,49 @@ const ProtectedRadicoDashboard = () => {
           const shopName = historicalShopData.shopName;
           
           if (shopName) {
-            // Find matching shop in current shop details by name
-            const matchingCurrentShop = shopDetails.slice(1).find(row => 
-              row[3]?.toString().trim() === shopName
+            // Method 1: Exact shop name match
+            const exactMatch = shopDetails.slice(1).find(row => 
+              row[3]?.toString().trim() === shopName.trim()
             );
             
-            if (matchingCurrentShop) {
-              const currentShopId = matchingCurrentShop[0]?.toString().trim();
+            if (exactMatch) {
+              const currentShopId = exactMatch[0]?.toString().trim();
               if (currentShopId && currentShopId !== historicalShopId) {
                 aliases[historicalShopId] = currentShopId;
-                console.log(`🔧 Auto-detected alias: ${historicalShopId} -> ${currentShopId} (${shopName})`);
+                console.log(`🎯 Exact name match alias: ${historicalShopId} -> ${currentShopId} (${shopName})`);
+                return;
               }
+            }
+            
+            // Method 2: Partial shop name match (for variations)
+            const partialMatch = shopDetails.slice(1).find(row => {
+              const currentShopName = row[3]?.toString().trim();
+              if (currentShopName && shopName) {
+                // Check if names contain similar words
+                const currentWords = currentShopName.toUpperCase().split(/\s+/);
+                const historicalWords = shopName.toUpperCase().split(/\s+/);
+                const commonWords = currentWords.filter(word => 
+                  word.length > 2 && historicalWords.some(hWord => hWord.includes(word) || word.includes(hWord))
+                );
+                return commonWords.length >= 2; // At least 2 common words
+              }
+              return false;
+            });
+            
+            if (partialMatch) {
+              const currentShopId = partialMatch[0]?.toString().trim();
+              if (currentShopId && currentShopId !== historicalShopId) {
+                aliases[historicalShopId] = currentShopId;
+                console.log(`🔍 Partial match alias: ${historicalShopId} -> ${currentShopId} (${shopName} ~ ${partialMatch[3]})`);
+              }
+            } else {
+              console.log(`❌ No match found for historical shop: ${historicalShopId} (${shopName})`);
             }
           }
         });
       }
       
+      console.log(`✅ Auto-detected ${Object.keys(aliases).length} shop aliases`);
       return aliases;
     };
 
@@ -946,11 +976,69 @@ const ProtectedRadicoDashboard = () => {
     const autoAliases = autoDetectShopAliases();
     const shopIdAliases: Record<string, string> = {
       '01/2024/1023': '01/2024/1544', // Manual: LAWRANCE ROAD
+      // 🔧 MANUAL: Add common July mismatches based on console output
+      '01/2024/0421': '01/2024/0421', // Keep as-is unless we find the correct mapping
+      '01/2024/1836': '01/2024/1836', // Keep as-is unless we find the correct mapping
       ...autoAliases // Auto-detected aliases
     };
     
-    console.log('🔧 COMPREHENSIVE Shop ID aliases configured:', Object.keys(shopIdAliases).length, 'aliases');
-    console.log('🔧 Sample aliases:', Object.entries(shopIdAliases).slice(0, 5));
+    // 🔧 SPECIFIC DEBUG: Check the exact shop IDs we're seeing in console
+    console.log('🔍 SPECIFIC DEBUGGING for problematic shop IDs:');
+    const problematicShopIds = ['01/2024/0421', '01/2024/1836', '01/2024/1023'];
+    
+    problematicShopIds.forEach(shopId => {
+      if (julyData.shopSales[shopId]) {
+        const julyShopData = julyData.shopSales[shopId];
+        console.log(`🔍 Shop ${shopId} in July data: "${julyShopData.shopName}" (${julyShopData.total} cases)`);
+        
+        // Try to find this shop name in current shop details
+        const exactMatch = shopDetails.slice(1).find(row => 
+          row[3]?.toString().trim() === julyShopData.shopName?.trim()
+        );
+        
+        if (exactMatch) {
+          console.log(`  ✅ Found exact match: ${exactMatch[0]} -> "${exactMatch[3]}"`);
+          if (!shopIdAliases[shopId] || shopIdAliases[shopId] === shopId) {
+            shopIdAliases[shopId] = exactMatch[0]?.toString().trim();
+            console.log(`  🔧 Added manual alias: ${shopId} -> ${exactMatch[0]}`);
+          }
+        } else {
+          console.log(`  ❌ No exact match found for "${julyShopData.shopName}"`);
+          
+          // Try partial matching
+          const partialMatches = shopDetails.slice(1).filter(row => {
+            const currentName = row[3]?.toString().trim().toUpperCase();
+            const julyName = julyShopData.shopName?.trim().toUpperCase();
+            return currentName && julyName && (
+              currentName.includes(julyName.split(' ')[0]) || 
+              julyName.includes(currentName.split(' ')[0])
+            );
+          });
+          
+          console.log(`  🔍 Partial matches found: ${partialMatches.length}`);
+          partialMatches.slice(0, 3).forEach(match => {
+            console.log(`    - ${match[0]} -> "${match[3]}"`);
+          });
+        }
+      } else {
+        console.log(`❌ Shop ${shopId} not found in July data`);
+      }
+    });
+    
+    console.log('🔧 FINAL Shop ID aliases configured:', Object.keys(shopIdAliases).length, 'aliases');
+    console.log('🔧 All aliases:', shopIdAliases);
+    
+    // 🔧 DEBUG: Show sample July shop data vs current shop details
+    console.log('🔍 DEBUG: July historical shop samples:');
+    Object.keys(julyData.shopSales).slice(0, 5).forEach(shopId => {
+      const shopData = julyData.shopSales[shopId];
+      console.log(`  July shop: ${shopId} -> "${shopData.shopName}" (${shopData.total} cases)`);
+    });
+    
+    console.log('🔍 DEBUG: Current shop details samples:');
+    shopDetails.slice(1, 6).forEach(row => {
+      console.log(`  Current shop: ${row[0]} -> "${row[3]}" (${row[2]})`);
+    });
 
     // EXISTING: Function to merge SKUs from multiple months (PRESERVED)
     const mergeSKUsFromMonth = (monthData: any, shopIdentifierMap: Record<string, string>) => {
