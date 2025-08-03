@@ -286,6 +286,23 @@ const applyRoleBasedFiltering = (data: DashboardData, user: any): DashboardData 
       }
       return true;
     });
+    
+    // 🔧 DEBUG: Check for LAWRANCE ROAD shop in mapping
+    console.log('🔍 DEBUG: Looking for LAWRANCE ROAD in shop mapping...');
+    Object.keys(shopDetailsMap).forEach(shopId => {
+      const details = shopDetailsMap[shopId];
+      if (details.shopName && details.shopName.includes('LAWRANCE')) {
+        console.log(`🎯 Found LAWRANCE shop: ${shopId} -> "${details.shopName}" (${details.dept})`);
+      }
+    });
+    
+    // Check current month data for LAWRANCE ROAD
+    console.log('🔍 DEBUG: Looking for LAWRANCE ROAD in current month data...');
+    Object.keys(currentMonthData.shopSales).forEach(shopId => {
+      if (shopId.includes('1544') || currentMonthData.shopSales[shopId].shopName?.includes('LAWRANCE')) {
+        console.log(`🎯 Found LAWRANCE in current month: ${shopId} -> ${currentMonthData.shopSales[shopId].total || 0} cases`);
+      }
+    });
   };
 
   // Filter all shop arrays
@@ -952,6 +969,11 @@ const ProtectedRadicoDashboard = () => {
         if (shopId && brand && cases > 0) {
           const actualShopName = shopNameMap[shopId] || shopNameFromChallan || 'Unknown Shop';
           
+          // 🔧 DEBUG: Log July current month assignments
+          if (currentMonth === '07' && shopId.includes('1544')) {
+            console.log(`🔍 July 2025 CURRENT processing: Shop ${shopId} -> ${actualShopName}, Cases: ${cases}`);
+          }
+          
           if (!shopSales[shopId]) {
             const shopDetails = shopDetailsMap[shopId] || {};
             shopSales[shopId] = { 
@@ -1036,6 +1058,7 @@ const ProtectedRadicoDashboard = () => {
           } else if (currentMonth === '07') {
             // 🔧 FIXED: Allow July current data assignment
             shopSales[shopId].julyTotal! += cases;
+            console.log(`🔍 July 2025 assignment: Shop ${shopId} (${shopSales[shopId].shopName}) += ${cases} cases, Total now: ${shopSales[shopId].julyTotal}`);
             if (parentBrand === "8PM") {
               shopSales[shopId].eightPM += cases;
               shopSales[shopId].julyEightPM! += cases;
@@ -1543,6 +1566,25 @@ const ProtectedRadicoDashboard = () => {
     console.log('✅ July 2024 historical data preserved');
     console.log('✅ Original shop identification logic preserved for accuracy');
     console.log(`✅ TARGETED PROTECTION: Showing ${getMonthName(currentMonth)} ${currentYear} data with July-specific fix only`);
+    
+    // 🔧 FINAL DEBUG: Check LAWRANCE ROAD final state
+    console.log('🔍 FINAL DEBUG: LAWRANCE ROAD shop status...');
+    const lawranceShopId = '01/2024/1544';
+    if (shopSales[lawranceShopId]) {
+      const shop = shopSales[lawranceShopId];
+      console.log(`🎯 LAWRANCE ROAD FINAL: ${lawranceShopId} -> "${shop.shopName}" (${shop.department})`);
+      console.log(`   April: ${shop.aprilTotal}, May: ${shop.mayTotal}, June: ${shop.juneTotal}, July: ${shop.julyTotal}, Aug: ${shop.augustTotal}`);
+    } else {
+      console.log(`❌ Shop ${lawranceShopId} not found in final shopSales!`);
+      // Check if it exists under a different ID
+      Object.keys(shopSales).forEach(shopId => {
+        const shop = shopSales[shopId];
+        if (shop.shopName && shop.shopName.includes('LAWRANCE')) {
+          console.log(`🔍 Found LAWRANCE under different ID: ${shopId} -> "${shop.shopName}"`);
+          console.log(`   April: ${shop.aprilTotal}, May: ${shop.mayTotal}, June: ${shop.juneTotal}, July: ${shop.julyTotal}, Aug: ${shop.augustTotal}`);
+        }
+      });
+    }
 
     return {
       summary: {
@@ -1655,7 +1697,7 @@ const ProtectedRadicoDashboard = () => {
         <div className="text-center">
           <RefreshCw className="w-12 h-12 animate-spin mx-auto mb-4 text-blue-600" />
           <h2 className="text-xl font-semibold text-gray-900 mb-2">Loading Enhanced Radico Dashboard</h2>
-          <p className="text-gray-600">Processing live data with FIXED July handling for {getMonthName(currentMonth)} {currentYear}...</p>
+          <p className="text-gray-600">Processing live data with TARGETED July handling for {getMonthName(currentMonth)} {currentYear}...</p>
         </div>
       </div>
     );
