@@ -574,13 +574,45 @@ const ShopInventoryTab = ({ data }: { data: InventoryData }) => {
                                 }
                               }
                               
-                              // Size matching requirement
+                              // Size matching requirement - ENHANCED FOR BETTER MATCHING
                               if (brandMatches) {
                                 const supplySizeNumber = rowSize.replace(/[^0-9]/g, '');
                                 const visitSizeNumber = bottleSize.replace(/[^0-9]/g, '');
                                 
-                                // Must have exact size match OR no size specified in supply
-                                if ((supplySizeNumber && visitSizeNumber && supplySizeNumber === visitSizeNumber) || !supplySizeNumber) {
+                                // Debug log for GOPAL HEIGHTS size matching
+                                if (isGopalHeights && rowBrand.includes('VERVE')) {
+                                  console.log(`    Size check: Supply="${rowSize}" (${supplySizeNumber}) vs Visit="${bottleSize}" (${visitSizeNumber})`);
+                                }
+                                
+                                // Enhanced size matching logic
+                                let sizeMatches = false;
+                                
+                                if (supplySizeNumber && visitSizeNumber) {
+                                  // Exact size match
+                                  if (supplySizeNumber === visitSizeNumber) {
+                                    sizeMatches = true;
+                                  }
+                                  // Special case: 180P in supply matches 180 in visit
+                                  else if (rowSize.includes('180') && bottleSize.includes('180')) {
+                                    sizeMatches = true;
+                                  }
+                                  // Special case: other size variations
+                                  else if (rowSize.includes('375') && bottleSize.includes('375')) {
+                                    sizeMatches = true;
+                                  }
+                                  else if (rowSize.includes('750') && bottleSize.includes('750')) {
+                                    sizeMatches = true;
+                                  }
+                                } else if (!supplySizeNumber) {
+                                  // No size specified in supply, allow match
+                                  sizeMatches = true;
+                                }
+                                
+                                if (isGopalHeights && rowBrand.includes('VERVE')) {
+                                  console.log(`    Size match result: ${sizeMatches}`);
+                                }
+                                
+                                if (sizeMatches) {
                                   
                                   // Parse cases value safely
                                   let parsedCases = 1;
