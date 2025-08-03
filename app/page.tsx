@@ -634,7 +634,13 @@ const ProtectedRadicoDashboard = () => {
             const cases = parseFloat(row[5]) || 0;
             const dateStr = row[7]?.toString().trim();
             const fullBrand = row[10]?.toString().trim();
-            const shopId = row[12]?.toString().trim();
+            let shopId = row[12]?.toString().trim();
+            
+            // 🔧 APPLY SHOP ID ALIAS MAPPING FOR HISTORICAL DATA
+            if (shopId && shopIdAliases[shopId]) {
+              console.log(`🔧 Historical shop ID alias applied: ${shopId} -> ${shopIdAliases[shopId]} for ${monthNumber}-${year}`);
+              shopId = shopIdAliases[shopId];
+            }
             
             if (dateStr && cases > 0) {
               const dateParts = dateStr.split('-');
@@ -794,14 +800,45 @@ const ProtectedRadicoDashboard = () => {
     const currentMonthData = processMonthlyData(currentMonth, currentYear, false);
     const effectiveDisplayMonth = currentMonth;
     
-    console.log(`📅 FIXED PROCESSING: Showing ${getMonthName(effectiveDisplayMonth)} ${currentYear} data`);
-    console.log(`📊 Current month stats (${effectiveDisplayMonth}):`, {
-      month: effectiveDisplayMonth,
-      total8PM: currentMonthData.total8PM,
-      totalVERVE: currentMonthData.totalVERVE,
-      activeShops: currentMonthData.uniqueShops.size,
-      challansFound: currentMonthData.challans.length
-    });
+    // 🔧 ENHANCED DEBUGGING: Check July 2025 vs July 2024 data processing
+    console.log('🔍 JULY DATA PROCESSING DEBUG:');
+    console.log(`Current month: ${currentMonth}, Current year: ${currentYear}`);
+    
+    // Check July 2025 current month data
+    if (currentMonth === '07') {
+      console.log(`📋 July 2025 challans found: ${currentMonthData.challans.length}`);
+      console.log(`📊 July 2025 unique shops: ${currentMonthData.uniqueShops.size}`);
+      console.log(`📈 July 2025 total cases: ${currentMonthData.total8PM + currentMonthData.totalVERVE}`);
+      
+      if (currentMonthData.challans.length === 0) {
+        console.log('❌ NO JULY 2025 CHALLANS FOUND - This explains why July shows 0 for all shops!');
+        console.log('🔍 Checking if July data exists in raw challans...');
+        
+        const allJulyChallans = challans.filter(row => 
+          row[1] && row[1].toString().includes('-07-2025')
+        );
+        console.log(`📋 Raw July 2025 challans in data: ${allJulyChallans.length}`);
+        
+        if (allJulyChallans.length > 0) {
+          console.log('✅ July 2025 data exists but not being processed correctly!');
+          allJulyChallans.slice(0, 3).forEach((row, i) => {
+            console.log(`Sample July challan ${i+1}:`, {
+              date: row[1],
+              shopId: row[8], 
+              shopName: row[9],
+              cases: row[14]
+            });
+          });
+        } else {
+          console.log('❌ No July 2025 data found in raw challans');
+        }
+      }
+    }
+    
+    // Check July 2024 historical data
+    console.log(`📊 July 2024 historical shops: ${Object.keys(julyData.shopSales).length}`);
+    console.log(`📈 July 2024 historical cases: ${julyData.total8PM + julyData.totalVERVE}`);
+    console.log('🔍 July 2024 shop ID samples:', Object.keys(julyData.shopSales).slice(0, 5));
 
     // Process other historical months (UNCHANGED)
     const mayData = processMonthlyData('05', currentYear, false);
@@ -875,6 +912,46 @@ const ProtectedRadicoDashboard = () => {
       }
     });
 
+    // 🔧 COMPREHENSIVE FIX: Auto-detect shop ID aliases for July data consistency
+    const autoDetectShopAliases = () => {
+      const aliases: Record<string, string> = {};
+      
+      // Check July 2024 historical data shop IDs vs current shop details
+      if (julyData && julyData.shopSales) {
+        Object.keys(julyData.shopSales).forEach(historicalShopId => {
+          const historicalShopData = julyData.shopSales[historicalShopId];
+          const shopName = historicalShopData.shopName;
+          
+          if (shopName) {
+            // Find matching shop in current shop details by name
+            const matchingCurrentShop = shopDetails.slice(1).find(row => 
+              row[3]?.toString().trim() === shopName
+            );
+            
+            if (matchingCurrentShop) {
+              const currentShopId = matchingCurrentShop[0]?.toString().trim();
+              if (currentShopId && currentShopId !== historicalShopId) {
+                aliases[historicalShopId] = currentShopId;
+                console.log(`🔧 Auto-detected alias: ${historicalShopId} -> ${currentShopId} (${shopName})`);
+              }
+            }
+          }
+        });
+      }
+      
+      return aliases;
+    };
+
+    // Auto-detect aliases and merge with manual ones
+    const autoAliases = autoDetectShopAliases();
+    const shopIdAliases: Record<string, string> = {
+      '01/2024/1023': '01/2024/1544', // Manual: LAWRANCE ROAD
+      ...autoAliases // Auto-detected aliases
+    };
+    
+    console.log('🔧 COMPREHENSIVE Shop ID aliases configured:', Object.keys(shopIdAliases).length, 'aliases');
+    console.log('🔧 Sample aliases:', Object.entries(shopIdAliases).slice(0, 5));
+
     // EXISTING: Function to merge SKUs from multiple months (PRESERVED)
     const mergeSKUsFromMonth = (monthData: any, shopIdentifierMap: Record<string, string>) => {
       Object.keys(monthData.shopSKUs || {}).forEach(shopIdentifier => {
@@ -921,19 +998,27 @@ const ProtectedRadicoDashboard = () => {
       });
     };
 
-    // Build identifier mapping for all shops (EXISTING - UNCHANGED)
+    // Build identifier mapping for all shops (ENHANCED WITH ALIASES)
     const shopIdentifierMap: Record<string, string> = {};
     
     Object.keys(currentMonthData.shopSales).forEach(shopId => {
-      shopIdentifierMap[shopId] = shopId;
+      // Apply alias mapping
+      const finalShopId = shopIdAliases[shopId] || shopId;
+      shopIdentifierMap[shopId] = finalShopId;
+      if (shopId !== finalShopId) {
+        console.log(`🔧 Current month identifier alias: ${shopId} -> ${finalShopId}`);
+      }
     });
     
-    // ENHANCED: Include ALL 15 months in identifier mapping
+    // ENHANCED: Include ALL 15 months in identifier mapping WITH ALIASES
     [mayData, aprilData, marchData, februaryData, januaryData, decemberData, novemberData, octoberData, septemberData, augustData, julyData, april2024Data, may2024Data, juneLastYearData].forEach(monthData => {
       Object.keys(monthData.shopSales).forEach(shopIdentifier => {
         if (!shopIdentifierMap[shopIdentifier]) {
-          if (shopDetailsMap[shopIdentifier]) {
-            shopIdentifierMap[shopIdentifier] = shopDetailsMap[shopIdentifier].shopId || shopIdentifier;
+          // Apply alias mapping first
+          const aliasedId = shopIdAliases[shopIdentifier] || shopIdentifier;
+          
+          if (shopDetailsMap[aliasedId]) {
+            shopIdentifierMap[shopIdentifier] = shopDetailsMap[aliasedId].shopId || aliasedId;
           } else {
             const matchingShop = shopDetails.slice(1).find(row => 
               row[3]?.toString().trim() === shopIdentifier
@@ -941,8 +1026,12 @@ const ProtectedRadicoDashboard = () => {
             if (matchingShop) {
               shopIdentifierMap[shopIdentifier] = matchingShop[0]?.toString().trim();
             } else {
-              shopIdentifierMap[shopIdentifier] = shopIdentifier;
+              shopIdentifierMap[shopIdentifier] = aliasedId;
             }
+          }
+          
+          if (shopIdentifier !== aliasedId) {
+            console.log(`🔧 Historical identifier alias: ${shopIdentifier} -> ${aliasedId}`);
           }
         }
       });
@@ -960,11 +1049,17 @@ const ProtectedRadicoDashboard = () => {
     // Process current month data WITH PROPER MONTH FIELD ASSIGNMENT
     currentMonthData.challans.forEach(row => {
       if (row.length >= 15) {
-        const shopId = row[8]?.toString().trim();
+        let shopId = row[8]?.toString().trim();
         const shopNameFromChallan = row[9]?.toString().trim();
         const brand = row[11]?.toString().trim();
         const size = row[12]?.toString().trim();
         const cases = parseFloat(row[14]) || 0;
+        
+        // 🔧 APPLY SHOP ID ALIAS MAPPING FOR CURRENT MONTH
+        if (shopId && shopIdAliases[shopId]) {
+          console.log(`🔧 Current month shop ID alias applied: ${shopId} -> ${shopIdAliases[shopId]}`);
+          shopId = shopIdAliases[shopId];
+        }
         
         if (shopId && brand && cases > 0) {
           const actualShopName = shopNameMap[shopId] || shopNameFromChallan || 'Unknown Shop';
@@ -1567,9 +1662,35 @@ const ProtectedRadicoDashboard = () => {
     console.log('✅ Original shop identification logic preserved for accuracy');
     console.log(`✅ TARGETED PROTECTION: Showing ${getMonthName(currentMonth)} ${currentYear} data with July-specific fix only`);
     
-    // 🔧 FINAL DEBUG: Check LAWRANCE ROAD final state
-    console.log('🔍 FINAL DEBUG: LAWRANCE ROAD shop status...');
+    // 🔧 FINAL DEBUG: Check July data assignment results
+    console.log('🔍 JULY DATA ASSIGNMENT SUMMARY:');
+    let july2025Shops = 0, july2024Shops = 0, totalJulyCases = 0;
+    
+    Object.keys(shopSales).forEach(shopId => {
+      const shop = shopSales[shopId];
+      if (shop.julyTotal && shop.julyTotal > 0) {
+        july2024Shops++;
+        totalJulyCases += shop.julyTotal;
+      }
+      if (currentMonth === '07' && shop.total > 0) {
+        july2025Shops++;
+      }
+    });
+    
+    console.log(`📊 July 2025 shops with data: ${july2025Shops}`);
+    console.log(`📊 July 2024 shops with data: ${july2024Shops}`);
+    console.log(`📈 Total July cases assigned: ${totalJulyCases}`);
+    
+    if (currentMonth === '07' && july2025Shops === 0 && july2024Shops > 0) {
+      console.log('🚨 ISSUE CONFIRMED: July 2025 current data not processed, only July 2024 historical data available');
+      console.log('💡 SOLUTION: Check July 2025 challan data in Google Sheets OR ensure aliases cover all shops');
+    }
+    
+    // 🔧 FINAL DEBUG: Check multiple shops' final state, not just LAWRANCE ROAD
+    console.log('🔍 FINAL DEBUG: Multiple shops July status...');
     const lawranceShopId = '01/2024/1544';
+    
+    // Check LAWRANCE ROAD specifically
     if (shopSales[lawranceShopId]) {
       const shop = shopSales[lawranceShopId];
       console.log(`🎯 LAWRANCE ROAD FINAL: ${lawranceShopId} -> "${shop.shopName}" (${shop.department})`);
@@ -1584,6 +1705,21 @@ const ProtectedRadicoDashboard = () => {
           console.log(`   April: ${shop.aprilTotal}, May: ${shop.mayTotal}, June: ${shop.juneTotal}, July: ${shop.julyTotal}, Aug: ${shop.augustTotal}`);
         }
       });
+    }
+    
+    // 🔧 NEW: Check other shops' July status
+    console.log('🔍 OTHER SHOPS July status (first 5 with July data):');
+    let julySampleCount = 0;
+    Object.keys(shopSales).forEach(shopId => {
+      const shop = shopSales[shopId];
+      if (shop.julyTotal && shop.julyTotal > 0 && julySampleCount < 5) {
+        julySampleCount++;
+        console.log(`${julySampleCount}. Shop ${shopId} (${shop.shopName}): July ${shop.julyTotal} cases`);
+      }
+    });
+    
+    if (julySampleCount === 0) {
+      console.log('❌ NO SHOPS have July data! This confirms system-wide July issue.');
     }
 
     return {
