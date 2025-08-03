@@ -490,7 +490,7 @@ const ShopInventoryTab = ({ data }: { data: InventoryData }) => {
               
               const visitDateStr = shop.visitDate ? shop.visitDate.toLocaleDateString('en-GB') : 'No Recent Visit';
               
-              // 🔧 ROBUST SUPPLY DATA READING WITH SAFE FALLBACKS
+              // 🔧 ENHANCED SUPPLY DATA READING WITH DEBUGGING FOR GOPAL HEIGHTS
               let bottleSize = '750ml';
               let casesDelivered = '1';
               let bottlesDelivered = '12';
@@ -523,8 +523,9 @@ const ShopInventoryTab = ({ data }: { data: InventoryData }) => {
                   expectedDailyConsumption = '25';
                 }
 
-                // Step 2: Try to read actual supply data, but use safe fallbacks
+                // Step 2: Try to read actual supply data
                 let actualCases = 2; // Default fallback
+                const isGopalHeights = shop.shopId === '01/2024/0193';
                 
                 if (item.lastSupplyDate && data.rawSupplyData?.pendingChallansData) {
                   try {
@@ -532,9 +533,15 @@ const ShopInventoryTab = ({ data }: { data: InventoryData }) => {
                     
                     if (Array.isArray(pendingChallans) && pendingChallans.length > 1) {
                       const rows = pendingChallans.slice(1);
+                      let matchesFound = [];
                       
-                      // Find matching supply record with simple approach
-                      for (let i = 0; i < Math.min(rows.length, 1000); i++) { // Limit search for performance
+                      // Debug logging for GOPAL HEIGHTS
+                      if (isGopalHeights && brandUpper.includes('VERVE')) {
+                        console.log(`🔍 DEBUGGING GOPAL HEIGHTS: ${item.brand} (${bottleSize})`);
+                      }
+                      
+                      // Search through supply data to find MOST RECENT record for this SKU
+                      for (let i = 0; i < Math.min(rows.length, 2000); i++) {
                         try {
                           const row = rows[i];
                           
@@ -543,12 +550,14 @@ const ShopInventoryTab = ({ data }: { data: InventoryData }) => {
                             const rowBrand = String(row[11] || '').trim().toUpperCase();
                             const rowSize = String(row[12] || '').trim();
                             const rowCases = row[14];
+                            const rowDate = String(row[0] || '').trim(); // Column A: challansdate
                             
-                            // Simple matching logic
-                            if (rowShopId === shop.shopId && rowBrand && rowCases) {
+                            // Only check GOPAL HEIGHTS rows
+                            if (rowShopId === shop.shopId) {
+                              
                               let brandMatches = false;
                               
-                              // VERVE matching
+                              // Enhanced VERVE matching
                               if (rowBrand.includes('VERVE') && brandUpper.includes('VERVE')) {
                                 if ((rowBrand.includes('CRANBERRY') && brandUpper.includes('CRANBERRY')) ||
                                     (rowBrand.includes('LEMON') && brandUpper.includes('LEMON')) ||
@@ -558,38 +567,96 @@ const ShopInventoryTab = ({ data }: { data: InventoryData }) => {
                                 }
                               }
                               
-                              // 8 PM matching
+                              // Enhanced 8 PM matching
                               else if (rowBrand.includes('8 PM') && brandUpper.includes('8 PM')) {
                                 if (rowBrand.includes('BLACK') && brandUpper.includes('BLACK')) {
                                   brandMatches = true;
                                 }
                               }
                               
-                              // Size matching boost
-                              if (brandMatches && rowSize) {
+                              // Size matching requirement
+                              if (brandMatches) {
                                 const supplySizeNumber = rowSize.replace(/[^0-9]/g, '');
                                 const visitSizeNumber = bottleSize.replace(/[^0-9]/g, '');
                                 
-                                if (supplySizeNumber === visitSizeNumber || !supplySizeNumber) {
+                                // Must have exact size match OR no size specified in supply
+                                if ((supplySizeNumber && visitSizeNumber && supplySizeNumber === visitSizeNumber) || !supplySizeNumber) {
+                                  
                                   // Parse cases value safely
-                                  const caseNum = parseFloat(String(rowCases).trim());
-                                  if (!isNaN(caseNum) && caseNum > 0 && caseNum < 100) { // Sanity check
-                                    actualCases = Math.round(caseNum);
-                                    break; // Found match, exit loop
+                                  let parsedCases = 1;
+                                  if (rowCases !== undefined && rowCases !== null) {
+                                    const caseNum = parseFloat(String(rowCases).trim());
+                                    if (!isNaN(caseNum) && caseNum > 0 && caseNum < 100) {
+                                      parsedCases = Math.round(caseNum);
+                                    }
+                                  }
+                                  
+                                  // Parse date for recency comparison
+                                  let parsedDate = null;
+                                  
+                                  if (rowDate) {
+                                    try {
+                                      // Try DD-MM-YYYY format
+                                      const parts = rowDate.split('-');
+                                      if (parts.length === 3) {
+                                        const day = parseInt(parts[0]);
+                                        const month = parseInt(parts[1]) - 1;
+                                        const year = parseInt(parts[2]);
+                                        parsedDate = new Date(year, month, day);
+                                      }
+                                    } catch (e) {
+                                      // Date parsing failed
+                                    }
+                                  }
+                                  
+                                  matchesFound.push({
+                                    cases: parsedCases,
+                                    brand: rowBrand,
+                                    size: rowSize,
+                                    supplySizeNumber,
+                                    visitSizeNumber,
+                                    rowIndex: i,
+                                    date: parsedDate,
+                                    dateString: rowDate
+                                  });
+                                  
+                                  if (isGopalHeights && brandUpper.includes('VERVE')) {
+                                    console.log(`    Found match: Cases=${parsedCases}, Date=${rowDate}, Size=${supplySizeNumber}==${visitSizeNumber}`);
                                   }
                                 }
                               }
                             }
                           }
                         } catch (rowError) {
-                          // Skip problematic row and continue
                           continue;
                         }
                       }
+                      
+                      // 🎯 FIND THE MOST RECENT MATCH
+                      if (matchesFound.length > 0) {
+                        // Sort by date (most recent first)
+                        matchesFound.sort((a, b) => {
+                          if (!a.date && !b.date) return 0;
+                          if (!a.date) return 1; // Put records without dates at the end
+                          if (!b.date) return -1;
+                          return b.date.getTime() - a.date.getTime(); // Most recent first
+                        });
+                        
+                        const mostRecentMatch = matchesFound[0];
+                        actualCases = mostRecentMatch.cases;
+                        
+                        if (isGopalHeights && brandUpper.includes('VERVE')) {
+                          console.log(`  ✅ MOST RECENT MATCH: ${mostRecentMatch.cases} cases on ${mostRecentMatch.dateString} for ${item.brand}`);
+                          console.log(`  All matches found (${matchesFound.length}):`, 
+                            matchesFound.map(m => `${m.cases} cases on ${m.dateString}`));
+                        }
+                      } else if (isGopalHeights && brandUpper.includes('VERVE')) {
+                        console.log(`  ❌ NO MATCHES FOUND for ${item.brand}`);
+                      }
                     }
                   } catch (supplyDataError) {
-                    // If supply data reading fails, use fallback
                     console.warn('Supply data reading failed for:', shop.shopName, item.brand);
+                    actualCases = 2; // Safe fallback
                   }
                 }
                 
@@ -598,7 +665,6 @@ const ShopInventoryTab = ({ data }: { data: InventoryData }) => {
                 bottlesDelivered = (actualCases * conversionRate).toString();
                 
               } catch (overallError) {
-                // If anything fails, use safe fallbacks
                 console.warn('Overall supply calculation error for:', shop.shopName, item.brand);
                 casesDelivered = '1';
                 bottlesDelivered = '12';
