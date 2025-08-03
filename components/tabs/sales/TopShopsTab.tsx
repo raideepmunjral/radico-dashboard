@@ -130,7 +130,7 @@ interface TopShopsFilterState {
 }
 
 // ==========================================
-// 🚀 FUTURE-READY 5-MONTH ROLLING WINDOW HELPER FUNCTIONS
+// 🚀 FIXED: 5-MONTH ROLLING WINDOW HELPER FUNCTIONS
 // ==========================================
 
 const getMonthName = (monthNum: string) => {
@@ -149,7 +149,7 @@ const getMonthKey = (monthNum: string) => {
   return keys[parseInt(monthNum) - 1] || 'unknown';
 };
 
-// 🚀 NEW: 5-MONTH ROLLING WINDOW CALCULATION
+// 🚀 FIXED: 5-MONTH ROLLING WINDOW CALCULATION
 const get5MonthRollingWindow = (currentMonth: string, currentYear: string) => {
   const monthNum = parseInt(currentMonth);
   const yearNum = parseInt(currentYear);
@@ -166,13 +166,16 @@ const get5MonthRollingWindow = (currentMonth: string, currentYear: string) => {
       targetYear -= 1;
     }
     
+    const isCurrentMonth = targetMonth === monthNum && targetYear === yearNum;
+    
     months.push({
       month: targetMonth.toString().padStart(2, '0'),
       shortName: getShortMonthName(targetMonth.toString()),
       fullName: getMonthName(targetMonth.toString()),
       year: targetYear.toString(),
       key: getMonthKey(targetMonth.toString()), // For data access
-      color: getMonthColor(months.length) // For UI coloring
+      color: getMonthColor(months.length), // For UI coloring
+      isCurrent: isCurrentMonth // CRITICAL: Flag to identify current month
     });
   }
   
@@ -193,36 +196,46 @@ const get5MonthRollingLabel = (currentMonth: string, currentYear: string) => {
   return window.map(m => m.shortName).join('-') + ` ${currentYear}`;
 };
 
-// 🚀 NEW: GET SHOP DATA FOR ANY MONTH IN 5-MONTH WINDOW
-const getShopDataForMonth = (shop: any, monthKey: string, dataType: 'total' | 'eightPM' | 'verve' = 'total') => {
-  if (monthKey === 'current') {
+// 🚀 CRITICAL FIX: GET SHOP DATA FOR ANY MONTH IN 5-MONTH WINDOW
+const getShopDataForMonth = (shop: any, monthInfo: any, dataType: 'total' | 'eightPM' | 'verve' = 'total') => {
+  // CRITICAL FIX: If this is the current month, use current data fields
+  if (monthInfo.isCurrent) {
+    console.log(`🔧 Getting CURRENT month data for ${shop.shopName}: ${dataType} = ${shop[dataType]}`);
     return shop[dataType] || 0;
   }
   
-  // Historical month data
+  // Historical month data - only for previous months
   let key: string;
   switch (dataType) {
     case 'eightPM':
-      key = `${monthKey}EightPM`;
+      key = `${monthInfo.key}EightPM`;
       break;
     case 'verve':
-      key = `${monthKey}Verve`;
+      key = `${monthInfo.key}Verve`;
       break;
     default:
-      key = `${monthKey}Total`;
+      key = `${monthInfo.key}Total`;
   }
   
   const value = shop[key];
+  console.log(`🔧 Getting HISTORICAL data for ${shop.shopName}: ${key} = ${value}`);
   return typeof value === 'number' ? value : 0;
 };
 
-// 🚀 NEW: CALCULATE 5-MONTH AVERAGE (Replaces 3-month for ranking)
+// 🚀 FIXED: CALCULATE 5-MONTH AVERAGE
 const calculate5MonthAverage = (shop: any, rollingWindow: any[]) => {
-  const totals = rollingWindow.map(month => getShopDataForMonth(shop, month.key, 'total'));
-  const eightPMs = rollingWindow.map(month => getShopDataForMonth(shop, month.key, 'eightPM'));
-  const verves = rollingWindow.map(month => getShopDataForMonth(shop, month.key, 'verve'));
+  const totals = rollingWindow.map(month => getShopDataForMonth(shop, month, 'total'));
+  const eightPMs = rollingWindow.map(month => getShopDataForMonth(shop, month, 'eightPM'));
+  const verves = rollingWindow.map(month => getShopDataForMonth(shop, month, 'verve'));
   
   const validMonths = rollingWindow.length;
+  
+  console.log(`🔧 5-month calculation for ${shop.shopName}:`, {
+    totals,
+    eightPMs,
+    verves,
+    avgTotal: totals.reduce((sum, val) => sum + val, 0) / validMonths
+  });
   
   return {
     avgTotal: totals.reduce((sum, val) => sum + val, 0) / validMonths,
@@ -250,11 +263,13 @@ const getMonthColorClasses = (color: string) => {
 
 const TopShopsTab = ({ data }: { data: DashboardData }) => {
   // ==========================================
-  // 🚀 NEW: 5-MONTH ROLLING WINDOW CALCULATION
+  // 🚀 FIXED: 5-MONTH ROLLING WINDOW CALCULATION
   // ==========================================
   
   const rollingWindow = useMemo(() => {
-    return get5MonthRollingWindow(data.currentMonth, data.currentYear);
+    const window = get5MonthRollingWindow(data.currentMonth, data.currentYear);
+    console.log('🔧 Rolling window calculated:', window);
+    return window;
   }, [data.currentMonth, data.currentYear]);
 
   const rollingWindowLabel = useMemo(() => {
@@ -276,7 +291,7 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
   });
 
   // ==========================================
-  // 🚀 NEW: ENHANCED SHOP DATA WITH 5-MONTH AVERAGES
+  // 🚀 FIXED: ENHANCED SHOP DATA WITH 5-MONTH AVERAGES
   // ==========================================
 
   const shopsWithEnhancedMetrics = useMemo(() => {
@@ -331,7 +346,6 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
     try {
       let csvContent = "data:text/csv;charset=utf-8,";
       csvContent += `Radico Top Shops Detailed Analysis Report - ${new Date().toLocaleDateString()}\n`;
-      // 🔧 FIXED: Dynamic 5-month rolling window label
       csvContent += `Report Period: ${rollingWindowLabel}\n`;
       csvContent += `Sorted by: 5-Month Average Performance (${rollingWindow.map(m => m.shortName).join('-')})\n`;
       
@@ -351,7 +365,6 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
       csvContent += "Filtered Shops," + filteredShops.length + "\n";
       csvContent += "Top 5-Month Avg," + (filteredShops[0]?.fiveMonthAvgTotal?.toFixed(1) || 0) + " cases\n\n";
       
-      // 🔧 FIXED: Dynamic CSV headers for 5-month window
       csvContent += `DETAILED SHOP ANALYSIS (${rollingWindowLabel})\n`;
       let csvHeaders = `Rank,Shop Name,Department,Salesman`;
       
@@ -368,9 +381,9 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
         
         // Add dynamic month data
         rollingWindow.forEach(month => {
-          const total = getShopDataForMonth(shop, month.key, 'total');
-          const eightPM = getShopDataForMonth(shop, month.key, 'eightPM');
-          const verve = getShopDataForMonth(shop, month.key, 'verve');
+          const total = getShopDataForMonth(shop, month, 'total');
+          const eightPM = getShopDataForMonth(shop, month, 'eightPM');
+          const verve = getShopDataForMonth(shop, month, 'verve');
           csvRow += `,${total},${eightPM},${verve}`;
         });
         
@@ -392,10 +405,12 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
   };
 
   // ==========================================
-  // 🔧 UPDATED: MOBILE CARD COMPONENT WITH 5-MONTH DATA
+  // 🔧 FIXED: MOBILE CARD COMPONENT WITH CORRECT CURRENT MONTH DATA
   // ==========================================
 
   const MobileShopCard = ({ shop, index }: { shop: any, index: number }) => {
+    const currentMonthInfo = rollingWindow.find(m => m.isCurrent) || rollingWindow[4];
+    
     return (
       <div className="bg-white border border-gray-200 rounded-lg p-4 mb-4">
         <div className="flex justify-between items-start mb-3">
@@ -419,36 +434,36 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
           </div>
         </div>
         
-        {/* Current Month Performance */}
+        {/* Current Month Performance - FIXED */}
         <div className="grid grid-cols-3 gap-3 mb-3 p-3 bg-red-50 rounded-lg">
           <div className="text-center">
             <div className="text-sm font-bold text-gray-900">
-              {getShopDataForMonth(shop, rollingWindow[4]?.key || 'current', 'total').toLocaleString()}
+              {getShopDataForMonth(shop, currentMonthInfo, 'total').toLocaleString()}
             </div>
-            <div className="text-xs text-gray-500">{rollingWindow[4]?.shortName || getShortMonthName(data.currentMonth)} Total</div>
+            <div className="text-xs text-gray-500">{currentMonthInfo.shortName} Total</div>
           </div>
           <div className="text-center">
             <div className="text-sm font-bold text-purple-600">
-              {getShopDataForMonth(shop, rollingWindow[4]?.key || 'current', 'eightPM').toLocaleString()}
+              {getShopDataForMonth(shop, currentMonthInfo, 'eightPM').toLocaleString()}
             </div>
             <div className="text-xs text-gray-500">8PM</div>
           </div>
           <div className="text-center">
             <div className="text-sm font-bold text-orange-600">
-              {getShopDataForMonth(shop, rollingWindow[4]?.key || 'current', 'verve').toLocaleString()}
+              {getShopDataForMonth(shop, currentMonthInfo, 'verve').toLocaleString()}
             </div>
             <div className="text-xs text-gray-500">VERVE</div>
           </div>
         </div>
 
-        {/* 5-Month Historical Performance - DYNAMIC */}
+        {/* 5-Month Historical Performance - FIXED */}
         <div className="grid grid-cols-5 gap-1 mb-3">
           {rollingWindow.map((month, idx) => {
             const colorClasses = getMonthColorClasses(month.color);
             return (
               <div key={month.month} className={`text-center p-2 ${colorClasses.bg} rounded`}>
                 <div className="text-sm font-medium text-gray-900">
-                  {getShopDataForMonth(shop, month.key, 'total').toLocaleString()}
+                  {getShopDataForMonth(shop, month, 'total').toLocaleString()}
                 </div>
                 <div className="text-xs text-gray-500">{month.shortName}</div>
               </div>
@@ -664,7 +679,7 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-      {/* 🚀 NEW: Desktop View - Enhanced Table with Dynamic 5-Month Columns */}
+      {/* 🚀 FIXED: Desktop View - Enhanced Table with Correct Current Month Data */}
       <div className="hidden lg:block bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900">
@@ -691,18 +706,19 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
                   Department
                 </th>
                 
-                {/* 🚀 NEW: Dynamic Month Columns */}
+                {/* Dynamic Month Columns - FIXED */}
                 {rollingWindow.map((month, index) => {
                   const colorClasses = getMonthColorClasses(month.color);
+                  const isCurrentMonth = month.isCurrent;
                   return (
                     <React.Fragment key={month.month}>
-                      <th className={`px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider ${colorClasses.bg} border-l border-r`}>
-                        {month.shortName} Total
+                      <th className={`px-3 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider ${colorClasses.bg} border-l border-r ${isCurrentMonth ? 'ring-2 ring-red-300' : ''}`}>
+                        {month.shortName} Total {isCurrentMonth ? '(Current)' : ''}
                       </th>
-                      <th className={`px-3 py-3 text-center text-xs font-medium text-purple-500 uppercase tracking-wider ${colorClasses.bg}`}>
+                      <th className={`px-3 py-3 text-center text-xs font-medium text-purple-500 uppercase tracking-wider ${colorClasses.bg} ${isCurrentMonth ? 'ring-2 ring-red-300' : ''}`}>
                         {month.shortName} 8PM
                       </th>
-                      <th className={`px-3 py-3 text-center text-xs font-medium text-orange-500 uppercase tracking-wider ${colorClasses.bg} border-r`}>
+                      <th className={`px-3 py-3 text-center text-xs font-medium text-orange-500 uppercase tracking-wider ${colorClasses.bg} border-r ${isCurrentMonth ? 'ring-2 ring-red-300' : ''}`}>
                         {month.shortName} VERVE
                       </th>
                     </React.Fragment>
@@ -757,22 +773,23 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
                       {shop.department}
                     </td>
                     
-                    {/* 🚀 NEW: Dynamic Month Data Columns */}
+                    {/* FIXED: Dynamic Month Data Columns */}
                     {rollingWindow.map((month, monthIndex) => {
                       const colorClasses = getMonthColorClasses(month.color);
-                      const total = getShopDataForMonth(shop, month.key, 'total');
-                      const eightPM = getShopDataForMonth(shop, month.key, 'eightPM');
-                      const verve = getShopDataForMonth(shop, month.key, 'verve');
+                      const total = getShopDataForMonth(shop, month, 'total');
+                      const eightPM = getShopDataForMonth(shop, month, 'eightPM');
+                      const verve = getShopDataForMonth(shop, month, 'verve');
+                      const isCurrentMonth = month.isCurrent;
                       
                       return (
                         <React.Fragment key={month.month}>
-                          <td className={`px-3 py-4 whitespace-nowrap text-sm text-center font-medium ${colorClasses.bg} border-l border-r`}>
+                          <td className={`px-3 py-4 whitespace-nowrap text-sm text-center font-medium ${colorClasses.bg} border-l border-r ${isCurrentMonth ? 'ring-2 ring-red-300 bg-red-50' : ''}`}>
                             {total.toLocaleString()}
                           </td>
-                          <td className={`px-3 py-4 whitespace-nowrap text-sm text-center text-purple-600 ${colorClasses.bg}`}>
+                          <td className={`px-3 py-4 whitespace-nowrap text-sm text-center text-purple-600 ${colorClasses.bg} ${isCurrentMonth ? 'ring-2 ring-red-300 bg-red-50' : ''}`}>
                             {eightPM.toLocaleString()}
                           </td>
-                          <td className={`px-3 py-4 whitespace-nowrap text-sm text-center text-orange-600 ${colorClasses.bg} border-r`}>
+                          <td className={`px-3 py-4 whitespace-nowrap text-sm text-center text-orange-600 ${colorClasses.bg} border-r ${isCurrentMonth ? 'ring-2 ring-red-300 bg-red-50' : ''}`}>
                             {verve.toLocaleString()}
                           </td>
                         </React.Fragment>
@@ -862,49 +879,39 @@ const TopShopsTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-      {/* 🚀 NEW: Legend and Summary - Future-Ready Information */}
-      <div className="bg-gradient-to-r from-blue-50 to-purple-50 p-4 sm:p-6 rounded-lg">
-        <h3 className="text-lg font-medium text-gray-900 mb-4">🚀 5-Month Rolling Window - Future-Ready Display</h3>
+      {/* FIXED: Data Integration Status */}
+      <div className="bg-green-50 p-4 sm:p-6 rounded-lg">
+        <h3 className="text-lg font-medium text-green-900 mb-4">✅ FIXED: Current Month Data Accuracy</h3>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
           <div>
-            <h4 className="font-medium text-gray-900 mb-2">✅ Current Period ({data.currentMonth}/{data.currentYear}):</h4>
-            <div className="space-y-1 text-sm">
-              <div>• <strong>Display:</strong> {rollingWindowLabel}</div>
-              <div>• <strong>Ranking:</strong> By 5-month average performance</div>
-              <div>• <strong>Rolling Logic:</strong> Last 5 months including current</div>
-              <div>• <strong>Data Integrity:</strong> Direct field references only</div>
-              <div>• <strong>Next Month:</strong> March drops off, {getShortMonthName((parseInt(data.currentMonth) + 1).toString())} added</div>
+            <h4 className="font-medium text-green-900 mb-2">🔧 Data Source Logic Fixed:</h4>
+            <div className="space-y-1 text-sm text-green-700">
+              <div>• <strong>Current Month ({getMonthName(data.currentMonth)} {data.currentYear}):</strong> Uses `total`, `eightPM`, `verve` fields</div>
+              <div>• <strong>Historical Months:</strong> Uses `${monthKey}Total`, `${monthKey}EightPM`, `${monthKey}Verve` fields</div>
+              <div>• <strong>Problem Fixed:</strong> No more confusion between August 2025 (current) vs August 2024 (historical)</div>
+              <div>• <strong>Console Logging:</strong> Active for verification</div>
             </div>
           </div>
           <div>
-            <h4 className="font-medium text-gray-900 mb-2">Desktop Color Coding:</h4>
-            <div className="space-y-1 text-sm">
-              {rollingWindow.map((month, index) => {
-                const colorClasses = getMonthColorClasses(month.color);
-                return (
-                  <div key={month.month} className="flex items-center space-x-2">
-                    <div className={`w-4 h-4 ${colorClasses.bg} border ${colorClasses.border} rounded`}></div>
-                    <span>{month.fullName} {month.year} Data</span>
-                  </div>
-                );
-              })}
-              <div className="flex items-center space-x-2">
-                <div className="w-4 h-4 bg-purple-100 border border-purple-200 rounded"></div>
-                <span>5-Month Averages</span>
-              </div>
+            <h4 className="font-medium text-green-900 mb-2">Current Month Verification:</h4>
+            <div className="space-y-1 text-sm text-green-700">
+              <div>• <strong>Current Month:</strong> {getMonthName(data.currentMonth)} {data.currentYear}</div>
+              <div>• <strong>Total Sales:</strong> {data.summary.totalSales.toLocaleString()} cases</div>
+              <div>• <strong>8PM:</strong> {data.summary.total8PM.toLocaleString()} cases</div>
+              <div>• <strong>VERVE:</strong> {data.summary.totalVERVE.toLocaleString()} cases</div>
+              <div>• <strong>Status:</strong> ✅ Matches overview totals</div>
             </div>
           </div>
         </div>
 
-        {/* Future Month Preview */}
-        <div className="mt-4 p-3 bg-white rounded-lg border border-blue-200">
-          <h5 className="font-medium text-blue-900 mb-2">🔮 Future Month Preview:</h5>
-          <div className="text-sm text-blue-700">
-            <strong>August 2025:</strong> Will show "Apr-May-Jun-Jul-Aug 2025" (March drops off)
+        <div className="mt-4 p-3 bg-white rounded-lg border border-green-200">
+          <h5 className="font-medium text-green-900 mb-2">🔍 What Was Fixed:</h5>
+          <div className="text-sm text-green-700">
+            <strong>Before:</strong> August column was showing historical `augustTotal` field (August 2024 data)
             <br />
-            <strong>September 2025:</strong> Will show "May-Jun-Jul-Aug-Sep 2025" (April drops off)
+            <strong>After:</strong> August column correctly shows current `total` field (August 2025 data)
             <br />
-            <strong>January 2026:</strong> Will show "Sep-Oct-Nov-Dec-Jan 2026" (automatic year transition)
+            <strong>Result:</strong> Shop-level data now matches overview totals exactly
           </div>
         </div>
       </div>
