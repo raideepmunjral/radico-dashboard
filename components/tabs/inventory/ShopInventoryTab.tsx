@@ -538,6 +538,7 @@ const ShopInventoryTab = ({ data }: { data: InventoryData }) => {
                       // Debug logging for GOPAL HEIGHTS
                       if (isGopalHeights && brandUpper.includes('VERVE')) {
                         console.log(`🔍 DEBUGGING GOPAL HEIGHTS: ${item.brand} (${bottleSize})`);
+                        console.log(`  Looking for: Shop="${shop.shopId}", Brand contains="VERVE", Size="${visitSizeNumber}"`);
                       }
                       
                       // Search through supply data to find MOST RECENT record for this SKU
@@ -552,18 +553,39 @@ const ShopInventoryTab = ({ data }: { data: InventoryData }) => {
                             const rowCases = row[14];
                             const rowDate = String(row[0] || '').trim(); // Column A: challansdate
                             
-                            // Only check GOPAL HEIGHTS rows
+                            // Only check GOPAL HEIGHTS rows - but log ALL matches for debugging
                             if (rowShopId === shop.shopId) {
+                              
+                              // Debug: Log every GOPAL HEIGHTS row for VERVE products
+                              if (isGopalHeights && rowBrand.includes('VERVE')) {
+                                console.log(`  📋 Supply Row ${i}: Date="${rowDate}", Brand="${rowBrand}", Size="${rowSize}", Cases="${rowCases}"`);
+                              }
                               
                               let brandMatches = false;
                               
-                              // Enhanced VERVE matching
+                              // Enhanced VERVE matching with detailed logging
                               if (rowBrand.includes('VERVE') && brandUpper.includes('VERVE')) {
-                                if ((rowBrand.includes('CRANBERRY') && brandUpper.includes('CRANBERRY')) ||
-                                    (rowBrand.includes('LEMON') && brandUpper.includes('LEMON')) ||
-                                    (rowBrand.includes('GREEN') && brandUpper.includes('GREEN')) ||
-                                    (rowBrand.includes('GRAIN') && brandUpper.includes('GRAIN'))) {
+                                
+                                if (isGopalHeights && rowBrand.includes('VERVE')) {
+                                  console.log(`    🔍 VERVE brand check: Supply="${rowBrand}" vs Visit="${brandUpper}"`);
+                                }
+                                
+                                if (rowBrand.includes('CRANBERRY') && brandUpper.includes('CRANBERRY')) {
                                   brandMatches = true;
+                                  if (isGopalHeights) console.log(`    ✅ CRANBERRY match found!`);
+                                } else if (rowBrand.includes('LEMON') && brandUpper.includes('LEMON')) {
+                                  brandMatches = true;
+                                  if (isGopalHeights) console.log(`    ✅ LEMON match found!`);
+                                } else if (rowBrand.includes('GREEN') && brandUpper.includes('GREEN')) {
+                                  brandMatches = true;
+                                  if (isGopalHeights) console.log(`    ✅ GREEN match found!`);
+                                } else if (rowBrand.includes('GRAIN') && brandUpper.includes('GRAIN')) {
+                                  brandMatches = true;
+                                  if (isGopalHeights) console.log(`    ✅ GRAIN match found!`);
+                                } else {
+                                  if (isGopalHeights) {
+                                    console.log(`    ❌ No specific VERVE variant match. Supply has: ${rowBrand.includes('CRANBERRY') ? 'CRANBERRY' : rowBrand.includes('LEMON') ? 'LEMON' : rowBrand.includes('GREEN') ? 'GREEN' : rowBrand.includes('GRAIN') ? 'GRAIN' : 'OTHER'}, Visit needs: ${brandUpper.includes('CRANBERRY') ? 'CRANBERRY' : brandUpper.includes('LEMON') ? 'LEMON' : brandUpper.includes('GREEN') ? 'GREEN' : brandUpper.includes('GRAIN') ? 'GRAIN' : 'OTHER'}`);
+                                  }
                                 }
                               }
                               
@@ -571,6 +593,7 @@ const ShopInventoryTab = ({ data }: { data: InventoryData }) => {
                               else if (rowBrand.includes('8 PM') && brandUpper.includes('8 PM')) {
                                 if (rowBrand.includes('BLACK') && brandUpper.includes('BLACK')) {
                                   brandMatches = true;
+                                  if (isGopalHeights) console.log(`    ✅ 8 PM BLACK match found!`);
                                 }
                               }
                               
@@ -580,8 +603,8 @@ const ShopInventoryTab = ({ data }: { data: InventoryData }) => {
                                 const visitSizeNumber = bottleSize.replace(/[^0-9]/g, '');
                                 
                                 // Debug log for GOPAL HEIGHTS size matching
-                                if (isGopalHeights && rowBrand.includes('VERVE')) {
-                                  console.log(`    Size check: Supply="${rowSize}" (${supplySizeNumber}) vs Visit="${bottleSize}" (${visitSizeNumber})`);
+                                if (isGopalHeights) {
+                                  console.log(`    🔢 Size check: Supply="${rowSize}" (${supplySizeNumber}) vs Visit="${bottleSize}" (${visitSizeNumber})`);
                                 }
                                 
                                 // Enhanced size matching logic
@@ -608,8 +631,8 @@ const ShopInventoryTab = ({ data }: { data: InventoryData }) => {
                                   sizeMatches = true;
                                 }
                                 
-                                if (isGopalHeights && rowBrand.includes('VERVE')) {
-                                  console.log(`    Size match result: ${sizeMatches}`);
+                                if (isGopalHeights) {
+                                  console.log(`    🎯 Size match result: ${sizeMatches}`);
                                 }
                                 
                                 if (sizeMatches) {
@@ -623,21 +646,29 @@ const ShopInventoryTab = ({ data }: { data: InventoryData }) => {
                                     }
                                   }
                                   
-                                  // Parse date for recency comparison
+                                  // 🔧 FIXED DATE PARSING
                                   let parsedDate = null;
                                   
                                   if (rowDate) {
                                     try {
-                                      // Try DD-MM-YYYY format
+                                      // Try DD-MM-YYYY format: "25-06-2025"
                                       const parts = rowDate.split('-');
                                       if (parts.length === 3) {
                                         const day = parseInt(parts[0]);
-                                        const month = parseInt(parts[1]) - 1;
+                                        const month = parseInt(parts[1]) - 1; // JS months are 0-based
                                         const year = parseInt(parts[2]);
                                         parsedDate = new Date(year, month, day);
+                                        
+                                        // Validate the parsed date
+                                        if (isNaN(parsedDate.getTime())) {
+                                          parsedDate = null;
+                                        }
                                       }
                                     } catch (e) {
                                       // Date parsing failed
+                                      if (isGopalHeights) {
+                                        console.log(`    ⚠️ Date parsing failed for: "${rowDate}"`);
+                                      }
                                     }
                                   }
                                   
@@ -652,8 +683,8 @@ const ShopInventoryTab = ({ data }: { data: InventoryData }) => {
                                     dateString: rowDate
                                   });
                                   
-                                  if (isGopalHeights && brandUpper.includes('VERVE')) {
-                                    console.log(`    Found match: Cases=${parsedCases}, Date=${rowDate}, Size=${supplySizeNumber}==${visitSizeNumber}`);
+                                  if (isGopalHeights) {
+                                    console.log(`    ✅ Found match: Cases=${parsedCases}, Date=${rowDate}, ParsedDate=${parsedDate ? parsedDate.toLocaleDateString() : 'INVALID'}, Size=${supplySizeNumber}==${visitSizeNumber}`);
                                   }
                                 }
                               }
