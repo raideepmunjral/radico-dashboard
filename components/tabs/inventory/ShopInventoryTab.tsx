@@ -148,8 +148,15 @@ const ShopInventoryTab = ({ data }: { data: InventoryData }) => {
     return [...new Set(keys)];
   };
 
-  // 🔧 CASE QUANTITY READING FUNCTION (copied from SupplyStockMismatchTab.tsx)
+  // 🔧 ENHANCED CASE QUANTITY READING WITH SIZE-SPECIFIC MATCHING
   const getActualSupplyData = (shopId: string, brandName: string, lastSupplyDate: Date): number => {
+    // Debug mode for specific shop
+    const isDebugShop = shopId === '01/2024/0193'; // GOPAL HEIGHTS debug
+    
+    if (isDebugShop) {
+      console.log('🔍 DEBUG MODE for GOPAL HEIGHTS:', { shopId, brandName, targetDate: lastSupplyDate.toLocaleDateString() });
+    }
+    
     // Try to get actual supply data from pending challans
     if (data.rawSupplyData?.pendingChallansData) {
       const pendingChallans = data.rawSupplyData.pendingChallansData;
@@ -164,6 +171,17 @@ const ShopInventoryTab = ({ data }: { data: InventoryData }) => {
         const brandIndex = 11;         // Column L
         const sizeIndex = 12;          // Column M
         const casesIndex = 14;         // Column O
+        
+        // 🆕 NEW: Extract size from visit brand name for better matching
+        const visitBottleInfo = getBottleSizeInfo(brandName);
+        const visitSizeNumber = visitBottleInfo.size.replace('ml', ''); // "180", "375", etc.
+        
+        if (isDebugShop) {
+          console.log('🔍 Visit brand analysis:', { brandName, detectedSize: visitBottleInfo.size, sizeNumber: visitSizeNumber });
+        }
+        
+        // 🆕 NEW: Collect ALL potential matches first, then find best match
+        const potentialMatches = [];
         
         // Find matching supply record
         for (let i = 0; i < rows.length; i++) {
@@ -215,29 +233,35 @@ const ShopInventoryTab = ({ data }: { data: InventoryData }) => {
               }
               
               if (rowBrand && rowCases > 0) {
-                // 🔧 ENHANCED BRAND MATCHING
+                // 🔧 ENHANCED BRAND MATCHING WITH SIZE CHECKING
                 const rowBrandUpper = rowBrand.toUpperCase();
                 const brandNameUpper = brandName.toUpperCase();
                 
                 let brandMatch = false;
+                let matchStrength = 0; // 🆕 NEW: Match strength scoring
                 
                 // Special matching for 8 PM products
                 if (rowBrandUpper.includes('8 PM') && brandNameUpper.includes('8 PM')) {
                   if (rowBrandUpper.includes('BLACK') && brandNameUpper.includes('BLACK')) {
-                    brandMatch = true; // 8 PM BLACK variants match
+                    brandMatch = true; 
+                    matchStrength = 2; // 8 PM BLACK variants match
                   }
                 }
                 
                 // Special matching for VERVE products  
                 else if (rowBrandUpper.includes('VERVE') && brandNameUpper.includes('VERVE')) {
                   if (rowBrandUpper.includes('LEMON') && brandNameUpper.includes('LEMON')) {
-                    brandMatch = true; // VERVE LEMON variants match
+                    brandMatch = true; 
+                    matchStrength = 2; // VERVE LEMON variants match
                   } else if (rowBrandUpper.includes('CRANBERRY') && brandNameUpper.includes('CRANBERRY')) {
-                    brandMatch = true; // VERVE CRANBERRY variants match
+                    brandMatch = true; 
+                    matchStrength = 2; // VERVE CRANBERRY variants match
                   } else if (rowBrandUpper.includes('GREEN') && brandNameUpper.includes('GREEN')) {
-                    brandMatch = true; // VERVE GREEN APPLE variants match
+                    brandMatch = true; 
+                    matchStrength = 2; // VERVE GREEN APPLE variants match
                   } else if (rowBrandUpper.includes('GRAIN') && brandNameUpper.includes('GRAIN')) {
-                    brandMatch = true; // VERVE GRAIN variants match
+                    brandMatch = true; 
+                    matchStrength = 2; // VERVE GRAIN variants match
                   }
                 }
                 
@@ -247,7 +271,16 @@ const ShopInventoryTab = ({ data }: { data: InventoryData }) => {
                   const rowWords = rowBrandUpper.split(' ');
                   const commonWords = brandWords.filter(word => rowWords.includes(word));
                   if (commonWords.length >= 2) {
-                    brandMatch = true; // At least 2 words match
+                    brandMatch = true; 
+                    matchStrength = 1; // At least 2 words match
+                  }
+                }
+                
+                // 🆕 NEW: SIZE MATCHING BOOST - Critical for fixing your issue!
+                if (brandMatch && rowSize) {
+                  const supplySizeNumber = rowSize.replace(/[^0-9]/g, ''); // Extract just numbers
+                  if (supplySizeNumber === visitSizeNumber) {
+                    matchStrength += 10; // 🎯 MAJOR BOOST for exact size match!
                   }
                 }
                 
@@ -300,7 +333,32 @@ const ShopInventoryTab = ({ data }: { data: InventoryData }) => {
                       const daysDiff = Math.abs(rowDate.getTime() - lastSupplyDate.getTime()) / (1000 * 60 * 60 * 24);
                       
                       if (daysDiff <= 2) { // Within 2 days
-                        return rowCases; // Return the actual parsed case quantity!
+                        // 🆕 NEW: Store as potential match instead of returning immediately
+                        potentialMatches.push({
+                          rowIndex: i,
+                          cases: rowCases,
+                          brand: rowBrand,
+                          size: rowSize,
+                          date: rowDate,
+                          daysDiff,
+                          matchStrength,
+                          supplySizeNumber,
+                          visitSizeNumber
+                        });
+                        
+                        if (isDebugShop) {
+                          console.log(`🔍 POTENTIAL MATCH ${potentialMatches.length}:`, {
+                            brand: rowBrand,
+                            size: rowSize,
+                            cases: rowCases,
+                            date: rowDate.toLocaleDateString(),
+                            daysDiff: Math.round(daysDiff * 10) / 10,
+                            matchStrength,
+                            supplySizeNumber,
+                            visitSizeNumber,
+                            sizeMatch: supplySizeNumber === visitSizeNumber ? '✅ EXACT SIZE' : '❌ SIZE MISMATCH'
+                          });
+                        }
                       }
                     }
                   }
@@ -308,6 +366,44 @@ const ShopInventoryTab = ({ data }: { data: InventoryData }) => {
               }
             }
           }
+        }
+        
+        // 🆕 NEW: Find the BEST match based on match strength (size + brand + date)
+        if (potentialMatches.length > 0) {
+          // Sort by match strength (highest first), then by smallest date difference
+          potentialMatches.sort((a, b) => {
+            if (b.matchStrength !== a.matchStrength) {
+              return b.matchStrength - a.matchStrength; // Higher strength first
+            }
+            return a.daysDiff - b.daysDiff; // Smaller date diff first
+          });
+          
+          const bestMatch = potentialMatches[0];
+          
+          if (isDebugShop) {
+            console.log('🎯 BEST MATCH SELECTED:', {
+              brand: bestMatch.brand,
+              size: bestMatch.size,
+              cases: bestMatch.cases,
+              date: bestMatch.date.toLocaleDateString(),
+              matchStrength: bestMatch.matchStrength,
+              reason: bestMatch.matchStrength >= 10 ? 'EXACT SIZE + BRAND MATCH' : 'BRAND MATCH ONLY',
+              FINAL_RESULT: bestMatch.cases
+            });
+            
+            if (potentialMatches.length > 1) {
+              console.log('🔍 OTHER MATCHES CONSIDERED:');
+              potentialMatches.slice(1, 3).forEach((match, i) => {
+                console.log(`  ${i + 2}. ${match.brand} ${match.size} - ${match.cases} cases (strength: ${match.matchStrength})`);
+              });
+            }
+          }
+          
+          return bestMatch.cases; // 🎯 Return the best match!
+        }
+        
+        if (isDebugShop) {
+          console.log('❌ NO MATCHES FOUND for GOPAL HEIGHTS');
         }
       }
     }
