@@ -832,6 +832,27 @@ export { parseGoogleSheetToSupplyRecords, debugSupplyData, type SupplyRecord };
  * 📦 Sample processed record: {brand, shopId, cases: 1, ...}
  * 
  * And the CSV will show the correct cases numbers!
+ * 
+ * TROUBLESHOOTING:
+ * - Check browser console for matching debug logs
+ * - Verify your Google Sheet column mapping in parseGoogleSheetToSupplyRecords()
+ * - Make sure shop IDs and brand names match between inventory and supply data
+ * - Check that the 'cases' column contains numeric values
+ * 
+ * QUICK FIX FOR MISSING CASES DATA:
+ * 
+ * 1. First, debug your supply data structure:
+ *    debugSupplyData(yourSupplyRecords);
+ * 
+ * 2. Look in the console for "Possible cases fields" - this will show you 
+ *    what field name contains your cases data from column O
+ * 
+ * 3. If your cases field is named differently (like "pack" or "quantity"), 
+ *    update the SupplyRecord interface or modify your data before passing it:
+ * 
+ *    yourSupplyRecords.forEach(record => {
+ *      record.cases = record.pack || record.O || record['14'] || 0;
+ *    });
  */
  * 
  * TROUBLESHOOTING:
