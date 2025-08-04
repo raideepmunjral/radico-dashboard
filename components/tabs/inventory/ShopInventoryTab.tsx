@@ -183,9 +183,9 @@ const ShopInventoryTab = ({ data }: { data: InventoryData }) => {
         }
         
         let matchAttempts = 0;
-        let debugMatches = [];
+        let potentialMatches = []; // 🔧 DECLARE the potentialMatches array
         
-        // Find matching supply record
+        // Find ALL matching supply records for this shop/brand
         for (let i = 0; i < rows.length; i++) {
           const row = rows[i];
           
@@ -397,65 +397,42 @@ const ShopInventoryTab = ({ data }: { data: InventoryData }) => {
                     console.log(`❌ BRAND MISMATCH: No matching pattern found`);
                   }
                 }
-                
-                // Store debug info for potential matches
-                debugMatches.push({
-                  rowIndex: i,
-                  shopId: rowShopId,
-                  brand: rowBrand,
-                  date: rowDateStr,
-                  cases: rowCases,
-                  brandMatch,
-                  brandMatchReason,
-                  parsingMethod,
-                  rawValue: rawCaseValue
-                });
               }
             }
           }
         }
         
-        // 🔍 ENHANCED DEBUG OUTPUT FOR TROUBLESHOOTING
-        if (isDebugMode) {
-          console.log('🔍 SEARCH COMPLETED - DETAILED ANALYSIS:', {
-            totalRowsChecked: rows.length,
-            shopMatchAttempts: matchAttempts,
-            casesColumnUsed: 'Column O (Index 14)',
-            targetShop: shopId,
-            targetBrand: brandName,
-            targetDate: lastSupplyDate.toLocaleDateString()
-          });
+        // 🎯 FIND THE MOST RECENT SUPPLY (KEY CHANGE FROM MISMATCH TAB)
+        if (potentialMatches.length > 0) {
+          // Sort by date (most recent first)
+          potentialMatches.sort((a, b) => b.date.getTime() - a.date.getTime());
           
-          if (debugMatches.length > 0) {
-            console.log('🔍 TOP DEBUG MATCHES (first 5):');
-            debugMatches.slice(0, 5).forEach((match, i) => {
-              console.log(`Match ${i + 1}:`, {
-                shopId: match.shopId,
-                brand: match.brand,
-                date: match.date,
-                cases: match.cases,
-                brandMatch: match.brandMatch,
-                brandMatchReason: match.brandMatchReason,
-                parsingMethod: match.parsingMethod,
-                rawValue: match.rawValue
-              });
+          const mostRecentMatch = potentialMatches[0];
+          
+          if (isDebugMode) {
+            console.log(`🎯 ✅ SUPPLY ANALYSIS FOR ${shopId} - ${brandName}:`);
+            console.log(`  Found ${potentialMatches.length} matching supply records:`);
+            
+            // Show ALL matches sorted by date
+            potentialMatches.forEach((match, i) => {
+              console.log(`    ${i + 1}. ${match.dateStr} -> ${match.cases} cases (Brand: ${match.brand})`);
             });
             
-            // Count different failure reasons
-            const brandFailures = debugMatches.filter(m => !m.brandMatch).length;
-            const brandSuccesses = debugMatches.filter(m => m.brandMatch).length;
-            
-            console.log('🔍 FAILURE ANALYSIS:', {
-              totalMatches: debugMatches.length,
-              brandFailures,
-              brandSuccesses,
-              mainIssue: brandFailures > brandSuccesses ? 'BRAND_MATCHING' : 'DATE_MATCHING'
-            });
-          } else {
-            console.log('❌ NO DEBUG MATCHES FOUND - NO SHOP MATCHES IN SUPPLY DATA');
+            console.log(`  🎯 SELECTED MOST RECENT: ${mostRecentMatch.dateStr} with ${mostRecentMatch.cases} cases`);
+            console.log(`  📦 RETURNING: ${mostRecentMatch.cases} cases`);
           }
           
-          console.log('🔍 === ENHANCED CASE QUANTITY DEBUG END (NO MATCH) ===');
+          return mostRecentMatch.cases; // 🎯 Return the most recent supply quantity!
+        }
+        
+        // 🔍 ENHANCED DEBUG OUTPUT FOR TROUBLESHOOTING
+        if (isDebugMode) {
+          console.log('🔍 SEARCH COMPLETED - NO MATCHES FOUND:', {
+            totalRowsChecked: rows.length,
+            shopMatchAttempts: matchAttempts,
+            targetShop: shopId,
+            targetBrand: brandName
+          });
         }
       }
     }
@@ -463,7 +440,6 @@ const ShopInventoryTab = ({ data }: { data: InventoryData }) => {
     // Fallback to 1 case if no matching data found
     if (isDebugMode) {
       console.log(`⚠️ FINAL FALLBACK: No supply match found for ${shopId} - ${brandName}, defaulting to 1 case`);
-      console.log('🔍 === ENHANCED CASE QUANTITY DEBUG END (FALLBACK) ===');
     }
     return 1;
   };
