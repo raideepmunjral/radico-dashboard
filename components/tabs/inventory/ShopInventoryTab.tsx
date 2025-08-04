@@ -137,7 +137,7 @@ const ShopInventoryTab = ({ data }: { data: InventoryData }) => {
   // ==========================================
   const getActualSupplyData = (shopId: string, brandName: string, lastSupplyDate: Date): number => {
     // 🎯 DEBUG MODE - Set to true only for troubleshooting specific shops
-    const isDebugMode = false; // Change to true and add shop conditions for debugging
+    const isDebugMode = shopId === '01/2024/0193'; // Enable debug for GOPAL HEIGHTS only
     
     if (isDebugMode) {
       console.log('🔍 === ENHANCED CASE QUANTITY DEBUG START ===');
