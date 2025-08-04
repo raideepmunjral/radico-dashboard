@@ -116,7 +116,8 @@ const generateCSVContent = (shops: ShopInventory[]): string => {
     'Days Out of Stock',
     'Reason No Stock',
     'Recently Restocked',
-    'Supply Cases Info'
+    'Supply Cases Info',
+    'Debug Info'
   ];
 
   const csvRows = [headers.join(',')];
@@ -129,10 +130,14 @@ const generateCSVContent = (shops: ShopInventory[]): string => {
       
       const ageCategory = item.ageCategory?.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()) || '';
       
-      // Enhanced supply cases information
-      const supplyCasesInfo = item.lastSupplyCases ? 
-        `Last: ${item.lastSupplyCases} cases` : 
-        item.casesDelivered ? `${item.casesDelivered} cases` : '';
+      // Enhanced supply cases information with better fallback
+      const casesValue = item.casesDelivered || item.lastSupplyCases || 0;
+      const supplyCasesInfo = casesValue > 0 ? 
+        `Last: ${casesValue} cases` : 
+        'No cases data';
+
+      // Debug information
+      const debugInfo = `HasSupplyData:${!!item.lastSupplyDate},Cases:${casesValue},Restocked:${!!item.suppliedAfterOutOfStock}`;
 
       const row = [
         shop.shopId,
@@ -147,13 +152,14 @@ const generateCSVContent = (shops: ShopInventory[]): string => {
         item.ageInDays,
         ageCategory,
         formatDateForCSV(item.lastSupplyDate),
-        item.casesDelivered || item.lastSupplyCases || '', // Cases delivered information
+        casesValue, // Cases delivered information - use the actual number
         item.supplyStatus?.replace(/_/g, ' ') || '',
         item.daysSinceLastSupply || '',
         item.daysOutOfStock || item.currentDaysOutOfStock || '',
         `"${item.reasonNoStock || ''}"`, // Quoted to handle commas
         item.suppliedAfterOutOfStock ? 'Yes' : 'No',
-        `"${supplyCasesInfo}"` // Enhanced cases info
+        `"${supplyCasesInfo}"`, // Enhanced cases info
+        `"${debugInfo}"` // Debug information
       ];
       
       csvRows.push(row.join(','));
@@ -176,6 +182,126 @@ const downloadCSV = (content: string, filename: string) => {
 };
 
 // ==========================================
+// DEBUG HELPER FUNCTION
+// ==========================================
+
+/**
+ * Use this function to debug your supply data structure
+ * Call this before passing data to the component to see the exact field names
+ */
+const debugSupplyData = (supplyRecords: any[]) => {
+  console.log('=== SUPPLY DATA STRUCTURE DEBUG ===');
+  console.log('Total records:', supplyRecords.length);
+  
+  if (supplyRecords.length > 0) {
+    const firstRecord = supplyRecords[0];
+    console.log('First record structure:', firstRecord);
+    console.log('All field names:', Object.keys(firstRecord));
+    
+    // Look for cases-related fields
+    const possibleCasesFields = Object.keys(firstRecord).filter(key => 
+      key.toLowerCase().includes('case') || 
+      key === 'O' || 
+      key === '14' ||
+      typeof firstRecord[key] === 'number' && firstRecord[key] > 0 && firstRecord[key] < 1000
+    );
+    console.log('Possible cases fields:', possibleCasesFields);
+    
+    possibleCasesFields.forEach(field => {
+      console.log(`Field "${field}" value:`, firstRecord[field]);
+    });
+  }
+  
+  console.log('=== END SUPPLY DATA STRUCTURE DEBUG ===');
+};
+
+// ==========================================
+// HELPER FUNCTION TO PARSE GOOGLE SHEET DATA
+// ==========================================
+
+/**
+ * Helper function to convert Google Sheet data to the format expected by the component
+ * Use this to process your Google Sheet data before passing it to the component
+ */
+const parseGoogleSheetToSupplyRecords = (sheetData: any[]): SupplyRecord[] => {
+  console.log('=== PARSING GOOGLE SHEET DATA ===');
+  console.log('Raw sheet data rows:', sheetData.length);
+  console.log('Sample row:', sheetData[0]);
+  
+  const supplyRecords: SupplyRecord[] = [];
+  
+  sheetData.forEach((row, index) => {
+    try {
+      // Adjust these column indices based on your actual Google Sheet structure
+      // From your images, it looks like:
+      // Column B: challandate
+      // Column E: shop_dep 
+      // Column H: Shop_id
+      // Column I: shop_name
+      // Column J: brand
+      // Column O: cases
+      
+      const record: SupplyRecord = {
+        brand: row.brand || row.J || row[9] || '', // Column J (index 9)
+        shopId: row.Shop_id || row.H || row[7] || '', // Column H (index 7)  
+        shopName: row.shop_name || row.I || row[8] || '', // Column I (index 8)
+        supplyDate: parseDate(row.challandate || row.B || row[1] || ''), // Column B (index 1)
+        cases: parseInt(row.cases || row.O || row[14] || '0'), // Column O (index 14)
+        orderNo: row.order_no || row.F || row[5] || '' // Column F (index 5)
+      };
+      
+      // Only add if we have essential data
+      if (record.brand && record.shopId && record.cases > 0) {
+        supplyRecords.push(record);
+        console.log(`Parsed row ${index + 1}:`, record);
+      } else {
+        console.log(`Skipped row ${index + 1} - missing essential data:`, {
+          brand: record.brand,
+          shopId: record.shopId,
+          cases: record.cases
+        });
+      }
+    } catch (error) {
+      console.error(`Error parsing row ${index + 1}:`, error, row);
+    }
+  });
+  
+  console.log(`Successfully parsed ${supplyRecords.length} supply records`);
+  console.log('=== END PARSING GOOGLE SHEET DATA ===');
+  
+  return supplyRecords;
+};
+
+// Helper function to parse dates from various formats
+const parseDate = (dateString: any): Date => {
+  if (!dateString) return new Date();
+  
+  // If it's already a Date object
+  if (dateString instanceof Date) return dateString;
+  
+  // If it's a string, try to parse it
+  if (typeof dateString === 'string') {
+    // Handle DD-MM-YYYY format
+    if (dateString.includes('-')) {
+      const parts = dateString.split('-');
+      if (parts.length === 3) {
+        return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+      }
+    }
+    // Handle DD/MM/YYYY format
+    if (dateString.includes('/')) {
+      const parts = dateString.split('/');
+      if (parts.length === 3) {
+        return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
+      }
+    }
+  }
+  
+  // Fallback to standard Date parsing
+  return new Date(dateString);
+};
+
+// ==========================================
 // MASTER DATA INTEGRATION FUNCTIONS
 // ==========================================
 
@@ -184,8 +310,11 @@ interface SupplyRecord {
   shopId: string;
   shopName: string;
   supplyDate: Date;
-  cases: number;
+  cases?: number;  // Make it optional since it might be named differently
+  Cases?: number;  // Alternative naming
+  O?: number;      // Direct column reference
   orderNo: string;
+  [key: string]: any; // Allow any additional properties
 }
 
 // Function to match supply data with inventory data
@@ -195,38 +324,108 @@ const enhanceInventoryWithSupplyData = (
 ): InventoryData => {
   const enhancedData = { ...inventoryData };
   
+  console.log('=== SUPPLY DATA MATCHING DEBUG ===');
+  console.log('Total supply records:', supplyRecords?.length || 0);
+  console.log('Sample supply record:', supplyRecords?.[0]);
+  
+  if (!supplyRecords || supplyRecords.length === 0) {
+    console.warn('No supply records provided!');
+    return enhancedData;
+  }
+  
+  let totalMatches = 0;
+  let totalAttempts = 0;
+  
   Object.keys(enhancedData.shops).forEach(shopId => {
     const shop = enhancedData.shops[shopId];
     
     Object.keys(shop.items).forEach(brandKey => {
       const item = shop.items[brandKey];
+      totalAttempts++;
       
-      // Find matching supply records for this shop and brand
-      const matchingSupplyRecords = supplyRecords.filter(record => 
-        record.shopId === shopId && 
-        record.brand.toLowerCase().includes(item.brand.toLowerCase())
-      );
+      // Enhanced matching logic - try multiple approaches
+      const matchingSupplyRecords = supplyRecords.filter(record => {
+        // Normalize shop IDs and names for comparison
+        const recordShopId = record.shopId?.toString().trim();
+        const recordShopName = record.shopName?.toLowerCase().trim();
+        const currentShopId = shopId?.toString().trim();
+        const currentShopName = shop.shopName?.toLowerCase().trim();
+        
+        // Normalize brand names for comparison
+        const recordBrand = record.brand?.toLowerCase().trim().replace(/[^\w\s]/g, '');
+        const itemBrand = item.brand?.toLowerCase().trim().replace(/[^\w\s]/g, '');
+        
+        // Try multiple matching strategies
+        const shopMatches = (
+          recordShopId === currentShopId ||
+          recordShopName === currentShopName ||
+          (recordShopName && currentShopName && recordShopName.includes(currentShopName)) ||
+          (recordShopName && currentShopName && currentShopName.includes(recordShopName))
+        );
+        
+        const brandMatches = (
+          recordBrand === itemBrand ||
+          (recordBrand && itemBrand && recordBrand.includes(itemBrand)) ||
+          (recordBrand && itemBrand && itemBrand.includes(recordBrand)) ||
+          // Check if key parts of brand name match
+          (recordBrand && itemBrand && 
+           recordBrand.split(' ').some(word => itemBrand.includes(word) && word.length > 3))
+        );
+        
+        return shopMatches && brandMatches;
+      });
       
       if (matchingSupplyRecords.length > 0) {
+        totalMatches++;
+        
         // Sort by supply date to get the most recent
-        matchingSupplyRecords.sort((a, b) => b.supplyDate.getTime() - a.supplyDate.getTime());
+        matchingSupplyRecords.sort((a, b) => {
+          const dateA = new Date(a.supplyDate).getTime();
+          const dateB = new Date(b.supplyDate).getTime();
+          return dateB - dateA;
+        });
+        
         const mostRecentSupply = matchingSupplyRecords[0];
         
+        console.log(`Match found for ${shop.shopName} - ${item.brand}:`, {
+          supplyDate: mostRecentSupply.supplyDate,
+          cases: mostRecentSupply.cases,
+          orderNo: mostRecentSupply.orderNo
+        });
+        
         // Update item with supply information
-        item.lastSupplyDate = mostRecentSupply.supplyDate;
-        item.lastSupplyCases = mostRecentSupply.cases;
-        item.casesDelivered = mostRecentSupply.cases;
+        item.lastSupplyDate = new Date(mostRecentSupply.supplyDate);
+        
+        // Extract cases value from column O - try multiple possible field names
+        const casesValue = mostRecentSupply.cases || 
+                          mostRecentSupply.Cases || 
+                          mostRecentSupply.O || 
+                          mostRecentSupply['cases'] || 
+                          mostRecentSupply['Cases'] || 
+                          mostRecentSupply['O'] ||
+                          (typeof mostRecentSupply[14] === 'number' ? mostRecentSupply[14] : 0); // Column O is index 14
+        
+        item.lastSupplyCases = casesValue;
+        item.casesDelivered = casesValue;
+        
+        console.log(`Cases extracted for ${item.brand}:`, casesValue, 'from record:', mostRecentSupply);
         
         // Calculate total cases delivered
-        item.totalCasesDelivered = matchingSupplyRecords.reduce((total, record) => total + record.cases, 0);
+        item.totalCasesDelivered = matchingSupplyRecords.reduce((total, record) => total + (record.cases || 0), 0);
         
         // Update supply status based on cases delivered
-        if (mostRecentSupply.cases > 0) {
+        if (mostRecentSupply.cases && mostRecentSupply.cases > 0) {
           item.suppliedAfterOutOfStock = true;
         }
+      } else {
+        // Debug: Show what we're trying to match
+        console.log(`No match for ${shop.shopName} (${shopId}) - ${item.brand}`);
       }
     });
   });
+  
+  console.log(`Matching complete: ${totalMatches}/${totalAttempts} items matched`);
+  console.log('=== END SUPPLY DATA MATCHING DEBUG ===');
   
   return enhancedData;
 };
@@ -559,3 +758,61 @@ const ShopInventoryTab = ({
 };
 
 export default ShopInventoryTab;
+export { parseGoogleSheetToSupplyRecords, debugSupplyData, type SupplyRecord };
+
+// ==========================================
+// USAGE EXAMPLE AND DEBUGGING GUIDE
+// ==========================================
+
+/**
+ * USAGE EXAMPLE:
+ * 
+ * 1. First, convert your Google Sheet data to the correct format:
+ * 
+ * const rawGoogleSheetData = [
+ *   {
+ *     challandate: "22-07-2025",
+ *     shop_dep: "DSCSC Limited", 
+ *     Shop_id: "P01954",
+ *     shop_name: "GOPAL HEIGHTS, NSP",
+ *     brand: "8 PM PREMIUM BLACK BLENDED WHISKY",
+ *     cases: 24,
+ *     order_no: "TPN21075446372"
+ *   },
+ *   // ... more rows from your Google Sheet
+ * ];
+ * 
+ * const supplyRecords = parseGoogleSheetToSupplyRecords(rawGoogleSheetData);
+ * 
+ * 2. Then use the component:
+ * 
+ * <ShopInventoryTab 
+ *   data={inventoryData} 
+ *   supplyData={supplyRecords} 
+ * />
+ * 
+ * 3. Check the browser console for debugging information when the component loads
+ * 
+ * 4. The exported CSV will now include a "Debug Info" column to help troubleshoot
+ * 
+ * TROUBLESHOOTING:
+ * - Check browser console for matching debug logs
+ * - Verify your Google Sheet column mapping in parseGoogleSheetToSupplyRecords()
+ * - Make sure shop IDs and brand names match between inventory and supply data
+ * - Check that the 'cases' column contains numeric values
+ * 
+ * QUICK FIX FOR MISSING CASES DATA:
+ * 
+ * 1. First, debug your supply data structure:
+ *    debugSupplyData(yourSupplyRecords);
+ * 
+ * 2. Look in the console for "Possible cases fields" - this will show you 
+ *    what field name contains your cases data from column O
+ * 
+ * 3. If your cases field is named differently (like "pack" or "quantity"), 
+ *    update the SupplyRecord interface or modify your data before passing it:
+ * 
+ *    yourSupplyRecords.forEach(record => {
+ *      record.cases = record.pack || record.O || record['14'] || 0;
+ *    });
+ */
