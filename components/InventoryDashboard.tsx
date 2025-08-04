@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { Package, AlertTriangle, TrendingUp, Clock, MapPin, Users, Filter, Search, X, ChevronDown, ChevronUp, BarChart3, Calendar, Eye, AlertCircle, CheckCircle, XCircle, Truck, ShoppingBag, Download, RefreshCw, ChevronLeft, ChevronRight, FileText, Table, Phone } from 'lucide-react';
+import { Package, AlertTriangle, TrendingUp, Clock, MapPin, Users, Filter, Search, X, ChevronDown, ChevronUp, BarChart3, Calendar, Eye, AlertCircle, CheckCircle, XCircle, Truck, ShoppingBag, Download, RefreshCw, ChevronLeft, ChevronRight, FileText, Table, Phone, Layers } from 'lucide-react';
 
 // ==========================================
 // IMPORTED EXTRACTED COMPONENTS
@@ -15,6 +15,8 @@ import StockIntelligenceTab from '../components/tabs/inventory/StockIntelligence
 import SupplyStockMismatchTab from '../components/tabs/inventory/SupplyStockMismatchTab';
 // 🆕 NEW: Location Verification Tab
 import LocationVerificationTab from '../components/tabs/inventory/LocationVerificationTab';
+// 🆕 NEW: Stock Level Tracking Tab
+import StockLevelTrackingTab from '../components/tabs/inventory/StockLevelTrackingTab';
 
 // ==========================================
 // ENHANCED INVENTORY TYPES & INTERFACES
@@ -1580,6 +1582,15 @@ const InventoryDashboard = () => {
         csvContent += "Location Verification,Distance Analysis,Compare master shop coordinates with visit submission coordinates\n";
         csvContent += "Location Verification,Accuracy Categories,Accurate (≤50m) | Acceptable (≤200m) | Questionable (≤500m) | Suspicious (≤5km) | Impossible (>5km)\n";
         csvContent += "Location Verification,Export Options,Detailed Report | Salesman Summary | Executive Summary\n";
+      } else if (activeTab === 'stock_tracking') {
+        // 🆕 NEW: Stock Level Tracking export
+        csvContent += "STOCK LEVEL TRACKING ANALYSIS\n";
+        csvContent += "Note: This is a basic export. Use the dedicated Stock Level Tracking tab export buttons for complete reports.\n";
+        csvContent += "Tab,Feature,Description\n";
+        csvContent += "Stock Level Tracking,Complete Inventory Visibility,Track all stock levels across visited and non-visited shops\n";
+        csvContent += "Stock Level Tracking,Supply Integration,Correlate supply deliveries with reported stock levels\n";
+        csvContent += "Stock Level Tracking,Time Periods,7/15/30 day tracking windows with real-time recalculation\n";
+        csvContent += "Stock Level Tracking,Export Options,Complete Report with Supply History and Visit History\n";
       }
 
       const encodedUri = encodeURI(csvContent);
@@ -1731,7 +1742,8 @@ const InventoryDashboard = () => {
               { id: 'frequency', label: 'Visit Frequency', icon: Calendar },
               { id: 'alerts', label: 'Stock Intelligence', icon: AlertTriangle },
               { id: 'mismatch', label: 'Supply-Stock Mismatch', icon: AlertCircle },
-              { id: 'location', label: 'Location Verification', icon: MapPin } // 🆕 NEW TAB
+              { id: 'location', label: 'Location Verification', icon: MapPin },
+              { id: 'stock_tracking', label: 'Stock Level Tracking', icon: Layers } // 🆕 NEW TAB
             ].map((tab) => (
               <button
                 key={tab.id}
@@ -1761,7 +1773,8 @@ const InventoryDashboard = () => {
             {activeTab === 'frequency' && <VisitFrequencyTab data={inventoryData} />}
             {activeTab === 'alerts' && <StockIntelligenceTab data={inventoryData} />}
             {activeTab === 'mismatch' && <SupplyStockMismatchTab data={inventoryData} />}
-            {activeTab === 'location' && <LocationVerificationTab data={inventoryData} />} {/* 🆕 NEW TAB */}
+            {activeTab === 'location' && <LocationVerificationTab data={inventoryData} />}
+            {activeTab === 'stock_tracking' && <StockLevelTrackingTab data={inventoryData} />} {/* 🆕 NEW TAB */}
           </>
         )}
       </main>
