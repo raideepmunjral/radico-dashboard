@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Search, X, ChevronDown, ChevronUp, CheckCircle, XCircle, AlertCircle, Truck } from 'lucide-react';
+import { Search, X, ChevronDown, ChevronUp, CheckCircle, XCircle, AlertCircle, Truck, Download } from 'lucide-react';
 
 // ==========================================
-// INVENTORY DATA TYPES (copied from main file)
+// INVENTORY DATA TYPES (enhanced with cases)
 // ==========================================
 
 interface InventoryItem {
@@ -26,6 +26,10 @@ interface InventoryItem {
   supplyDateAfterVisit?: Date;
   currentDaysOutOfStock?: number;
   supplyStatus: 'current' | 'aging_30_45' | 'aging_45_60' | 'aging_60_75' | 'aging_75_90' | 'aging_critical' | 'recently_restocked' | 'awaiting_supply' | 'unknown';
+  // Enhanced with cases information
+  casesDelivered?: number;
+  lastSupplyCases?: number;
+  totalCasesDelivered?: number;
 }
 
 interface ShopInventory {
@@ -34,7 +38,7 @@ interface ShopInventory {
   department: string;
   salesman: string;
   visitDate: Date | null;
-  items: Record<string, any>;
+  items: Record<string, InventoryItem>;
   totalItems: number;
   inStockCount: number;
   outOfStockCount: number;
@@ -84,10 +88,160 @@ interface ShopInventoryFilters {
 }
 
 // ==========================================
+// CSV EXPORT UTILITY FUNCTIONS
+// ==========================================
+
+const formatDateForCSV = (date: Date | null | undefined): string => {
+  if (!date) return '';
+  return date.toLocaleDateString('en-GB'); // DD/MM/YYYY format
+};
+
+const generateCSVContent = (shops: ShopInventory[]): string => {
+  const headers = [
+    'Shop ID',
+    'Shop Name',
+    'Department',
+    'Salesman',
+    'Visit Date',
+    'Data Source',
+    'Brand',
+    'Quantity',
+    'Stock Status',
+    'Age (Days)',
+    'Age Category',
+    'Last Supply Date',
+    'Cases Delivered',
+    'Supply Status',
+    'Days Since Supply',
+    'Days Out of Stock',
+    'Reason No Stock',
+    'Recently Restocked',
+    'Supply Cases Info'
+  ];
+
+  const csvRows = [headers.join(',')];
+
+  shops.forEach(shop => {
+    Object.values(shop.items).forEach(item => {
+      const stockStatus = item.isInStock ? 'In Stock' : 
+                         item.isOutOfStock ? 'Out of Stock' : 
+                         item.isLowStock ? 'Low Stock' : 'Unknown';
+      
+      const ageCategory = item.ageCategory?.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()) || '';
+      
+      // Enhanced supply cases information
+      const supplyCasesInfo = item.lastSupplyCases ? 
+        `Last: ${item.lastSupplyCases} cases` : 
+        item.casesDelivered ? `${item.casesDelivered} cases` : '';
+
+      const row = [
+        shop.shopId,
+        `"${shop.shopName}"`, // Quoted to handle commas in shop names
+        shop.department,
+        `"${shop.salesman}"`, // Quoted to handle commas in salesman names
+        formatDateForCSV(shop.visitDate),
+        shop.dataSource,
+        `"${item.brand}"`, // Quoted to handle commas in brand names
+        item.quantity,
+        stockStatus,
+        item.ageInDays,
+        ageCategory,
+        formatDateForCSV(item.lastSupplyDate),
+        item.casesDelivered || item.lastSupplyCases || '', // Cases delivered information
+        item.supplyStatus?.replace(/_/g, ' ') || '',
+        item.daysSinceLastSupply || '',
+        item.daysOutOfStock || item.currentDaysOutOfStock || '',
+        `"${item.reasonNoStock || ''}"`, // Quoted to handle commas
+        item.suppliedAfterOutOfStock ? 'Yes' : 'No',
+        `"${supplyCasesInfo}"` // Enhanced cases info
+      ];
+      
+      csvRows.push(row.join(','));
+    });
+  });
+
+  return csvRows.join('\n');
+};
+
+const downloadCSV = (content: string, filename: string) => {
+  const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement('a');
+  const url = URL.createObjectURL(blob);
+  link.setAttribute('href', url);
+  link.setAttribute('download', filename);
+  link.style.visibility = 'hidden';
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+};
+
+// ==========================================
+// MASTER DATA INTEGRATION FUNCTIONS
+// ==========================================
+
+interface SupplyRecord {
+  brand: string;
+  shopId: string;
+  shopName: string;
+  supplyDate: Date;
+  cases: number;
+  orderNo: string;
+}
+
+// Function to match supply data with inventory data
+const enhanceInventoryWithSupplyData = (
+  inventoryData: InventoryData, 
+  supplyRecords: SupplyRecord[]
+): InventoryData => {
+  const enhancedData = { ...inventoryData };
+  
+  Object.keys(enhancedData.shops).forEach(shopId => {
+    const shop = enhancedData.shops[shopId];
+    
+    Object.keys(shop.items).forEach(brandKey => {
+      const item = shop.items[brandKey];
+      
+      // Find matching supply records for this shop and brand
+      const matchingSupplyRecords = supplyRecords.filter(record => 
+        record.shopId === shopId && 
+        record.brand.toLowerCase().includes(item.brand.toLowerCase())
+      );
+      
+      if (matchingSupplyRecords.length > 0) {
+        // Sort by supply date to get the most recent
+        matchingSupplyRecords.sort((a, b) => b.supplyDate.getTime() - a.supplyDate.getTime());
+        const mostRecentSupply = matchingSupplyRecords[0];
+        
+        // Update item with supply information
+        item.lastSupplyDate = mostRecentSupply.supplyDate;
+        item.lastSupplyCases = mostRecentSupply.cases;
+        item.casesDelivered = mostRecentSupply.cases;
+        
+        // Calculate total cases delivered
+        item.totalCasesDelivered = matchingSupplyRecords.reduce((total, record) => total + record.cases, 0);
+        
+        // Update supply status based on cases delivered
+        if (mostRecentSupply.cases > 0) {
+          item.suppliedAfterOutOfStock = true;
+        }
+      }
+    });
+  });
+  
+  return enhancedData;
+};
+
+// ==========================================
 // INDEPENDENT SHOP INVENTORY TAB COMPONENT
 // ==========================================
 
-const ShopInventoryTab = ({ data }: { data: InventoryData }) => {
+const ShopInventoryTab = ({ 
+  data, 
+  supplyData 
+}: { 
+  data: InventoryData;
+  supplyData?: SupplyRecord[];
+}) => {
   // ==========================================
   // OWN STATE MANAGEMENT
   // ==========================================
@@ -102,21 +256,25 @@ const ShopInventoryTab = ({ data }: { data: InventoryData }) => {
   });
   
   const [expandedShop, setExpandedShop] = useState<string | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+
+  // Enhance data with supply information if available
+  const enhancedData = supplyData ? enhanceInventoryWithSupplyData(data, supplyData) : data;
 
   // ==========================================
   // OWN HELPER FUNCTIONS
   // ==========================================
   
   const getDepartments = () => {
-    return Array.from(new Set(Object.values(data.shops).map(shop => shop.department))).sort();
+    return Array.from(new Set(Object.values(enhancedData.shops).map(shop => shop.department))).sort();
   };
 
   const getSalesmen = () => {
-    return Array.from(new Set(Object.values(data.shops).map(shop => shop.salesman))).sort();
+    return Array.from(new Set(Object.values(enhancedData.shops).map(shop => shop.salesman))).sort();
   };
 
   const getFilteredShops = () => {
-    return Object.values(data.shops).filter(shop => {
+    return Object.values(enhancedData.shops).filter(shop => {
       const matchesDepartment = !filters.department || shop.department === filters.department;
       const matchesSalesman = !filters.salesman || shop.salesman === filters.salesman;
       const matchesSearch = !filters.searchText || 
@@ -136,17 +294,38 @@ const ShopInventoryTab = ({ data }: { data: InventoryData }) => {
     });
   };
 
-  const getEnhancedSupplyStatusDisplay = (item: any) => {
+  const getEnhancedSupplyStatusDisplay = (item: InventoryItem) => {
     if ((item as any).advancedSupplyStatus) {
       return (item as any).advancedSupplyStatus;
     }
     
-    if (item.suppliedAfterOutOfStock && (item as any).daysSinceSupply !== undefined) {
-      return `Restocked (${(item as any).daysSinceSupply}d)`;
-    } else if (item.supplyStatus === 'awaiting_supply' && (item as any).currentDaysOutOfStock) {
-      return `Awaiting Supply (out for ${(item as any).currentDaysOutOfStock} days)`;
+    if (item.suppliedAfterOutOfStock && item.daysSinceLastSupply !== undefined) {
+      const casesInfo = item.lastSupplyCases ? ` (${item.lastSupplyCases} cases)` : '';
+      return `Restocked (${item.daysSinceLastSupply}d)${casesInfo}`;
+    } else if (item.supplyStatus === 'awaiting_supply' && item.currentDaysOutOfStock) {
+      return `Awaiting Supply (out for ${item.currentDaysOutOfStock} days)`;
     } else {
       return item.supplyStatus?.replace(/_/g, ' ') || 'Unknown';
+    }
+  };
+
+  // ==========================================
+  // EXPORT FUNCTIONALITY
+  // ==========================================
+  
+  const handleExportCSV = async () => {
+    setIsExporting(true);
+    try {
+      const filteredShops = getFilteredShops();
+      const csvContent = generateCSVContent(filteredShops);
+      const timestamp = new Date().toISOString().split('T')[0];
+      const filename = `shop_inventory_with_cases_${timestamp}.csv`;
+      downloadCSV(csvContent, filename);
+    } catch (error) {
+      console.error('Error exporting CSV:', error);
+      alert('Error exporting CSV. Please try again.');
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -226,6 +405,16 @@ const ShopInventoryTab = ({ data }: { data: InventoryData }) => {
             <X className="w-4 h-4" />
             <span>Clear</span>
           </button>
+
+          {/* Export Button */}
+          <button
+            onClick={handleExportCSV}
+            disabled={isExporting}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center space-x-2"
+          >
+            <Download className="w-4 h-4" />
+            <span>{isExporting ? 'Exporting...' : 'Export CSV'}</span>
+          </button>
         </div>
       </div>
 
@@ -233,7 +422,10 @@ const ShopInventoryTab = ({ data }: { data: InventoryData }) => {
       <div className="bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900">Master-Integrated Shop Inventory Status</h3>
-          <p className="text-sm text-gray-500">Showing {filteredShops.length} shops with master data integration ({data.summary.rollingPeriodDays}-day rolling period)</p>
+          <p className="text-sm text-gray-500">
+            Showing {filteredShops.length} shops with master data integration ({enhancedData.summary.rollingPeriodDays}-day rolling period)
+            {supplyData && <span className="text-blue-600"> • Enhanced with supply cases data</span>}
+          </p>
         </div>
         <div className="divide-y divide-gray-200">
           {filteredShops.map((shop: ShopInventory) => (
@@ -307,6 +499,7 @@ const ShopInventoryTab = ({ data }: { data: InventoryData }) => {
                                 <Truck className="w-4 h-4 text-blue-500" />
                                 <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 px-2 py-1 text-xs text-white bg-gray-800 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
                                   Recently Restocked
+                                  {item.lastSupplyCases && ` - ${item.lastSupplyCases} cases`}
                                 </div>
                               </div>
                             )}
@@ -320,6 +513,16 @@ const ShopInventoryTab = ({ data }: { data: InventoryData }) => {
                           {item.lastSupplyDate && (
                             <div className="text-xs text-blue-600">
                               Last Supply: {item.lastSupplyDate.toLocaleDateString('en-GB')}
+                              {item.lastSupplyCases && (
+                                <span className="font-semibold text-blue-800 ml-1">
+                                  ({item.lastSupplyCases} cases)
+                                </span>
+                              )}
+                            </div>
+                          )}
+                          {item.totalCasesDelivered && (
+                            <div className="text-xs text-green-600">
+                              Total Cases: {item.totalCasesDelivered}
                             </div>
                           )}
                           {(item as any).agingDataSource && (
