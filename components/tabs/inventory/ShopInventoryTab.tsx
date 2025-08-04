@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Search, X, ChevronDown, ChevronUp, CheckCircle, XCircle, AlertCircle, Truck, Download } from 'lucide-react';
+import { Search, X, ChevronDown, ChevronUp, CheckCircle, XCircle, AlertCircle, Truck } from 'lucide-react';
 
 // ==========================================
-// INVENTORY DATA TYPES (enhanced with cases)
+// INVENTORY DATA TYPES (copied from main file)
 // ==========================================
 
 interface InventoryItem {
@@ -26,10 +26,6 @@ interface InventoryItem {
   supplyDateAfterVisit?: Date;
   currentDaysOutOfStock?: number;
   supplyStatus: 'current' | 'aging_30_45' | 'aging_45_60' | 'aging_60_75' | 'aging_75_90' | 'aging_critical' | 'recently_restocked' | 'awaiting_supply' | 'unknown';
-  // Enhanced with cases information
-  casesDelivered?: number;
-  lastSupplyCases?: number;
-  totalCasesDelivered?: number;
 }
 
 interface ShopInventory {
@@ -38,7 +34,7 @@ interface ShopInventory {
   department: string;
   salesman: string;
   visitDate: Date | null;
-  items: Record<string, InventoryItem>;
+  items: Record<string, any>;
   totalItems: number;
   inStockCount: number;
   outOfStockCount: number;
@@ -88,375 +84,10 @@ interface ShopInventoryFilters {
 }
 
 // ==========================================
-// CSV EXPORT UTILITY FUNCTIONS
-// ==========================================
-
-const formatDateForCSV = (date: Date | null | undefined): string => {
-  if (!date) return '';
-  return date.toLocaleDateString('en-GB'); // DD/MM/YYYY format
-};
-
-const generateCSVContent = (shops: ShopInventory[]): string => {
-  const headers = [
-    'Shop ID',
-    'Shop Name',
-    'Department',
-    'Salesman',
-    'Visit Date',
-    'Data Source',
-    'Brand',
-    'Quantity',
-    'Stock Status',
-    'Age (Days)',
-    'Age Category',
-    'Last Supply Date',
-    'Cases Delivered',
-    'Supply Status',
-    'Days Since Supply',
-    'Days Out of Stock',
-    'Reason No Stock',
-    'Recently Restocked',
-    'Supply Cases Info',
-    'Debug Info'
-  ];
-
-  const csvRows = [headers.join(',')];
-
-  shops.forEach(shop => {
-    Object.values(shop.items).forEach(item => {
-      const stockStatus = item.isInStock ? 'In Stock' : 
-                         item.isOutOfStock ? 'Out of Stock' : 
-                         item.isLowStock ? 'Low Stock' : 'Unknown';
-      
-      const ageCategory = item.ageCategory?.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase()) || '';
-      
-      // Enhanced supply cases information with better fallback
-      const casesValue = item.casesDelivered || item.lastSupplyCases || 0;
-      const supplyCasesInfo = casesValue > 0 ? 
-        `Last: ${casesValue} cases` : 
-        'No cases data';
-
-      // Debug information
-      const debugInfo = `HasSupplyData:${!!item.lastSupplyDate},Cases:${casesValue},Restocked:${!!item.suppliedAfterOutOfStock}`;
-
-      const row = [
-        shop.shopId,
-        `"${shop.shopName}"`, // Quoted to handle commas in shop names
-        shop.department,
-        `"${shop.salesman}"`, // Quoted to handle commas in salesman names
-        formatDateForCSV(shop.visitDate),
-        shop.dataSource,
-        `"${item.brand}"`, // Quoted to handle commas in brand names
-        item.quantity,
-        stockStatus,
-        item.ageInDays,
-        ageCategory,
-        formatDateForCSV(item.lastSupplyDate),
-        casesValue, // Cases delivered information - use the actual number
-        item.supplyStatus?.replace(/_/g, ' ') || '',
-        item.daysSinceLastSupply || '',
-        item.daysOutOfStock || item.currentDaysOutOfStock || '',
-        `"${item.reasonNoStock || ''}"`, // Quoted to handle commas
-        item.suppliedAfterOutOfStock ? 'Yes' : 'No',
-        `"${supplyCasesInfo}"`, // Enhanced cases info
-        `"${debugInfo}"` // Debug information
-      ];
-      
-      csvRows.push(row.join(','));
-    });
-  });
-
-  return csvRows.join('\n');
-};
-
-const downloadCSV = (content: string, filename: string) => {
-  const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
-  const link = document.createElement('a');
-  const url = URL.createObjectURL(blob);
-  link.setAttribute('href', url);
-  link.setAttribute('download', filename);
-  link.style.visibility = 'hidden';
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-};
-
-// ==========================================
-// DEBUG HELPER FUNCTION
-// ==========================================
-
-/**
- * Use this function to debug your supply data structure
- * Call this before passing data to the component to see the exact field names
- */
-const debugSupplyData = (supplyRecords: any[]) => {
-  console.log('=== SUPPLY DATA STRUCTURE DEBUG ===');
-  console.log('Total records:', supplyRecords.length);
-  
-  if (supplyRecords.length > 0) {
-    const firstRecord = supplyRecords[0];
-    console.log('First record structure:', firstRecord);
-    console.log('All field names:', Object.keys(firstRecord));
-    
-    // Look for cases-related fields
-    const possibleCasesFields = Object.keys(firstRecord).filter(key => 
-      key.toLowerCase().includes('case') || 
-      key === 'O' || 
-      key === '14' ||
-      typeof firstRecord[key] === 'number' && firstRecord[key] > 0 && firstRecord[key] < 1000
-    );
-    console.log('Possible cases fields:', possibleCasesFields);
-    
-    possibleCasesFields.forEach(field => {
-      console.log(`Field "${field}" value:`, firstRecord[field]);
-    });
-  }
-  
-  console.log('=== END SUPPLY DATA STRUCTURE DEBUG ===');
-};
-
-// ==========================================
-// HELPER FUNCTION TO PARSE GOOGLE SHEET DATA
-// ==========================================
-
-/**
- * Helper function to convert Google Sheet data to the format expected by the component
- * Use this to process your Google Sheet data before passing it to the component
- */
-const parseGoogleSheetToSupplyRecords = (sheetData: any[]): SupplyRecord[] => {
-  console.log('=== PARSING GOOGLE SHEET DATA ===');
-  console.log('Raw sheet data rows:', sheetData.length);
-  console.log('Sample row:', sheetData[0]);
-  
-  const supplyRecords: SupplyRecord[] = [];
-  
-  sheetData.forEach((row, index) => {
-    try {
-      // Adjust these column indices based on your actual Google Sheet structure
-      // From your images, it looks like:
-      // Column B: challandate
-      // Column E: shop_dep 
-      // Column H: Shop_id
-      // Column I: shop_name
-      // Column J: brand
-      // Column O: cases
-      
-      const record: SupplyRecord = {
-        brand: row.brand || row.J || row[9] || '', // Column J (index 9)
-        shopId: row.Shop_id || row.H || row[7] || '', // Column H (index 7)  
-        shopName: row.shop_name || row.I || row[8] || '', // Column I (index 8)
-        supplyDate: parseDate(row.challandate || row.B || row[1] || ''), // Column B (index 1)
-        cases: parseInt(row.cases || row.O || row[14] || '0'), // Column O (index 14)
-        orderNo: row.order_no || row.F || row[5] || '' // Column F (index 5)
-      };
-      
-      // Only add if we have essential data
-      if (record.brand && record.shopId && record.cases > 0) {
-        supplyRecords.push(record);
-        console.log(`Parsed row ${index + 1}:`, record);
-      } else {
-        console.log(`Skipped row ${index + 1} - missing essential data:`, {
-          brand: record.brand,
-          shopId: record.shopId,
-          cases: record.cases
-        });
-      }
-    } catch (error) {
-      console.error(`Error parsing row ${index + 1}:`, error, row);
-    }
-  });
-  
-  console.log(`Successfully parsed ${supplyRecords.length} supply records`);
-  console.log('=== END PARSING GOOGLE SHEET DATA ===');
-  
-  return supplyRecords;
-};
-
-// Helper function to parse dates from various formats
-const parseDate = (dateString: any): Date => {
-  if (!dateString) return new Date();
-  
-  // If it's already a Date object
-  if (dateString instanceof Date) return dateString;
-  
-  // If it's a string, try to parse it
-  if (typeof dateString === 'string') {
-    // Handle DD-MM-YYYY format
-    if (dateString.includes('-')) {
-      const parts = dateString.split('-');
-      if (parts.length === 3) {
-        return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
-      }
-    }
-    // Handle DD/MM/YYYY format
-    if (dateString.includes('/')) {
-      const parts = dateString.split('/');
-      if (parts.length === 3) {
-        return new Date(parseInt(parts[2]), parseInt(parts[1]) - 1, parseInt(parts[0]));
-      }
-    }
-  }
-  
-  // Fallback to standard Date parsing
-  return new Date(dateString);
-};
-
-// ==========================================
-// MASTER DATA INTEGRATION FUNCTIONS
-// ==========================================
-
-interface SupplyRecord {
-  brand: string;
-  shopId: string;
-  shopName: string;
-  supplyDate: Date;
-  cases?: number;  // Make it optional since it might be named differently
-  Cases?: number;  // Alternative naming
-  O?: number;      // Direct column reference
-  orderNo: string;
-  [key: string]: any; // Allow any additional properties
-}
-
-// Function to match supply data with inventory data
-const enhanceInventoryWithSupplyData = (
-  inventoryData: InventoryData, 
-  supplyRecords: SupplyRecord[]
-): InventoryData => {
-  const enhancedData = { ...inventoryData };
-  
-  console.log('=== SUPPLY DATA MATCHING DEBUG ===');
-  console.log('Total supply records:', supplyRecords?.length || 0);
-  console.log('Sample supply record:', supplyRecords?.[0]);
-  
-  if (!supplyRecords || supplyRecords.length === 0) {
-    console.warn('No supply records provided!');
-    return enhancedData;
-  }
-  
-  let totalMatches = 0;
-  let totalAttempts = 0;
-  
-  Object.keys(enhancedData.shops).forEach(shopId => {
-    const shop = enhancedData.shops[shopId];
-    
-    Object.keys(shop.items).forEach(brandKey => {
-      const item = shop.items[brandKey];
-      totalAttempts++;
-      
-      // Enhanced matching logic - try multiple approaches
-      const matchingSupplyRecords = supplyRecords.filter(record => {
-        // Normalize shop IDs and names for comparison
-        const recordShopId = record.shopId?.toString().trim();
-        const recordShopName = record.shopName?.toLowerCase().trim();
-        const currentShopId = shopId?.toString().trim();
-        const currentShopName = shop.shopName?.toLowerCase().trim();
-        
-        // Normalize brand names for comparison
-        const recordBrand = record.brand?.toLowerCase().trim().replace(/[^\w\s]/g, '');
-        const itemBrand = item.brand?.toLowerCase().trim().replace(/[^\w\s]/g, '');
-        
-        // Try multiple matching strategies
-        const shopMatches = (
-          recordShopId === currentShopId ||
-          recordShopName === currentShopName ||
-          (recordShopName && currentShopName && recordShopName.includes(currentShopName)) ||
-          (recordShopName && currentShopName && currentShopName.includes(recordShopName))
-        );
-        
-        const brandMatches = (
-          recordBrand === itemBrand ||
-          (recordBrand && itemBrand && recordBrand.includes(itemBrand)) ||
-          (recordBrand && itemBrand && itemBrand.includes(recordBrand)) ||
-          // Check if key parts of brand name match
-          (recordBrand && itemBrand && 
-           recordBrand.split(' ').some(word => itemBrand.includes(word) && word.length > 3))
-        );
-        
-        return shopMatches && brandMatches;
-      });
-      
-      if (matchingSupplyRecords.length > 0) {
-        totalMatches++;
-        
-        // Sort by supply date to get the most recent
-        matchingSupplyRecords.sort((a, b) => {
-          const dateA = new Date(a.supplyDate).getTime();
-          const dateB = new Date(b.supplyDate).getTime();
-          return dateB - dateA;
-        });
-        
-        const mostRecentSupply = matchingSupplyRecords[0];
-        
-        console.log(`Match found for ${shop.shopName} - ${item.brand}:`, {
-          supplyDate: mostRecentSupply.supplyDate,
-          cases: mostRecentSupply.cases,
-          orderNo: mostRecentSupply.orderNo
-        });
-        
-        console.log(`✅ Supply matched for ${item.brand}:`, {
-          date: mostRecentSupply.supplyDate,
-          allFieldsInRecord: Object.keys(mostRecentSupply),
-          allValuesInRecord: mostRecentSupply,
-          casesField: mostRecentSupply.cases,
-          OField: mostRecentSupply.O,
-          casesExtracted: casesValue
-        });
-        
-        // Update item with supply information
-        item.lastSupplyDate = new Date(mostRecentSupply.supplyDate);
-        
-        // Try EVERY possible way to get the cases value
-        const casesValue = Number(mostRecentSupply.cases) || 
-                          Number(mostRecentSupply.Cases) || 
-                          Number(mostRecentSupply.O) || 
-                          Number(mostRecentSupply['cases']) || 
-                          Number(mostRecentSupply['Cases']) || 
-                          Number(mostRecentSupply['O']) ||
-                          Number(mostRecentSupply.pack) ||
-                          Number(mostRecentSupply.quantity) ||
-                          // Try all numeric values in the record as fallback
-                          (() => {
-                            const numericValues = Object.values(mostRecentSupply)
-                              .filter(val => typeof val === 'number' && val > 0 && val < 1000);
-                            return numericValues.length > 0 ? numericValues[numericValues.length - 1] : 0;
-                          })();
-        
-        item.lastSupplyCases = casesValue;
-        item.casesDelivered = casesValue;
-        
-        // Calculate total cases delivered
-        item.totalCasesDelivered = matchingSupplyRecords.reduce((total, record) => total + (record.cases || 0), 0);
-        
-        // Update supply status based on cases delivered
-        if (mostRecentSupply.cases && mostRecentSupply.cases > 0) {
-          item.suppliedAfterOutOfStock = true;
-        }
-      } else {
-        // Debug: Show what we're trying to match
-        console.log(`No match for ${shop.shopName} (${shopId}) - ${item.brand}`);
-      }
-    });
-  });
-  
-  console.log(`Matching complete: ${totalMatches}/${totalAttempts} items matched`);
-  console.log('=== END SUPPLY DATA MATCHING DEBUG ===');
-  
-  return enhancedData;
-};
-
-// ==========================================
 // INDEPENDENT SHOP INVENTORY TAB COMPONENT
 // ==========================================
 
-const ShopInventoryTab = ({ 
-  data, 
-  supplyData,
-  rawSupplyData // Add this to accept raw Google Sheets data directly
-}: { 
-  data: InventoryData;
-  supplyData?: SupplyRecord[];
-  rawSupplyData?: any[]; // Raw Google Sheets data
-}) => {
+const ShopInventoryTab = ({ data }: { data: InventoryData }) => {
   // ==========================================
   // OWN STATE MANAGEMENT
   // ==========================================
@@ -471,44 +102,21 @@ const ShopInventoryTab = ({
   });
   
   const [expandedShop, setExpandedShop] = useState<string | null>(null);
-  const [isExporting, setIsExporting] = useState(false);
-
-  // Process raw supply data if provided
-  let processedSupplyData = supplyData;
-  if (rawSupplyData && rawSupplyData.length > 0) {
-    console.log('🔄 Processing raw supply data:', rawSupplyData.length, 'rows');
-    console.log('🔍 Sample raw row:', rawSupplyData[0]);
-    
-    processedSupplyData = rawSupplyData.map(row => ({
-      brand: row.brand || '',
-      shopId: row.Shop_id || row.shop_id || '',
-      shopName: row.shop_name || '',
-      supplyDate: new Date(row.challandate || row.date || ''),
-      cases: Number(row.cases) || Number(row.Cases) || Number(row.O) || 1, // Default to 1 if no cases found
-      orderNo: row.order_no || ''
-    })).filter(record => record.brand && record.shopId);
-    
-    console.log('✅ Processed supply records:', processedSupplyData.length);
-    console.log('📦 Sample processed record:', processedSupplyData[0]);
-  }
-
-  // Enhance data with supply information if available
-  const enhancedData = processedSupplyData ? enhanceInventoryWithSupplyData(data, processedSupplyData) : data;
 
   // ==========================================
   // OWN HELPER FUNCTIONS
   // ==========================================
   
   const getDepartments = () => {
-    return Array.from(new Set(Object.values(enhancedData.shops).map(shop => shop.department))).sort();
+    return Array.from(new Set(Object.values(data.shops).map(shop => shop.department))).sort();
   };
 
   const getSalesmen = () => {
-    return Array.from(new Set(Object.values(enhancedData.shops).map(shop => shop.salesman))).sort();
+    return Array.from(new Set(Object.values(data.shops).map(shop => shop.salesman))).sort();
   };
 
   const getFilteredShops = () => {
-    return Object.values(enhancedData.shops).filter(shop => {
+    return Object.values(data.shops).filter(shop => {
       const matchesDepartment = !filters.department || shop.department === filters.department;
       const matchesSalesman = !filters.salesman || shop.salesman === filters.salesman;
       const matchesSearch = !filters.searchText || 
@@ -528,38 +136,17 @@ const ShopInventoryTab = ({
     });
   };
 
-  const getEnhancedSupplyStatusDisplay = (item: InventoryItem) => {
+  const getEnhancedSupplyStatusDisplay = (item: any) => {
     if ((item as any).advancedSupplyStatus) {
       return (item as any).advancedSupplyStatus;
     }
     
-    if (item.suppliedAfterOutOfStock && item.daysSinceLastSupply !== undefined) {
-      const casesInfo = item.lastSupplyCases ? ` (${item.lastSupplyCases} cases)` : '';
-      return `Restocked (${item.daysSinceLastSupply}d)${casesInfo}`;
-    } else if (item.supplyStatus === 'awaiting_supply' && item.currentDaysOutOfStock) {
-      return `Awaiting Supply (out for ${item.currentDaysOutOfStock} days)`;
+    if (item.suppliedAfterOutOfStock && (item as any).daysSinceSupply !== undefined) {
+      return `Restocked (${(item as any).daysSinceSupply}d)`;
+    } else if (item.supplyStatus === 'awaiting_supply' && (item as any).currentDaysOutOfStock) {
+      return `Awaiting Supply (out for ${(item as any).currentDaysOutOfStock} days)`;
     } else {
       return item.supplyStatus?.replace(/_/g, ' ') || 'Unknown';
-    }
-  };
-
-  // ==========================================
-  // EXPORT FUNCTIONALITY
-  // ==========================================
-  
-  const handleExportCSV = async () => {
-    setIsExporting(true);
-    try {
-      const filteredShops = getFilteredShops();
-      const csvContent = generateCSVContent(filteredShops);
-      const timestamp = new Date().toISOString().split('T')[0];
-      const filename = `shop_inventory_with_cases_${timestamp}.csv`;
-      downloadCSV(csvContent, filename);
-    } catch (error) {
-      console.error('Error exporting CSV:', error);
-      alert('Error exporting CSV. Please try again.');
-    } finally {
-      setIsExporting(false);
     }
   };
 
@@ -639,16 +226,6 @@ const ShopInventoryTab = ({
             <X className="w-4 h-4" />
             <span>Clear</span>
           </button>
-
-          {/* Export Button */}
-          <button
-            onClick={handleExportCSV}
-            disabled={isExporting}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 flex items-center space-x-2"
-          >
-            <Download className="w-4 h-4" />
-            <span>{isExporting ? 'Exporting...' : 'Export CSV'}</span>
-          </button>
         </div>
       </div>
 
@@ -656,10 +233,7 @@ const ShopInventoryTab = ({
       <div className="bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200">
           <h3 className="text-lg font-medium text-gray-900">Master-Integrated Shop Inventory Status</h3>
-          <p className="text-sm text-gray-500">
-            Showing {filteredShops.length} shops with master data integration ({enhancedData.summary.rollingPeriodDays}-day rolling period)
-            {processedSupplyData && <span className="text-blue-600"> • Enhanced with {processedSupplyData.length} supply records</span>}
-          </p>
+          <p className="text-sm text-gray-500">Showing {filteredShops.length} shops with master data integration ({data.summary.rollingPeriodDays}-day rolling period)</p>
         </div>
         <div className="divide-y divide-gray-200">
           {filteredShops.map((shop: ShopInventory) => (
@@ -733,7 +307,6 @@ const ShopInventoryTab = ({
                                 <Truck className="w-4 h-4 text-blue-500" />
                                 <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-1 px-2 py-1 text-xs text-white bg-gray-800 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
                                   Recently Restocked
-                                  {item.lastSupplyCases && ` - ${item.lastSupplyCases} cases`}
                                 </div>
                               </div>
                             )}
@@ -747,16 +320,6 @@ const ShopInventoryTab = ({
                           {item.lastSupplyDate && (
                             <div className="text-xs text-blue-600">
                               Last Supply: {item.lastSupplyDate.toLocaleDateString('en-GB')}
-                              {item.lastSupplyCases && (
-                                <span className="font-semibold text-blue-800 ml-1">
-                                  ({item.lastSupplyCases} cases)
-                                </span>
-                              )}
-                            </div>
-                          )}
-                          {item.totalCasesDelivered && (
-                            <div className="text-xs text-green-600">
-                              Total Cases: {item.totalCasesDelivered}
                             </div>
                           )}
                           {(item as any).agingDataSource && (
@@ -793,26 +356,3 @@ const ShopInventoryTab = ({
 };
 
 export default ShopInventoryTab;
-export { parseGoogleSheetToSupplyRecords, debugSupplyData, type SupplyRecord };
- * 
- * TROUBLESHOOTING:
- * - Check browser console for matching debug logs
- * - Verify your Google Sheet column mapping in parseGoogleSheetToSupplyRecords()
- * - Make sure shop IDs and brand names match between inventory and supply data
- * - Check that the 'cases' column contains numeric values
- * 
- * QUICK FIX FOR MISSING CASES DATA:
- * 
- * 1. First, debug your supply data structure:
- *    debugSupplyData(yourSupplyRecords);
- * 
- * 2. Look in the console for "Possible cases fields" - this will show you 
- *    what field name contains your cases data from column O
- * 
- * 3. If your cases field is named differently (like "pack" or "quantity"), 
- *    update the SupplyRecord interface or modify your data before passing it:
- * 
- *    yourSupplyRecords.forEach(record => {
- *      record.cases = record.pack || record.O || record['14'] || 0;
- *    });
- */
