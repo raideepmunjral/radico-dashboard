@@ -186,13 +186,10 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
     return [...new Set(keys)];
   };
 
-  // 🔧 PERFORMANCE CACHE - Store processed supply data
-  const supplyDataCache = useMemo(() => new Map<string, Array<{date: Date, cases: number}>>(), [data.rawSupplyData, filters.trackingPeriod]);
-
-  // 🔧 FIXED: Size-specific supply data extraction with performance optimization
-  const getSupplyDataForSKU = (shopId: string, brandName: string, trackingPeriod: number): Array<{date: Date, cases: number}> => {
+  // 🔧 CRITICAL FIX: Get ALL supply data for visited shops (not filtered by tracking period)
+  const getAllSupplyDataForSKU = (shopId: string, brandName: string): Array<{date: Date, cases: number}> => {
     // Cache key for performance
-    const cacheKey = `${shopId}_${brandName}_${trackingPeriod}`;
+    const cacheKey = `${shopId}_${brandName}_ALL_SUPPLY`;
     if (supplyDataCache.has(cacheKey)) {
       return supplyDataCache.get(cacheKey)!;
     }
@@ -219,72 +216,64 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
     const sizeIndex = 12;
     const casesIndex = 14;
     
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - trackingPeriod);
+    // 🎯 CRITICAL FIX: NO DATE CUTOFF - Get ALL supply data for visited shops
+    // const cutoffDate = new Date();
+    // cutoffDate.setDate(cutoffDate.getDate() - trackingPeriod); // ❌ REMOVED
     
     // 🔧 EXTRACT TARGET SIZE FROM BRAND NAME
     const targetBrandInfo = getBottleSizeInfo(brandName);
-    const targetSize = targetBrandInfo.size.replace('ml', ''); // Extract numeric size (750, 375, 180, etc.)
+    const targetSize = targetBrandInfo.size.replace('ml', '');
     
-    // 🔧 SIZE-SPECIFIC MATCHING FUNCTION
+    // 🔧 SIZE-SPECIFIC MATCHING FUNCTION (same as before)
     const isExactSizeAndBrandMatch = (supplyBrand: string, supplySize: string, targetBrand: string, targetSize: string): boolean => {
       const supplyBrandUpper = supplyBrand.toUpperCase();
       const targetBrandUpper = targetBrand.toUpperCase();
       
-      // Extract size from supply data (handle various formats)
       let normalizedSupplySize = '';
       if (supplySize) {
         const sizeMatch = supplySize.toString().match(/(\d+)/);
         normalizedSupplySize = sizeMatch ? sizeMatch[1] : '';
       }
       
-      // If no size column, try to extract from brand name
       if (!normalizedSupplySize) {
         const brandSizeMatch = supplyBrand.match(/(\d+)(?:ML|P)?/i);
         normalizedSupplySize = brandSizeMatch ? brandSizeMatch[1] : '';
       }
       
-      // 🎯 EXACT SIZE MATCHING REQUIRED
       const sizeMatches = normalizedSupplySize === targetSize;
+      if (!sizeMatches) return false;
       
-      if (!sizeMatches) {
-        return false; // ❌ Size mismatch - reject immediately
-      }
-      
-      // 🎯 BRAND FAMILY MATCHING (only after size matches)
       if (supplyBrandUpper.includes('8 PM') && targetBrandUpper.includes('8 PM')) {
         if (supplyBrandUpper.includes('BLACK') && targetBrandUpper.includes('BLACK')) {
-          return true; // ✅ 8 PM BLACK + exact size match
+          return true;
         }
       } else if (supplyBrandUpper.includes('VERVE') && targetBrandUpper.includes('VERVE')) {
         if (supplyBrandUpper.includes('LEMON') && targetBrandUpper.includes('LEMON')) {
-          return true; // ✅ VERVE LEMON + exact size match
+          return true;
         } else if (supplyBrandUpper.includes('CRANBERRY') && targetBrandUpper.includes('CRANBERRY')) {
-          return true; // ✅ VERVE CRANBERRY + exact size match
+          return true;
         } else if (supplyBrandUpper.includes('GREEN') && targetBrandUpper.includes('GREEN')) {
-          return true; // ✅ VERVE GREEN + exact size match
+          return true;
         } else if (supplyBrandUpper.includes('GRAIN') && targetBrandUpper.includes('GRAIN')) {
-          return true; // ✅ VERVE GRAIN + exact size match
+          return true;
         }
       } else {
-        // Fallback: word matching but only with exact size
         const brandWords = targetBrandUpper.split(' ').filter(word => word.length > 2);
         const supplyWords = supplyBrandUpper.split(' ').filter(word => word.length > 2);
         const commonWords = brandWords.filter(word => supplyWords.includes(word));
-        return commonWords.length >= 2; // ✅ Multiple word match + exact size
+        return commonWords.length >= 2;
       }
       
       return false;
     };
     
-    // 🔧 OPTIMIZED LOOP WITH SIZE FILTERING
+    // 🔧 OPTIMIZED LOOP - NO DATE FILTERING
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       
       if (row.length > Math.max(shopIdIndex, brandIndex, casesIndex)) {
         const rowShopId = row[shopIdIndex]?.toString().trim();
         
-        // ⚡ PERFORMANCE: Skip early if shop doesn't match
         if (rowShopId !== shopId) continue;
         
         const rowBrand = row[brandIndex]?.toString().trim();
@@ -294,8 +283,7 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
         
         if (rowBrand && rowDateStr) {
           const rowDate = parseDate(rowDateStr);
-          if (rowDate && rowDate >= cutoffDate) {
-            // 🔧 ENHANCED CASE PARSING (same as before)
+          if (rowDate) { // ✅ Accept ALL dates, no cutoff
             let rowCases = 1;
             if (rawCaseValue !== undefined && rawCaseValue !== null) {
               const caseString = String(rawCaseValue).trim();
@@ -312,7 +300,6 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
               }
             }
             
-            // 🎯 CRITICAL FIX: Use size-specific matching
             const isMatch = isExactSizeAndBrandMatch(rowBrand, rowSize, brandName, targetSize);
             
             if (isMatch && rowCases > 0) {
@@ -329,6 +316,16 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
     const sortedHistory = supplyHistory.sort((a, b) => a.date.getTime() - b.date.getTime());
     supplyDataCache.set(cacheKey, sortedHistory);
     return sortedHistory;
+  };
+
+  // 🔧 KEEP OLD FUNCTION FOR BACKWARD COMPATIBILITY BUT REDIRECT TO NEW ONE
+  const getSupplyDataForSKU = (shopId: string, brandName: string, trackingPeriod: number): Array<{date: Date, cases: number}> => {
+    // 🎯 CRITICAL CHANGE: Get ALL supply data, then filter if needed for specific use cases
+    const allSupplyData = getAllSupplyDataForSKU(shopId, brandName);
+    
+    // For now, return all data to fix the "No Supply" issue
+    // If specific use cases need date filtering, they can filter the results
+    return allSupplyData;
   };
 
   // 🔧 PERFORMANCE CACHE for visit data
