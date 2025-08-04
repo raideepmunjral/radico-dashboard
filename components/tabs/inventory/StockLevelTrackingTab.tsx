@@ -1,6 +1,6 @@
 /*
   ==========================================
-  STOCK LEVEL TRACKING DASHBOARD - FIXED
+  STOCK LEVEL TRACKING DASHBOARD
   Complete inventory visibility across all shops with supply data integration
   ==========================================
 */
@@ -123,20 +123,9 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
   const itemsPerPage = 20;
 
   // ==========================================
-  // CACHES FOR PERFORMANCE (DEFINED FIRST)
-  // ==========================================
-  const supplyDataCache = useMemo(() => new Map<string, Array<{date: Date, cases: number}>>(), 
-    [data.rawSupplyData, filters.trackingPeriod]);
-  
-  const visitDataCache = useMemo(() => new Map<string, Array<{date: Date, stock: number}>>(), 
-    [data.rawVisitData, filters.trackingPeriod]);
-
-  // ==========================================
   // HELPER FUNCTIONS
   // ==========================================
   const getBottleSizeInfo = (skuName: string): { size: string; conversionRate: number; expectedDailyConsumption: number } => {
-    if (!skuName) return { size: '750ml', conversionRate: 12, expectedDailyConsumption: 2 };
-    
     const sku = skuName.toUpperCase();
     
     if (sku.includes('750') || sku.includes('750ML')) {
@@ -184,24 +173,40 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
     }
   };
 
-  // 🔧 CRITICAL FIX: Get ALL supply data for visited shops (not filtered by tracking period)
-  const getAllSupplyDataForSKU = (shopId: string, brandName: string, cache: Map<string, Array<{date: Date, cases: number}>>): Array<{date: Date, cases: number}> => {
+  const createMultipleBrandKeys = (shopId: string, brandName: string, size?: string): string[] => {
+    const brandInfo = getBottleSizeInfo(brandName);
+    const actualSize = size || brandInfo.size.replace('ml', '');
+    
+    const keys = [
+      `${shopId}_${brandName.toUpperCase()}_${actualSize}`,
+      `${shopId}_${brandName.toUpperCase()}`,
+      `${shopId}_${brandName}`,
+    ];
+    
+    return [...new Set(keys)];
+  };
+
+  // 🔧 PERFORMANCE CACHE - Store processed supply data
+  const supplyDataCache = useMemo(() => new Map<string, Array<{date: Date, cases: number}>>(), [data.rawSupplyData, filters.trackingPeriod]);
+
+  // 🔧 FIXED: Size-specific supply data extraction with performance optimization
+  const getSupplyDataForSKU = (shopId: string, brandName: string, trackingPeriod: number): Array<{date: Date, cases: number}> => {
     // Cache key for performance
-    const cacheKey = `${shopId}_${brandName}_ALL_SUPPLY`;
-    if (cache.has(cacheKey)) {
-      return cache.get(cacheKey)!;
+    const cacheKey = `${shopId}_${brandName}_${trackingPeriod}`;
+    if (supplyDataCache.has(cacheKey)) {
+      return supplyDataCache.get(cacheKey)!;
     }
 
     const supplyHistory: Array<{date: Date, cases: number}> = [];
     
     if (!data.rawSupplyData?.pendingChallansData) {
-      cache.set(cacheKey, supplyHistory);
+      supplyDataCache.set(cacheKey, supplyHistory);
       return supplyHistory;
     }
     
     const pendingChallans = data.rawSupplyData.pendingChallansData;
     if (pendingChallans.length <= 1) {
-      cache.set(cacheKey, supplyHistory);
+      supplyDataCache.set(cacheKey, supplyHistory);
       return supplyHistory;
     }
     
@@ -214,64 +219,72 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
     const sizeIndex = 12;
     const casesIndex = 14;
     
-    // 🎯 CRITICAL FIX: NO DATE CUTOFF - Get ALL supply data for visited shops
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - trackingPeriod);
     
     // 🔧 EXTRACT TARGET SIZE FROM BRAND NAME
     const targetBrandInfo = getBottleSizeInfo(brandName);
-    const targetSize = targetBrandInfo.size.replace('ml', '');
+    const targetSize = targetBrandInfo.size.replace('ml', ''); // Extract numeric size (750, 375, 180, etc.)
     
     // 🔧 SIZE-SPECIFIC MATCHING FUNCTION
     const isExactSizeAndBrandMatch = (supplyBrand: string, supplySize: string, targetBrand: string, targetSize: string): boolean => {
-      if (!supplyBrand || !targetBrand) return false;
-      
       const supplyBrandUpper = supplyBrand.toUpperCase();
       const targetBrandUpper = targetBrand.toUpperCase();
       
+      // Extract size from supply data (handle various formats)
       let normalizedSupplySize = '';
       if (supplySize) {
         const sizeMatch = supplySize.toString().match(/(\d+)/);
         normalizedSupplySize = sizeMatch ? sizeMatch[1] : '';
       }
       
+      // If no size column, try to extract from brand name
       if (!normalizedSupplySize) {
         const brandSizeMatch = supplyBrand.match(/(\d+)(?:ML|P)?/i);
         normalizedSupplySize = brandSizeMatch ? brandSizeMatch[1] : '';
       }
       
+      // 🎯 EXACT SIZE MATCHING REQUIRED
       const sizeMatches = normalizedSupplySize === targetSize;
-      if (!sizeMatches) return false;
       
+      if (!sizeMatches) {
+        return false; // ❌ Size mismatch - reject immediately
+      }
+      
+      // 🎯 BRAND FAMILY MATCHING (only after size matches)
       if (supplyBrandUpper.includes('8 PM') && targetBrandUpper.includes('8 PM')) {
         if (supplyBrandUpper.includes('BLACK') && targetBrandUpper.includes('BLACK')) {
-          return true;
+          return true; // ✅ 8 PM BLACK + exact size match
         }
       } else if (supplyBrandUpper.includes('VERVE') && targetBrandUpper.includes('VERVE')) {
         if (supplyBrandUpper.includes('LEMON') && targetBrandUpper.includes('LEMON')) {
-          return true;
+          return true; // ✅ VERVE LEMON + exact size match
         } else if (supplyBrandUpper.includes('CRANBERRY') && targetBrandUpper.includes('CRANBERRY')) {
-          return true;
+          return true; // ✅ VERVE CRANBERRY + exact size match
         } else if (supplyBrandUpper.includes('GREEN') && targetBrandUpper.includes('GREEN')) {
-          return true;
+          return true; // ✅ VERVE GREEN + exact size match
         } else if (supplyBrandUpper.includes('GRAIN') && targetBrandUpper.includes('GRAIN')) {
-          return true;
+          return true; // ✅ VERVE GRAIN + exact size match
         }
       } else {
+        // Fallback: word matching but only with exact size
         const brandWords = targetBrandUpper.split(' ').filter(word => word.length > 2);
         const supplyWords = supplyBrandUpper.split(' ').filter(word => word.length > 2);
         const commonWords = brandWords.filter(word => supplyWords.includes(word));
-        return commonWords.length >= 2;
+        return commonWords.length >= 2; // ✅ Multiple word match + exact size
       }
       
       return false;
     };
     
-    // 🔧 OPTIMIZED LOOP - NO DATE FILTERING
+    // 🔧 OPTIMIZED LOOP WITH SIZE FILTERING
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       
-      if (row && row.length > Math.max(shopIdIndex, brandIndex, casesIndex)) {
+      if (row.length > Math.max(shopIdIndex, brandIndex, casesIndex)) {
         const rowShopId = row[shopIdIndex]?.toString().trim();
         
+        // ⚡ PERFORMANCE: Skip early if shop doesn't match
         if (rowShopId !== shopId) continue;
         
         const rowBrand = row[brandIndex]?.toString().trim();
@@ -281,7 +294,8 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
         
         if (rowBrand && rowDateStr) {
           const rowDate = parseDate(rowDateStr);
-          if (rowDate) { // ✅ Accept ALL dates, no cutoff
+          if (rowDate && rowDate >= cutoffDate) {
+            // 🔧 ENHANCED CASE PARSING (same as before)
             let rowCases = 1;
             if (rawCaseValue !== undefined && rawCaseValue !== null) {
               const caseString = String(rawCaseValue).trim();
@@ -298,6 +312,7 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
               }
             }
             
+            // 🎯 CRITICAL FIX: Use size-specific matching
             const isMatch = isExactSizeAndBrandMatch(rowBrand, rowSize, brandName, targetSize);
             
             if (isMatch && rowCases > 0) {
@@ -312,32 +327,30 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
     }
     
     const sortedHistory = supplyHistory.sort((a, b) => a.date.getTime() - b.date.getTime());
-    cache.set(cacheKey, sortedHistory);
+    supplyDataCache.set(cacheKey, sortedHistory);
     return sortedHistory;
   };
 
+  // 🔧 PERFORMANCE CACHE for visit data
+  const visitDataCache = useMemo(() => new Map<string, Array<{date: Date, stock: number}>>(), [data.rawVisitData, filters.trackingPeriod]);
+
   // 🔧 OPTIMIZED: Visit data extraction with caching
-  const getVisitDataForSKU = (shopId: string, brandName: string, trackingPeriod: number, cache: Map<string, Array<{date: Date, stock: number}>>): Array<{date: Date, stock: number}> => {
+  const getVisitDataForSKU = (shopId: string, brandName: string, trackingPeriod: number): Array<{date: Date, stock: number}> => {
     // Cache key for performance
     const cacheKey = `${shopId}_${brandName}_${trackingPeriod}`;
-    if (cache.has(cacheKey)) {
-      return cache.get(cacheKey)!;
+    if (visitDataCache.has(cacheKey)) {
+      return visitDataCache.get(cacheKey)!;
     }
 
     const visitHistory: Array<{date: Date, stock: number}> = [];
     
     if (!data.rawVisitData?.rollingPeriodRows) {
-      cache.set(cacheKey, visitHistory);
+      visitDataCache.set(cacheKey, visitHistory);
       return visitHistory;
     }
     
     const rows = data.rawVisitData.rollingPeriodRows;
     const columnIndices = data.rawVisitData.columnIndices;
-    
-    if (!columnIndices) {
-      cache.set(cacheKey, visitHistory);
-      return visitHistory;
-    }
     
     const cutoffDate = new Date();
     cutoffDate.setDate(cutoffDate.getDate() - trackingPeriod);
@@ -348,8 +361,6 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
     
     // 🔧 SIZE-SPECIFIC VISIT MATCHING
     const isExactVisitMatch = (visitBrand: string, targetBrand: string, targetSize: string): boolean => {
-      if (!visitBrand || !targetBrand) return false;
-      
       const visitBrandUpper = visitBrand.toUpperCase();
       const targetBrandUpper = targetBrand.toUpperCase();
       
@@ -380,8 +391,6 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
     };
     
     rows.forEach(row => {
-      if (!row || !Array.isArray(row)) return;
-      
       const rowShopId = row[columnIndices.shopId];
       
       // ⚡ PERFORMANCE: Skip early if shop doesn't match
@@ -406,7 +415,7 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
     });
     
     const sortedHistory = visitHistory.sort((a, b) => a.date.getTime() - b.date.getTime());
-    cache.set(cacheKey, sortedHistory);
+    visitDataCache.set(cacheKey, sortedHistory);
     return sortedHistory;
   };
 
@@ -427,7 +436,7 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
       status = 'healthy';
     }
     
-    if (Array.isArray(supplyHistory) && supplyHistory.length >= 2) {
+    if (supplyHistory.length >= 2) {
       const recent = supplyHistory.slice(-3);
       const stockValues = recent.map(h => h.stock || 0);
       
@@ -457,103 +466,96 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
     try {
       const today = new Date();
       
-      // Safely check if data.shops exists and is an object
-      if (data.shops && typeof data.shops === 'object') {
-        // Process visited shops from inventory data
-        Object.values(data.shops).forEach(shop => {
-          try {
-            if (!shop || !shop.items || typeof shop.items !== 'object') return;
-            
-            Object.values(shop.items).forEach((item: any) => {
-              try {
-                if (!item || !item.brand || !shop.shopId) return;
-                
-                const combinationKey = `${shop.shopId}_${item.brand}`;
-                if (processedCombinations.has(combinationKey)) return;
-                processedCombinations.add(combinationKey);
-                
-                const bottleInfo = getBottleSizeInfo(item.brand);
-                const supplyHistory = getAllSupplyDataForSKU(shop.shopId, item.brand, supplyDataCache);
-                const visitHistory = getVisitDataForSKU(shop.shopId, item.brand, filters.trackingPeriod, visitDataCache);
-                
-                const totalCasesSupplied = supplyHistory.reduce((sum, supply) => sum + supply.cases, 0);
-                const totalBottlesSupplied = totalCasesSupplied * bottleInfo.conversionRate;
-                
-                const daysSinceLastVisit = shop.visitDate ? 
-                  Math.floor((today.getTime() - shop.visitDate.getTime()) / (1000 * 60 * 60 * 24)) : null;
-                
-                const lastSupplyDate = supplyHistory.length > 0 ? supplyHistory[supplyHistory.length - 1].date : null;
-                const daysSinceLastSupply = lastSupplyDate ?
-                  Math.floor((today.getTime() - lastSupplyDate.getTime()) / (1000 * 60 * 60 * 24)) : null;
-                
-                // Calculate theoretical stock based on supply and expected consumption
-                let theoreticalStock = 0;
-                if (supplyHistory.length > 0 && daysSinceLastSupply !== null) {
-                  const daysSinceFirstSupply = Math.floor(
-                    (today.getTime() - supplyHistory[0].date.getTime()) / (1000 * 60 * 60 * 24)
-                  );
-                  const expectedConsumed = daysSinceFirstSupply * bottleInfo.expectedDailyConsumption;
-                  theoreticalStock = Math.max(0, totalBottlesSupplied - expectedConsumed);
-                }
-                
-                const stockVariance = (item.quantity || 0) - theoreticalStock;
-                const consumptionRate = visitHistory.length >= 2 ? 
-                  bottleInfo.expectedDailyConsumption : bottleInfo.expectedDailyConsumption;
-                
-                const { status, trend } = calculateStockStatus(item.quantity || 0, theoreticalStock, visitHistory);
-                
-                const supplyFrequency = supplyHistory.length > 0 ? filters.trackingPeriod / supplyHistory.length : 0;
-                const visitFrequency = visitHistory.length > 0 ? filters.trackingPeriod / visitHistory.length : 0;
-                
-                let dataQuality: 'complete' | 'partial' | 'supply_only' | 'visit_only' = 'complete';
-                if (supplyHistory.length === 0 && visitHistory.length > 0) dataQuality = 'visit_only';
-                else if (supplyHistory.length > 0 && visitHistory.length === 0) dataQuality = 'supply_only';
-                else if (supplyHistory.length === 0 || visitHistory.length === 0) dataQuality = 'partial';
-                
-                const record: StockRecord = {
-                  id: `${shop.shopId}_${item.brand}`,
-                  shopId: shop.shopId,
-                  shopName: shop.shopName || 'Unknown Shop',
-                  department: shop.department || 'Unknown',
-                  salesman: shop.salesman || 'Unknown',
-                  salesmanUid: shop.salesmanUid,
-                  sku: item.brand,
-                  bottleSize: bottleInfo.size,
-                  currentStockLevel: item.quantity || 0,
-                  lastVisitDate: shop.visitDate || null,
-                  lastSupplyDate,
-                  daysSinceLastVisit,
-                  daysSinceLastSupply,
-                  totalSupplied: totalBottlesSupplied,
-                  casesSupplied: totalCasesSupplied,
-                  bottlesSupplied: totalBottlesSupplied,
-                  theoreticalStock,
-                  stockVariance,
-                  consumptionRate,
-                  stockStatus: status,
-                  stockTrend: trend,
-                  supplyFrequency,
-                  visitFrequency,
-                  dataQuality,
-                  reasonNoStock: item.reasonNoStock,
-                  conversionRate: bottleInfo.conversionRate,
-                  supplyHistory,
-                  visitHistory
-                };
-                
-                records.push(record);
-              } catch (itemError) {
-                console.error('Error processing item:', itemError);
+      // Process visited shops from inventory data
+      Object.values(data.shops).forEach(shop => {
+        try {
+          Object.values(shop.items).forEach((item: any) => {
+            try {
+              const combinationKey = `${shop.shopId}_${item.brand}`;
+              if (processedCombinations.has(combinationKey)) return;
+              processedCombinations.add(combinationKey);
+              
+              const bottleInfo = getBottleSizeInfo(item.brand);
+              const supplyHistory = getSupplyDataForSKU(shop.shopId, item.brand, filters.trackingPeriod);
+              const visitHistory = getVisitDataForSKU(shop.shopId, item.brand, filters.trackingPeriod);
+              
+              const totalCasesSupplied = supplyHistory.reduce((sum, supply) => sum + supply.cases, 0);
+              const totalBottlesSupplied = totalCasesSupplied * bottleInfo.conversionRate;
+              
+              const daysSinceLastVisit = shop.visitDate ? 
+                Math.floor((today.getTime() - shop.visitDate.getTime()) / (1000 * 60 * 60 * 24)) : null;
+              
+              const lastSupplyDate = supplyHistory.length > 0 ? supplyHistory[supplyHistory.length - 1].date : null;
+              const daysSinceLastSupply = lastSupplyDate ?
+                Math.floor((today.getTime() - lastSupplyDate.getTime()) / (1000 * 60 * 60 * 24)) : null;
+              
+              // Calculate theoretical stock based on supply and expected consumption
+              let theoreticalStock = 0;
+              if (supplyHistory.length > 0 && daysSinceLastSupply !== null) {
+                const daysSinceFirstSupply = Math.floor(
+                  (today.getTime() - supplyHistory[0].date.getTime()) / (1000 * 60 * 60 * 24)
+                );
+                const expectedConsumed = daysSinceFirstSupply * bottleInfo.expectedDailyConsumption;
+                theoreticalStock = Math.max(0, totalBottlesSupplied - expectedConsumed);
               }
-            });
-          } catch (shopError) {
-            console.error('Error processing shop:', shopError);
-          }
-        });
-      }
+              
+              const stockVariance = item.quantity - theoreticalStock;
+              const consumptionRate = visitHistory.length >= 2 ? 
+                bottleInfo.expectedDailyConsumption : bottleInfo.expectedDailyConsumption;
+              
+              const { status, trend } = calculateStockStatus(item.quantity, theoreticalStock, visitHistory);
+              
+              const supplyFrequency = supplyHistory.length > 0 ? filters.trackingPeriod / supplyHistory.length : 0;
+              const visitFrequency = visitHistory.length > 0 ? filters.trackingPeriod / visitHistory.length : 0;
+              
+              let dataQuality: 'complete' | 'partial' | 'supply_only' | 'visit_only' = 'complete';
+              if (supplyHistory.length === 0 && visitHistory.length > 0) dataQuality = 'visit_only';
+              else if (supplyHistory.length > 0 && visitHistory.length === 0) dataQuality = 'supply_only';
+              else if (supplyHistory.length === 0 || visitHistory.length === 0) dataQuality = 'partial';
+              
+              const record: StockRecord = {
+                id: `${shop.shopId}_${item.brand}`,
+                shopId: shop.shopId,
+                shopName: shop.shopName,
+                department: shop.department,
+                salesman: shop.salesman,
+                salesmanUid: shop.salesmanUid,
+                sku: item.brand,
+                bottleSize: bottleInfo.size,
+                currentStockLevel: item.quantity,
+                lastVisitDate: shop.visitDate,
+                lastSupplyDate,
+                daysSinceLastVisit,
+                daysSinceLastSupply,
+                totalSupplied: totalBottlesSupplied,
+                casesSupplied: totalCasesSupplied,
+                bottlesSupplied: totalBottlesSupplied,
+                theoreticalStock,
+                stockVariance,
+                consumptionRate,
+                stockStatus: status,
+                stockTrend: trend,
+                supplyFrequency,
+                visitFrequency,
+                dataQuality,
+                reasonNoStock: item.reasonNoStock,
+                conversionRate: bottleInfo.conversionRate,
+                supplyHistory,
+                visitHistory
+              };
+              
+              records.push(record);
+            } catch (itemError) {
+              console.error('Error processing item:', itemError);
+            }
+          });
+        } catch (shopError) {
+          console.error('Error processing shop:', shopError);
+        }
+      });
       
       // Process non-visited shops with supply data
-      if (data.rawSupplyData?.pendingChallansData && Array.isArray(data.rawSupplyData.pendingChallansData)) {
+      if (data.rawSupplyData?.pendingChallansData) {
         const pendingChallans = data.rawSupplyData.pendingChallansData;
         if (pendingChallans.length > 1) {
           const rows = pendingChallans.slice(1);
@@ -561,8 +563,6 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
           
           rows.forEach(row => {
             try {
-              if (!row || !Array.isArray(row)) return;
-              
               const shopId = row[8]?.toString().trim();
               const shopName = row[9]?.toString().trim() || 'Unknown Shop';
               const brand = row[11]?.toString().trim();
@@ -578,7 +578,7 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
                 processedShopSKUs.add(combinationKey);
                 
                 const bottleInfo = getBottleSizeInfo(brand);
-                const supplyHistory = getAllSupplyDataForSKU(shopId, brand, supplyDataCache);
+                const supplyHistory = getSupplyDataForSKU(shopId, brand, filters.trackingPeriod);
                 
                 if (supplyHistory.length > 0) {
                   const totalCasesSupplied = supplyHistory.reduce((sum, supply) => sum + supply.cases, 0);
@@ -642,20 +642,7 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
     }
     
     return records;
-  }, [data.shops, data.rawSupplyData, data.rawVisitData, filters.trackingPeriod, supplyDataCache, visitDataCache]);
-
-  // Handle case where there's no data
-  if (!data || (!data.shops && !data.rawSupplyData)) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-center">
-          <AlertTriangle className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No Data Available</h3>
-          <p className="text-gray-500">Please ensure your data sources are properly configured and contain valid information.</p>
-        </div>
-      </div>
-    );
-  }
+  }, [data.shops, data.rawSupplyData, data.rawVisitData, filters.trackingPeriod]);
 
   // ==========================================
   // FILTERING AND SORTING
@@ -789,6 +776,7 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
       csvContent += "STOCK LEVEL TRACKING DASHBOARD REPORT\n";
       csvContent += `Generated: ${new Date().toLocaleString()}\n`;
       csvContent += `Tracking Period: ${filters.trackingPeriod} days\n`;
+      csvContent += `Period: ${data.summary.periodStartDate.toLocaleDateString()} - ${data.summary.periodEndDate.toLocaleDateString()}\n`;
       csvContent += `Total Records: ${filteredRecords.length}\n`;
       csvContent += `Visited Shops: ${stats.visitedShops} | Supply-Only Shops: ${stats.supplyOnlyShops}\n`;
       csvContent += `Stock Status: Healthy: ${stats.healthy} | Low: ${stats.low} | Out: ${stats.out} | Overstocked: ${stats.overstocked}\n\n`;
@@ -825,6 +813,34 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
         csvContent += `"${record.reasonNoStock || 'N/A'}"\n`;
       });
       
+      // Add supply history details
+      csvContent += "\n\nSUPPLY HISTORY DETAILS\n";
+      csvContent += "Shop Name,Shop ID,SKU,Supply Date,Cases Delivered\n";
+      
+      filteredRecords.forEach(record => {
+        record.supplyHistory.forEach(supply => {
+          csvContent += `"${record.shopName}",`;
+          csvContent += `"${record.shopId}",`;
+          csvContent += `"${record.sku}",`;
+          csvContent += `"${supply.date.toLocaleDateString('en-GB')}",`;
+          csvContent += `"${supply.cases}"\n`;
+        });
+      });
+      
+      // Add visit history details
+      csvContent += "\n\nVISIT HISTORY DETAILS\n";
+      csvContent += "Shop Name,Shop ID,SKU,Visit Date,Reported Stock\n";
+      
+      filteredRecords.forEach(record => {
+        record.visitHistory.forEach(visit => {
+          csvContent += `"${record.shopName}",`;
+          csvContent += `"${record.shopId}",`;
+          csvContent += `"${record.sku}",`;
+          csvContent += `"${visit.date.toLocaleDateString('en-GB')}",`;
+          csvContent += `"${visit.stock}"\n`;
+        });
+      });
+      
       // Create download link
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement("a");
@@ -850,7 +866,7 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
         <h2 className="text-2xl font-bold text-gray-900 mb-2 flex items-center justify-center space-x-2">
           <span>Stock Level Tracking Dashboard</span>
           <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
-            FIXED ✅
+            SIZE-SPECIFIC FIXED ✅
           </span>
         </h2>
         <p className="text-gray-600">
@@ -907,10 +923,10 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
           <button
             onClick={exportStockTrackingCSV}
             className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors text-sm"
-            title="Export complete stock tracking report with SIZE-SPECIFIC corrections applied."
+            title="Export complete stock tracking report with SIZE-SPECIFIC corrections applied. Example: LOK NAYAK BHAWAN 180ml now shows only 180ml cases, not total of all sizes."
           >
             <Download className="w-4 h-4" />
-            <span>Export Report</span>
+            <span>Export SIZE-CORRECTED Report</span>
           </button>
         </div>
 
@@ -1210,7 +1226,7 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
                           </div>
                           
                           {/* Supply History */}
-                          {record.supplyHistory && record.supplyHistory.length > 0 && (
+                          {record.supplyHistory.length > 0 && (
                             <div>
                               <h4 className="font-medium text-gray-900 mb-2">Supply History ({record.supplyHistory.length} deliveries)</h4>
                               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 text-sm">
@@ -1224,7 +1240,7 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
                           )}
                           
                           {/* Visit History */}
-                          {record.visitHistory && record.visitHistory.length > 0 && (
+                          {record.visitHistory.length > 0 && (
                             <div>
                               <h4 className="font-medium text-gray-900 mb-2">Visit History ({record.visitHistory.length} visits)</h4>
                               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 text-sm">
@@ -1265,7 +1281,7 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
             <button
               onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
               disabled={currentPage === totalPages}
-              className="px-3 py-1 border border-gray-300 rounded text-sm disabled:cursor-not-allowed hover:bg-gray-50"
+              className="px-3 py-1 border border-gray-300 rounded text-sm disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-50"
             >
               <ChevronRight className="w-4 h-4" />
             </button>
