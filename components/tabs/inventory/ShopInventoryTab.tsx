@@ -396,19 +396,23 @@ const enhanceInventoryWithSupplyData = (
         // Update item with supply information
         item.lastSupplyDate = new Date(mostRecentSupply.supplyDate);
         
-        // Extract cases value from column O - try multiple possible field names
-        const casesValue = mostRecentSupply.cases || 
-                          mostRecentSupply.Cases || 
-                          mostRecentSupply.O || 
-                          mostRecentSupply['cases'] || 
-                          mostRecentSupply['Cases'] || 
-                          mostRecentSupply['O'] ||
-                          (typeof mostRecentSupply[14] === 'number' ? mostRecentSupply[14] : 0); // Column O is index 14
+        // Extract cases value from column O - the value should be directly available
+        const casesValue = Number(mostRecentSupply.cases) || 
+                          Number(mostRecentSupply.Cases) || 
+                          Number(mostRecentSupply.O) || 
+                          Number(mostRecentSupply['cases']) || 
+                          Number(mostRecentSupply['O']) ||
+                          0;
         
         item.lastSupplyCases = casesValue;
         item.casesDelivered = casesValue;
         
-        console.log(`Cases extracted for ${item.brand}:`, casesValue, 'from record:', mostRecentSupply);
+        console.log(`✅ Supply matched for ${item.brand}:`, {
+          date: mostRecentSupply.supplyDate,
+          casesFromRecord: mostRecentSupply.cases,
+          casesExtracted: casesValue,
+          allFields: Object.keys(mostRecentSupply)
+        });
         
         // Calculate total cases delivered
         item.totalCasesDelivered = matchingSupplyRecords.reduce((total, record) => total + (record.cases || 0), 0);
