@@ -364,45 +364,27 @@ const ShopInventoryTab = ({ data }: { data: InventoryData }) => {
                     }
                     
                     if (rowDate && !isNaN(rowDate.getTime())) {
-                      const daysDiff = Math.abs(rowDate.getTime() - lastSupplyDate.getTime()) / (1000 * 60 * 60 * 24);
+                      // 🎯 KEY CHANGE: Store ALL valid matches instead of checking any threshold
+                      potentialMatches.push({
+                        rowIndex: i,
+                        cases: rowCases,
+                        brand: rowBrand,
+                        size: rowSize,
+                        date: rowDate,
+                        dateStr: rowDateStr,
+                        brandMatchReason,
+                        parsingMethod,
+                        rawCaseValue
+                      });
                       
                       if (isDebugMode) {
-                        console.log(`🔍 DATE MATCHING ATTEMPT:`, {
-                          rawDateString: rowDateStr,
-                          parsedSupplyDate: rowDate.toLocaleDateString(),
-                          targetDate: lastSupplyDate.toLocaleDateString(),
-                          daysDiff: Math.round(daysDiff * 10) / 10,
-                          withinThreshold: daysDiff <= 2,
-                          casesIfMatch: rowCases
+                        console.log(`✅ VALID MATCH STORED:`, {
+                          shopId,
+                          brandName,
+                          supplyDate: rowDate.toLocaleDateString(),
+                          casesDelivered: rowCases,
+                          brandMatchReason
                         });
-                      }
-                      
-                      if (daysDiff <= 2) { // Within 2 days
-                        if (isDebugMode) {
-                          console.log(`🎯 ✅ PERFECT MATCH FOUND!`, {
-                            shopId,
-                            brandName,
-                            supplyDate: rowDate.toLocaleDateString(),
-                            targetDate: lastSupplyDate.toLocaleDateString(),
-                            casesDelivered: rowCases,
-                            parsingMethod,
-                            rawCaseValue,
-                            daysDiff: Math.round(daysDiff * 10) / 10,
-                            brandMatchReason,
-                            success: rowCases > 1 ? '🎉 ACTUAL CASES READ' : '⚠️ DEFAULTED TO 1',
-                            RETURNING: rowCases
-                          });
-                          console.log('🎯 === ENHANCED CASE QUANTITY DEBUG END (SUCCESS) ===');
-                        }
-                        return rowCases; // Return the actual parsed case quantity!
-                      } else {
-                        if (isDebugMode) {
-                          console.log(`❌ DATE MISMATCH: ${daysDiff} days difference > 2 day threshold`);
-                        }
-                      }
-                    } else {
-                      if (isDebugMode) {
-                        console.log(`❌ DATE PARSING FAILED: Could not parse "${rowDateStr}"`);
                       }
                     }
                   } else {
