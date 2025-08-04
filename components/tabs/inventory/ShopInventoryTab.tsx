@@ -794,66 +794,6 @@ const ShopInventoryTab = ({
 
 export default ShopInventoryTab;
 export { parseGoogleSheetToSupplyRecords, debugSupplyData, type SupplyRecord };
-
-// ==========================================
-// USAGE EXAMPLE AND DEBUGGING GUIDE
-// ==========================================
-
-/**
- * SIMPLIFIED USAGE - Pass raw Google Sheets data directly:
- * 
- * const rawGoogleSheetsData = [
- *   {
- *     challandate: "27-07-2025",
- *     Shop_id: "P01954", 
- *     shop_name: "GOPAL HEIGHTS, NSP",
- *     brand: "8 PM PREMIUM BLACK BLENDED WHISKY",
- *     cases: 1,  // This is the value from column O
- *     order_no: "TPN26072547489"
- *   },
- *   // ... more rows from your Google Sheet
- * ];
- * 
- * // Just pass the raw data directly:
- * <ShopInventoryTab 
- *   data={inventoryData} 
- *   rawSupplyData={rawGoogleSheetsData} 
- * />
- * 
- * ALTERNATIVE - If you have processed supply data:
- * <ShopInventoryTab 
- *   data={inventoryData} 
- *   supplyData={processedSupplyRecords} 
- * />
- * 
- * The component will now show in the console:
- * 🔄 Processing raw supply data: X rows
- * ✅ Processed supply records: Y
- * 📦 Sample processed record: {brand, shopId, cases: 1, ...}
- * 
- * And the CSV will show the correct cases numbers!
- * 
- * TROUBLESHOOTING:
- * - Check browser console for matching debug logs
- * - Verify your Google Sheet column mapping in parseGoogleSheetToSupplyRecords()
- * - Make sure shop IDs and brand names match between inventory and supply data
- * - Check that the 'cases' column contains numeric values
- * 
- * QUICK FIX FOR MISSING CASES DATA:
- * 
- * 1. First, debug your supply data structure:
- *    debugSupplyData(yourSupplyRecords);
- * 
- * 2. Look in the console for "Possible cases fields" - this will show you 
- *    what field name contains your cases data from column O
- * 
- * 3. If your cases field is named differently (like "pack" or "quantity"), 
- *    update the SupplyRecord interface or modify your data before passing it:
- * 
- *    yourSupplyRecords.forEach(record => {
- *      record.cases = record.pack || record.O || record['14'] || 0;
- *    });
- */
  * 
  * TROUBLESHOOTING:
  * - Check browser console for matching debug logs
