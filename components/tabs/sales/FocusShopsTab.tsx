@@ -110,48 +110,79 @@ const getMonthDataField = (monthNum: string, field: 'Total' | 'EightPM' | 'Verve
   return monthKey ? `${monthKey}${field}` : `${field.toLowerCase()}`;
 };
 
-const getMonthData = (shop: ShopData, monthNum: string, field: 'Total' | 'EightPM' | 'Verve'): number => {
-  const fieldName = getMonthDataField(monthNum, field);
-  return shop[fieldName] || 0;
+// ✅ FIXED: PHANTOM DATA PREVENTION - Proper current vs historical data handling
+const getMonthData = (shop: ShopData, monthNum: string, field: 'Total' | 'EightPM' | 'Verve', currentMonth: string): number => {
+  try {
+    // ✅ CRITICAL FIX: For current month, always use current data from challans
+    if (monthNum === currentMonth) {
+      switch (field) {
+        case 'EightPM':
+          return shop.eightPM || 0;
+        case 'Verve':
+          return shop.verve || 0;
+        default:
+          return shop.total || 0;
+      }
+    }
+    
+    // ✅ FIXED: For historical months, use stored historical data
+    const fieldName = getMonthDataField(monthNum, field);
+    return shop[fieldName] || 0;
+  } catch (error) {
+    console.error('Error in getMonthData:', error);
+    return 0;
+  }
 };
 
+// ✅ FIXED: PHANTOM DATA PREVENTION - Enhanced getCurrentMonthData
 const getCurrentMonthData = (shop: ShopData, currentMonth: string) => {
-  const total = getMonthData(shop, currentMonth, 'Total') || shop.total || 0;
-  const eightPM = getMonthData(shop, currentMonth, 'EightPM') || shop.eightPM || 0;
-  const verve = getMonthData(shop, currentMonth, 'Verve') || shop.verve || 0;
-  
-  return { total, eightPM, verve };
+  try {
+    // ✅ ALWAYS use current month data from challans, never historical fields
+    const total = shop.total || 0;
+    const eightPM = shop.eightPM || 0;
+    const verve = shop.verve || 0;
+    
+    return { total, eightPM, verve };
+  } catch (error) {
+    console.error('Error in getCurrentMonthData:', error);
+    return { total: 0, eightPM: 0, verve: 0 };
+  }
 };
 
 const getRollingMonths = (currentMonth: string, currentYear: string): RollingMonth[] => {
-  const months: RollingMonth[] = [];
-  let month = parseInt(currentMonth);
-  let year = parseInt(currentYear);
-  
-  for (let i = 3; i >= 0; i--) {
-    let targetMonth = month - i;
-    let targetYear = year;
+  try {
+    const months: RollingMonth[] = [];
+    let month = parseInt(currentMonth);
+    let year = parseInt(currentYear);
     
-    if (targetMonth <= 0) {
-      targetMonth += 12;
-      targetYear -= 1;
+    for (let i = 3; i >= 0; i--) {
+      let targetMonth = month - i;
+      let targetYear = year;
+      
+      if (targetMonth <= 0) {
+        targetMonth += 12;
+        targetYear -= 1;
+      }
+      
+      const monthStr = targetMonth.toString().padStart(2, '0');
+      const yearStr = targetYear.toString();
+      const isCurrent = (targetMonth === month && targetYear === year);
+      
+      months.push({
+        month: monthStr,
+        year: yearStr,
+        monthName: getMonthName(monthStr),
+        shortName: getShortMonthName(monthStr),
+        isCurrent,
+        key: `${monthStr}-${yearStr}`
+      });
     }
     
-    const monthStr = targetMonth.toString().padStart(2, '0');
-    const yearStr = targetYear.toString();
-    const isCurrent = (targetMonth === month && targetYear === year);
-    
-    months.push({
-      month: monthStr,
-      year: yearStr,
-      monthName: getMonthName(monthStr),
-      shortName: getShortMonthName(monthStr),
-      isCurrent,
-      key: `${monthStr}-${yearStr}`
-    });
+    return months;
+  } catch (error) {
+    console.error('Error in getRollingMonths:', error);
+    return [];
   }
-  
-  return months;
 };
 
 // ==========================================
@@ -274,11 +305,16 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
   };
 
   const calculateTargetAchievement = (shop: ShopData, monthNum: string): number => {
-    const target = getMonthTarget(shop.shopId, monthNum);
-    const actual = getMonthData(shop, monthNum, 'EightPM');
-    
-    if (!target || target === 0) return 0;
-    return (actual / target) * 100;
+    try {
+      const target = getMonthTarget(shop.shopId, monthNum);
+      const actual = getMonthData(shop, monthNum, 'EightPM', currentMonth);
+      
+      if (!target || target === 0) return 0;
+      return (actual / target) * 100;
+    } catch (error) {
+      console.error('Error in calculateTargetAchievement:', error);
+      return 0;
+    }
   };
 
   const MobileFocusShopCard = ({ shop, index }: { shop: ShopData, index: number }) => {
@@ -312,10 +348,11 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
 
         <div className="space-y-3">
           {rollingMonths.map((monthInfo: RollingMonth) => {
+            // ✅ FIXED: Use proper data access with phantom data prevention
             const monthData = {
-              total: getMonthData(shop, monthInfo.month, 'Total'),
-              eightPM: getMonthData(shop, monthInfo.month, 'EightPM'),
-              verve: getMonthData(shop, monthInfo.month, 'Verve')
+              total: getMonthData(shop, monthInfo.month, 'Total', currentMonth),
+              eightPM: getMonthData(shop, monthInfo.month, 'EightPM', currentMonth),
+              verve: getMonthData(shop, monthInfo.month, 'Verve', currentMonth)
             };
             const target = getMonthTarget(shop.shopId, monthInfo.month);
             const achievement = target > 0 ? (monthData.eightPM / target) * 100 : 0;
@@ -385,7 +422,7 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
           <div className="text-center p-2 bg-gray-50 rounded">
             <div className="text-sm font-bold text-blue-600">
               {shop.threeMonthAvgTotal?.toFixed(1) || 
-               (((shop.marchTotal || 0) + (shop.aprilTotal || 0) + (shop.mayTotal || 0)) / 3).toFixed(1)}
+               (((getMonthData(shop, '03', 'Total', currentMonth) + getMonthData(shop, '04', 'Total', currentMonth) + getMonthData(shop, '05', 'Total', currentMonth)) / 3).toFixed(1))}
             </div>
             <div className="text-xs text-gray-500">3M Avg</div>
           </div>
@@ -417,99 +454,111 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
   };
 
   const focusShopsData = useMemo((): ShopData[] => {
-    if (!data?.salesData || focusShopsConfig.length === 0) return [];
+    try {
+      if (!data?.salesData || focusShopsConfig.length === 0) return [];
 
-    const focusShopIds = focusShopsConfig.map((config: FocusShopConfig) => config.shopId);
-    
-    const focusShops = (Object.values(data.salesData) as ShopData[])
-      .filter((shop: ShopData) => focusShopIds.includes(shop.shopId))
-      .map((shop: ShopData) => {
-        const currentData = getCurrentMonthData(shop, currentMonth);
-        const currentTarget = getMonthTarget(shop.shopId, currentMonth);
-        
-        return {
-          ...shop,
-          currentTotal: currentData.total,
-          currentEightPM: currentData.eightPM,
-          currentVerve: currentData.verve,
-          currentTarget8PM: currentTarget,
-          currentAchievement: calculateTargetAchievement(shop, currentMonth)
-        };
-      })
-      .filter((shop: ShopData) => 
-        !searchFilter || 
-        shop.shopName.toLowerCase().includes(searchFilter.toLowerCase()) ||
-        shop.department.toLowerCase().includes(searchFilter.toLowerCase()) ||
-        shop.salesman.toLowerCase().includes(searchFilter.toLowerCase())
-      );
+      const focusShopIds = focusShopsConfig.map((config: FocusShopConfig) => config.shopId);
+      
+      const focusShops = (Object.values(data.salesData) as ShopData[])
+        .filter((shop: ShopData) => focusShopIds.includes(shop.shopId))
+        .map((shop: ShopData) => {
+          // ✅ FIXED: Use phantom data prevention for current data
+          const currentData = getCurrentMonthData(shop, currentMonth);
+          const currentTarget = getMonthTarget(shop.shopId, currentMonth);
+          
+          return {
+            ...shop,
+            currentTotal: currentData.total,
+            currentEightPM: currentData.eightPM,
+            currentVerve: currentData.verve,
+            currentTarget8PM: currentTarget,
+            currentAchievement: calculateTargetAchievement(shop, currentMonth)
+          };
+        })
+        .filter((shop: ShopData) => 
+          !searchFilter || 
+          shop.shopName.toLowerCase().includes(searchFilter.toLowerCase()) ||
+          shop.department.toLowerCase().includes(searchFilter.toLowerCase()) ||
+          shop.salesman.toLowerCase().includes(searchFilter.toLowerCase())
+        );
 
-    return focusShops.sort((a: ShopData, b: ShopData) => {
-      switch (sortBy) {
-        case 'growth':
-          return (b.growthPercent || 0) - (a.growthPercent || 0);
-        case 'trend':
-          const trendOrder = { improving: 3, stable: 2, declining: 1, new: 0 };
-          return (trendOrder[b.monthlyTrend as keyof typeof trendOrder] || 0) - 
-                 (trendOrder[a.monthlyTrend as keyof typeof trendOrder] || 0);
-        case 'target_achievement':
-          return (b.currentAchievement || 0) - (a.currentAchievement || 0);
-        default:
-          return (b.currentTotal || 0) - (a.currentTotal || 0);
-      }
-    });
+      return focusShops.sort((a: ShopData, b: ShopData) => {
+        switch (sortBy) {
+          case 'growth':
+            return (b.growthPercent || 0) - (a.growthPercent || 0);
+          case 'trend':
+            const trendOrder = { improving: 3, stable: 2, declining: 1, new: 0 };
+            return (trendOrder[b.monthlyTrend as keyof typeof trendOrder] || 0) - 
+                   (trendOrder[a.monthlyTrend as keyof typeof trendOrder] || 0);
+          case 'target_achievement':
+            return (b.currentAchievement || 0) - (a.currentAchievement || 0);
+          default:
+            return (b.currentTotal || 0) - (a.currentTotal || 0);
+        }
+      });
+    } catch (error) {
+      console.error('Error in focusShopsData calculation:', error);
+      return [];
+    }
   }, [data, searchFilter, sortBy, currentMonth, focusShopsConfig]);
 
   const focusMetrics = useMemo(() => {
-    if (!focusShopsData.length) return null;
+    try {
+      if (!focusShopsData.length) return null;
 
-    const totalFocusShops = focusShopsConfig.length;
-    const activeFocusShops = focusShopsData.length;
-    
-    const monthlyMetrics = rollingMonths.map((monthInfo: RollingMonth) => {
-      const monthTotals = focusShopsData.reduce((acc, shop: ShopData) => {
-        const monthData = {
-          total: getMonthData(shop, monthInfo.month, 'Total'),
-          eightPM: getMonthData(shop, monthInfo.month, 'EightPM'),
-          verve: getMonthData(shop, monthInfo.month, 'Verve')
+      const totalFocusShops = focusShopsConfig.length;
+      const activeFocusShops = focusShopsData.length;
+      
+      const monthlyMetrics = rollingMonths.map((monthInfo: RollingMonth) => {
+        const monthTotals = focusShopsData.reduce((acc, shop: ShopData) => {
+          // ✅ FIXED: Use proper data access with phantom data prevention
+          const monthData = {
+            total: getMonthData(shop, monthInfo.month, 'Total', currentMonth),
+            eightPM: getMonthData(shop, monthInfo.month, 'EightPM', currentMonth),
+            verve: getMonthData(shop, monthInfo.month, 'Verve', currentMonth)
+          };
+          acc.totalSales += monthData.total;
+          acc.total8PM += monthData.eightPM;
+          acc.totalVERVE += monthData.verve;
+          return acc;
+        }, { totalSales: 0, total8PM: 0, totalVERVE: 0 });
+
+        const targetSum = focusShopsData.reduce((sum: number, shop: ShopData) => sum + getMonthTarget(shop.shopId, monthInfo.month), 0);
+        const achievement = targetSum > 0 ? (monthTotals.total8PM / targetSum) * 100 : 0;
+        const targetAchievers = focusShopsData.filter((shop: ShopData) => calculateTargetAchievement(shop, monthInfo.month) >= 100).length;
+
+        return {
+          ...monthInfo,
+          ...monthTotals,
+          targetSum,
+          achievement,
+          targetAchievers
         };
-        acc.totalSales += monthData.total;
-        acc.total8PM += monthData.eightPM;
-        acc.totalVERVE += monthData.verve;
-        return acc;
-      }, { totalSales: 0, total8PM: 0, totalVERVE: 0 });
+      });
 
-      const targetSum = focusShopsData.reduce((sum: number, shop: ShopData) => sum + getMonthTarget(shop.shopId, monthInfo.month), 0);
-      const achievement = targetSum > 0 ? (monthTotals.total8PM / targetSum) * 100 : 0;
-      const targetAchievers = focusShopsData.filter((shop: ShopData) => calculateTargetAchievement(shop, monthInfo.month) >= 100).length;
+      const currentMonthMetrics = monthlyMetrics.find((m: any) => m.isCurrent) || monthlyMetrics[monthlyMetrics.length - 1];
+      
+      const avgGrowth = focusShopsData.reduce((sum: number, shop: ShopData) => sum + (shop.growthPercent || 0), 0) / activeFocusShops;
+      
+      const improving = focusShopsData.filter((shop: ShopData) => shop.monthlyTrend === 'improving').length;
+      const declining = focusShopsData.filter((shop: ShopData) => shop.monthlyTrend === 'declining').length;
 
       return {
-        ...monthInfo,
-        ...monthTotals,
-        targetSum,
-        achievement,
-        targetAchievers
+        totalFocusShops,
+        activeFocusShops,
+        monthlyMetrics,
+        currentMonthMetrics,
+        avgGrowth,
+        improving,
+        declining,
+        coveragePercent: (activeFocusShops / totalFocusShops) * 100,
+        currentMonth,
+        currentMonthName: getMonthName(currentMonth)
       };
-    });
-
-    const currentMonthMetrics = monthlyMetrics.find((m: any) => m.isCurrent) || monthlyMetrics[monthlyMetrics.length - 1];
-    
-    const avgGrowth = focusShopsData.reduce((sum: number, shop: ShopData) => sum + (shop.growthPercent || 0), 0) / activeFocusShops;
-    
-    const improving = focusShopsData.filter((shop: ShopData) => shop.monthlyTrend === 'improving').length;
-    const declining = focusShopsData.filter((shop: ShopData) => shop.monthlyTrend === 'declining').length;
-
-    return {
-      totalFocusShops,
-      activeFocusShops,
-      monthlyMetrics,
-      currentMonthMetrics,
-      avgGrowth,
-      improving,
-      declining,
-      coveragePercent: (activeFocusShops / totalFocusShops) * 100,
-      currentMonth,
-      currentMonthName: getMonthName(currentMonth)
-    };
+    } catch (error) {
+      console.error('Error in focusMetrics calculation:', error);
+      return null;
+    }
   }, [focusShopsData, currentMonth, rollingMonths, focusShopsConfig]);
 
   if (loading) {
@@ -539,6 +588,19 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
               Retry Loading
             </button>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ✅ SAFETY CHECK: Ensure data exists
+  if (!data || !data.salesData) {
+    return (
+      <div className="space-y-6">
+        <div className="text-center py-12">
+          <AlertTriangle className="w-8 h-8 text-yellow-500 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">No Data Available</h3>
+          <p className="text-gray-600">Sales data is not available yet.</p>
         </div>
       </div>
     );
@@ -703,8 +765,6 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-
-
       <div className="block lg:hidden">
         <div className="bg-white rounded-lg shadow">
           <div className="px-4 py-4 border-b border-gray-200">
@@ -801,9 +861,10 @@ const FocusShopsTab = ({ data }: { data: DashboardData }) => {
                   <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-900">{shop.department}</td>
                   
                   {rollingMonths.map((monthInfo: RollingMonth) => {
+                    // ✅ FIXED: Use proper data access with phantom data prevention
                     const monthData = {
-                      eightPM: getMonthData(shop, monthInfo.month, 'EightPM'),
-                      verve: getMonthData(shop, monthInfo.month, 'Verve')
+                      eightPM: getMonthData(shop, monthInfo.month, 'EightPM', currentMonth),
+                      verve: getMonthData(shop, monthInfo.month, 'Verve', currentMonth)
                     };
                     const target = getMonthTarget(shop.shopId, monthInfo.month);
                     const achievement = target > 0 ? (monthData.eightPM / target) * 100 : 0;
