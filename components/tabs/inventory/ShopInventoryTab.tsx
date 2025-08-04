@@ -393,26 +393,36 @@ const enhanceInventoryWithSupplyData = (
           orderNo: mostRecentSupply.orderNo
         });
         
+        console.log(`✅ Supply matched for ${item.brand}:`, {
+          date: mostRecentSupply.supplyDate,
+          allFieldsInRecord: Object.keys(mostRecentSupply),
+          allValuesInRecord: mostRecentSupply,
+          casesField: mostRecentSupply.cases,
+          OField: mostRecentSupply.O,
+          casesExtracted: casesValue
+        });
+        
         // Update item with supply information
         item.lastSupplyDate = new Date(mostRecentSupply.supplyDate);
         
-        // Extract cases value from column O - the value should be directly available
+        // Try EVERY possible way to get the cases value
         const casesValue = Number(mostRecentSupply.cases) || 
                           Number(mostRecentSupply.Cases) || 
                           Number(mostRecentSupply.O) || 
                           Number(mostRecentSupply['cases']) || 
+                          Number(mostRecentSupply['Cases']) || 
                           Number(mostRecentSupply['O']) ||
-                          0;
+                          Number(mostRecentSupply.pack) ||
+                          Number(mostRecentSupply.quantity) ||
+                          // Try all numeric values in the record as fallback
+                          (() => {
+                            const numericValues = Object.values(mostRecentSupply)
+                              .filter(val => typeof val === 'number' && val > 0 && val < 1000);
+                            return numericValues.length > 0 ? numericValues[numericValues.length - 1] : 0;
+                          })();
         
         item.lastSupplyCases = casesValue;
         item.casesDelivered = casesValue;
-        
-        console.log(`✅ Supply matched for ${item.brand}:`, {
-          date: mostRecentSupply.supplyDate,
-          casesFromRecord: mostRecentSupply.cases,
-          casesExtracted: casesValue,
-          allFields: Object.keys(mostRecentSupply)
-        });
         
         // Calculate total cases delivered
         item.totalCasesDelivered = matchingSupplyRecords.reduce((total, record) => total + (record.cases || 0), 0);
