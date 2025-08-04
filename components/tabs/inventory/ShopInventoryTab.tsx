@@ -450,10 +450,12 @@ const enhanceInventoryWithSupplyData = (
 
 const ShopInventoryTab = ({ 
   data, 
-  supplyData 
+  supplyData,
+  rawSupplyData // Add this to accept raw Google Sheets data directly
 }: { 
   data: InventoryData;
   supplyData?: SupplyRecord[];
+  rawSupplyData?: any[]; // Raw Google Sheets data
 }) => {
   // ==========================================
   // OWN STATE MANAGEMENT
@@ -471,8 +473,27 @@ const ShopInventoryTab = ({
   const [expandedShop, setExpandedShop] = useState<string | null>(null);
   const [isExporting, setIsExporting] = useState(false);
 
+  // Process raw supply data if provided
+  let processedSupplyData = supplyData;
+  if (rawSupplyData && rawSupplyData.length > 0) {
+    console.log('🔄 Processing raw supply data:', rawSupplyData.length, 'rows');
+    console.log('🔍 Sample raw row:', rawSupplyData[0]);
+    
+    processedSupplyData = rawSupplyData.map(row => ({
+      brand: row.brand || '',
+      shopId: row.Shop_id || row.shop_id || '',
+      shopName: row.shop_name || '',
+      supplyDate: new Date(row.challandate || row.date || ''),
+      cases: Number(row.cases) || Number(row.Cases) || Number(row.O) || 1, // Default to 1 if no cases found
+      orderNo: row.order_no || ''
+    })).filter(record => record.brand && record.shopId);
+    
+    console.log('✅ Processed supply records:', processedSupplyData.length);
+    console.log('📦 Sample processed record:', processedSupplyData[0]);
+  }
+
   // Enhance data with supply information if available
-  const enhancedData = supplyData ? enhanceInventoryWithSupplyData(data, supplyData) : data;
+  const enhancedData = processedSupplyData ? enhanceInventoryWithSupplyData(data, processedSupplyData) : data;
 
   // ==========================================
   // OWN HELPER FUNCTIONS
@@ -637,7 +658,7 @@ const ShopInventoryTab = ({
           <h3 className="text-lg font-medium text-gray-900">Master-Integrated Shop Inventory Status</h3>
           <p className="text-sm text-gray-500">
             Showing {filteredShops.length} shops with master data integration ({enhancedData.summary.rollingPeriodDays}-day rolling period)
-            {supplyData && <span className="text-blue-600"> • Enhanced with supply cases data</span>}
+            {processedSupplyData && <span className="text-blue-600"> • Enhanced with {processedSupplyData.length} supply records</span>}
           </p>
         </div>
         <div className="divide-y divide-gray-200">
@@ -779,35 +800,39 @@ export { parseGoogleSheetToSupplyRecords, debugSupplyData, type SupplyRecord };
 // ==========================================
 
 /**
- * USAGE EXAMPLE:
+ * SIMPLIFIED USAGE - Pass raw Google Sheets data directly:
  * 
- * 1. First, convert your Google Sheet data to the correct format:
- * 
- * const rawGoogleSheetData = [
+ * const rawGoogleSheetsData = [
  *   {
- *     challandate: "22-07-2025",
- *     shop_dep: "DSCSC Limited", 
- *     Shop_id: "P01954",
+ *     challandate: "27-07-2025",
+ *     Shop_id: "P01954", 
  *     shop_name: "GOPAL HEIGHTS, NSP",
  *     brand: "8 PM PREMIUM BLACK BLENDED WHISKY",
- *     cases: 24,
- *     order_no: "TPN21075446372"
+ *     cases: 1,  // This is the value from column O
+ *     order_no: "TPN26072547489"
  *   },
  *   // ... more rows from your Google Sheet
  * ];
  * 
- * const supplyRecords = parseGoogleSheetToSupplyRecords(rawGoogleSheetData);
- * 
- * 2. Then use the component:
- * 
+ * // Just pass the raw data directly:
  * <ShopInventoryTab 
  *   data={inventoryData} 
- *   supplyData={supplyRecords} 
+ *   rawSupplyData={rawGoogleSheetsData} 
  * />
  * 
- * 3. Check the browser console for debugging information when the component loads
+ * ALTERNATIVE - If you have processed supply data:
+ * <ShopInventoryTab 
+ *   data={inventoryData} 
+ *   supplyData={processedSupplyRecords} 
+ * />
  * 
- * 4. The exported CSV will now include a "Debug Info" column to help troubleshoot
+ * The component will now show in the console:
+ * 🔄 Processing raw supply data: X rows
+ * ✅ Processed supply records: Y
+ * 📦 Sample processed record: {brand, shopId, cases: 1, ...}
+ * 
+ * And the CSV will show the correct cases numbers!
+ */
  * 
  * TROUBLESHOOTING:
  * - Check browser console for matching debug logs
