@@ -1,7 +1,8 @@
 /*
   ==========================================
-  STOCK LEVEL TRACKING DASHBOARD
-  Complete inventory visibility across all shops with supply data integration
+  STOCK LEVEL TRACKING DASHBOARD - FIXED
+  🎯 PERIOD FILTERS VISITS (not supply data)
+  📦 SUPPLY DATA: Goes back as far as available for visited shops
   ==========================================
 */
 
@@ -93,7 +94,7 @@ interface StockFilters {
   bottleSize: string;
   stockTrend: string;
   searchText: string;
-  trackingPeriod: number;
+  visitPeriod: number; // 🔧 RENAMED: Now clearly indicates it's for visit filtering
 }
 
 // ==========================================
@@ -112,7 +113,7 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
     bottleSize: '',
     stockTrend: '',
     searchText: '',
-    trackingPeriod: 15
+    visitPeriod: 15 // 🔧 RENAMED: Clear that this filters visits
   });
   
   const [currentPage, setCurrentPage] = useState(1);
@@ -173,41 +174,17 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
     }
   };
 
-  const createMultipleBrandKeys = (shopId: string, brandName: string, size?: string): string[] => {
-    const brandInfo = getBottleSizeInfo(brandName);
-    const actualSize = size || brandInfo.size.replace('ml', '');
-    
-    const keys = [
-      `${shopId}_${brandName.toUpperCase()}_${actualSize}`,
-      `${shopId}_${brandName.toUpperCase()}`,
-      `${shopId}_${brandName}`,
-    ];
-    
-    return [...new Set(keys)];
-  };
-
-  // 🔧 PERFORMANCE CACHE - Store processed supply data
-  const supplyDataCache = useMemo(() => new Map<string, Array<{date: Date, cases: number}>>(), [data.rawSupplyData, filters.trackingPeriod]);
-
-  // 🔧 FIXED: Size-specific supply data extraction with performance optimization
-  const getSupplyDataForSKU = (shopId: string, brandName: string, trackingPeriod: number): Array<{date: Date, cases: number}> => {
-    // Cache key for performance
-    const cacheKey = `${shopId}_${brandName}_${trackingPeriod}`;
-    if (supplyDataCache.has(cacheKey)) {
-      return supplyDataCache.get(cacheKey)!;
-    }
-
-    const supplyHistory: Array<{date: Date, cases: number}> = [];
+  // 🎯 FIXED: Get MOST RECENT supply delivery for a shop/SKU (NO TIME FILTERING)
+  const getMostRecentSupplyForSKU = (shopId: string, brandName: string): {date: Date, cases: number} | null => {
+    let mostRecentSupply: {date: Date, cases: number} | null = null;
     
     if (!data.rawSupplyData?.pendingChallansData) {
-      supplyDataCache.set(cacheKey, supplyHistory);
-      return supplyHistory;
+      return mostRecentSupply;
     }
     
     const pendingChallans = data.rawSupplyData.pendingChallansData;
     if (pendingChallans.length <= 1) {
-      supplyDataCache.set(cacheKey, supplyHistory);
-      return supplyHistory;
+      return mostRecentSupply;
     }
     
     const headers = pendingChallans[0];
@@ -218,9 +195,6 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
     const brandIndex = 11;
     const sizeIndex = 12;
     const casesIndex = 14;
-    
-    const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - trackingPeriod);
     
     // 🔧 EXTRACT TARGET SIZE FROM BRAND NAME
     const targetBrandInfo = getBottleSizeInfo(brandName);
@@ -277,7 +251,7 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
       return false;
     };
     
-    // 🔧 OPTIMIZED LOOP WITH SIZE FILTERING
+    // 🔧 FIND MOST RECENT MATCHING SUPPLY
     for (let i = 0; i < rows.length; i++) {
       const row = rows[i];
       
@@ -294,8 +268,8 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
         
         if (rowBrand && rowDateStr) {
           const rowDate = parseDate(rowDateStr);
-          if (rowDate && rowDate >= cutoffDate) {
-            // 🔧 ENHANCED CASE PARSING (same as before)
+          if (rowDate) {
+            // 🔧 ENHANCED CASE PARSING
             let rowCases = 1;
             if (rawCaseValue !== undefined && rawCaseValue !== null) {
               const caseString = String(rawCaseValue).trim();
@@ -312,48 +286,40 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
               }
             }
             
-            // 🎯 CRITICAL FIX: Use size-specific matching
+            // 🎯 CRITICAL: Use size-specific matching
             const isMatch = isExactSizeAndBrandMatch(rowBrand, rowSize, brandName, targetSize);
             
             if (isMatch && rowCases > 0) {
-              supplyHistory.push({
-                date: rowDate,
-                cases: rowCases
-              });
+              // 🎯 KEEP ONLY THE MOST RECENT
+              if (!mostRecentSupply || rowDate > mostRecentSupply.date) {
+                mostRecentSupply = {
+                  date: rowDate,
+                  cases: rowCases
+                };
+              }
             }
           }
         }
       }
     }
     
-    const sortedHistory = supplyHistory.sort((a, b) => a.date.getTime() - b.date.getTime());
-    supplyDataCache.set(cacheKey, sortedHistory);
-    return sortedHistory;
+    return mostRecentSupply;
   };
 
-  // 🔧 PERFORMANCE CACHE for visit data
-  const visitDataCache = useMemo(() => new Map<string, Array<{date: Date, stock: number}>>(), [data.rawVisitData, filters.trackingPeriod]);
-
-  // 🔧 OPTIMIZED: Visit data extraction with caching
-  const getVisitDataForSKU = (shopId: string, brandName: string, trackingPeriod: number): Array<{date: Date, stock: number}> => {
-    // Cache key for performance
-    const cacheKey = `${shopId}_${brandName}_${trackingPeriod}`;
-    if (visitDataCache.has(cacheKey)) {
-      return visitDataCache.get(cacheKey)!;
-    }
-
+  // 🎯 FIXED: Visit data filtered by visitPeriod only
+  const getVisitDataForSKU = (shopId: string, brandName: string, visitPeriod: number): Array<{date: Date, stock: number}> => {
     const visitHistory: Array<{date: Date, stock: number}> = [];
     
     if (!data.rawVisitData?.rollingPeriodRows) {
-      visitDataCache.set(cacheKey, visitHistory);
       return visitHistory;
     }
     
     const rows = data.rawVisitData.rollingPeriodRows;
     const columnIndices = data.rawVisitData.columnIndices;
     
+    // 🎯 VISIT CUTOFF: Only filter visits by period
     const cutoffDate = new Date();
-    cutoffDate.setDate(cutoffDate.getDate() - trackingPeriod);
+    cutoffDate.setDate(cutoffDate.getDate() - visitPeriod);
     
     // 🔧 EXTRACT TARGET SIZE for precise matching
     const targetBrandInfo = getBottleSizeInfo(brandName);
@@ -402,8 +368,8 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
       
       if (rowBrand && rowDateStr) {
         const rowDate = parseDate(rowDateStr);
-        if (rowDate && rowDate >= cutoffDate) {
-          // 🎯 CRITICAL FIX: Use size-specific matching for visits too
+        if (rowDate && rowDate >= cutoffDate) { // ✅ Filter visits by period
+          // 🎯 CRITICAL: Use size-specific matching for visits too
           if (isExactVisitMatch(rowBrand, brandName, targetSize)) {
             visitHistory.push({
               date: rowDate,
@@ -414,9 +380,36 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
       }
     });
     
-    const sortedHistory = visitHistory.sort((a, b) => a.date.getTime() - b.date.getTime());
-    visitDataCache.set(cacheKey, sortedHistory);
-    return sortedHistory;
+    return visitHistory.sort((a, b) => a.date.getTime() - b.date.getTime());
+  };
+
+  // 🎯 STEP 1: Get shops visited in the period
+  const getShopsVisitedInPeriod = (visitPeriod: number): Set<string> => {
+    const visitedShops = new Set<string>();
+    
+    if (!data.rawVisitData?.rollingPeriodRows) {
+      return visitedShops;
+    }
+    
+    const rows = data.rawVisitData.rollingPeriodRows;
+    const columnIndices = data.rawVisitData.columnIndices;
+    
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - visitPeriod);
+    
+    rows.forEach(row => {
+      const rowShopId = row[columnIndices.shopId];
+      const rowDateStr = row[columnIndices.checkInDateTime];
+      
+      if (rowShopId && rowDateStr) {
+        const rowDate = parseDate(rowDateStr);
+        if (rowDate && rowDate >= cutoffDate) {
+          visitedShops.add(rowShopId);
+        }
+      }
+    });
+    
+    return visitedShops;
   };
 
   const calculateStockStatus = (currentStock: number, theoreticalStock: number, supplyHistory: Array<any>): {
@@ -466,8 +459,17 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
     try {
       const today = new Date();
       
-      // Process visited shops from inventory data
+      // 🎯 STEP 1: Get shops visited in the period
+      const shopsVisitedInPeriod = getShopsVisitedInPeriod(filters.visitPeriod);
+      console.log(`🎯 Shops visited in last ${filters.visitPeriod} days:`, shopsVisitedInPeriod.size);
+      
+      // 🎯 STEP 2: Process only visited shops from inventory data
       Object.values(data.shops).forEach(shop => {
+        // 🔥 KEY FILTER: Only process shops visited in the period
+        if (!shopsVisitedInPeriod.has(shop.shopId)) {
+          return; // Skip shops not visited in period
+        }
+        
         try {
           Object.values(shop.items).forEach((item: any) => {
             try {
@@ -476,42 +478,44 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
               processedCombinations.add(combinationKey);
               
               const bottleInfo = getBottleSizeInfo(item.brand);
-              const supplyHistory = getSupplyDataForSKU(shop.shopId, item.brand, filters.trackingPeriod);
-              const visitHistory = getVisitDataForSKU(shop.shopId, item.brand, filters.trackingPeriod);
               
-              const totalCasesSupplied = supplyHistory.reduce((sum, supply) => sum + supply.cases, 0);
+              // 🎯 KEY CHANGE: Get MOST RECENT supply delivery only
+              const mostRecentSupply = getMostRecentSupplyForSKU(shop.shopId, item.brand);
+              
+              // 🎯 Get visit data filtered by period
+              const visitHistory = getVisitDataForSKU(shop.shopId, item.brand, filters.visitPeriod);
+              
+              // Calculate metrics based on MOST RECENT supply only
+              const totalCasesSupplied = mostRecentSupply ? mostRecentSupply.cases : 0;
               const totalBottlesSupplied = totalCasesSupplied * bottleInfo.conversionRate;
               
               const daysSinceLastVisit = shop.visitDate ? 
                 Math.floor((today.getTime() - shop.visitDate.getTime()) / (1000 * 60 * 60 * 24)) : null;
               
-              const lastSupplyDate = supplyHistory.length > 0 ? supplyHistory[supplyHistory.length - 1].date : null;
+              const lastSupplyDate = mostRecentSupply ? mostRecentSupply.date : null;
               const daysSinceLastSupply = lastSupplyDate ?
                 Math.floor((today.getTime() - lastSupplyDate.getTime()) / (1000 * 60 * 60 * 24)) : null;
               
-              // Calculate theoretical stock based on supply and expected consumption
+              // Calculate theoretical stock based on MOST RECENT supply and expected consumption
               let theoreticalStock = 0;
-              if (supplyHistory.length > 0 && daysSinceLastSupply !== null) {
-                const daysSinceFirstSupply = Math.floor(
-                  (today.getTime() - supplyHistory[0].date.getTime()) / (1000 * 60 * 60 * 24)
-                );
-                const expectedConsumed = daysSinceFirstSupply * bottleInfo.expectedDailyConsumption;
+              if (mostRecentSupply && daysSinceLastSupply !== null) {
+                const expectedConsumed = daysSinceLastSupply * bottleInfo.expectedDailyConsumption;
                 theoreticalStock = Math.max(0, totalBottlesSupplied - expectedConsumed);
               }
               
               const stockVariance = item.quantity - theoreticalStock;
-              const consumptionRate = visitHistory.length >= 2 ? 
-                bottleInfo.expectedDailyConsumption : bottleInfo.expectedDailyConsumption;
+              const consumptionRate = bottleInfo.expectedDailyConsumption;
               
               const { status, trend } = calculateStockStatus(item.quantity, theoreticalStock, visitHistory);
               
-              const supplyFrequency = supplyHistory.length > 0 ? filters.trackingPeriod / supplyHistory.length : 0;
-              const visitFrequency = visitHistory.length > 0 ? filters.trackingPeriod / visitHistory.length : 0;
+              // Supply frequency: N/A for single delivery
+              const supplyFrequency = mostRecentSupply ? daysSinceLastSupply || 0 : 0;
+              const visitFrequency = visitHistory.length > 0 ? filters.visitPeriod / visitHistory.length : 0;
               
               let dataQuality: 'complete' | 'partial' | 'supply_only' | 'visit_only' = 'complete';
-              if (supplyHistory.length === 0 && visitHistory.length > 0) dataQuality = 'visit_only';
-              else if (supplyHistory.length > 0 && visitHistory.length === 0) dataQuality = 'supply_only';
-              else if (supplyHistory.length === 0 || visitHistory.length === 0) dataQuality = 'partial';
+              if (!mostRecentSupply && visitHistory.length > 0) dataQuality = 'visit_only';
+              else if (mostRecentSupply && visitHistory.length === 0) dataQuality = 'supply_only';
+              else if (!mostRecentSupply || visitHistory.length === 0) dataQuality = 'partial';
               
               const record: StockRecord = {
                 id: `${shop.shopId}_${item.brand}`,
@@ -540,7 +544,7 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
                 dataQuality,
                 reasonNoStock: item.reasonNoStock,
                 conversionRate: bottleInfo.conversionRate,
-                supplyHistory,
+                supplyHistory: mostRecentSupply ? [{date: mostRecentSupply.date, cases: mostRecentSupply.cases}] : [],
                 visitHistory
               };
               
@@ -554,95 +558,14 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
         }
       });
       
-      // Process non-visited shops with supply data
-      if (data.rawSupplyData?.pendingChallansData) {
-        const pendingChallans = data.rawSupplyData.pendingChallansData;
-        if (pendingChallans.length > 1) {
-          const rows = pendingChallans.slice(1);
-          const processedShopSKUs = new Set<string>();
-          
-          rows.forEach(row => {
-            try {
-              const shopId = row[8]?.toString().trim();
-              const shopName = row[9]?.toString().trim() || 'Unknown Shop';
-              const brand = row[11]?.toString().trim();
-              const dateStr = row[1]?.toString().trim();
-              
-              if (shopId && brand && dateStr) {
-                const combinationKey = `${shopId}_${brand}`;
-                
-                // Skip if already processed from visited shops
-                if (processedCombinations.has(combinationKey) || processedShopSKUs.has(combinationKey)) {
-                  return;
-                }
-                processedShopSKUs.add(combinationKey);
-                
-                const bottleInfo = getBottleSizeInfo(brand);
-                const supplyHistory = getSupplyDataForSKU(shopId, brand, filters.trackingPeriod);
-                
-                if (supplyHistory.length > 0) {
-                  const totalCasesSupplied = supplyHistory.reduce((sum, supply) => sum + supply.cases, 0);
-                  const totalBottlesSupplied = totalCasesSupplied * bottleInfo.conversionRate;
-                  
-                  const lastSupplyDate = supplyHistory[supplyHistory.length - 1].date;
-                  const daysSinceLastSupply = Math.floor((today.getTime() - lastSupplyDate.getTime()) / (1000 * 60 * 60 * 24));
-                  
-                  // For non-visited shops, theoretical stock is based on supplies minus expected consumption
-                  const daysSinceFirstSupply = Math.floor(
-                    (today.getTime() - supplyHistory[0].date.getTime()) / (1000 * 60 * 60 * 24)
-                  );
-                  const expectedConsumed = daysSinceFirstSupply * bottleInfo.expectedDailyConsumption;
-                  const theoreticalStock = Math.max(0, totalBottlesSupplied - expectedConsumed);
-                  
-                  // Get shop info from master data if available
-                  const masterInfo = data.rawVisitData?.shopSalesmanMap?.get(shopId);
-                  
-                  const record: StockRecord = {
-                    id: `${shopId}_${brand}_supply_only`,
-                    shopId,
-                    shopName: masterInfo?.shopName || shopName,
-                    department: masterInfo?.department || 'Unknown',
-                    salesman: masterInfo?.salesman || 'Unknown',
-                    salesmanUid: masterInfo?.salesmanUid,
-                    sku: brand,
-                    bottleSize: bottleInfo.size,
-                    currentStockLevel: theoreticalStock, // Use theoretical as current for non-visited
-                    lastVisitDate: null,
-                    lastSupplyDate,
-                    daysSinceLastVisit: null,
-                    daysSinceLastSupply,
-                    totalSupplied: totalBottlesSupplied,
-                    casesSupplied: totalCasesSupplied,
-                    bottlesSupplied: totalBottlesSupplied,
-                    theoreticalStock,
-                    stockVariance: 0, // Unknown variance for non-visited
-                    consumptionRate: bottleInfo.expectedDailyConsumption,
-                    stockStatus: theoreticalStock > 0 ? 'healthy' : 'out',
-                    stockTrend: 'unknown',
-                    supplyFrequency: filters.trackingPeriod / supplyHistory.length,
-                    visitFrequency: 0,
-                    dataQuality: 'supply_only',
-                    conversionRate: bottleInfo.conversionRate,
-                    supplyHistory,
-                    visitHistory: []
-                  };
-                  
-                  records.push(record);
-                }
-              }
-            } catch (rowError) {
-              console.error('Error processing supply row:', rowError);
-            }
-          });
-        }
-      }
+      console.log(`✅ Processed ${records.length} stock records for ${shopsVisitedInPeriod.size} visited shops`);
       
     } catch (error) {
       console.error('Error in stock records processing:', error);
     }
     
     return records;
-  }, [data.shops, data.rawSupplyData, data.rawVisitData, filters.trackingPeriod]);
+  }, [data.shops, data.rawSupplyData, data.rawVisitData, filters.visitPeriod]);
 
   // ==========================================
   // FILTERING AND SORTING
@@ -756,12 +679,12 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
     const totalSupplied = filteredRecords.reduce((sum, record) => sum + record.totalSupplied, 0);
     const avgStockLevel = total > 0 ? Math.round(totalStock / total) : 0;
     
-    const visitedShops = filteredRecords.filter(r => r.lastVisitDate !== null).length;
-    const supplyOnlyShops = filteredRecords.filter(r => r.dataQuality === 'supply_only').length;
+    const visitedShops = Array.from(new Set(filteredRecords.map(r => r.shopId))).length;
+    const totalSupplyRecords = filteredRecords.reduce((sum, record) => sum + record.supplyHistory.length, 0);
     
     return { 
       total, healthy, low, out, overstocked, noData, 
-      totalStock, totalSupplied, avgStockLevel, visitedShops, supplyOnlyShops 
+      totalStock, totalSupplied, avgStockLevel, visitedShops, totalSupplyRecords 
     };
   }, [filteredRecords]);
 
@@ -773,16 +696,17 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
       let csvContent = "data:text/csv;charset=utf-8,";
       
       // Header
-      csvContent += "STOCK LEVEL TRACKING DASHBOARD REPORT\n";
+      csvContent += "STOCK LEVEL TRACKING DASHBOARD REPORT - MOST RECENT SUPPLY\n";
       csvContent += `Generated: ${new Date().toLocaleString()}\n`;
-      csvContent += `Tracking Period: ${filters.trackingPeriod} days\n`;
-      csvContent += `Period: ${data.summary.periodStartDate.toLocaleDateString()} - ${data.summary.periodEndDate.toLocaleDateString()}\n`;
+      csvContent += `🎯 VISIT PERIOD: ${filters.visitPeriod} days (filters which shops to analyze)\n`;
+      csvContent += `📦 SUPPLY DATA: Most recent delivery only for visited shops\n`;
       csvContent += `Total Records: ${filteredRecords.length}\n`;
-      csvContent += `Visited Shops: ${stats.visitedShops} | Supply-Only Shops: ${stats.supplyOnlyShops}\n`;
+      csvContent += `Visited Shops in Period: ${stats.visitedShops}\n`;
+      csvContent += `Supply Records: ${stats.totalSupplyRecords} (latest delivery per shop/SKU)\n`;
       csvContent += `Stock Status: Healthy: ${stats.healthy} | Low: ${stats.low} | Out: ${stats.out} | Overstocked: ${stats.overstocked}\n\n`;
       
       // Column headers
-      csvContent += "Shop Name,Shop ID,Department,Salesman,SKU,Bottle Size,Current Stock,Last Visit Date,Last Supply Date,Days Since Visit,Days Since Supply,Cases Supplied,Bottles Supplied,Theoretical Stock,Stock Variance,Stock Status,Stock Trend,Consumption Rate,Supply Frequency,Visit Frequency,Data Quality,Reason No Stock\n";
+      csvContent += "Shop Name,Shop ID,Department,Salesman,SKU,Bottle Size,Current Stock,Last Visit Date,Last Supply Date,Days Since Visit,Days Since Supply,Cases Supplied (LATEST),Bottles Supplied (LATEST),Theoretical Stock,Stock Variance,Stock Status,Stock Trend,Consumption Rate,Supply Frequency,Visit Frequency,Data Quality,Reason No Stock\n";
       
       // Data rows
       filteredRecords.forEach(record => {
@@ -810,11 +734,13 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
         csvContent += `"${record.supplyFrequency.toFixed(1)}",`;
         csvContent += `"${record.visitFrequency.toFixed(1)}",`;
         csvContent += `"${record.dataQuality.toUpperCase()}",`;
-        csvContent += `"${record.reasonNoStock || 'N/A'}"\n`;
+        csvContent += `"${record.reasonNoStock || 'N/A'}",`;
+        csvContent += `"${record.supplyHistory.length}",`;
+        csvContent += `"${record.visitHistory.length}"\n`;
       });
       
-      // Add supply history details
-      csvContent += "\n\nSUPPLY HISTORY DETAILS\n";
+      // Add most recent supply details
+      csvContent += "\n\nMOST RECENT SUPPLY FOR VISITED SHOPS\n";
       csvContent += "Shop Name,Shop ID,SKU,Supply Date,Cases Delivered\n";
       
       filteredRecords.forEach(record => {
@@ -828,7 +754,7 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
       });
       
       // Add visit history details
-      csvContent += "\n\nVISIT HISTORY DETAILS\n";
+      csvContent += "\n\nVISIT HISTORY (PERIOD-FILTERED)\n";
       csvContent += "Shop Name,Shop ID,SKU,Visit Date,Reported Stock\n";
       
       filteredRecords.forEach(record => {
@@ -845,7 +771,7 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
       const encodedUri = encodeURI(csvContent);
       const link = document.createElement("a");
       link.setAttribute("href", encodedUri);
-      link.setAttribute("download", `Stock_Level_Tracking_${filters.trackingPeriod}Days_${new Date().toISOString().split('T')[0]}.csv`);
+      link.setAttribute("download", `Stock_Level_Tracking_FIXED_Visit${filters.visitPeriod}Days_AllSupply_${new Date().toISOString().split('T')[0]}.csv`);
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -864,26 +790,26 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
       {/* Header */}
       <div className="text-center">
         <h2 className="text-2xl font-bold text-gray-900 mb-2 flex items-center justify-center space-x-2">
-          <span>Stock Level Tracking Dashboard</span>
+          <span>Stock Level Tracking Dashboard - MOST RECENT SUPPLY</span>
           <span className="px-2 py-1 bg-green-100 text-green-800 text-xs font-medium rounded-full">
-            SIZE-SPECIFIC FIXED ✅
+            ✅ VISITS: {filters.visitPeriod}d | SUPPLY: LATEST ONLY
           </span>
         </h2>
         <p className="text-gray-600">
-          Comprehensive inventory visibility across all shops with supply data integration. 
-          Track stock levels, supply deliveries, consumption patterns, and identify optimization opportunities.
+          🎯 <strong>Visit Period Filtering:</strong> Shows shops visited in last {filters.visitPeriod} days<br/>
+          📦 <strong>Supply Data:</strong> Most recent supply delivery only for those shops
         </p>
         <p className="text-sm text-gray-500">
-          Tracking Period: {filters.trackingPeriod} days • 
-          Data Sources: Visit Reports + Supply Challans + Master Shop Data • 
-          Coverage: Visited shops + Supply-only shops
+          Logic: Visit Period = {filters.visitPeriod} days • 
+          Supply Data = Latest delivery only • 
+          Coverage: Only shops visited in period
         </p>
         <div className="mt-2 flex items-center justify-center space-x-4">
           <span className="text-xs text-green-600 bg-green-50 px-2 py-1 rounded">
-            🎯 Size-Specific Matching: Cases now accurately separated by bottle size
+            🎯 FIXED: Visit period filters shops, LATEST supply delivery only
           </span>
           <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
-            ⚡ Performance: Optimized with data caching ({supplyDataCache.size} cached queries)
+            📊 Size-Specific: Accurate case-to-bottle conversion per SKU size
           </span>
         </div>
       </div>
@@ -894,16 +820,17 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <Calendar className="w-5 h-5 text-gray-400" />
-              <label className="text-sm font-medium text-gray-700">Tracking Period:</label>
+              <label className="text-sm font-medium text-gray-700">Visit Period (Shop Filter):</label>
               <select
-                value={filters.trackingPeriod}
-                onChange={(e) => setFilters({ ...filters, trackingPeriod: parseInt(e.target.value) })}
+                value={filters.visitPeriod}
+                onChange={(e) => setFilters({ ...filters, visitPeriod: parseInt(e.target.value) })}
                 className="border border-gray-300 rounded px-2 py-1 text-sm"
               >
                 <option value={7}>Last 7 Days</option>
                 <option value={15}>Last 15 Days</option>
                 <option value={30}>Last 30 Days</option>
               </select>
+              <span className="text-xs text-gray-500">(Filters which shops to analyze)</span>
             </div>
             
             <div className="flex items-center space-x-2">
@@ -923,10 +850,10 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
           <button
             onClick={exportStockTrackingCSV}
             className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors text-sm"
-            title="Export complete stock tracking report with SIZE-SPECIFIC corrections applied. Example: LOK NAYAK BHAWAN 180ml now shows only 180ml cases, not total of all sizes."
+            title="Export FIXED logic: Visit period filters shops, MOST RECENT supply delivery included"
           >
             <Download className="w-4 h-4" />
-            <span>Export SIZE-CORRECTED Report</span>
+            <span>Export FIXED Report</span>
           </button>
         </div>
 
@@ -1010,7 +937,7 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
               bottleSize: '', 
               stockTrend: '',
               searchText: '',
-              trackingPeriod: filters.trackingPeriod
+              visitPeriod: filters.visitPeriod
             })}
             className="px-3 py-1 bg-gray-100 text-gray-700 rounded text-sm hover:bg-gray-200 flex items-center space-x-1"
           >
@@ -1021,7 +948,7 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
       </div>
 
       {/* Statistics Dashboard */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4">
         <div className="bg-white p-4 rounded-lg shadow text-center">
           <div className="text-2xl font-bold text-gray-900">{stats.total}</div>
           <div className="text-sm text-gray-500">Total Records</div>
@@ -1046,18 +973,15 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
           <div className="text-2xl font-bold text-blue-600">{stats.visitedShops}</div>
           <div className="text-sm text-blue-700">Visited Shops</div>
         </div>
-        <div className="bg-purple-50 p-4 rounded-lg shadow text-center border border-purple-200">
-          <div className="text-2xl font-bold text-purple-600">{stats.supplyOnlyShops}</div>
-          <div className="text-sm text-purple-700">Supply Only</div>
-        </div>
       </div>
 
       {/* Main Content */}
       <div className="bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">Stock Level Records</h3>
+          <h3 className="text-lg font-medium text-gray-900">Stock Level Records - FIXED LOGIC</h3>
           <p className="text-sm text-gray-500">
-            Showing {startIndex + 1}-{Math.min(endIndex, filteredRecords.length)} of {filteredRecords.length} stock records
+            Showing {startIndex + 1}-{Math.min(endIndex, filteredRecords.length)} of {filteredRecords.length} stock records • 
+            🎯 Visit Filter: {filters.visitPeriod} days • 📦 Supply Data: ALL time
           </p>
         </div>
         
@@ -1108,7 +1032,7 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
                   Status {sortField === 'stockStatus' && (sortDirection === 'asc' ? '↑' : '↓')}
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Last Activity
+                  Latest Supply
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   Actions
@@ -1162,25 +1086,22 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <div className="space-y-1">
-                        {record.lastVisitDate && (
-                          <div className="flex items-center space-x-1">
-                            <Users className="w-3 h-3 text-blue-400" />
-                            <span className="text-xs">{record.daysSinceLastVisit}d ago</span>
-                          </div>
-                        )}
-                        {record.lastSupplyDate && (
-                          <div className="flex items-center space-x-1">
-                            <Truck className="w-3 h-3 text-green-400" />
-                            <span className="text-xs">{record.daysSinceLastSupply}d ago</span>
-                          </div>
-                        )}
+                        <div className="flex items-center space-x-1">
+                          <Truck className="w-3 h-3 text-green-400" />
+                          <span className="text-xs font-medium">{record.casesSupplied} cases</span>
+                        </div>
+                        <div className="flex items-center space-x-1">
+                          <Package className="w-3 h-3 text-blue-400" />
+                          <span className="text-xs">{record.bottlesSupplied} bottles</span>
+                        </div>
+                        <div className="text-xs text-gray-500">Latest delivery</div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <button
                         onClick={() => setExpandedRecord(expandedRecord === record.id ? null : record.id)}
                         className="text-blue-600 hover:text-blue-800 p-1 hover:bg-blue-50 rounded"
-                        title="View details"
+                        title="View all-time supply details"
                       >
                         <Eye className="w-4 h-4" />
                       </button>
@@ -1204,45 +1125,42 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
                               </div>
                             </div>
                             <div>
-                              <h4 className="font-medium text-gray-900 mb-2">Supply Activity</h4>
+                              <h4 className="font-medium text-gray-900 mb-2">Latest Supply Activity</h4>
                               <div className="space-y-1 text-sm">
-                                <div>Total Cases Supplied: {record.casesSupplied}</div>
-                                <div>Total Bottles Supplied: {record.bottlesSupplied}</div>
-                                <div>Supply Frequency: {record.supplyFrequency.toFixed(1)} days/supply</div>
-                                <div>Last Supply: {record.lastSupplyDate ? record.lastSupplyDate.toLocaleDateString('en-GB') : 'No Supply'}</div>
+                                <div>Latest Cases: {record.casesSupplied}</div>
+                                <div>Latest Bottles: {record.bottlesSupplied}</div>
+                                <div>Supply Date: {record.lastSupplyDate ? record.lastSupplyDate.toLocaleDateString('en-GB') : 'No Supply'}</div>
                                 <div>Days Since Supply: {record.daysSinceLastSupply || 'N/A'}</div>
+                                <div>Conversion Rate: {record.conversionRate} bottles/case</div>
                               </div>
                             </div>
                             <div>
-                              <h4 className="font-medium text-gray-900 mb-2">Visit Activity</h4>
+                              <h4 className="font-medium text-gray-900 mb-2">Visit Activity (Period)</h4>
                               <div className="space-y-1 text-sm">
                                 <div>Last Visit: {record.lastVisitDate ? record.lastVisitDate.toLocaleDateString('en-GB') : 'No Visit'}</div>
                                 <div>Days Since Visit: {record.daysSinceLastVisit || 'N/A'}</div>
-                                <div>Visit Frequency: {record.visitFrequency.toFixed(1)} days/visit</div>
+                                <div>Visit Records: {record.visitHistory.length}</div>
                                 <div>Data Quality: {record.dataQuality.replace('_', ' ').toUpperCase()}</div>
                                 {record.reasonNoStock && <div>Reason: {record.reasonNoStock}</div>}
                               </div>
                             </div>
                           </div>
                           
-                          {/* Supply History */}
+                          {/* Most Recent Supply */}
                           {record.supplyHistory.length > 0 && (
                             <div>
-                              <h4 className="font-medium text-gray-900 mb-2">Supply History ({record.supplyHistory.length} deliveries)</h4>
-                              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 text-sm">
-                                {record.supplyHistory.slice(-6).map((supply, index) => (
-                                  <div key={index} className="bg-white p-2 rounded border">
-                                    {supply.date.toLocaleDateString('en-GB')}: {supply.cases} cases
-                                  </div>
-                                ))}
+                              <h4 className="font-medium text-gray-900 mb-2">Most Recent Supply Delivery</h4>
+                              <div className="bg-white p-3 rounded border">
+                                {record.supplyHistory[0].date.toLocaleDateString('en-GB')}: {record.supplyHistory[0].cases} cases
+                                ({record.supplyHistory[0].cases * record.conversionRate} bottles)
                               </div>
                             </div>
                           )}
                           
-                          {/* Visit History */}
+                          {/* Visit History (Period-Filtered) */}
                           {record.visitHistory.length > 0 && (
                             <div>
-                              <h4 className="font-medium text-gray-900 mb-2">Visit History ({record.visitHistory.length} visits)</h4>
+                              <h4 className="font-medium text-gray-900 mb-2">Visit History - Last {filters.visitPeriod} Days ({record.visitHistory.length} visits)</h4>
                               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-2 text-sm">
                                 {record.visitHistory.slice(-6).map((visit, index) => (
                                   <div key={index} className="bg-white p-2 rounded border">
@@ -1265,7 +1183,8 @@ const StockLevelTrackingTab = ({ data }: { data: InventoryData }) => {
         {/* Pagination */}
         <div className="px-6 py-3 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center">
           <div className="text-sm text-gray-700 mb-2 sm:mb-0">
-            Showing {startIndex + 1} to {Math.min(endIndex, filteredRecords.length)} of {filteredRecords.length} stock records
+            Showing {startIndex + 1} to {Math.min(endIndex, filteredRecords.length)} of {filteredRecords.length} stock records • 
+            🎯 Shops visited in {filters.visitPeriod} days with LATEST supply data
           </div>
           <div className="flex space-x-2">
             <button
