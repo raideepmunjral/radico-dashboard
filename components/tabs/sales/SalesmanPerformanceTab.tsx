@@ -27,6 +27,30 @@ interface ShopData {
   juneTotal?: number;
   juneEightPM?: number;
   juneVerve?: number;
+  julyTotal?: number;
+  julyEightPM?: number;
+  julyVerve?: number;
+  augustTotal?: number;
+  augustEightPM?: number;
+  augustVerve?: number;
+  septemberTotal?: number;
+  septemberEightPM?: number;
+  septemberVerve?: number;
+  octoberTotal?: number;
+  octoberEightPM?: number;
+  octoberVerve?: number;
+  novemberTotal?: number;
+  novemberEightPM?: number;
+  novemberVerve?: number;
+  decemberTotal?: number;
+  decemberEightPM?: number;
+  decemberVerve?: number;
+  januaryTotal?: number;
+  januaryEightPM?: number;
+  januaryVerve?: number;
+  februaryTotal?: number;
+  februaryEightPM?: number;
+  februaryVerve?: number;
   growthPercent?: number;
   monthlyTrend?: 'improving' | 'declining' | 'stable' | 'new';
 }
@@ -36,7 +60,7 @@ interface DashboardData {
   salespersonStats: Record<string, any>;
   currentMonth: string;
   currentYear: string;
-  allShopsComparison: ShopData[]; // ❌ CONTAMINATED - will be replaced
+  allShopsComparison: ShopData[]; // Legacy - now unused
 }
 
 // ==========================================
@@ -46,6 +70,34 @@ interface DashboardData {
 const getMonthName = (monthNum: string) => {
   const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
   return months[parseInt(monthNum) - 1] || 'Unknown';
+};
+
+// ==========================================
+// ROLLING 5-MONTH WINDOW UTILITY
+// ==========================================
+
+const getRolling5MonthWindow = (currentMonth: string) => {
+  const monthKeys = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  const monthAbbrev = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  
+  const currentMonthIndex = parseInt(currentMonth) - 1; // Convert to 0-based index
+  const rolling5Months = [];
+  
+  // Get the last 5 months including current month
+  for (let i = 4; i >= 0; i--) {
+    let targetMonthIndex = currentMonthIndex - i;
+    if (targetMonthIndex < 0) targetMonthIndex += 12; // Handle year wraparound
+    
+    rolling5Months.push({
+      key: monthKeys[targetMonthIndex],
+      name: monthNames[targetMonthIndex],
+      abbrev: monthAbbrev[targetMonthIndex],
+      index: targetMonthIndex + 1 // Convert back to 1-based for display
+    });
+  }
+  
+  return rolling5Months;
 };
 
 // ==========================================
@@ -81,6 +133,11 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
     shops: any[];
     type: '8pm' | 'verve' | 'both' | '8pm-only' | 'verve-only' | 'zero-sales';
   } | null>(null);
+
+  // Get the rolling 5-month window
+  const rolling5Months = useMemo(() => {
+    return getRolling5MonthWindow(data.currentMonth);
+  }, [data.currentMonth]);
 
   // INTERNAL FUNCTION to handle case breakdown click
   const handleCaseBreakdownClick = (salesmanName: string, month: string, monthName: string, total: number, eightPM: number, verve: number) => {
@@ -194,65 +251,90 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-      {/* Historical Trend - Rolling 4 Months */}
-      <div className="grid grid-cols-4 gap-2 mb-3">
-        {(() => {
-          const currentMonth = parseInt(data.currentMonth);
-          const monthKeys = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
-          const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-          const colors = ['bg-blue-100 hover:bg-blue-200', 'bg-green-100 hover:bg-green-200', 'bg-yellow-100 hover:bg-yellow-200', 'bg-purple-100 hover:bg-purple-200'];
+      {/* Historical Trend - Rolling 5 Months */}
+      <div className="grid grid-cols-5 gap-1 mb-3">
+        {rolling5Months.map((month, index) => {
+          const totalField = `${month.key}Total`;
+          const eightPMField = `${month.key}EightPM`;
+          const verveField = `${month.key}Verve`;
           
-          const buttons = [];
-          for (let i = 3; i >= 0; i--) {
-            let targetMonth = currentMonth - i;
-            if (targetMonth <= 0) targetMonth += 12;
-            
-            const monthKey = monthKeys[targetMonth - 1];
-            const monthName = monthNames[targetMonth - 1];
-            const totalField = `${monthKey}Total`;
-            const eightPMField = `${monthKey}EightPM`;
-            const verveField = `${monthKey}Verve`;
-            
-            const total = Number(salesman[totalField]) || 0;
-            const eightPM = Number(salesman[eightPMField]) || 0;
-            const verve = Number(salesman[verveField]) || 0;
-            
-            buttons.push(
-              <button
-                key={monthKey}
-                onClick={() => handleCaseBreakdownClick(salesman.name, monthKey, monthNames[targetMonth - 1].replace('Jan', 'January').replace('Feb', 'February').replace('Mar', 'March').replace('Apr', 'April').replace('Jun', 'June').replace('Jul', 'July').replace('Aug', 'August').replace('Sep', 'September').replace('Oct', 'October').replace('Nov', 'November').replace('Dec', 'December'), total, eightPM, verve)}
-                className={`text-center p-2 ${colors[3-i]} rounded transition-colors`}
-              >
-                <div className="text-sm font-medium text-gray-900">{total.toLocaleString()}</div>
-                <div className="text-xs text-gray-500">{monthName}</div>
-              </button>
-            );
+          // For current month, use live data
+          let total, eightPM, verve;
+          if (month.index.toString().padStart(2, '0') === data.currentMonth) {
+            total = (Number(salesman.total8PM) || 0) + (Number(salesman.totalVERVE) || 0);
+            eightPM = Number(salesman.total8PM) || 0;
+            verve = Number(salesman.totalVERVE) || 0;
+          } else {
+            total = Number(salesman[totalField]) || 0;
+            eightPM = Number(salesman[eightPMField]) || 0;
+            verve = Number(salesman[verveField]) || 0;
           }
-          return buttons;
-        })()}
+          
+          const colors = [
+            'bg-blue-100 hover:bg-blue-200', 
+            'bg-green-100 hover:bg-green-200', 
+            'bg-yellow-100 hover:bg-yellow-200', 
+            'bg-purple-100 hover:bg-purple-200',
+            'bg-red-100 hover:bg-red-200'
+          ];
+          
+          return (
+            <button
+              key={month.key}
+              onClick={() => handleCaseBreakdownClick(salesman.name, month.key, month.name, total, eightPM, verve)}
+              className={`text-center p-2 ${colors[index]} rounded transition-colors`}
+            >
+              <div className="text-sm font-medium text-gray-900">{total.toLocaleString()}</div>
+              <div className="text-xs text-gray-500">{month.abbrev}</div>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* 5-Month Average */}
+      <div className="grid grid-cols-2 gap-3 mt-3 mb-3">
+        <div className="text-center p-2 bg-gray-50 rounded">
+          <div className="text-sm font-bold text-blue-600">
+            {(() => {
+              // Calculate 5-month average
+              const monthTotals = rolling5Months.map(month => {
+                const totalField = `${month.key}Total`;
+                if (month.index.toString().padStart(2, '0') === data.currentMonth) {
+                  return (Number(salesman.total8PM) || 0) + (Number(salesman.totalVERVE) || 0);
+                }
+                return Number(salesman[totalField]) || 0;
+              });
+              const avg = monthTotals.reduce((sum, total) => sum + total, 0) / 5;
+              return Math.round(avg).toLocaleString();
+            })()}
+          </div>
+          <div className="text-xs text-gray-500">5M Avg</div>
+        </div>
+        <div className="text-center p-2 bg-gray-50 rounded">
+          <div className="text-sm font-bold text-gray-600">
+            {rolling5Months.map(m => m.abbrev).join('-')}
+          </div>
+          <div className="text-xs text-gray-500">Window</div>
+        </div>
       </div>
 
       {/* Trend Indicator */}
       <div className="flex justify-center">
         {(() => {
-          // Calculate trend using rolling 4-month data
-          const currentMonth = parseInt(data.currentMonth);
-          const monthKeys = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+          // Calculate trend using rolling 5-month data
+          const monthTotals = rolling5Months.map(month => {
+            const totalField = `${month.key}Total`;
+            if (month.index.toString().padStart(2, '0') === data.currentMonth) {
+              return (Number(salesman.total8PM) || 0) + (Number(salesman.totalVERVE) || 0);
+            }
+            return Number(salesman[totalField]) || 0;
+          });
           
-          const rollingTotals = [];
-          for (let i = 3; i >= 0; i--) {
-            let targetMonth = currentMonth - i;
-            if (targetMonth <= 0) targetMonth += 12;
-            const monthKey = monthKeys[targetMonth - 1];
-            const totalField = `${monthKey}Total`;
-            rollingTotals.push(Number(salesman[totalField]) || 0);
-          }
-          
-          // Compare recent 2 months vs earlier 2 months
-          const recent2Avg = (rollingTotals[2] + rollingTotals[3]) / 2;
-          const earlier2Avg = (rollingTotals[0] + rollingTotals[1]) / 2;
-          const trend = recent2Avg > earlier2Avg * 1.1 ? 'improving' :
-                      recent2Avg < earlier2Avg * 0.9 ? 'declining' : 'stable';
+          // Compare recent 3 months vs earlier 2 months
+          const recent3Avg = (monthTotals[2] + monthTotals[3] + monthTotals[4]) / 3;
+          const earlier2Avg = (monthTotals[0] + monthTotals[1]) / 2;
+          const trend = recent3Avg > earlier2Avg * 1.1 ? 'improving' :
+                      recent3Avg < earlier2Avg * 0.9 ? 'declining' : 'stable';
           
           return (
             <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${
@@ -837,7 +919,7 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
   };
 
   // ==========================================
-  // ✅ FIXED: ENHANCED SALESMAN PERFORMANCE CALCULATION WITH PHANTOM DATA PREVENTION
+  // ✅ ENHANCED SALESMAN PERFORMANCE CALCULATION WITH ROLLING 5-MONTH SUPPORT
   // ==========================================
   
   const salesmanPerformance = useMemo(() => {
@@ -860,7 +942,7 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
         return names[0] || 'Unknown';
       };
       
-      console.log('🔧 Processing salesman performance data with phantom data prevention...');
+      console.log('🔧 Processing salesman performance data with rolling 5-month window...');
       
       // ✅ CRITICAL FIX: Use data.salesData instead of contaminated data.allShopsComparison
       if (!data?.salesData) {
@@ -870,6 +952,21 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
       
       const allShops = Object.values(data.salesData);
       console.log(`📊 Processing ${allShops.length} shops from clean salesData source`);
+      
+      // 🔍 DEBUG: Check sample shop data for June/July availability
+      const sampleShop = allShops[0];
+      if (sampleShop) {
+        console.log('🔍 SAMPLE SHOP DATA CHECK:', {
+          shopName: sampleShop.shopName,
+          currentTotal: sampleShop.total,
+          rolling5MonthFields: rolling5Months.map(month => ({
+            month: month.name,
+            totalField: `${month.key}Total`,
+            value: (sampleShop as any)[`${month.key}Total`] || 0
+          })),
+          availableFields: Object.keys(sampleShop).filter(key => key.includes('Total'))
+        });
+      }
       
       // Track all name variations for each normalized name
       const nameVariations: Record<string, string[]> = {};
@@ -905,15 +1002,19 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
             targetVERVE: 0,
             achievement8PM: 0,
             achievementVERVE: 0,
-            marchTotal: 0,
-            marchEightPM: 0,
-            marchVerve: 0,
-            aprilTotal: 0,
-            aprilEightPM: 0,
-            aprilVerve: 0,
-            mayTotal: 0,
-            mayEightPM: 0,
-            mayVerve: 0,
+            // Historical data for all months (rolling 5-month support)
+            marchTotal: 0, marchEightPM: 0, marchVerve: 0,
+            aprilTotal: 0, aprilEightPM: 0, aprilVerve: 0,
+            mayTotal: 0, mayEightPM: 0, mayVerve: 0,
+            juneTotal: 0, juneEightPM: 0, juneVerve: 0,
+            julyTotal: 0, julyEightPM: 0, julyVerve: 0,
+            augustTotal: 0, augustEightPM: 0, augustVerve: 0,
+            septemberTotal: 0, septemberEightPM: 0, septemberVerve: 0,
+            octoberTotal: 0, octoberEightPM: 0, octoberVerve: 0,
+            novemberTotal: 0, novemberEightPM: 0, novemberVerve: 0,
+            decemberTotal: 0, decemberEightPM: 0, decemberVerve: 0,
+            januaryTotal: 0, januaryEightPM: 0, januaryVerve: 0,
+            februaryTotal: 0, februaryEightPM: 0, februaryVerve: 0,
             shops: []
           };
         } else {
@@ -961,18 +1062,19 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
           }
         }
           
-        // ✅ FIXED: Add historical data properly (use historical fields only)
-        performanceMap[normalizedName].marchTotal += Number(shop.marchTotal) || 0;
-        performanceMap[normalizedName].marchEightPM += Number(shop.marchEightPM) || 0;
-        performanceMap[normalizedName].marchVerve += Number(shop.marchVerve) || 0;
+        // ✅ FIXED: Add ALL historical data properly (use historical fields only)
+        // Support for rolling 5-month window
+        const allMonthKeys = ['march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december', 'january', 'february'];
         
-        performanceMap[normalizedName].aprilTotal += Number(shop.aprilTotal) || 0;
-        performanceMap[normalizedName].aprilEightPM += Number(shop.aprilEightPM) || 0;
-        performanceMap[normalizedName].aprilVerve += Number(shop.aprilVerve) || 0;
-        
-        performanceMap[normalizedName].mayTotal += Number(shop.mayTotal) || 0;
-        performanceMap[normalizedName].mayEightPM += Number(shop.mayEightPM) || 0;
-        performanceMap[normalizedName].mayVerve += Number(shop.mayVerve) || 0;
+        allMonthKeys.forEach(monthKey => {
+          const totalField = `${monthKey}Total`;
+          const eightPMField = `${monthKey}EightPM`;
+          const verveField = `${monthKey}Verve`;
+          
+          performanceMap[normalizedName][totalField] += Number(shop[totalField as keyof ShopData]) || 0;
+          performanceMap[normalizedName][eightPMField] += Number(shop[eightPMField as keyof ShopData]) || 0;
+          performanceMap[normalizedName][verveField] += Number(shop[verveField as keyof ShopData]) || 0;
+        });
       });
       
       // Update display names to best format
@@ -1068,14 +1170,15 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
       
       const result = Object.values(performanceMap).filter((p: any) => p.name !== 'Unknown');
       
-      console.log(`✅ Processed ${result.length} salesmen with phantom data prevention using clean salesData source`);
+      console.log(`✅ Processed ${result.length} salesmen with rolling 5-month window support`);
+      console.log(`📊 Current rolling window: ${rolling5Months.map(m => m.abbrev).join('-')} ${data.currentYear}`);
       
       return result;
     } catch (error) {
       console.error('❌ Error in salesmanPerformance calculation:', error);
       return [];
     }
-  }, [data]);
+  }, [data, rolling5Months]);
 
   // AGGRESSIVE FIX: Force React to completely re-render
   const [forceUpdate, setForceUpdate] = useState(0);
@@ -1125,8 +1228,11 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
         <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Salesman Performance Dashboard</h2>
         <p className="text-gray-600 text-sm sm:text-base">Individual salesman achievements and targets for {getMonthName(data.currentMonth)} {data.currentYear}</p>
         <div className="mt-2 text-xs text-green-600 bg-green-50 rounded-full px-3 py-1 inline-block">
-          ✅ Now using clean salesData source (phantom data prevented)
+          ✅ Rolling 5-Month Window: {rolling5Months.map(m => m.abbrev).join('-')} {data.currentYear}
         </div>
+        <p className="text-xs text-gray-500 mt-1">
+          Automatically updates each month • Current window shows last 5 months including {getMonthName(data.currentMonth)}
+        </p>
       </div>
 
       {/* 🛠️ WARNING BANNER FOR SUSPICIOUS TARGETS */}
@@ -1230,7 +1336,7 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
               Salesman Performance - Mobile View
             </h3>
             <p className="text-sm text-gray-500">
-              Ranked by total sales ({getMonthName(data.currentMonth)} {data.currentYear})
+              Ranked by total sales • Rolling 5-month window: {rolling5Months.map(m => m.abbrev).join('-')}
             </p>
           </div>
           
@@ -1338,22 +1444,12 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-      {/* 4-Month Rolling Historical Performance - Desktop Only */}
+      {/* Rolling 5-Month Historical Performance - Desktop Only */}
       <div className="hidden lg:block bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">4-Month Rolling Performance Trend</h3>
+          <h3 className="text-lg font-medium text-gray-900">Rolling 5-Month Performance Trend</h3>
           <p className="text-sm text-gray-500">
-            Rolling 4-month window that automatically updates • Current: {(() => {
-              const currentMonth = parseInt(data.currentMonth);
-              const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-              const rollingMonths = [];
-              for (let i = 3; i >= 0; i--) {
-                let targetMonth = currentMonth - i;
-                if (targetMonth <= 0) targetMonth += 12;
-                rollingMonths.push(months[targetMonth - 1]);
-              }
-              return rollingMonths.join('-');
-            })()} {data.currentYear}
+            Rolling window automatically updates each month • Current: {rolling5Months.map(m => m.abbrev).join('-')} {data.currentYear}
           </p>
         </div>
         <div className="overflow-x-auto">
@@ -1361,61 +1457,53 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salesman</th>
-                {(() => {
-                  const currentMonth = parseInt(data.currentMonth);
-                  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-                  const headers = [];
-                  for (let i = 3; i >= 0; i--) {
-                    let targetMonth = currentMonth - i;
-                    if (targetMonth <= 0) targetMonth += 12;
-                    headers.push(
-                      <th key={targetMonth} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        {months[targetMonth - 1]} Total
-                      </th>
-                    );
-                  }
-                  return headers;
-                })()}
+                {rolling5Months.map((month, index) => (
+                  <th key={month.key} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    {month.name} Total
+                  </th>
+                ))}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trend</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">4-Month Avg</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">5-Month Avg</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {sortedSalesmen.slice(0, 10).map((salesman: any) => {
-                // Calculate rolling 4-month data
-                const currentMonth = parseInt(data.currentMonth);
-                const monthKeys = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
-                const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-                
-                const rollingData = [];
-                for (let i = 3; i >= 0; i--) {
-                  let targetMonth = currentMonth - i;
-                  if (targetMonth <= 0) targetMonth += 12;
+                // Calculate rolling 5-month data
+                const rollingData = rolling5Months.map(month => {
+                  const totalField = `${month.key}Total`;
+                  const eightPMField = `${month.key}EightPM`;
+                  const verveField = `${month.key}Verve`;
                   
-                  const monthKey = monthKeys[targetMonth - 1];
-                  const monthName = monthNames[targetMonth - 1];
-                  const totalField = `${monthKey}Total`;
-                  const eightPMField = `${monthKey}EightPM`;
-                  const verveField = `${monthKey}Verve`;
+                  // For current month, use live data
+                  let total, eightPM, verve;
+                  if (month.index.toString().padStart(2, '0') === data.currentMonth) {
+                    total = (Number(salesman.total8PM) || 0) + (Number(salesman.totalVERVE) || 0);
+                    eightPM = Number(salesman.total8PM) || 0;
+                    verve = Number(salesman.totalVERVE) || 0;
+                  } else {
+                    total = Number(salesman[totalField]) || 0;
+                    eightPM = Number(salesman[eightPMField]) || 0;
+                    verve = Number(salesman[verveField]) || 0;
+                  }
                   
-                  rollingData.push({
-                    month: targetMonth,
-                    monthName,
-                    monthKey,
-                    total: Number(salesman[totalField]) || 0,
-                    eightPM: Number(salesman[eightPMField]) || 0,
-                    verve: Number(salesman[verveField]) || 0
-                  });
-                }
+                  return {
+                    month: month.index,
+                    monthName: month.name,
+                    monthKey: month.key,
+                    total,
+                    eightPM,
+                    verve
+                  };
+                });
                 
-                // Calculate 4-month average
-                const avg4Month = (rollingData.reduce((sum, month) => sum + month.total, 0) / 4).toFixed(0);
+                // Calculate 5-month average
+                const avg5Month = (rollingData.reduce((sum, month) => sum + month.total, 0) / 5).toFixed(0);
                 
-                // Calculate trend (latest 2 months vs earlier 2 months)
-                const recent2Avg = (rollingData[2].total + rollingData[3].total) / 2;
+                // Calculate trend (latest 3 months vs earlier 2 months)
+                const recent3Avg = (rollingData[2].total + rollingData[3].total + rollingData[4].total) / 3;
                 const earlier2Avg = (rollingData[0].total + rollingData[1].total) / 2;
-                const trend = recent2Avg > earlier2Avg * 1.1 ? 'improving' :
-                            recent2Avg < earlier2Avg * 0.9 ? 'declining' : 'stable';
+                const trend = recent3Avg > earlier2Avg * 1.1 ? 'improving' :
+                            recent3Avg < earlier2Avg * 0.9 ? 'declining' : 'stable';
                 
                 return (
                   <tr key={salesman._sortKey}>
@@ -1446,7 +1534,7 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
                         {trend === 'improving' ? '📈 Growing' : trend === 'declining' ? '📉 Declining' : '➡️ Stable'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">{avg4Month}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">{avg5Month}</td>
                   </tr>
                 );
               })}
@@ -1530,7 +1618,7 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
       {/* Summary - Mobile Responsive */}
       <div className="bg-gradient-to-r from-purple-50 to-orange-50 p-4 sm:p-6 rounded-lg">
         <h3 className="text-lg font-medium text-gray-900 mb-4">Salesman Achievement Summary - {getMonthName(data.currentMonth)} {data.currentYear}</h3>
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
           <div className="text-center">
             <div className="text-xl sm:text-2xl font-bold text-green-600">
               {sortedSalesmen.filter((s: any) => s.achievement8PM >= 100 && s.target8PM > 0).length}
@@ -1555,6 +1643,25 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
             </div>
             <div className="text-xs text-gray-600">Active Salesmen</div>
           </div>
+          <div className="text-center">
+            <div className="text-xl sm:text-2xl font-bold text-gray-600">
+              {rolling5Months.map(m => m.abbrev).join('-')}
+            </div>
+            <div className="text-xs text-gray-600">Rolling Window</div>
+          </div>
+        </div>
+        
+        {/* Future Month Preview */}
+        <div className="mt-6 p-4 bg-white bg-opacity-60 rounded-lg">
+          <h4 className="text-sm font-medium text-gray-900 mb-2">🔮 Next Month Preview</h4>
+          <p className="text-xs text-gray-600">
+            When {getMonthName(String(parseInt(data.currentMonth) + 1).padStart(2, '0'))} {data.currentYear} begins, 
+            the window will automatically shift to: {(() => {
+              const nextMonth = parseInt(data.currentMonth) + 1 > 12 ? '01' : String(parseInt(data.currentMonth) + 1).padStart(2, '0');
+              const nextWindow = getRolling5MonthWindow(nextMonth);
+              return nextWindow.map(m => m.abbrev).join('-');
+            })()} {parseInt(data.currentMonth) === 12 ? parseInt(data.currentYear) + 1 : data.currentYear}
+          </p>
         </div>
       </div>
 
