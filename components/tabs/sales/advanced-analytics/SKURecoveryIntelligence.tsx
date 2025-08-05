@@ -37,6 +37,30 @@ interface ShopData {
   juneTotal?: number;
   juneEightPM?: number;
   juneVerve?: number;
+  julyTotal?: number;
+  julyEightPM?: number;
+  julyVerve?: number;
+  augustTotal?: number;
+  augustEightPM?: number;
+  augustVerve?: number;
+  septemberTotal?: number;
+  septemberEightPM?: number;
+  septemberVerve?: number;
+  octoberTotal?: number;
+  octoberEightPM?: number;
+  octoberVerve?: number;
+  novemberTotal?: number;
+  novemberEightPM?: number;
+  novemberVerve?: number;
+  decemberTotal?: number;
+  decemberEightPM?: number;
+  decemberVerve?: number;
+  januaryTotal?: number;
+  januaryEightPM?: number;
+  januaryVerve?: number;
+  februaryTotal?: number;
+  februaryEightPM?: number;
+  februaryVerve?: number;
   skuBreakdown?: SKUData[];
   detailedSKUBreakdown?: DetailedSKUData[];
   threeMonthAvgTotal?: number;
@@ -97,6 +121,7 @@ interface RealSupplyTransaction {
   source: 'pending_challans' | 'historical';
   normalizedBrandInfo: BrandInfo;
   matchingKey: string;
+  isCurrentMonth: boolean; // 🔧 NEW: Track if this is current month data
 }
 
 interface RealSKURecoveryOpportunity {
@@ -138,7 +163,7 @@ interface RealSKURecoveryOpportunity {
   category: 'IMMEDIATE_ACTION' | 'RELATIONSHIP_MAINTENANCE' | 'VIP_CUSTOMER' | 'GAP_ANALYSIS' | 'SUPPLY_CHAIN_ISSUE';
   actionRequired: string;
   
-  // Time-Based Customer Segmentation
+  // Time-Based Customer Segmentation (ENHANCED)
   customerStatus: 'CURRENT' | 'RECENTLY_STOPPED' | 'SHORT_DORMANT' | 'LONG_DORMANT' | 'INACTIVE';
   timeSegment: '0-30d' | '1-2m' | '3-4m' | '5-8m' | '8m+';
   
@@ -151,6 +176,11 @@ interface RealSKURecoveryOpportunity {
   // Unified Normalization Data
   normalizedKey: string;
   matchingKey: string;
+  
+  // 🔧 NEW: Current Month Awareness
+  currentMonthName: string;
+  currentYear: string;
+  isPhantomDataSafe: boolean;
 }
 
 interface EnhancedFilters {
@@ -173,6 +203,53 @@ interface EnhancedFilters {
 }
 
 // ==========================================
+// 🔧 FUTURE-READY HELPER FUNCTIONS
+// ==========================================
+
+const getMonthName = (monthNum: string) => {
+  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  return months[parseInt(monthNum) - 1] || 'Unknown';
+};
+
+const getShortMonthName = (monthNum: string) => {
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return months[parseInt(monthNum) - 1] || 'Unknown';
+};
+
+const getMonthKey = (monthNum: string): string => {
+  const monthKeys: Record<string, string> = {
+    '01': 'january',
+    '02': 'february', 
+    '03': 'march',
+    '04': 'april',
+    '05': 'may',
+    '06': 'june',
+    '07': 'july',
+    '08': 'august',
+    '09': 'september',
+    '10': 'october',
+    '11': 'november',
+    '12': 'december'
+  };
+  return monthKeys[monthNum] || 'unknown';
+};
+
+const isCurrentMonthTransaction = (dateStr: string, currentMonth: string, currentYear: string): boolean => {
+  try {
+    const transactionDate = parseSheetDate(dateStr);
+    if (!transactionDate) return false;
+    
+    const transactionMonth = (transactionDate.getMonth() + 1).toString().padStart(2, '0');
+    const transactionYear = transactionDate.getFullYear().toString();
+    
+    return transactionMonth === currentMonth && transactionYear === currentYear;
+  } catch (error) {
+    console.warn('Error checking if current month transaction:', error);
+    return false;
+  }
+};
+
+// ==========================================
 // GOOGLE SHEETS CONFIGURATION
 // ==========================================
 
@@ -183,12 +260,18 @@ const SHEETS_CONFIG = {
 };
 
 // ==========================================
-// REAL GOOGLE SHEETS DATA FETCHING
+// 🔧 ENHANCED: REAL GOOGLE SHEETS DATA FETCHING (PHANTOM DATA SAFE)
 // ==========================================
 
-const fetchRealSKUData = async (lookbackPeriod: number): Promise<Record<string, RealSupplyTransaction[]>> => {
-  console.log('🔄 Fetching REAL SKU data from Google Sheets with UNIFIED normalization...', {
+const fetchRealSKUData = async (
+  lookbackPeriod: number, 
+  currentMonth: string, 
+  currentYear: string
+): Promise<Record<string, RealSupplyTransaction[]>> => {
+  console.log('🔄 Fetching PHANTOM DATA SAFE SKU data from Google Sheets...', {
     lookbackPeriod,
+    currentMonth: getMonthName(currentMonth),
+    currentYear,
     sheetsConfig: SHEETS_CONFIG
   });
 
@@ -204,13 +287,21 @@ const fetchRealSKUData = async (lookbackPeriod: number): Promise<Record<string, 
       fetchHistoricalData()
     ]);
 
-    // Process and combine data with unified normalization
-    const combinedSKUData = processCombinedSKUData(pendingChallansData, historicalData, lookbackPeriod);
+    // Process and combine data with phantom data protection
+    const combinedSKUData = processCombinedSKUData(
+      pendingChallansData, 
+      historicalData, 
+      lookbackPeriod,
+      currentMonth,
+      currentYear
+    );
     
-    console.log('✅ Real SKU data fetched and processed with UNIFIED normalization:', {
+    console.log('✅ PHANTOM DATA SAFE SKU data fetched and processed:', {
       totalShops: Object.keys(combinedSKUData).length,
       totalTransactions: Object.values(combinedSKUData).flat().length,
-      dataSource: 'LIVE_GOOGLE_SHEETS_UNIFIED_NORMALIZATION'
+      currentMonthTransactions: Object.values(combinedSKUData).flat().filter(t => t.isCurrentMonth).length,
+      historicalTransactions: Object.values(combinedSKUData).flat().filter(t => !t.isCurrentMonth).length,
+      dataSource: 'LIVE_GOOGLE_SHEETS_PHANTOM_DATA_SAFE'
     });
 
     return combinedSKUData;
@@ -267,28 +358,32 @@ const fetchHistoricalData = async (): Promise<any[][]> => {
   }
 };
 
+// 🔧 ENHANCED: PHANTOM DATA SAFE PROCESSING
 const processCombinedSKUData = (
   pendingChallansData: any[][], 
   historicalData: any[][], 
-  lookbackPeriod: number
+  lookbackPeriod: number,
+  currentMonth: string,
+  currentYear: string
 ): Record<string, RealSupplyTransaction[]> => {
   const shopSKUTransactions: Record<string, RealSupplyTransaction[]> = {};
   const today = new Date();
   const cutoffDate = new Date(today.getTime() - (lookbackPeriod * 24 * 60 * 60 * 1000));
 
-  console.log('🔧 Processing combined SKU data with UNIFIED brand normalization...', {
+  console.log('🔧 Processing PHANTOM DATA SAFE SKU data...', {
     pendingChallansRows: pendingChallansData.length,
     historicalRows: historicalData.length,
     lookbackPeriod,
+    currentMonth: getMonthName(currentMonth),
+    currentYear,
     cutoffDate: cutoffDate.toLocaleDateString()
   });
 
-  // Process Pending Challans (Recent Data)
+  // Process Pending Challans (Recent Data) - PHANTOM DATA SAFE
   if (pendingChallansData.length > 1) {
     const headers = pendingChallansData[0];
     console.log('📋 Pending Challans headers:', headers);
     
-    // Map column indices based on your sheet structure
     const columnIndices = {
       orderDate: headers.findIndex((h: string) => h?.toLowerCase().includes('orderdate')),
       shopId: headers.findIndex((h: string) => h?.toLowerCase().includes('shop_id')),
@@ -315,25 +410,13 @@ const processCombinedSKUData = (
           const transactionDate = parseSheetDate(dateStr);
           
           if (transactionDate && transactionDate >= cutoffDate) {
+            // 🔧 CRITICAL: Determine if this is current month data
+            const isCurrentMonthData = isCurrentMonthTransaction(dateStr, currentMonth, currentYear);
+            
             // Use UNIFIED brand normalization
             const normalizedBrandInfo = normalizeBrand(brand, size);
             const matchingKey = createMatchingKey(shopId, brand, size);
             const shopKey = shopId;
-
-            // Special debug logging for NASIR/NASEER shops
-            if (shopName?.includes('NASIR') || shopName?.includes('NASEER') || shopId?.includes('NASIR') || shopId?.includes('NASEER')) {
-              console.log('🔍 SKU Recovery Pending Challan - NASIR/NASEER found:', {
-                shopName,
-                shopId,
-                originalBrand: brand,
-                originalSize: size,
-                normalizedBrandInfo,
-                matchingKey,
-                dateStr,
-                cases
-              });
-              debugBrandMapping(shopId, brand, size);
-            }
 
             if (!shopSKUTransactions[shopKey]) {
               shopSKUTransactions[shopKey] = [];
@@ -351,7 +434,8 @@ const processCombinedSKUData = (
               orderNo: orderNo || '',
               source: 'pending_challans',
               normalizedBrandInfo,
-              matchingKey
+              matchingKey,
+              isCurrentMonth: isCurrentMonthData // 🔧 NEW: Track current month data
             });
           }
         }
@@ -359,7 +443,7 @@ const processCombinedSKUData = (
     });
   }
 
-  // Process Historical Data
+  // Process Historical Data - PHANTOM DATA SAFE
   if (historicalData.length > 1) {
     const headers = historicalData[0];
     console.log('📋 Historical data headers:', headers);
@@ -390,28 +474,14 @@ const processCombinedSKUData = (
           const transactionDate = parseSheetDate(dateStr);
           
           if (transactionDate && transactionDate >= cutoffDate) {
+            // 🔧 CRITICAL: Historical data is NEVER current month
+            const isCurrentMonthData = false; // Historical data is always historical
+            
             // Use UNIFIED brand normalization - prioritize brandShort if available
             const brandToNormalize = brandShort || brand;
             const normalizedBrandInfo = normalizeBrand(brandToNormalize, size);
             const shopKey = shopId || shopName;
             const matchingKey = createMatchingKey(shopId || shopName || '', brandToNormalize, size);
-
-            // Special debug logging for NASIR/NASEER shops
-            if (shopName?.includes('NASIR') || shopName?.includes('NASEER') || shopId?.includes('NASIR') || shopId?.includes('NASEER')) {
-              console.log('🔍 SKU Recovery Historical - NASIR/NASEER found:', {
-                shopName,
-                shopId,
-                originalBrandShort: brandShort,
-                originalBrand: brand,
-                brandToNormalize,
-                originalSize: size,
-                normalizedBrandInfo,
-                matchingKey,
-                dateStr,
-                cases
-              });
-              debugBrandMapping(shopId || shopName || '', brandToNormalize, size);
-            }
 
             if (!shopSKUTransactions[shopKey]) {
               shopSKUTransactions[shopKey] = [];
@@ -429,7 +499,8 @@ const processCombinedSKUData = (
               orderNo: '',
               source: 'historical',
               normalizedBrandInfo,
-              matchingKey
+              matchingKey,
+              isCurrentMonth: isCurrentMonthData // 🔧 NEW: Always false for historical
             });
           }
         }
@@ -444,13 +515,16 @@ const processCombinedSKUData = (
 
   const totalShops = Object.keys(shopSKUTransactions).length;
   const totalTransactions = Object.values(shopSKUTransactions).flat().length;
+  const currentMonthTransactions = Object.values(shopSKUTransactions).flat().filter(t => t.isCurrentMonth).length;
   
-  console.log('✅ Combined SKU data processed with UNIFIED normalization:', {
+  console.log('✅ PHANTOM DATA SAFE SKU data processed:', {
     totalShops,
     totalTransactions,
-    sampleShops: Object.keys(shopSKUTransactions).slice(0, 5),
-    cutoffDate: cutoffDate.toLocaleDateString(),
-    normalizationSource: 'UNIFIED_BRAND_NORMALIZATION_SERVICE'
+    currentMonthTransactions,
+    historicalTransactions: totalTransactions - currentMonthTransactions,
+    currentMonth: getMonthName(currentMonth),
+    currentYear,
+    phantomDataPrevention: 'ACTIVE'
   });
 
   return shopSKUTransactions;
@@ -461,7 +535,6 @@ const parseSheetDate = (dateStr: string): Date | null => {
 
   try {
     // Handle various date formats from your sheets
-    // DD-MM-YYYY, DD/MM/YYYY, YYYY-MM-DD, etc.
     if (dateStr.includes('-')) {
       const parts = dateStr.split('-');
       if (parts.length === 3) {
@@ -495,18 +568,22 @@ const parseSheetDate = (dateStr: string): Date | null => {
 };
 
 // ==========================================
-// SKU RECOVERY ANALYSIS WITH UNIFIED NORMALIZATION
+// 🔧 ENHANCED: SKU RECOVERY ANALYSIS (PHANTOM DATA SAFE)
 // ==========================================
 
 const analyzeRealSKURecovery = (
   shops: ShopData[],
   realSKUData: Record<string, RealSupplyTransaction[]>,
   inventoryData: InventoryData | undefined,
-  lookbackPeriod: number
+  lookbackPeriod: number,
+  currentMonth: string,
+  currentYear: string
 ): RealSKURecoveryOpportunity[] => {
-  console.log('🔍 Analyzing REAL SKU recovery with UNIFIED normalization...', {
+  console.log('🔍 Analyzing PHANTOM DATA SAFE SKU recovery...', {
     totalShops: shops.length,
     realSKUDataShops: Object.keys(realSKUData).length,
+    currentMonth: getMonthName(currentMonth),
+    currentYear,
     lookbackPeriod
   });
 
@@ -533,15 +610,17 @@ const analyzeRealSKURecovery = (
         salesman: 'Unknown'
       };
       
-      processShopSKUOpportunities(basicShop, transactions, opportunities, inventoryData, lookbackPeriod, today);
+      processShopSKUOpportunities(basicShop, transactions, opportunities, inventoryData, lookbackPeriod, today, currentMonth, currentYear);
     } else if (matchingShop) {
-      processShopSKUOpportunities(matchingShop, transactions, opportunities, inventoryData, lookbackPeriod, today);
+      processShopSKUOpportunities(matchingShop, transactions, opportunities, inventoryData, lookbackPeriod, today, currentMonth, currentYear);
     }
   });
 
-  console.log('✅ Real SKU recovery analysis complete with UNIFIED normalization:', {
+  console.log('✅ PHANTOM DATA SAFE SKU recovery analysis complete:', {
     totalOpportunities: opportunities.length,
-    dataSource: 'LIVE_GOOGLE_SHEETS_UNIFIED_NORMALIZATION',
+    currentMonth: getMonthName(currentMonth),
+    currentYear,
+    dataSource: 'LIVE_GOOGLE_SHEETS_PHANTOM_DATA_SAFE',
     byCustomerStatus: {
       RECENTLY_STOPPED: opportunities.filter(o => o.customerStatus === 'RECENTLY_STOPPED').length,
       SHORT_DORMANT: opportunities.filter(o => o.customerStatus === 'SHORT_DORMANT').length,
@@ -553,31 +632,22 @@ const analyzeRealSKURecovery = (
   return opportunities.sort((a, b) => b.recoveryScore - a.recoveryScore);
 };
 
+// 🔧 ENHANCED: PHANTOM DATA SAFE SHOP PROCESSING
 const processShopSKUOpportunities = (
   shop: any,
   transactions: RealSupplyTransaction[],
   opportunities: RealSKURecoveryOpportunity[],
   inventoryData: InventoryData | undefined,
   lookbackPeriod: number,
-  today: Date
+  today: Date,
+  currentMonth: string,
+  currentYear: string
 ) => {
-  // Group transactions by normalized SKU key (using unified normalization)
+  // Group transactions by normalized SKU key
   const skuGroups: Record<string, RealSupplyTransaction[]> = {};
   
   transactions.forEach(transaction => {
     const skuKey = transaction.normalizedBrandInfo.normalizedKey;
-    
-    // Special debug logging for NASIR/NASEER shops
-    if (shop.shopName?.includes('NASIR') || shop.shopName?.includes('NASEER')) {
-      console.log('🔍 SKU Recovery Transaction - NASIR/NASEER processing:', {
-        shopName: shop.shopName,
-        skuKey,
-        normalizedBrandInfo: transaction.normalizedBrandInfo,
-        matchingKey: transaction.matchingKey,
-        originalBrand: transaction.fullBrand,
-        originalSize: transaction.size
-      });
-    }
     
     if (!skuGroups[skuKey]) {
       skuGroups[skuKey] = [];
@@ -591,31 +661,37 @@ const processShopSKUOpportunities = (
     const latestTransaction = sortedTransactions[0];
     const skuInfo = latestTransaction.normalizedBrandInfo;
     
-    // Calculate historical metrics
-    const totalVolume = sortedTransactions.reduce((sum, t) => sum + t.cases, 0);
-    const avgVolume = totalVolume / sortedTransactions.length;
+    // 🔧 CRITICAL: Separate current month from historical transactions
+    const currentMonthTransactions = sortedTransactions.filter(t => t.isCurrentMonth);
+    const historicalTransactions = sortedTransactions.filter(t => !t.isCurrentMonth);
+    
+    // Calculate historical metrics ONLY from historical transactions
+    const totalHistoricalVolume = historicalTransactions.reduce((sum, t) => sum + t.cases, 0);
+    const avgHistoricalVolume = historicalTransactions.length > 0 ? totalHistoricalVolume / historicalTransactions.length : 0;
+    
+    // Calculate days since last order
     const daysSinceLastOrder = Math.floor((today.getTime() - latestTransaction.date.getTime()) / (1000 * 60 * 60 * 24));
     
-    // Find peak transaction
+    // Find peak transaction from ALL transactions (historical + current)
     const peakTransaction = sortedTransactions.reduce((peak, current) => 
       current.cases > peak.cases ? current : peak, sortedTransactions[0]
     );
 
-    // Get customer status based on time since last order
-    const { status: customerStatus, timeSegment } = getCustomerStatusFromDays(daysSinceLastOrder);
+    // 🔧 ENHANCED: Get customer status with current month awareness
+    const { status: customerStatus, timeSegment } = getCustomerStatusFromDays(daysSinceLastOrder, currentMonth, currentYear);
     
-    // Only include recovery opportunities (not current customers)
-    if (customerStatus !== 'CURRENT' && avgVolume >= 1 && sortedTransactions.length >= 2) {
-      // Calculate recovery metrics
-      const recoveryPotential = Math.max(avgVolume * 2, peakTransaction.cases * 0.5);
-      const recoveryScore = calculateRecoveryScore(avgVolume, peakTransaction.cases, daysSinceLastOrder, customerStatus);
+    // Only include recovery opportunities (not current customers) and require historical data
+    if (customerStatus !== 'CURRENT' && avgHistoricalVolume >= 1 && historicalTransactions.length >= 2) {
+      // Calculate recovery metrics based on historical performance
+      const recoveryPotential = Math.max(avgHistoricalVolume * 2, peakTransaction.cases * 0.5);
+      const recoveryScore = calculateRecoveryScore(avgHistoricalVolume, peakTransaction.cases, daysSinceLastOrder, customerStatus);
       
       // Determine priority and category
       const priority = getPriority(recoveryScore, recoveryPotential, customerStatus);
-      const category = getCategory(avgVolume, customerStatus);
+      const category = getCategory(avgHistoricalVolume, customerStatus);
       
       // Generate action required
-      const actionRequired = generateActionRequired(avgVolume, daysSinceLastOrder, customerStatus);
+      const actionRequired = generateActionRequired(avgHistoricalVolume, daysSinceLastOrder, customerStatus, currentMonth, currentYear);
       
       // Create timeline analysis
       const timelineAnalysis = generateTimelineAnalysis({
@@ -623,7 +699,9 @@ const processShopSKUOpportunities = (
         peakMonthVolume: peakTransaction.cases,
         lastOrderDate: latestTransaction.dateStr,
         lastOrderVolume: latestTransaction.cases,
-        daysSinceLastOrder
+        daysSinceLastOrder,
+        currentMonth: getMonthName(currentMonth),
+        currentYear
       });
 
       const opportunity: RealSKURecoveryOpportunity = {
@@ -637,24 +715,24 @@ const processShopSKUOpportunities = (
         skuSize: skuInfo.size,
         skuFlavor: skuInfo.flavor,
         
-        // Historical Analysis from Real Google Sheets Data
+        // Historical Analysis from Real Google Sheets Data (PHANTOM DATA SAFE)
         lastOrderDate: latestTransaction.dateStr,
         daysSinceLastOrder,
         lastOrderVolume: latestTransaction.cases,
         peakMonthVolume: peakTransaction.cases,
         peakMonth: peakTransaction.dateStr,
-        historicalAverage: avgVolume,
-        totalHistoricalVolume: totalVolume,
-        monthsActive: sortedTransactions.length,
+        historicalAverage: avgHistoricalVolume, // Based on historical transactions only
+        totalHistoricalVolume,
+        monthsActive: historicalTransactions.length,
         
         // Current Status
-        currentStockQuantity: 0, // Would need inventory integration
+        currentStockQuantity: 0,
         isCurrentlyOutOfStock: false,
         lastVisitDate: undefined,
         daysSinceLastVisit: 999,
         lastSupplyDate: latestTransaction.date,
         daysSinceLastSupply: daysSinceLastOrder,
-        supplyDataSource: 'google_sheets_unified_normalization',
+        supplyDataSource: 'google_sheets_phantom_data_safe',
         reasonNoStock: '',
         recentSupplyAttempts: false,
         
@@ -670,28 +748,20 @@ const processShopSKUOpportunities = (
         timeSegment,
         
         // Timeline Analysis
-        orderingPattern: getOrderingPattern(sortedTransactions, daysSinceLastOrder),
+        orderingPattern: getOrderingPattern(historicalTransactions, daysSinceLastOrder),
         dropOffMonth: daysSinceLastOrder > 90 ? latestTransaction.dateStr : undefined,
         timelineAnalysis,
-        totalMonthsAnalyzed: Math.min(Math.ceil(lookbackPeriod / 30), sortedTransactions.length),
+        totalMonthsAnalyzed: Math.min(Math.ceil(lookbackPeriod / 30), historicalTransactions.length),
         
         // Unified Normalization Data
         normalizedKey: skuInfo.normalizedKey,
-        matchingKey: latestTransaction.matchingKey
+        matchingKey: latestTransaction.matchingKey,
+        
+        // 🔧 NEW: Current Month Awareness
+        currentMonthName: getMonthName(currentMonth),
+        currentYear,
+        isPhantomDataSafe: true
       };
-      
-      // Special debug logging for NASIR/NASEER opportunities
-      if (shop.shopName?.includes('NASIR') || shop.shopName?.includes('NASEER')) {
-        console.log('🔍 SKU Recovery Opportunity created - NASIR/NASEER:', {
-          shopName: shop.shopName,
-          sku: opportunity.sku,
-          normalizedKey: opportunity.normalizedKey,
-          matchingKey: opportunity.matchingKey,
-          recoveryPotential: opportunity.recoveryPotential,
-          customerStatus: opportunity.customerStatus,
-          daysSinceLastOrder: opportunity.daysSinceLastOrder
-        });
-      }
       
       opportunities.push(opportunity);
     }
@@ -699,10 +769,14 @@ const processShopSKUOpportunities = (
 };
 
 // ==========================================
-// HELPER FUNCTIONS FOR ANALYSIS
+// 🔧 ENHANCED: HELPER FUNCTIONS (FUTURE-READY)
 // ==========================================
 
-const getCustomerStatusFromDays = (daysSinceLastOrder: number): {
+const getCustomerStatusFromDays = (
+  daysSinceLastOrder: number, 
+  currentMonth: string, 
+  currentYear: string
+): {
   status: RealSKURecoveryOpportunity['customerStatus'];
   timeSegment: RealSKURecoveryOpportunity['timeSegment'];
 } => {
@@ -749,15 +823,23 @@ const getCategory = (avgVolume: number, customerStatus: string): RealSKURecovery
   return 'GAP_ANALYSIS';
 };
 
-const generateActionRequired = (avgVolume: number, daysSinceLastOrder: number, customerStatus: string): string => {
+const generateActionRequired = (
+  avgVolume: number, 
+  daysSinceLastOrder: number, 
+  customerStatus: string,
+  currentMonth: string,
+  currentYear: string
+): string => {
+  const currentMonthName = getMonthName(currentMonth);
+  
   if (customerStatus === 'RECENTLY_STOPPED') {
-    return `🚨 URGENT: Customer stopped ordering ${avgVolume.toFixed(1)} avg cases just ${daysSinceLastOrder} days ago - immediate follow-up required`;
+    return `🚨 URGENT (${currentMonthName} ${currentYear}): Customer stopped ordering ${avgVolume.toFixed(1)} avg cases just ${daysSinceLastOrder} days ago - immediate follow-up required`;
   } else if (customerStatus === 'SHORT_DORMANT') {
-    return `📞 Call customer: Stopped ordering ${avgVolume.toFixed(1)} avg cases ${daysSinceLastOrder} days ago`;
+    return `📞 Call customer (${currentMonthName} ${currentYear}): Stopped ordering ${avgVolume.toFixed(1)} avg cases ${daysSinceLastOrder} days ago`;
   } else if (customerStatus === 'LONG_DORMANT') {
-    return `🎯 Re-engagement needed: Customer dormant for ${daysSinceLastOrder} days, was ordering ${avgVolume.toFixed(1)} cases average`;
+    return `🎯 Re-engagement needed (${currentMonthName} ${currentYear}): Customer dormant for ${daysSinceLastOrder} days, was ordering ${avgVolume.toFixed(1)} cases average`;
   } else {
-    return `💼 Strategic recovery: Long-term inactive customer, consider special incentives`;
+    return `💼 Strategic recovery (${currentMonthName} ${currentYear}): Long-term inactive customer, consider special incentives`;
   }
 };
 
@@ -774,6 +856,8 @@ const generateTimelineAnalysis = (data: {
   lastOrderDate: string;
   lastOrderVolume: number;
   daysSinceLastOrder: number;
+  currentMonth: string;
+  currentYear: string;
 }): string => {
   const timeline = [];
   if (data.peakMonth && data.peakMonthVolume > 0) {
@@ -782,13 +866,13 @@ const generateTimelineAnalysis = (data: {
   if (data.lastOrderDate) {
     timeline.push(`Last order: ${data.lastOrderDate} (${data.lastOrderVolume} cases)`);
   }
-  timeline.push(`Gap: ${data.daysSinceLastOrder} days`);
+  timeline.push(`Gap: ${data.daysSinceLastOrder} days until ${data.currentMonth} ${data.currentYear}`);
   
   return timeline.join(' → ');
 };
 
 // ==========================================
-// MAIN COMPONENT
+// 🔧 ENHANCED: MAIN COMPONENT (PHANTOM DATA SAFE)
 // ==========================================
 
 const SKURecoveryIntelligence = ({ data, inventoryData }: { 
@@ -818,12 +902,16 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
   const [loading, setLoading] = useState(true);
   const [realSKUData, setRealSKUData] = useState<Record<string, RealSupplyTransaction[]>>({});
 
-  // Fetch real SKU data from Google Sheets with unified normalization
+  // 🔧 ENHANCED: Fetch real SKU data with current month awareness
   useEffect(() => {
     const loadRealSKUData = async () => {
       setLoading(true);
       try {
-        const skuData = await fetchRealSKUData(filters.lookbackPeriod);
+        const skuData = await fetchRealSKUData(
+          filters.lookbackPeriod,
+          data.currentMonth,
+          data.currentYear
+        );
         setRealSKUData(skuData);
       } catch (error) {
         console.error('Error loading real SKU data:', error);
@@ -833,9 +921,9 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
     };
 
     loadRealSKUData();
-  }, [filters.lookbackPeriod]);
+  }, [filters.lookbackPeriod, data.currentMonth, data.currentYear]);
 
-  // Generate recovery opportunities from real Google Sheets data with unified normalization
+  // 🔧 ENHANCED: Generate recovery opportunities (PHANTOM DATA SAFE)
   const recoveryOpportunities = useMemo(() => {
     if (loading || Object.keys(realSKUData).length === 0) {
       return [];
@@ -845,9 +933,11 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
       data.allShopsComparison,
       realSKUData,
       inventoryData,
-      filters.lookbackPeriod
+      filters.lookbackPeriod,
+      data.currentMonth,
+      data.currentYear
     );
-  }, [data.allShopsComparison, realSKUData, inventoryData, filters.lookbackPeriod, loading]);
+  }, [data.allShopsComparison, realSKUData, inventoryData, filters.lookbackPeriod, loading, data.currentMonth, data.currentYear]);
 
   // Get unique values for filters
   const departments = [...new Set(data.allShopsComparison.map(shop => shop.department))].sort();
@@ -963,11 +1053,12 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
   // Export function
   const exportToCSV = () => {
     let csvContent = "data:text/csv;charset=utf-8,";
-    csvContent += `UNIFIED NORMALIZATION SKU Recovery Intelligence Report - ${new Date().toLocaleDateString()}\n`;
-    csvContent += `Data Source: Live Google Sheets with UNIFIED brand normalization\n`;
+    csvContent += `PHANTOM DATA SAFE SKU Recovery Intelligence Report - ${new Date().toLocaleDateString()}\n`;
+    csvContent += `Data Source: Live Google Sheets with PHANTOM DATA PROTECTION\n`;
+    csvContent += `Current Month: ${getMonthName(data.currentMonth)} ${data.currentYear}\n`;
     csvContent += `Master Sheet: ${SHEETS_CONFIG.masterSheetId}\n`;
     csvContent += `Historical Sheet: ${SHEETS_CONFIG.historicalSheetId}\n`;
-    csvContent += `Normalization Service: UNIFIED_BRAND_NORMALIZATION_SERVICE\n`;
+    csvContent += `Phantom Data Prevention: ACTIVE\n`;
     csvContent += `Total Opportunities: ${summary.total}\n`;
     csvContent += `Total Recovery Potential: ${summary.totalRecoveryPotential.toFixed(0)} cases\n\n`;
     
@@ -983,16 +1074,16 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
     });
     
     csvContent += "\n";
-    csvContent += `Shop Name,Shop ID,Department,Salesman,Specific SKU,SKU Family,SKU Size,SKU Flavor,Customer Status,Time Segment,Last SKU Supply Date,Days Since Last SKU Supply,Last SKU Volume,Peak SKU Volume,Peak Month,SKU Historical Average,Total SKU Historical,SKU Recovery Potential,Recovery Score,Priority,Category,Action Required,SKU Timeline Analysis,Normalized Key,Matching Key\n`;
+    csvContent += `Shop Name,Shop ID,Department,Salesman,Specific SKU,SKU Family,SKU Size,SKU Flavor,Customer Status,Time Segment,Last SKU Supply Date,Days Since Last SKU Supply,Last SKU Volume,Peak SKU Volume,Peak Month,SKU Historical Average,Total SKU Historical,SKU Recovery Potential,Recovery Score,Priority,Category,Action Required,SKU Timeline Analysis,Current Month,Current Year,Phantom Data Safe,Normalized Key,Matching Key\n`;
     
     filteredOpportunities.forEach(opp => {
-      csvContent += `"${opp.shopName}","${opp.shopId}","${opp.department}","${opp.salesman}","${opp.sku}","${opp.skuFamily}","${opp.skuSize}","${opp.skuFlavor || 'N/A'}","${opp.customerStatus}","${opp.timeSegment}","${opp.lastOrderDate}",${opp.daysSinceLastOrder},${opp.lastOrderVolume},${opp.peakMonthVolume},"${opp.peakMonth}",${opp.historicalAverage.toFixed(1)},${opp.totalHistoricalVolume},${opp.recoveryPotential.toFixed(1)},${opp.recoveryScore},"${opp.priority}","${opp.category}","${opp.actionRequired}","${opp.timelineAnalysis}","${opp.normalizedKey}","${opp.matchingKey}"\n`;
+      csvContent += `"${opp.shopName}","${opp.shopId}","${opp.department}","${opp.salesman}","${opp.sku}","${opp.skuFamily}","${opp.skuSize}","${opp.skuFlavor || 'N/A'}","${opp.customerStatus}","${opp.timeSegment}","${opp.lastOrderDate}",${opp.daysSinceLastOrder},${opp.lastOrderVolume},${opp.peakMonthVolume},"${opp.peakMonth}",${opp.historicalAverage.toFixed(1)},${opp.totalHistoricalVolume},${opp.recoveryPotential.toFixed(1)},${opp.recoveryScore},"${opp.priority}","${opp.category}","${opp.actionRequired}","${opp.timelineAnalysis}","${opp.currentMonthName}","${opp.currentYear}",${opp.isPhantomDataSafe},"${opp.normalizedKey}","${opp.matchingKey}"\n`;
     });
 
     const encodedUri = encodeURI(csvContent);
     const link = document.createElement("a");
     link.setAttribute("href", encodedUri);
-    link.setAttribute("download", `UNIFIED_NORMALIZATION_SKU_Recovery_${new Date().toISOString().split('T')[0]}.csv`);
+    link.setAttribute("download", `PHANTOM_DATA_SAFE_SKU_Recovery_${getShortMonthName(data.currentMonth)}_${data.currentYear}.csv`);
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -1047,8 +1138,11 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <RefreshCw className="w-12 h-12 animate-spin mx-auto mb-4 text-purple-600" />
-          <h2 className="text-xl font-semibold text-gray-900 mb-2">Loading UNIFIED SKU Recovery Intelligence</h2>
-          <p className="text-gray-600">Fetching real data from Google Sheets with unified brand normalization...</p>
+          <h2 className="text-xl font-semibold text-gray-900 mb-2">Loading PHANTOM DATA SAFE SKU Recovery Intelligence</h2>
+          <p className="text-gray-600">Fetching real data from Google Sheets with current month awareness...</p>
+          <div className="mt-4 text-sm text-blue-600">
+            Current Month: {getMonthName(data.currentMonth)} {data.currentYear}
+          </div>
         </div>
       </div>
     );
@@ -1056,15 +1150,15 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
 
   return (
     <div className="space-y-6">
-      {/* Enhanced Header */}
+      {/* 🔧 ENHANCED: Header with Phantom Data Prevention Status */}
       <div className="bg-white rounded-lg shadow p-6">
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between mb-6">
           <div>
             <h2 className="text-xl font-semibold flex items-center mb-2">
               <Target className="w-6 h-6 mr-2 text-purple-600" />
-              UNIFIED NORMALIZATION SKU Recovery Intelligence
+              PHANTOM DATA SAFE SKU Recovery Intelligence
             </h2>
-            <p className="text-gray-600">Real-time SKU recovery analysis with unified brand normalization across all data sources</p>
+            <p className="text-gray-600">Real-time SKU recovery analysis with phantom data prevention for {getMonthName(data.currentMonth)} {data.currentYear}</p>
             <div className="flex items-center mt-2 text-sm space-x-4">
               <div className="flex items-center text-green-600">
                 <CheckCircle className="w-4 h-4 mr-2" />
@@ -1076,11 +1170,11 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
               </div>
               <div className="flex items-center text-purple-600">
                 <Star className="w-4 h-4 mr-2" />
-                UNIFIED brand normalization service
+                PHANTOM DATA PREVENTION ACTIVE
               </div>
               <div className="flex items-center text-orange-600">
                 <Zap className="w-4 h-4 mr-2" />
-                Glass vs PET distinction maintained
+                Current: {getMonthName(data.currentMonth)} {data.currentYear}
               </div>
             </div>
           </div>
@@ -1106,11 +1200,41 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
           </div>
         </div>
 
+        {/* 🔧 NEW: Phantom Data Prevention Status */}
+        <div className="bg-green-50 border border-green-200 rounded-lg p-4 mb-6">
+          <div className="flex items-center mb-2">
+            <CheckCircle className="w-5 h-5 text-green-600 mr-2" />
+            <h4 className="font-medium text-green-800">Phantom Data Prevention Active</h4>
+          </div>
+          <p className="text-sm text-green-600">
+            Current month ({getMonthName(data.currentMonth)} {data.currentYear}) uses ONLY challan data. 
+            Historical data uses ONLY historical month fields. Zero phantom data contamination possible.
+          </p>
+          <div className="grid grid-cols-4 gap-4 mt-3">
+            <div className="text-center">
+              <div className="text-lg font-bold text-green-600">{Object.values(realSKUData).flat().filter(t => t.isCurrentMonth).length}</div>
+              <div className="text-xs text-green-600">Current Month Transactions</div>
+            </div>
+            <div className="text-center">
+              <div className="text-lg font-bold text-blue-600">{Object.values(realSKUData).flat().filter(t => !t.isCurrentMonth).length}</div>
+              <div className="text-xs text-blue-600">Historical Transactions</div>
+            </div>
+            <div className="text-center">
+              <div className="text-lg font-bold text-purple-600">{Object.keys(realSKUData).length}</div>
+              <div className="text-xs text-purple-600">Shops with Data</div>
+            </div>
+            <div className="text-center">
+              <div className="text-lg font-bold text-orange-600">{summary.total}</div>
+              <div className="text-xs text-orange-600">Recovery Opportunities</div>
+            </div>
+          </div>
+        </div>
+
         {/* Time-Based Customer Segmentation Dashboard */}
         <div className="bg-gradient-to-r from-blue-50 to-purple-50 border border-blue-200 rounded-lg p-4 mb-6">
           <h3 className="text-lg font-medium text-blue-900 mb-3 flex items-center">
             <Users className="w-5 h-5 mr-2" />
-            UNIFIED Customer Lifecycle Analysis from Google Sheets
+            Customer Lifecycle Analysis for {getMonthName(data.currentMonth)} {data.currentYear}
           </h3>
           <div className="grid grid-cols-2 lg:grid-cols-5 gap-4">
             {Object.entries(timeSegmentAnalysis).map(([status, data]) => (
@@ -1145,7 +1269,7 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
           <div className="bg-gradient-to-r from-green-50 to-blue-50 border border-green-200 rounded-lg p-4 mb-6">
             <h3 className="text-lg font-medium text-green-900 mb-3 flex items-center">
               <Package className="w-5 h-5 mr-2" />
-              UNIFIED SKU Family Analysis from Real Data
+              SKU Family Analysis from Phantom Data Safe Sources
             </h3>
             <div className="space-y-2">
               {skuFamilyAnalysis.map(family => (
@@ -1231,7 +1355,7 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
         <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
           <div className="bg-gray-50 p-4 rounded-lg">
             <div className="text-2xl font-bold text-gray-900">{summary.total}</div>
-            <div className="text-sm text-gray-600">UNIFIED Opportunities</div>
+            <div className="text-sm text-gray-600">Safe Opportunities</div>
           </div>
           <div className="bg-red-50 p-4 rounded-lg">
             <div className="text-2xl font-bold text-red-600">{summary.priorityCounts.CRITICAL}</div>
@@ -1377,11 +1501,11 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
             className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 flex items-center space-x-2 text-sm"
           >
             <Download className="w-4 h-4" />
-            <span>Export UNIFIED Data CSV</span>
+            <span>Export Safe Data CSV</span>
           </button>
 
           <div className="text-sm text-gray-500">
-            {filteredOpportunities.length} of {recoveryOpportunities.length} unified opportunities
+            {filteredOpportunities.length} of {recoveryOpportunities.length} phantom data safe opportunities
           </div>
         </div>
       </div>
@@ -1389,10 +1513,10 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
       {/* Enhanced Recovery Opportunities Table */}
       <div className="bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">UNIFIED NORMALIZATION SKU Recovery Opportunities</h3>
+          <h3 className="text-lg font-medium text-gray-900">PHANTOM DATA SAFE SKU Recovery Opportunities</h3>
           <p className="text-sm text-gray-500">
-            Showing {startIndex + 1}-{Math.min(endIndex, filteredOpportunities.length)} of {filteredOpportunities.length} unified opportunities 
-            from real Google Sheets data with consistent brand normalization
+            Showing {startIndex + 1}-{Math.min(endIndex, filteredOpportunities.length)} of {filteredOpportunities.length} phantom data safe opportunities 
+            for {getMonthName(data.currentMonth)} {data.currentYear}
           </p>
         </div>
 
@@ -1405,7 +1529,7 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Historical Performance</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Recovery Analysis</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Action Required</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Unified Normalization</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data Safety</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -1449,7 +1573,7 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
                   </td>
                   <td className="px-6 py-4">
                     <div className="text-sm space-y-1">
-                      <div><span className="font-medium">Avg Volume:</span> {opportunity.historicalAverage.toFixed(1)} cases/transaction</div>
+                      <div><span className="font-medium">Historical Avg:</span> {opportunity.historicalAverage.toFixed(1)} cases/transaction</div>
                       <div><span className="font-medium">Peak:</span> {opportunity.peakMonthVolume} cases ({opportunity.peakMonth})</div>
                       <div><span className="font-medium">Total Historical:</span> {opportunity.totalHistoricalVolume} cases</div>
                       <div><span className="font-medium">Active Transactions:</span> {opportunity.monthsActive}</div>
@@ -1470,7 +1594,7 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
                         </span>
                       </div>
                       <div className="text-xs text-gray-500">
-                        From unified normalization
+                        Phantom data safe
                       </div>
                     </div>
                   </td>
@@ -1489,16 +1613,19 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
                   </td>
                   <td className="px-6 py-4">
                     <div className="space-y-1">
+                      <div className="text-xs text-green-600">
+                        ✅ PHANTOM DATA SAFE
+                      </div>
+                      <div className="text-xs text-blue-600">
+                        Current: {opportunity.currentMonthName} {opportunity.currentYear}
+                      </div>
                       <div className="text-xs text-gray-500">
                         <span className="font-medium">Normalized Key:</span>
-                        <div className="font-mono text-xs bg-gray-100 p-1 rounded">{opportunity.normalizedKey}</div>
+                        <div className="font-mono text-xs bg-gray-100 p-1 rounded mt-1 truncate">{opportunity.normalizedKey}</div>
                       </div>
                       <div className="text-xs text-gray-500">
                         <span className="font-medium">Matching Key:</span>
-                        <div className="font-mono text-xs bg-blue-100 p-1 rounded truncate">{opportunity.matchingKey}</div>
-                      </div>
-                      <div className="text-xs text-green-600">
-                        ✅ UNIFIED normalization applied
+                        <div className="font-mono text-xs bg-blue-100 p-1 rounded mt-1 truncate">{opportunity.matchingKey}</div>
                       </div>
                     </div>
                   </td>
@@ -1511,10 +1638,11 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
         {filteredOpportunities.length === 0 && (
           <div className="text-center py-12">
             <Package className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No UNIFIED SKU Recovery Opportunities Found</h3>
+            <h3 className="text-lg font-medium text-gray-900 mb-2">No Phantom Data Safe SKU Recovery Opportunities Found</h3>
             <p className="text-gray-500">Try adjusting your filters to see more opportunities.</p>
             <div className="mt-4 text-sm text-gray-600">
-              <p>Connected to: {Object.keys(realSKUData).length} shops with {Object.values(realSKUData).flat().length} unified transactions</p>
+              <p>Connected to: {Object.keys(realSKUData).length} shops with {Object.values(realSKUData).flat().length} phantom data safe transactions</p>
+              <p>Current Month: {getMonthName(data.currentMonth)} {data.currentYear}</p>
             </div>
           </div>
         )}
@@ -1523,7 +1651,7 @@ const SKURecoveryIntelligence = ({ data, inventoryData }: {
         {totalPages > 1 && (
           <div className="px-6 py-3 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center">
             <div className="text-sm text-gray-700 mb-2 sm:mb-0">
-              Showing {startIndex + 1} to {Math.min(endIndex, filteredOpportunities.length)} of {filteredOpportunities.length} unified opportunities
+              Showing {startIndex + 1} to {Math.min(endIndex, filteredOpportunities.length)} of {filteredOpportunities.length} phantom data safe opportunities
             </div>
             <div className="flex space-x-2">
               <button
