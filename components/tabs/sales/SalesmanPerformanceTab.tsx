@@ -194,36 +194,66 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-      {/* Historical Trend */}
-      <div className="grid grid-cols-3 gap-2 mb-3">
-        <button
-          onClick={() => handleCaseBreakdownClick(salesman.name, 'march', 'March', salesman.marchTotal, salesman.marchEightPM, salesman.marchVerve)}
-          className="text-center p-2 bg-blue-100 rounded hover:bg-blue-200 transition-colors"
-        >
-          <div className="text-sm font-medium text-gray-900">{salesman.marchTotal.toLocaleString()}</div>
-          <div className="text-xs text-gray-500">Mar</div>
-        </button>
-        <button
-          onClick={() => handleCaseBreakdownClick(salesman.name, 'april', 'April', salesman.aprilTotal, salesman.aprilEightPM, salesman.aprilVerve)}
-          className="text-center p-2 bg-green-100 rounded hover:bg-green-200 transition-colors"
-        >
-          <div className="text-sm font-medium text-gray-900">{salesman.aprilTotal.toLocaleString()}</div>
-          <div className="text-xs text-gray-500">Apr</div>
-        </button>
-        <button
-          onClick={() => handleCaseBreakdownClick(salesman.name, 'may', 'May', salesman.mayTotal, salesman.mayEightPM, salesman.mayVerve)}
-          className="text-center p-2 bg-yellow-100 rounded hover:bg-yellow-200 transition-colors"
-        >
-          <div className="text-sm font-medium text-gray-900">{salesman.mayTotal.toLocaleString()}</div>
-          <div className="text-xs text-gray-500">May</div>
-        </button>
+      {/* Historical Trend - Rolling 4 Months */}
+      <div className="grid grid-cols-4 gap-2 mb-3">
+        {(() => {
+          const currentMonth = parseInt(data.currentMonth);
+          const monthKeys = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+          const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+          const colors = ['bg-blue-100 hover:bg-blue-200', 'bg-green-100 hover:bg-green-200', 'bg-yellow-100 hover:bg-yellow-200', 'bg-purple-100 hover:bg-purple-200'];
+          
+          const buttons = [];
+          for (let i = 3; i >= 0; i--) {
+            let targetMonth = currentMonth - i;
+            if (targetMonth <= 0) targetMonth += 12;
+            
+            const monthKey = monthKeys[targetMonth - 1];
+            const monthName = monthNames[targetMonth - 1];
+            const totalField = `${monthKey}Total`;
+            const eightPMField = `${monthKey}EightPM`;
+            const verveField = `${monthKey}Verve`;
+            
+            const total = Number(salesman[totalField]) || 0;
+            const eightPM = Number(salesman[eightPMField]) || 0;
+            const verve = Number(salesman[verveField]) || 0;
+            
+            buttons.push(
+              <button
+                key={monthKey}
+                onClick={() => handleCaseBreakdownClick(salesman.name, monthKey, monthNames[targetMonth - 1].replace('Jan', 'January').replace('Feb', 'February').replace('Mar', 'March').replace('Apr', 'April').replace('Jun', 'June').replace('Jul', 'July').replace('Aug', 'August').replace('Sep', 'September').replace('Oct', 'October').replace('Nov', 'November').replace('Dec', 'December'), total, eightPM, verve)}
+                className={`text-center p-2 ${colors[3-i]} rounded transition-colors`}
+              >
+                <div className="text-sm font-medium text-gray-900">{total.toLocaleString()}</div>
+                <div className="text-xs text-gray-500">{monthName}</div>
+              </button>
+            );
+          }
+          return buttons;
+        })()}
       </div>
 
       {/* Trend Indicator */}
       <div className="flex justify-center">
         {(() => {
-          const trend = salesman.mayTotal > salesman.aprilTotal && salesman.aprilTotal > salesman.marchTotal ? 'improving' :
-                      salesman.mayTotal < salesman.aprilTotal && salesman.aprilTotal < salesman.marchTotal ? 'declining' : 'stable';
+          // Calculate trend using rolling 4-month data
+          const currentMonth = parseInt(data.currentMonth);
+          const monthKeys = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+          
+          const rollingTotals = [];
+          for (let i = 3; i >= 0; i--) {
+            let targetMonth = currentMonth - i;
+            if (targetMonth <= 0) targetMonth += 12;
+            const monthKey = monthKeys[targetMonth - 1];
+            const totalField = `${monthKey}Total`;
+            rollingTotals.push(Number(salesman[totalField]) || 0);
+          }
+          
+          // Compare recent 2 months vs earlier 2 months
+          const recent2Avg = (rollingTotals[2] + rollingTotals[3]) / 2;
+          const earlier2Avg = (rollingTotals[0] + rollingTotals[1]) / 2;
+          const trend = recent2Avg > earlier2Avg * 1.1 ? 'improving' :
+                      recent2Avg < earlier2Avg * 0.9 ? 'declining' : 'stable';
+          
           return (
             <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full ${
               trend === 'improving' ? 'bg-green-100 text-green-800' :
@@ -1308,57 +1338,105 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
         </div>
       </div>
 
-      {/* 3-Month Historical Performance - Desktop Only */}
+      {/* 4-Month Rolling Historical Performance - Desktop Only */}
       <div className="hidden lg:block bg-white rounded-lg shadow">
         <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">3-Month Performance Trend (Mar-Apr-May {data.currentYear})</h3>
-          <p className="text-sm text-gray-500">Historical performance comparison for 8PM and VERVE by salesman</p>
+          <h3 className="text-lg font-medium text-gray-900">4-Month Rolling Performance Trend</h3>
+          <p className="text-sm text-gray-500">
+            Rolling 4-month window that automatically updates • Current: {(() => {
+              const currentMonth = parseInt(data.currentMonth);
+              const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+              const rollingMonths = [];
+              for (let i = 3; i >= 0; i--) {
+                let targetMonth = currentMonth - i;
+                if (targetMonth <= 0) targetMonth += 12;
+                rollingMonths.push(months[targetMonth - 1]);
+              }
+              return rollingMonths.join('-');
+            })()} {data.currentYear}
+          </p>
         </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Salesman</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">March Total</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">April Total</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">May Total</th>
+                {(() => {
+                  const currentMonth = parseInt(data.currentMonth);
+                  const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+                  const headers = [];
+                  for (let i = 3; i >= 0; i--) {
+                    let targetMonth = currentMonth - i;
+                    if (targetMonth <= 0) targetMonth += 12;
+                    headers.push(
+                      <th key={targetMonth} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        {months[targetMonth - 1]} Total
+                      </th>
+                    );
+                  }
+                  return headers;
+                })()}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Trend</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">3-Month Avg</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">4-Month Avg</th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {sortedSalesmen.slice(0, 10).map((salesman: any) => {
-                const avg3Month = ((Number(salesman.marchTotal) + Number(salesman.aprilTotal) + Number(salesman.mayTotal)) / 3).toFixed(0);
-                const trend = Number(salesman.mayTotal) > Number(salesman.aprilTotal) && Number(salesman.aprilTotal) > Number(salesman.marchTotal) ? 'improving' :
-                            Number(salesman.mayTotal) < Number(salesman.aprilTotal) && Number(salesman.aprilTotal) < Number(salesman.marchTotal) ? 'declining' : 'stable';
+                // Calculate rolling 4-month data
+                const currentMonth = parseInt(data.currentMonth);
+                const monthKeys = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december'];
+                const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+                
+                const rollingData = [];
+                for (let i = 3; i >= 0; i--) {
+                  let targetMonth = currentMonth - i;
+                  if (targetMonth <= 0) targetMonth += 12;
+                  
+                  const monthKey = monthKeys[targetMonth - 1];
+                  const monthName = monthNames[targetMonth - 1];
+                  const totalField = `${monthKey}Total`;
+                  const eightPMField = `${monthKey}EightPM`;
+                  const verveField = `${monthKey}Verve`;
+                  
+                  rollingData.push({
+                    month: targetMonth,
+                    monthName,
+                    monthKey,
+                    total: Number(salesman[totalField]) || 0,
+                    eightPM: Number(salesman[eightPMField]) || 0,
+                    verve: Number(salesman[verveField]) || 0
+                  });
+                }
+                
+                // Calculate 4-month average
+                const avg4Month = (rollingData.reduce((sum, month) => sum + month.total, 0) / 4).toFixed(0);
+                
+                // Calculate trend (latest 2 months vs earlier 2 months)
+                const recent2Avg = (rollingData[2].total + rollingData[3].total) / 2;
+                const earlier2Avg = (rollingData[0].total + rollingData[1].total) / 2;
+                const trend = recent2Avg > earlier2Avg * 1.1 ? 'improving' :
+                            recent2Avg < earlier2Avg * 0.9 ? 'declining' : 'stable';
                 
                 return (
                   <tr key={salesman._sortKey}>
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">{salesman.name}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <button
-                        onClick={() => handleCaseBreakdownClick(salesman.name, 'march', 'March', Number(salesman.marchTotal), Number(salesman.marchEightPM), Number(salesman.marchVerve))}
-                        className="text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer"
-                      >
-                        {Number(salesman.marchTotal).toLocaleString()}
-                      </button>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <button
-                        onClick={() => handleCaseBreakdownClick(salesman.name, 'april', 'April', Number(salesman.aprilTotal), Number(salesman.aprilEightPM), Number(salesman.aprilVerve))}
-                        className="text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer"
-                      >
-                        {Number(salesman.aprilTotal).toLocaleString()}
-                      </button>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      <button
-                        onClick={() => handleCaseBreakdownClick(salesman.name, 'may', 'May', Number(salesman.mayTotal), Number(salesman.mayEightPM), Number(salesman.mayVerve))}
-                        className="text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer"
-                      >
-                        {Number(salesman.mayTotal).toLocaleString()}
-                      </button>
-                    </td>
+                    {rollingData.map((monthData, index) => (
+                      <td key={index} className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                        <button
+                          onClick={() => handleCaseBreakdownClick(
+                            salesman.name, 
+                            monthData.monthKey, 
+                            monthData.monthName, 
+                            monthData.total, 
+                            monthData.eightPM, 
+                            monthData.verve
+                          )}
+                          className="text-blue-600 hover:text-blue-800 hover:underline font-medium cursor-pointer"
+                        >
+                          {monthData.total.toLocaleString()}
+                        </button>
+                      </td>
+                    ))}
                     <td className="px-6 py-4 whitespace-nowrap text-sm">
                       <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                         trend === 'improving' ? 'bg-green-100 text-green-800' :
@@ -1368,7 +1446,7 @@ const SalesmanPerformanceTab = ({ data }: { data: DashboardData }) => {
                         {trend === 'improving' ? '📈 Growing' : trend === 'declining' ? '📉 Declining' : '➡️ Stable'}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">{avg3Month}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-blue-600">{avg4Month}</td>
                   </tr>
                 );
               })}
