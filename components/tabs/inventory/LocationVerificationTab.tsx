@@ -37,13 +37,16 @@ interface LocationDiscrepancy {
   outliersRemoved?: number;
   isOutlierVisit?: boolean;
   outlierDistance?: number;
-  // 🆕 NEW: Consensus-based fraud detection fields
-  consensusStatus?: 'consistent' | 'mostly_consistent' | 'inconsistent' | 'highly_suspicious' | 'single_visit';
+  // 🆕 NEW: Enhanced consensus-based fraud detection fields
+  consensusStatus?: 'consistent' | 'mostly_consistent' | 'inconsistent' | 'highly_suspicious' | 'single_visit' | 'two_distant_locations' | 'insufficient_data';
   fraudRiskScore?: number;
   isNormalLocation?: boolean;
   isDominantLocation?: boolean;
   deviationFromConsensus?: number;
   visitPattern?: string;
+  distanceBetweenVisits?: number;
+  allVisitLocations?: {lat: number, lng: number, date: string}[];
+  isBothLocationsSuspicious?: boolean;
 }
 
 interface SalesmanAccuracy {
@@ -217,7 +220,7 @@ const getStabilityStatus = (stabilityMeters: number): {
   }
 };
 
-// 🆕 NEW: Consensus-based fraud detection with location clustering
+// 🆕 NEW: Enhanced consensus-based fraud detection with proper 2-visit handling
 const analyzeLocationConsensus = (visits: any[], shopId: string): {
   dominantLocation: {lat: number, lng: number};
   dominantClusterSize: number;
@@ -226,8 +229,17 @@ const analyzeLocationConsensus = (visits: any[], shopId: string): {
     consensusStatus: string;
     fraudRisk: number;
     visitPattern: string;
+    distanceBetweenVisits?: number;
+    allVisitLocations: {lat: number, lng: number, date: string}[];
   };
 } => {
+  // Collect all visit locations for map plotting
+  const allVisitLocations = visits.map(v => ({
+    lat: v.actualLatitude,
+    lng: v.actualLongitude,
+    date: v.visitDate.toLocaleDateString()
+  }));
+
   if (visits.length <= 1) {
     return {
       dominantLocation: visits[0] ? {lat: visits[0].actualLatitude, lng: visits[0].actualLongitude} : {lat: 0, lng: 0},
@@ -241,13 +253,68 @@ const analyzeLocationConsensus = (visits: any[], shopId: string): {
       consensusMetrics: {
         consensusStatus: 'single_visit',
         fraudRisk: 0.5,
-        visitPattern: 'Single visit - verification needed'
+        visitPattern: 'Single visit - verification needed',
+        allVisitLocations
       }
     };
   }
 
-  // STEP 1: Create location clusters using consensus threshold
-  const CONSENSUS_THRESHOLD = 200; // meters - locations within 200m considered "same location"
+  // 🆕 ENHANCED: Special handling for 2-visit scenarios
+  if (visits.length === 2) {
+    const distanceBetween = calculateDistance(
+      visits[0].actualLatitude, visits[0].actualLongitude,
+      visits[1].actualLatitude, visits[1].actualLongitude
+    );
+
+    if (distanceBetween <= 200) {
+      // Both visits close together = consistent
+      const avgLat = (visits[0].actualLatitude + visits[1].actualLatitude) / 2;
+      const avgLng = (visits[0].actualLongitude + visits[1].actualLongitude) / 2;
+      
+      return {
+        dominantLocation: {lat: avgLat, lng: avgLng},
+        dominantClusterSize: 2,
+        visitClassifications: visits.map(v => ({
+          ...v,
+          isNormalLocation: true,
+          isDominantLocation: true,
+          deviationFromConsensus: Math.round(distanceBetween / 2),
+          isSuspiciousVisit: false
+        })),
+        consensusMetrics: {
+          consensusStatus: 'consistent',
+          fraudRisk: 0.1,
+          visitPattern: `Both visits from same location (${Math.round(distanceBetween)}m apart) - CONSISTENT`,
+          distanceBetweenVisits: Math.round(distanceBetween),
+          allVisitLocations
+        }
+      };
+    } else {
+      // Visits far apart = both suspicious, no consensus possible
+      return {
+        dominantLocation: {lat: visits[0].actualLatitude, lng: visits[0].actualLongitude}, // Arbitrary reference point
+        dominantClusterSize: 0, // No true consensus
+        visitClassifications: visits.map(v => ({
+          ...v,
+          isNormalLocation: false,
+          isDominantLocation: false,
+          deviationFromConsensus: Math.round(distanceBetween),
+          isSuspiciousVisit: true,
+          isBothLocationsSuspicious: true
+        })),
+        consensusMetrics: {
+          consensusStatus: 'two_distant_locations',
+          fraudRisk: 0.8, // High risk - definitely suspicious
+          visitPattern: `2 visits ${Math.round(distanceBetween)}m apart - BOTH LOCATIONS SUSPICIOUS`,
+          distanceBetweenVisits: Math.round(distanceBetween),
+          allVisitLocations
+        }
+      };
+    }
+  }
+
+  // STEP 1: Create location clusters for 3+ visits (original logic)
+  const CONSENSUS_THRESHOLD = 200;
   const clusters: {coordinates: {lat: number, lng: number}, visits: any[]}[] = [];
 
   visits.forEach(visit => {
@@ -298,7 +365,7 @@ const analyzeLocationConsensus = (visits: any[], shopId: string): {
     };
   });
 
-  // STEP 4: Calculate consensus metrics
+  // STEP 4: Calculate consensus metrics for 3+ visits
   const dominantVisits = dominantCluster.visits.length;
   const totalVisits = visits.length;
   const consensusRate = dominantVisits / totalVisits;
@@ -324,9 +391,7 @@ const analyzeLocationConsensus = (visits: any[], shopId: string): {
 
   // Generate pattern description for fraud analysis
   let visitPattern = '';
-  if (totalVisits === 1) {
-    visitPattern = "Single visit - verification needed";
-  } else if (dominantVisits === totalVisits) {
+  if (dominantVisits === totalVisits) {
     visitPattern = `All ${totalVisits} visits from same location - CONSISTENT`;
   } else if (dominantVisits === totalVisits - 1) {
     visitPattern = `${dominantVisits}/${totalVisits} visits normal, 1 deviant - investigate`;
@@ -343,7 +408,8 @@ const analyzeLocationConsensus = (visits: any[], shopId: string): {
     consensusMetrics: {
       consensusStatus,
       fraudRisk,
-      visitPattern
+      visitPattern,
+      allVisitLocations
     }
   };
 };
@@ -398,6 +464,27 @@ const detectClustering = (discrepancies: LocationDiscrepancy[]): LocationDiscrep
   });
   
   return discrepancies;
+};
+
+// 🆕 NEW: Multi-location map plotting for suspicious visit patterns
+const plotMultipleLocations = (visitLocations: {lat: number, lng: number, date: string}[]) => {
+  if (visitLocations.length === 1) {
+    // Single location
+    const location = visitLocations[0];
+    window.open(`https://maps.google.com/maps?q=${location.lat},${location.lng}`, '_blank');
+  } else if (visitLocations.length === 2) {
+    // Two locations - show both with directions
+    const [loc1, loc2] = visitLocations;
+    const url = `https://maps.google.com/maps/dir/${loc1.lat},${loc1.lng}/${loc2.lat},${loc2.lng}`;
+    window.open(url, '_blank');
+  } else {
+    // Multiple locations - show as waypoints
+    const origin = visitLocations[0];
+    const destination = visitLocations[visitLocations.length - 1];
+    const waypoints = visitLocations.slice(1, -1).map(loc => `${loc.lat},${loc.lng}`).join('|');
+    const url = `https://maps.google.com/maps/dir/${origin.lat},${origin.lng}/${destination.lat},${destination.lng}${waypoints ? `?waypoints=${waypoints}` : ''}`;
+    window.open(url, '_blank');
+  }
 };
 
 // ==========================================
@@ -568,6 +655,9 @@ const LocationVerificationTab = ({ data }: { data: InventoryData }) => {
           visit.isDominantLocation = consensusVisit.isDominantLocation;
           visit.deviationFromConsensus = consensusVisit.deviationFromConsensus;
           visit.visitPattern = consensusResult.consensusMetrics.visitPattern;
+          visit.distanceBetweenVisits = consensusResult.consensusMetrics.distanceBetweenVisits;
+          visit.allVisitLocations = consensusResult.consensusMetrics.allVisitLocations;
+          visit.isBothLocationsSuspicious = consensusVisit.isBothLocationsSuspicious || false;
         });
       } else {
         // Single visit shops
@@ -583,6 +673,8 @@ const LocationVerificationTab = ({ data }: { data: InventoryData }) => {
         visit.isDominantLocation = true;
         visit.deviationFromConsensus = 0;
         visit.visitPattern = 'Single visit - verification needed';
+        visit.allVisitLocations = [{lat: visit.actualLatitude, lng: visit.actualLongitude, date: visit.visitDate.toLocaleDateString()}];
+        visit.isBothLocationsSuspicious = false;
       }
     });
 
@@ -869,7 +961,7 @@ const LocationVerificationTab = ({ data }: { data: InventoryData }) => {
         'Stability (meters)', 'Stability Status', 'Total Visits for Shop', 'Coordinates Averaged',
         'Is GPS Outlier', 'Outlier Distance', 'Outliers Removed from Shop',
         'Consensus Status', 'Fraud Risk Score', 'Is Normal Location', 'Deviation from Consensus',
-        'Visit Pattern', 'GPS Error', 'Parking Lot', 'Cluster',
+        'Distance Between Visits (m)', 'Both Locations Suspicious', 'Visit Pattern', 'GPS Error', 'Parking Lot', 'Cluster',
         'Google Maps Link (Master)', 'Google Maps Link (Actual)'
       ].join(','),
       ...filteredAndSortedData.map(d => [
@@ -897,6 +989,8 @@ const LocationVerificationTab = ({ data }: { data: InventoryData }) => {
         (d.fraudRiskScore || 0).toFixed(2),
         d.isNormalLocation ? 'Yes' : 'No',
         d.deviationFromConsensus || 0,
+        d.distanceBetweenVisits || 0,
+        d.isBothLocationsSuspicious ? 'Yes' : 'No',
         `"${d.visitPattern || 'N/A'}"`,
         d.isGPSError ? 'Yes' : 'No',
         d.isParkingLot ? 'Yes' : 'No',
@@ -971,7 +1065,7 @@ const LocationVerificationTab = ({ data }: { data: InventoryData }) => {
       [
         'Shop ID', 'Shop Name', 'Salesman', 'Visit Date', 'Outlier Distance from Shop Center (m)',
         'Shop Stability (m)', 'Total Visits for Shop', 'Total Outliers in Shop',
-        'Consensus Status', 'Fraud Risk Score', 'Deviation from Consensus (m)', 'Visit Pattern',
+        'Consensus Status', 'Fraud Risk Score', 'Deviation from Consensus (m)', 'Distance Between Visits (m)', 'Visit Pattern',
         'Actual Latitude', 'Actual Longitude', 'Distance from Master (m)',
         'Google Maps Link'
       ].join(','),
@@ -987,6 +1081,7 @@ const LocationVerificationTab = ({ data }: { data: InventoryData }) => {
         `"${d.consensusStatus?.toUpperCase() || 'N/A'}"`,
         (d.fraudRiskScore || 0).toFixed(2),
         d.deviationFromConsensus || 0,
+        d.distanceBetweenVisits || 0,
         `"${d.visitPattern || 'N/A'}"`,
         d.actualLatitude,
         d.actualLongitude,
@@ -1418,6 +1513,9 @@ const LocationVerificationTab = ({ data }: { data: InventoryData }) => {
                       {selectedAnalysis === 'stability' && discrepancy.isOutlierVisit && (
                         <div className="text-xs text-red-600 font-medium">🚨 FRAUD OUTLIER</div>
                       )}
+                      {selectedAnalysis === 'stability' && discrepancy.consensusStatus === 'two_distant_locations' && (
+                        <div className="text-xs text-red-600 font-medium">🚨 BOTH LOCATIONS SUSPICIOUS</div>
+                      )}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
@@ -1436,20 +1534,34 @@ const LocationVerificationTab = ({ data }: { data: InventoryData }) => {
                       </div>
                     ) : (
                       <div>
-                        <div className="font-medium text-gray-900">
-                          {discrepancy.isNormalLocation ? 'Normal Location' : 'Deviant Location'}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {discrepancy.totalVisitsForShop} visits • {discrepancy.deviationFromConsensus}m from consensus
-                        </div>
-                        <div className="text-xs">
-                          <span className={`font-medium ${
-                            (discrepancy.fraudRiskScore || 0) <= 0.3 ? 'text-green-600' :
-                            (discrepancy.fraudRiskScore || 0) <= 0.6 ? 'text-yellow-600' : 'text-red-600'
-                          }`}>
-                            Risk: {((discrepancy.fraudRiskScore || 0) * 100).toFixed(0)}%
-                          </span>
-                        </div>
+                        {discrepancy.consensusStatus === 'two_distant_locations' ? (
+                          <div>
+                            <div className="font-medium text-red-600">2 SUSPICIOUS LOCATIONS</div>
+                            <div className="text-xs text-gray-600">
+                              Distance: {discrepancy.distanceBetweenVisits}m apart
+                            </div>
+                            <div className="text-xs text-red-600 font-medium">
+                              Risk: {((discrepancy.fraudRiskScore || 0) * 100).toFixed(0)}%
+                            </div>
+                          </div>
+                        ) : (
+                          <div>
+                            <div className="font-medium text-gray-900">
+                              {discrepancy.isNormalLocation ? 'Normal Location' : 'Deviant Location'}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {discrepancy.totalVisitsForShop} visits • {discrepancy.deviationFromConsensus}m from consensus
+                            </div>
+                            <div className="text-xs">
+                              <span className={`font-medium ${
+                                (discrepancy.fraudRiskScore || 0) <= 0.3 ? 'text-green-600' :
+                                (discrepancy.fraudRiskScore || 0) <= 0.6 ? 'text-yellow-600' : 'text-red-600'
+                              }`}>
+                                Risk: {((discrepancy.fraudRiskScore || 0) * 100).toFixed(0)}%
+                              </span>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     )}
                   </td>
@@ -1466,13 +1578,18 @@ const LocationVerificationTab = ({ data }: { data: InventoryData }) => {
                           discrepancy.consensusStatus === 'mostly_consistent' ? 'bg-blue-100 text-blue-800' :
                           discrepancy.consensusStatus === 'inconsistent' ? 'bg-yellow-100 text-yellow-800' :
                           discrepancy.consensusStatus === 'highly_suspicious' ? 'bg-red-100 text-red-800' :
+                          discrepancy.consensusStatus === 'two_distant_locations' ? 'bg-red-100 text-red-800' :
                           'bg-gray-100 text-gray-800'
                         }`}>
                           <Target className="w-3 h-3 mr-1" />
-                          {discrepancy.consensusStatus?.toUpperCase()}
+                          {discrepancy.consensusStatus === 'two_distant_locations' ? 'BOTH SUSPICIOUS' : 
+                           discrepancy.consensusStatus?.toUpperCase()}
                         </span>
-                        {discrepancy.isOutlierVisit && (
+                        {discrepancy.isOutlierVisit && !discrepancy.isBothLocationsSuspicious && (
                           <div className="text-xs text-red-600 font-medium">FRAUD OUTLIER</div>
+                        )}
+                        {discrepancy.isBothLocationsSuspicious && (
+                          <div className="text-xs text-red-600 font-medium">BOTH LOCATIONS SUSPICIOUS</div>
                         )}
                       </div>
                     )}
@@ -1488,13 +1605,28 @@ const LocationVerificationTab = ({ data }: { data: InventoryData }) => {
                         <div className="font-medium text-gray-700 mb-1">
                           {discrepancy.visitPattern || 'Pattern analysis not available'}
                         </div>
-                        <div>
-                          {discrepancy.isDominantLocation ? (
-                            <span className="text-green-600">✓ Dominant location</span>
-                          ) : (
-                            <span className="text-orange-600">⚠ Deviant pattern</span>
-                          )}
-                        </div>
+                        {discrepancy.consensusStatus === 'two_distant_locations' ? (
+                          <div>
+                            <div className="text-red-600 font-medium">⚠ Both locations require investigation</div>
+                            <div className="text-red-600">Distance: {discrepancy.distanceBetweenVisits}m apart</div>
+                            {discrepancy.allVisitLocations && discrepancy.allVisitLocations.length > 1 && (
+                              <button
+                                onClick={() => plotMultipleLocations(discrepancy.allVisitLocations || [])}
+                                className="mt-1 bg-red-600 text-white px-2 py-1 rounded text-xs hover:bg-red-700"
+                              >
+                                🗺️ Plot Both Locations
+                              </button>
+                            )}
+                          </div>
+                        ) : (
+                          <div>
+                            {discrepancy.isDominantLocation ? (
+                              <span className="text-green-600">✓ Dominant location</span>
+                            ) : (
+                              <span className="text-orange-600">⚠ Deviant pattern</span>
+                            )}
+                          </div>
+                        )}
                         {(discrepancy.outliersRemoved || 0) > 0 && (
                           <div className="text-red-600">⚠ {discrepancy.outliersRemoved} outliers in shop</div>
                         )}
@@ -1517,6 +1649,19 @@ const LocationVerificationTab = ({ data }: { data: InventoryData }) => {
                       >
                         <Navigation className="w-4 h-4" />
                       </button>
+                      {/* 🆕 NEW: Multi-location plotting for suspicious patterns */}
+                      {(discrepancy.consensusStatus === 'two_distant_locations' || 
+                        discrepancy.consensusStatus === 'highly_suspicious' || 
+                        discrepancy.consensusStatus === 'inconsistent') && 
+                        discrepancy.allVisitLocations && discrepancy.allVisitLocations.length > 1 && (
+                        <button
+                          onClick={() => plotMultipleLocations(discrepancy.allVisitLocations || [])}
+                          className="text-red-600 hover:text-red-900"
+                          title="Plot All Visit Locations"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                      )}
                     </div>
                   </td>
                 </tr>
