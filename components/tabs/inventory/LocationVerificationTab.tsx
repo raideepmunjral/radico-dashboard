@@ -4,7 +4,7 @@ import React, { useState, useMemo, useEffect } from 'react';
 import { MapPin, AlertTriangle, CheckCircle, Download, Filter, Search, Eye, X, Navigation, Target, Zap, Clock, Users, BarChart3, TrendingUp } from 'lucide-react';
 
 // ==========================================
-// ENHANCED LOCATION VERIFICATION TYPES WITH STABILITY
+// ENHANCED FRAUD-DETECTION LOCATION VERIFICATION TYPES
 // ==========================================
 
 interface LocationDiscrepancy {
@@ -28,15 +28,16 @@ interface LocationDiscrepancy {
   isCluster: boolean;
   salesmanUid?: string;
   visitId: string;
-  // 🆕 NEW: Stability and outlier detection
-  stabilityMeters?: number;
-  stabilityStatus?: 'excellent' | 'good' | 'moderate' | 'poor' | 'critical';
-  stabilityColor?: string;
+  // 🆕 NEW: Consensus-based fraud detection
+  consensusStatus?: 'consistent' | 'mostly_consistent' | 'inconsistent' | 'highly_suspicious' | 'single_visit';
+  consensusColor?: string;
   totalVisitsForShop?: number;
-  coordinatesAveraged?: number;
-  outliersRemoved?: number;
-  isOutlierVisit?: boolean;
-  outlierDistance?: number;
+  dominantLocationVisits?: number;
+  deviationFromDominant?: number;
+  isSuspiciousVisit?: boolean;
+  fraudRiskScore?: number;
+  visitPattern?: string;
+  isNormalLocation?: boolean;
 }
 
 interface SalesmanAccuracy {
@@ -52,24 +53,26 @@ interface SalesmanAccuracy {
   worstDistance: number;
   consistentError: boolean;
   visits: LocationDiscrepancy[];
-  // 🆕 NEW: Stability metrics
-  averageStability: number;
-  excellentStability: number;
-  poorStability: number;
-  outlierVisits: number;
-  totalOutliersRemoved: number;
+  // 🆕 NEW: Consensus-based fraud detection metrics
+  consistentVisits: number;
+  mostlyConsistentVisits: number;
+  inconsistentVisits: number;
+  highlySuspiciousVisits: number;
+  fraudRiskScore: number;
+  consistencyRate: number;
+  suspiciousPatterns: number;
 }
 
-interface StabilityAnalysis {
+interface ConsensusAnalysis {
   totalShops: number;
   shopsWithMultipleVisits: number;
-  excellentStability: number;
-  goodStability: number;
-  moderateStability: number;
-  poorStability: number;
-  criticalStability: number;
-  totalOutliers: number;
-  avgStabilityMeters: number;
+  consistentShops: number;
+  mostlyConsistentShops: number;
+  inconsistentShops: number;
+  highlySuspiciousShops: number;
+  singleVisitShops: number;
+  totalSuspiciousVisits: number;
+  avgFraudRisk: number;
 }
 
 interface InventoryData {
@@ -161,82 +164,141 @@ const getAccuracyStatus = (distance: number): {
   }
 };
 
-// Get stability status based on variance in meters
-const getStabilityStatus = (stabilityMeters: number): {
-  status: LocationDiscrepancy['stabilityStatus'];
+// Get consensus status based on visit patterns for fraud detection
+const getConsensusStatus = (
+  totalVisits: number,
+  dominantClusterSize: number,
+  deviationFromDominant: number
+): {
+  status: LocationDiscrepancy['consensusStatus'];
   color: string;
   label: string;
+  fraudRisk: number;
 } => {
-  if (stabilityMeters <= 10) {
+  if (totalVisits === 1) {
     return {
-      status: 'excellent',
+      status: 'single_visit',
+      color: 'bg-gray-100 text-gray-800',
+      label: 'SINGLE VISIT',
+      fraudRisk: 0.5 // Unknown risk
+    };
+  }
+
+  const consistencyRate = dominantClusterSize / totalVisits;
+  
+  if (consistencyRate >= 0.8 && deviationFromDominant <= 100) {
+    return {
+      status: 'consistent',
       color: 'bg-green-100 text-green-800',
-      label: 'EXCELLENT'
+      label: 'CONSISTENT',
+      fraudRisk: 0.1
     };
-  } else if (stabilityMeters <= 50) {
+  } else if (consistencyRate >= 0.6 && deviationFromDominant <= 300) {
     return {
-      status: 'good',
+      status: 'mostly_consistent',
       color: 'bg-blue-100 text-blue-800',
-      label: 'GOOD'
+      label: 'MOSTLY CONSISTENT',
+      fraudRisk: 0.3
     };
-  } else if (stabilityMeters <= 200) {
+  } else if (consistencyRate >= 0.4 && deviationFromDominant <= 1000) {
     return {
-      status: 'moderate',
+      status: 'inconsistent',
       color: 'bg-yellow-100 text-yellow-800',
-      label: 'MODERATE'
-    };
-  } else if (stabilityMeters <= 1000) {
-    return {
-      status: 'poor',
-      color: 'bg-orange-100 text-orange-800',
-      label: 'POOR'
+      label: 'INCONSISTENT',
+      fraudRisk: 0.6
     };
   } else {
     return {
-      status: 'critical',
+      status: 'highly_suspicious',
       color: 'bg-red-100 text-red-800',
-      label: 'CRITICAL'
+      label: 'HIGHLY SUSPICIOUS',
+      fraudRisk: 0.9
     };
   }
 };
 
-// Detect outlier visits within a shop's visit history
-const detectOutlierVisits = (visits: any[], shopId: string): any[] => {
-  if (visits.length <= 2) return visits;
-  
-  // Calculate average coordinates for this shop
-  const avgLat = visits.reduce((sum, v) => sum + v.actualLatitude, 0) / visits.length;
-  const avgLng = visits.reduce((sum, v) => sum + v.actualLongitude, 0) / visits.length;
-  
-  // Mark outliers (>500m from average)
-  return visits.map(visit => {
-    const distanceFromCenter = calculateDistance(
-      avgLat, avgLng,
+// Consensus-based location clustering for fraud detection
+const analyzeLocationConsensus = (visits: any[], shopId: string): {
+  dominantLocation: {lat: number, lng: number};
+  dominantClusterSize: number;
+  visitClassifications: any[];
+} => {
+  if (visits.length <= 1) {
+    return {
+      dominantLocation: visits[0] ? {lat: visits[0].actualLatitude, lng: visits[0].actualLongitude} : {lat: 0, lng: 0},
+      dominantClusterSize: visits.length,
+      visitClassifications: visits.map(v => ({...v, isNormalLocation: true, deviationFromDominant: 0}))
+    };
+  }
+
+  // STEP 1: Create clusters of similar coordinates (within 200m = same location)
+  const CLUSTER_THRESHOLD = 200; // meters - locations within 200m considered "same"
+  const clusters: {coordinates: {lat: number, lng: number}, visits: any[]}[] = [];
+
+  visits.forEach(visit => {
+    let addedToCluster = false;
+    
+    for (let cluster of clusters) {
+      const distance = calculateDistance(
+        cluster.coordinates.lat, cluster.coordinates.lng,
+        visit.actualLatitude, visit.actualLongitude
+      );
+      
+      if (distance <= CLUSTER_THRESHOLD) {
+        cluster.visits.push(visit);
+        addedToCluster = true;
+        break;
+      }
+    }
+    
+    if (!addedToCluster) {
+      clusters.push({
+        coordinates: {lat: visit.actualLatitude, lng: visit.actualLongitude},
+        visits: [visit]
+      });
+    }
+  });
+
+  // STEP 2: Find dominant cluster (most frequently visited location)
+  const dominantCluster = clusters.reduce((largest, current) => 
+    current.visits.length > largest.visits.length ? current : largest
+  );
+
+  // STEP 3: Classify each visit based on dominant location
+  const visitClassifications = visits.map(visit => {
+    const distanceFromDominant = calculateDistance(
+      dominantCluster.coordinates.lat, dominantCluster.coordinates.lng,
       visit.actualLatitude, visit.actualLongitude
     );
     
-    const isOutlier = distanceFromCenter > 500; // 500m threshold
+    const isNormalLocation = distanceFromDominant <= CLUSTER_THRESHOLD;
     
     return {
       ...visit,
-      isOutlierVisit: isOutlier,
-      outlierDistance: Math.round(distanceFromCenter)
+      isNormalLocation,
+      deviationFromDominant: Math.round(distanceFromDominant),
+      isSuspiciousVisit: !isNormalLocation && distanceFromDominant > 500
     };
   });
+
+  return {
+    dominantLocation: dominantCluster.coordinates,
+    dominantClusterSize: dominantCluster.visits.length,
+    visitClassifications
+  };
 };
 
-// Calculate stability metrics for shops with multiple visits
-const calculateShopStability = (visits: any[], shopId: string): number => {
-  if (visits.length <= 1) return 0;
+// Generate visit pattern description for fraud analysis
+const generateVisitPattern = (visits: any[], dominantClusterSize: number): string => {
+  const total = visits.length;
+  const normal = dominantClusterSize;
+  const suspicious = visits.filter(v => v.isSuspiciousVisit).length;
   
-  const avgLat = visits.reduce((sum, v) => sum + v.actualLatitude, 0) / visits.length;
-  const avgLng = visits.reduce((sum, v) => sum + v.actualLongitude, 0) / visits.length;
-  
-  // Calculate variance and convert to meters
-  const latVariance = visits.reduce((sum, v) => sum + Math.pow(v.actualLatitude - avgLat, 2), 0) / visits.length;
-  const lngVariance = visits.reduce((sum, v) => sum + Math.pow(v.actualLongitude - avgLng, 2), 0) / visits.length;
-  
-  return Math.sqrt(latVariance + lngVariance) * 111000; // Convert to meters
+  if (total === 1) return "Single visit - verification needed";
+  if (normal === total) return `All ${total} visits from same location - GOOD`;
+  if (normal === total - 1) return `${normal}/${total} visits normal, 1 deviant - investigate`;
+  if (suspicious > 0) return `${normal}/${total} normal, ${suspicious} highly suspicious - FRAUD RISK`;
+  return `${normal}/${total} visits from dominant location - mixed pattern`;
 };
 
 // Detect GPS clustering (multiple shops at same location)
@@ -269,9 +331,9 @@ const LocationVerificationTab = ({ data }: { data: InventoryData }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedSalesman, setSelectedSalesman] = useState('All');
   const [selectedStatus, setSelectedStatus] = useState('All');
-  const [selectedStability, setSelectedStability] = useState('All');
-  const [showOutliersOnly, setShowOutliersOnly] = useState(false);
-  const [sortBy, setSortBy] = useState<'distance' | 'shopName' | 'salesman' | 'visitDate' | 'stability'>('distance');
+  const [selectedConsensus, setSelectedConsensus] = useState('All');
+  const [showSuspiciousOnly, setShowSuspiciousOnly] = useState(false);
+  const [sortBy, setSortBy] = useState<'distance' | 'shopName' | 'salesman' | 'visitDate' | 'consensus' | 'fraudRisk'>('distance');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [showVisitDetails, setShowVisitDetails] = useState<string | null>(null);
   const [processing, setProcessing] = useState(false);
@@ -282,22 +344,22 @@ const LocationVerificationTab = ({ data }: { data: InventoryData }) => {
   // Processing state
   const [locationDiscrepancies, setLocationDiscrepancies] = useState<LocationDiscrepancy[]>([]);
   const [salesmanAccuracies, setSalesmanAccuracies] = useState<SalesmanAccuracy[]>([]);
-  const [stabilityAnalysis, setStabilityAnalysis] = useState<StabilityAnalysis | null>(null);
-  const [selectedAnalysis, setSelectedAnalysis] = useState<'distance' | 'stability'>('distance');
+  const [consensusAnalysis, setConsensusAnalysis] = useState<ConsensusAnalysis | null>(null);
+  const [selectedAnalysis, setSelectedAnalysis] = useState<'distance' | 'consensus'>('distance');
 
   // ==========================================
-  // ENHANCED PROCESSING WITH STABILITY ANALYSIS
+  // ENHANCED PROCESSING WITH CONSENSUS-BASED FRAUD DETECTION
   // ==========================================
 
   const processLocationDiscrepancies = useMemo(() => {
-    if (!data.rawVisitData || processed) return { discrepancies: [], accuracies: [], stability: null };
+    if (!data.rawVisitData || processed) return { discrepancies: [], accuracies: [], consensus: null };
 
-    console.log('🔄 Processing location discrepancies with GPS stability analysis...');
+    console.log('🔄 Processing location discrepancies with consensus-based fraud detection...');
     const { rollingPeriodRows, columnIndices, shopSalesmanMap, parseDate } = data.rawVisitData;
 
     const discrepancies: LocationDiscrepancy[] = [];
     const salesmanStats: Record<string, SalesmanAccuracy> = {};
-    const shopVisitGroups: Record<string, any[]> = {}; // Group visits by shop for stability analysis
+    const shopVisitGroups: Record<string, any[]> = {}; // Group visits by shop for consensus analysis
 
     // ==========================================
     // STEP 1: Process each visit and group by shop
@@ -326,7 +388,7 @@ const LocationVerificationTab = ({ data }: { data: InventoryData }) => {
 
       const salesman = masterShop.salesman || row[columnIndices.salesman] || 'Unknown';
 
-      // Group visits by shop for stability analysis
+      // Group visits by shop for consensus analysis
       if (!shopVisitGroups[shopId]) {
         shopVisitGroups[shopId] = [];
       }
@@ -350,77 +412,82 @@ const LocationVerificationTab = ({ data }: { data: InventoryData }) => {
     });
 
     // ==========================================
-    // STEP 2: Calculate stability and detect outliers per shop
+    // STEP 2: Perform consensus analysis per shop for fraud detection
     // ==========================================
-    const stabilityStats = {
+    const consensusStats = {
       totalShops: 0,
       shopsWithMultipleVisits: 0,
-      excellentStability: 0,
-      goodStability: 0,
-      moderateStability: 0,
-      poorStability: 0,
-      criticalStability: 0,
-      totalOutliers: 0,
-      totalStabilitySum: 0
+      consistentShops: 0,
+      mostlyConsistentShops: 0,
+      inconsistentShops: 0,
+      highlySuspiciousShops: 0,
+      singleVisitShops: 0,
+      totalSuspiciousVisits: 0,
+      totalFraudRisk: 0
     };
 
     Object.keys(shopVisitGroups).forEach(shopId => {
       const shopVisits = shopVisitGroups[shopId];
-      stabilityStats.totalShops++;
+      consensusStats.totalShops++;
 
-      if (shopVisits.length > 1) {
-        stabilityStats.shopsWithMultipleVisits++;
-        
-        // Calculate stability for this shop
-        const stabilityMeters = calculateShopStability(shopVisits, shopId);
-        stabilityStats.totalStabilitySum += stabilityMeters;
-
-        // Categorize stability
-        if (stabilityMeters <= 10) stabilityStats.excellentStability++;
-        else if (stabilityMeters <= 50) stabilityStats.goodStability++;
-        else if (stabilityMeters <= 200) stabilityStats.moderateStability++;
-        else if (stabilityMeters <= 1000) stabilityStats.poorStability++;
-        else stabilityStats.criticalStability++;
-
-        // Detect outliers in this shop's visits
-        const visitsWithOutliers = detectOutlierVisits(shopVisits, shopId);
-        const outliers = visitsWithOutliers.filter(v => v.isOutlierVisit);
-        stabilityStats.totalOutliers += outliers.length;
-
-        // Add stability info to each visit
-        shopVisits.forEach((visit, index) => {
-          const visitWithOutlier = visitsWithOutliers[index];
-          visit.stabilityMeters = stabilityMeters;
-          visit.totalVisitsForShop = shopVisits.length;
-          visit.coordinatesAveraged = shopVisits.length;
-          visit.outliersRemoved = outliers.length;
-          visit.isOutlierVisit = visitWithOutlier.isOutlierVisit;
-          visit.outlierDistance = visitWithOutlier.outlierDistance;
-        });
+      // Perform consensus analysis for this shop
+      const consensusResult = analyzeLocationConsensus(shopVisits, shopId);
+      
+      if (shopVisits.length === 1) {
+        consensusStats.singleVisitShops++;
       } else {
-        // Single visit shops
-        shopVisits[0].stabilityMeters = 0;
-        shopVisits[0].totalVisitsForShop = 1;
-        shopVisits[0].coordinatesAveraged = 1;
-        shopVisits[0].outliersRemoved = 0;
-        shopVisits[0].isOutlierVisit = false;
+        consensusStats.shopsWithMultipleVisits++;
       }
+
+      // Add consensus analysis to each visit
+      shopVisits.forEach((visit, index) => {
+        const classifiedVisit = consensusResult.visitClassifications[index];
+        const consensus = getConsensusStatus(
+          shopVisits.length,
+          consensusResult.dominantClusterSize,
+          classifiedVisit.deviationFromDominant
+        );
+
+        // Update visit with consensus data
+        visit.totalVisitsForShop = shopVisits.length;
+        visit.dominantLocationVisits = consensusResult.dominantClusterSize;
+        visit.deviationFromDominant = classifiedVisit.deviationFromDominant;
+        visit.isNormalLocation = classifiedVisit.isNormalLocation;
+        visit.isSuspiciousVisit = classifiedVisit.isSuspiciousVisit;
+        visit.consensusStatus = consensus.status;
+        visit.consensusColor = consensus.color;
+        visit.fraudRiskScore = consensus.fraudRisk;
+        visit.visitPattern = generateVisitPattern(consensusResult.visitClassifications, consensusResult.dominantClusterSize);
+
+        // Count by consensus status
+        switch (consensus.status) {
+          case 'consistent': consensusStats.consistentShops++; break;
+          case 'mostly_consistent': consensusStats.mostlyConsistentShops++; break;
+          case 'inconsistent': consensusStats.inconsistentShops++; break;
+          case 'highly_suspicious': consensusStats.highlySuspiciousShops++; break;
+        }
+
+        if (classifiedVisit.isSuspiciousVisit) {
+          consensusStats.totalSuspiciousVisits++;
+        }
+
+        consensusStats.totalFraudRisk += consensus.fraudRisk;
+      });
     });
 
     // ==========================================
-    // STEP 3: Create discrepancy records with stability data
+    // STEP 3: Create discrepancy records with consensus data
     // ==========================================
     Object.values(shopVisitGroups).flat().forEach(visit => {
-      // Calculate distance
+      // Calculate distance for traditional accuracy
       const distance = calculateDistance(
         visit.masterLatitude, visit.masterLongitude, 
         visit.actualLatitude, visit.actualLongitude
       );
       
       const accuracy = getAccuracyStatus(distance);
-      const stability = getStabilityStatus(visit.stabilityMeters || 0);
 
-      // Create enhanced discrepancy record
+      // Create enhanced discrepancy record with consensus analysis
       const discrepancy: LocationDiscrepancy = {
         ...visit,
         distanceMeters: Math.round(distance),
@@ -431,14 +498,11 @@ const LocationVerificationTab = ({ data }: { data: InventoryData }) => {
         isGPSError: distance > 20 && distance < 100,
         isParkingLot: distance > 50 && distance < 300,
         isCluster: false, // Will be set by clustering detection
-        // 🆕 NEW: Stability data
-        stabilityStatus: stability.status,
-        stabilityColor: stability.color
       };
 
       discrepancies.push(discrepancy);
 
-      // Track enhanced salesman statistics
+      // Track enhanced salesman statistics with fraud detection
       if (!salesmanStats[visit.salesman]) {
         salesmanStats[visit.salesman] = {
           salesman: visit.salesman,
@@ -453,12 +517,14 @@ const LocationVerificationTab = ({ data }: { data: InventoryData }) => {
           worstDistance: 0,
           consistentError: false,
           visits: [],
-          // 🆕 NEW: Stability metrics
-          averageStability: 0,
-          excellentStability: 0,
-          poorStability: 0,
-          outlierVisits: 0,
-          totalOutliersRemoved: 0
+          // 🆕 NEW: Consensus-based fraud detection metrics
+          consistentVisits: 0,
+          mostlyConsistentVisits: 0,
+          inconsistentVisits: 0,
+          highlySuspiciousVisits: 0,
+          fraudRiskScore: 0,
+          consistencyRate: 0,
+          suspiciousPatterns: 0
         };
       }
 
@@ -476,28 +542,32 @@ const LocationVerificationTab = ({ data }: { data: InventoryData }) => {
         case 'impossible': stats.impossibleVisits++; break;
       }
 
-      // 🆕 NEW: Track stability metrics
-      if (visit.isOutlierVisit) stats.outlierVisits++;
-      stats.totalOutliersRemoved += visit.outliersRemoved || 0;
-      
-      if (stability.status === 'excellent') stats.excellentStability++;
-      else if (['poor', 'critical'].includes(stability.status)) stats.poorStability++;
+      // 🆕 NEW: Track consensus-based fraud metrics
+      switch (visit.consensusStatus) {
+        case 'consistent': stats.consistentVisits++; break;
+        case 'mostly_consistent': stats.mostlyConsistentVisits++; break;
+        case 'inconsistent': stats.inconsistentVisits++; break;
+        case 'highly_suspicious': stats.highlySuspiciousVisits++; break;
+      }
+
+      if (visit.isSuspiciousVisit) stats.suspiciousPatterns++;
+      stats.fraudRiskScore += visit.fraudRiskScore || 0;
     });
 
     // Detect clustering (unchanged)
     const clusteredDiscrepancies = detectClustering(discrepancies);
 
-    // Calculate final salesman stats
+    // Calculate final salesman stats with fraud detection
     Object.values(salesmanStats).forEach(stats => {
       const goodVisits = stats.accurateVisits + stats.acceptableVisits;
       stats.accuracyPercentage = stats.totalVisits > 0 ? (goodVisits / stats.totalVisits) * 100 : 0;
       stats.averageDistance = stats.totalVisits > 0 ? 
         stats.visits.reduce((sum, visit) => sum + visit.distanceMeters, 0) / stats.totalVisits : 0;
       
-      // Calculate average stability for this salesman
-      const stabilityValues = stats.visits.map(v => v.stabilityMeters || 0).filter(s => s > 0);
-      stats.averageStability = stabilityValues.length > 0 ?
-        stabilityValues.reduce((sum, s) => sum + s, 0) / stabilityValues.length : 0;
+      // Calculate consensus-based consistency rate for fraud detection
+      const consistentVisits = stats.consistentVisits + stats.mostlyConsistentVisits;
+      stats.consistencyRate = stats.totalVisits > 0 ? (consistentVisits / stats.totalVisits) * 100 : 0;
+      stats.fraudRiskScore = stats.totalVisits > 0 ? stats.fraudRiskScore / stats.totalVisits : 0;
       
       // Detect consistent GPS error pattern (unchanged)
       const distances = stats.visits.map(v => v.distanceMeters);
@@ -506,32 +576,33 @@ const LocationVerificationTab = ({ data }: { data: InventoryData }) => {
       stats.consistentError = variance < 50 && avgDistance > 50;
     });
 
-    // Create final stability analysis
-    const finalStabilityAnalysis: StabilityAnalysis = {
-      totalShops: stabilityStats.totalShops,
-      shopsWithMultipleVisits: stabilityStats.shopsWithMultipleVisits,
-      excellentStability: stabilityStats.excellentStability,
-      goodStability: stabilityStats.goodStability,
-      moderateStability: stabilityStats.moderateStability,
-      poorStability: stabilityStats.poorStability,
-      criticalStability: stabilityStats.criticalStability,
-      totalOutliers: stabilityStats.totalOutliers,
-      avgStabilityMeters: stabilityStats.shopsWithMultipleVisits > 0 ?
-        stabilityStats.totalStabilitySum / stabilityStats.shopsWithMultipleVisits : 0
+    // Create final consensus analysis for fraud detection
+    const finalConsensusAnalysis: ConsensusAnalysis = {
+      totalShops: consensusStats.totalShops,
+      shopsWithMultipleVisits: consensusStats.shopsWithMultipleVisits,
+      consistentShops: consensusStats.consistentShops,
+      mostlyConsistentShops: consensusStats.mostlyConsistentShops,
+      inconsistentShops: consensusStats.inconsistentShops,
+      highlySuspiciousShops: consensusStats.highlySuspiciousShops,
+      singleVisitShops: consensusStats.singleVisitShops,
+      totalSuspiciousVisits: consensusStats.totalSuspiciousVisits,
+      avgFraudRisk: consensusStats.totalShops > 0 ?
+        consensusStats.totalFraudRisk / (consensusStats.totalShops * consensusStats.shopsWithMultipleVisits || 1) : 0
     };
 
-    console.log('✅ Enhanced location discrepancies with stability processed:', {
+    console.log('✅ Enhanced location discrepancies with consensus-based fraud detection processed:', {
       totalDiscrepancies: clusteredDiscrepancies.length,
-      shopsAnalyzed: stabilityStats.totalShops,
-      multiVisitShops: stabilityStats.shopsWithMultipleVisits,
-      outliersDetected: stabilityStats.totalOutliers,
-      avgStability: finalStabilityAnalysis.avgStabilityMeters.toFixed(1) + 'm'
+      shopsAnalyzed: consensusStats.totalShops,
+      multiVisitShops: consensusStats.shopsWithMultipleVisits,
+      suspiciousVisits: consensusStats.totalSuspiciousVisits,
+      highlySuspiciousShops: consensusStats.highlySuspiciousShops,
+      avgFraudRisk: finalConsensusAnalysis.avgFraudRisk.toFixed(2)
     });
 
     return {
       discrepancies: clusteredDiscrepancies,
-      accuracies: Object.values(salesmanStats).sort((a, b) => b.suspiciousVisits - a.suspiciousVisits),
-      stability: finalStabilityAnalysis
+      accuracies: Object.values(salesmanStats).sort((a, b) => b.fraudRiskScore - a.fraudRiskScore),
+      consensus: finalConsensusAnalysis
     };
   }, [data.rawVisitData, processed]);
 
