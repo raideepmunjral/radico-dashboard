@@ -64,7 +64,7 @@ const LocationVerificationTab: React.FC<LocationVerificationTabProps> = ({ data 
   // ==========================================
 
   const processLocationDiscrepancies = useMemo(() => {
-    if (!data.rawVisitData || !data.rawMasterData) {
+    if (!data.rawVisitData) {
       return {
         discrepancies: [],
         consensusData: [],
@@ -74,7 +74,8 @@ const LocationVerificationTab: React.FC<LocationVerificationTabProps> = ({ data 
 
     console.log('🔍 Processing location discrepancies with consensus-based fraud detection...');
 
-    // Helper function to calculate distance between coordinates
+    // Extract visit data structure (all data comes from rawVisitData)
+    const { rollingPeriodRows, columnIndices, shopSalesmanMap, parseDate } = data.rawVisitData;
     const calculateDistance = (lat1: number, lng1: number, lat2: number, lng2: number): number => {
       const R = 6371000; // Earth's radius in meters
       const dLat = (lat2 - lat1) * Math.PI / 180;
@@ -521,13 +522,13 @@ const LocationVerificationTab: React.FC<LocationVerificationTabProps> = ({ data 
     }
   };
 
-  if (!data.rawVisitData || !data.rawMasterData) {
+  if (!data.rawVisitData) {
     return (
       <div className="p-6 text-center">
         <AlertTriangle className="mx-auto h-12 w-12 text-yellow-500 mb-4" />
         <h3 className="text-lg font-medium text-gray-900 mb-2">No Data Available</h3>
         <p className="text-gray-500">
-          Visit data and master data are required for location verification analysis.
+          Visit data with coordinates is required for location verification analysis.
         </p>
       </div>
     );
