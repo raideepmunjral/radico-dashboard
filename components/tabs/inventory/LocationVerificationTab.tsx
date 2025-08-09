@@ -1299,8 +1299,8 @@ const LocationVerificationTab = ({ data }: { data: InventoryData }) => {
             <div className="text-sm text-gray-500">Suspicious Shops</div>
           </div>
           <div className="bg-white p-4 rounded-lg shadow text-center">
-            <div className="text-2xl font-bold text-red-600">{stabilityAnalysis?.totalFraudFlags || 0}</div>
-            <div className="text-sm text-gray-500">Fraud Flags</div>
+            <div className="text-2xl font-bold text-red-600">{stabilityAnalysis?.suspiciousShops || 0}</div>
+            <div className="text-sm text-gray-500">Shops with Issues</div>
           </div>
           <div className="bg-white p-4 rounded-lg shadow text-center">
             <div className="text-2xl font-bold text-purple-600">{stabilityAnalysis?.totalOutliers || 0}</div>
@@ -1352,7 +1352,7 @@ const LocationVerificationTab = ({ data }: { data: InventoryData }) => {
         {/* 🔧 FIXED: Map plotting legend for fraud investigation */}
         {selectedAnalysis === 'stability' && (
           <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-            <div className="text-sm font-medium text-gray-700 mb-2">📍 Map Plotting Legend (FIXED - Now Works!):</div>
+            <div className="text-sm font-medium text-gray-700 mb-2">📍 Map Plotting Legend:</div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs">
               <div className="flex items-center">
                 <div className="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
@@ -1370,10 +1370,6 @@ const LocationVerificationTab = ({ data }: { data: InventoryData }) => {
                 <div className="w-3 h-3 bg-orange-500 rounded-full mr-2"></div>
                 <span>Orange (S) = Suspicious Pattern</span>
               </div>
-            </div>
-            <div className="text-xs text-green-600 font-medium mt-2">
-              ✅ 2-Location plotting works perfectly - shows directions!<br/>
-              ✅ 3+ Location plotting now SIMPLE-FIXED - uses SAME logic as 2-location (extended routes)!
             </div>
           </div>
         )}
@@ -1701,7 +1697,7 @@ const LocationVerificationTab = ({ data }: { data: InventoryData }) => {
                                 onClick={() => plotMultipleLocations(discrepancy.allVisitLocations || [])}
                                 className="mt-1 bg-red-600 text-white px-2 py-1 rounded text-xs hover:bg-red-700"
                               >
-                                🗺️ Plot Both Suspicious Locations (SIMPLE-FIXED!)
+                                🗺️ Plot Both Suspicious Locations
                               </button>
                             )}
                           </div>
@@ -1720,7 +1716,7 @@ const LocationVerificationTab = ({ data }: { data: InventoryData }) => {
                                 onClick={() => plotEnhancedLocations(discrepancy)}
                                 className="mt-1 bg-orange-600 text-white px-2 py-1 rounded text-xs hover:bg-orange-700"
                               >
-                                🗺️ Plot Consensus + Deviant Locations (SIMPLE-FIXED!)
+                                🗺️ Plot Consensus + Deviant Locations
                               </button>
                             )}
                           </div>
@@ -1732,7 +1728,7 @@ const LocationVerificationTab = ({ data }: { data: InventoryData }) => {
                                 onClick={() => plotEnhancedLocations(discrepancy)}
                                 className="mt-1 bg-yellow-600 text-white px-2 py-1 rounded text-xs hover:bg-yellow-700"
                               >
-                                🗺️ Plot All Visit Locations (SIMPLE-FIXED!)
+                                🗺️ Plot All Visit Locations
                               </button>
                             )}
                           </div>
@@ -1783,10 +1779,10 @@ const LocationVerificationTab = ({ data }: { data: InventoryData }) => {
                             'text-purple-600 hover:text-purple-900'
                           }`}
                           title={
-                            discrepancy.allVisitLocations!.length === 2 ? 'Plot Both Locations with Directions (FIXED!)' :
+                            discrepancy.allVisitLocations!.length === 2 ? 'Plot Both Locations with Directions' :
                             discrepancy.consensusStatus === 'two_distant_locations' ? 'Plot Both Suspicious Locations' :
-                            (discrepancy.outliersRemoved && discrepancy.outliersRemoved > 0) ? 'Plot Consensus + Deviant Locations (SIMPLE-FIXED!)' :
-                            'Plot All Visit Locations (SIMPLE-FIXED!)'
+                            (discrepancy.outliersRemoved && discrepancy.outliersRemoved > 0) ? 'Plot Consensus + Deviant Locations' :
+                            'Plot All Visit Locations'
                           }
                         >
                           <Eye className="w-4 h-4" />
